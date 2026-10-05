@@ -557,5 +557,5 @@ function deskHint(deskId: string): Hint {
     };
   }
 
-  return { officeIsFull, firstFreeSeat, hire, hireAtDesk, resumeWorker, fixLostWorktree, pullRequestFor, standAt, boardActions };
+  return { killWorker, officeIsFull, firstFreeSeat, hire, hireAtDesk, resumeWorker, fixLostWorktree, pullRequestFor, standAt, boardActions };
 }

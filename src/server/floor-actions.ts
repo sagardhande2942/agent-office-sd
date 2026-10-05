@@ -49,6 +49,7 @@ import type {
 } from '../shared/protocol.js';
 import type { BallState } from '../shared/hoop.js';
 import type { CarPose, CarSeat, CarState } from '../shared/garage.js';
+import type { BossGuard } from '../shared/boss.js';
 import type { Decoration } from '../shared/decor.js';
 import type { JukeboxSpot, JukeboxState } from '../shared/jukebox.js';
 import type { TvState } from '../shared/tv.js';
@@ -137,7 +138,7 @@ export interface FloorWorkers {
   /** A board agent on a station desk: told what it is there for before its first request. */
   station(deskId: string, by: string, text: string, owner?: string): Awaitable<{ info: WorkerInfo; hired: boolean } | string>;
   resume(id: string, prompt?: string): Awaitable<string | undefined>;
-  prompt(id: string, text: string, by?: string): Awaitable<string | undefined>;
+  prompt(id: string, text: string, by?: string, guard?: BossGuard): Awaitable<string | undefined>;
   deliverHelperReport(id: string, by?: string): Awaitable<string | undefined>;
   kill(id: string, cleanup?: WorktreeCleanup): Promise<{ note?: string; error?: string }>;
 

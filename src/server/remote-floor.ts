@@ -93,7 +93,7 @@ export class RemoteFloor implements FloorActions {
     /** The floor's identity, as the host announced it. Named so refusals and the elevator can use it. */
     readonly def: { id: string; name: string; dir: string; repo?: string; palette: number; addedBy: string; addedAt: number },
     /** What the host's `ready` frame said, kept here so the office can describe the floor it is in. */
-    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind } = { providers: [], forge: 'github' },
+    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean } = { providers: [], forge: 'github' },
   ) {
     // The office keeps this for identity, and must never use it: it is a path on the host.
     this.dir = '';
@@ -183,7 +183,7 @@ export class RemoteFloor implements FloorActions {
       // The same frame is where the host says which branch it is on and which agents it has, which is
       // what `project` and `officeDefault` answer from. Recorded here rather than in the constructor,
       // because the office registers a hosted floor from the building long before its machine pairs.
-      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge };
+      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true };
       return;
     }
     // An unaddressed refusal (no floor) is about the connection, not a call, so it never settles one.
@@ -317,7 +317,7 @@ export class RemoteFloor implements FloorActions {
       station: async (deskId, by, text, owner) => (await remote.call('station.prompt', { deskId, by, text, owner })) as { info: WorkerInfo; hired: boolean } | string,
       resume: async (id, prompt) => String((await remote.call('worker.resume', { workerId: id, prompt })) ?? ''),
       deliverHelperReport: async (id, by) => String((await remote.call('worker.prompt', { workerId: id, helperReport: true, by })) ?? ''),
-      prompt: async (id, text, by) => String((await remote.call('worker.prompt', { workerId: id, text, by })) ?? ''),
+      prompt: async (id, text, by, guard) => guard !== undefined && !remote.announced.bossGuard ? 'Update the floor host before sending Boss prompts; its terminal guard is unavailable' : String((await remote.call('worker.prompt', { workerId: id, text, by, ...(guard !== undefined ? {guard} : {}) })) ?? ''),
       kill: async (id, cleanup) => {
         const result = await remote.call('worker.kill', { workerId: id, cleanup });
         return typeof result === 'string' ? { error: result } : (result ?? {}) as { note?: string; error?: string };

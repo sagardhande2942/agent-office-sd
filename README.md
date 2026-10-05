@@ -474,3 +474,5 @@ See [the upstream integration notes](docs/upstream-integration.md) for the impor
 Press **J** or choose **Smartphone** in the menu to find workers and helpers, open their terminals, send a prompt or review a helper report. Messages may queue while a worker is busy; replies and approvals are handled in the terminal. Phone history lasts for this browser session.
 
 The garage uses Blender-built Lambo and Ferrari models with wheel arches, detailed wheels and roof-off cockpits. Drive them with the existing E/WASD controls. If the model asset fails to load, the original cars remain available. The build includes the models; Blender is only needed to regenerate them (see [Blender models](blender/README.md)).
+
+Open **Boss Control Center** from the menu or the Workers panel’s **Boss** button, or sit in the boss chair and press E. It shows live worker status and reported spend, opens terminals/helper reports, reviews agent broadcast or auto-assign prompts, and exports a local floor report. Send-home uses the existing worktree choices. **Play Minesweeper** remains available. See [features](docs/features.md) and the [PR295 security review](docs/security/pr-295.md).

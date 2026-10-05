@@ -5,6 +5,7 @@ import { isAsleep, isBusy } from '../../shared/status.js';
 import { helperDesk, helperId, isHelperId, plainText } from '../../shared/helper.js';
 import type { DeskDef } from '../../shared/layout.js';
 import type { ForgeKind } from '../../shared/protocol.js';
+import { validBossPrompt, validBossGuard, type BossGuard } from '../../shared/boss.js';
 import { officePrompt } from '../prompts.js';
 const FINDING_LINES = 180;
 import { randomBytes } from 'node:crypto';
@@ -536,10 +537,10 @@ export class WorkerManager {
   stageHelperReport(id: string, helperName: string, text: string): void { return helperOps.stageHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, helperName, text); }
   async deliverHelperReport(id: string, by?: string): Promise<string | undefined> { return helperOps.deliverHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist(),prompt:(id:string,text:string,by?:string)=>this.prompt(id,text,by)}, id, by); }
 
-  /** Types a prompt into the agent's input box and submits it. */
-  prompt(id: string, text: string, by?: string): string | undefined {
+  prompt(id: string, text: string, by?: string, guard?: BossGuard): string | undefined {
     const w = this.workers.get(id);
     if (!w) return 'No such worker';
+    if (guard !== undefined && (!validBossGuard(w.info, guard) || !validBossPrompt(text))) return 'Worker changed or is unavailable for a boss prompt';
     if (w.dsh) {
       const clean = text.replace(/\r\n?/g, '\n').trim();
       if (!clean) return 'Empty prompt';
@@ -553,9 +554,8 @@ export class WorkerManager {
     if (!w.pty) return 'Worker is not running';
     const clean = text.replace(/\r\n?/g, '\n').trim();
     if (!clean) return 'Empty prompt';
-    // Bracketed paste keeps multi-line prompts in one message, then Enter submits.
     w.pty.write(`\x1b[200~${clean}\x1b[201~`);
-    setTimeout(() => w.pty?.write('\r'), 120);
+    setTimeout(() => { if (guard === undefined || validBossGuard(w.info, guard)) w.pty?.write('\r'); }, 120);
     w.info.activity = truncate(clean, 80);
     this.tasks.notePrompt(w, clean);
     if (by) w.info.lastInput = { by, at: Date.now() };

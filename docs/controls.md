@@ -59,3 +59,5 @@ Helpers can assist agent and shell workers, in their own worktree or the shared 
 At a regular worker’s desk, press U or click **U — Bring a helper** to open the helper dialog. This works for shell and agent workers with or without a separate worktree.
 
 Helpers carry a laptop showing their own terminal. Aim at the helper or its laptop and press **E**, or click **Open helper terminal** in the hint. You can also open the helper by name in the Workers list. **Needs you** means its agent is waiting: answer the question or approve/reject the permission request inside that helper’s terminal. Close it with Esc or ✕ to return to the office.
+
+At the boss chair, sit down and press **E** to open **Boss Control Center**. Choose **Play Minesweeper** to use the existing game. The center is also available from the menu or the Workers panel’s **Boss** button.
