@@ -19,6 +19,7 @@ Back to the [README](../README.md).
 | X | Send a worker home (frees the desk; a worker with its own worktree asks what to do with it). In the [castle](maps.md#the-castle), the Kingsguard takes it down to the dungeon; on the [space station](maps.md#the-space-station), Security puts it out of the airlock |
 | L | Hang a big sign over the desk you face (*Operations*, *Code cleanup*), in one of seven colors; again to change it or take it down |
 | O | Open a pull request for a worker on its own branch, or see the one it has (a worker across several projects gets one in each) |
+| J | Open the smartphone: worker/helper contacts, terminal calls, messages and helper report review |
 | N | Go to the worker that has waited longest on someone; again for the next one |
 | U | At an agent or shell worker’s desk: walk a helper over to it, which reads what it's doing, tells the worker what it found, and goes home (it cannot edit, commit or open a pull request) |
 | F | Hang a picture from the web on a wall (scroll to size it, click to hang it); while moving the jukebox, **Esc** leaves it where it was |

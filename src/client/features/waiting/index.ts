@@ -45,7 +45,8 @@ export function installWaiting(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
   /** Puts you behind worker `id`, looking over its shoulder, with any window closed. False when there's no getting there (you're between floors, or it's gone). */
   function goToWorker(id: string): boolean {
     const w = store.workers.get(id);
-    const desk = w && parts.worlds.plan().byId.get(w.deskId);
+    const host = w?.helper && store.workers.get(w.helper.hostId);
+    const desk = w && parts.worlds.plan().byId.get(host?.deskId ?? w.deskId);
     if (core.trip || !desk) return false;
     closeAllModals();
     parts.actions.standAt(desk);
@@ -110,13 +111,13 @@ export function installWaiting(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
   ctx.ticks.add('render', ({ now }) => pointToWaiting(now));
 
   /** Opening a sleeping worker's terminal wakes it, so there's nothing to press first. */
-  function openWorkerTerminal(id: string, find?: TerminalFind) {
+  function openWorkerTerminal(id: string, find?: TerminalFind, doing?: string) {
     const w = store.workers.get(id);
     if (!w) return;
     const { actions } = parts;
     if (w.lost) return actions.fixLostWorktree(w);
     if (isAsleep(w.status)) actions.resumeWorker(w);
-    openTerminal(net, id, () => openWorkerChanges(id), find);
+    openTerminal(net, id, () => openWorkerChanges(id), find, { doing });
   }
 
   /** 🔎 the chat and every terminal; a terminal line opens that terminal right at it. */
