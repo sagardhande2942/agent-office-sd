@@ -264,6 +264,7 @@ export interface FloorMeetings {
  * checks that claim at the assignment in floor.ts.
  */
 export interface FloorActions {
+  helpers?: { states(): import('../shared/helper.js').HelperState[] };
   readonly id: string;
   readonly def: { id: string; name: string; dir: string; repo?: string };
   /** Where the checkout is. Empty for a hosted floor, which the office must never touch. */

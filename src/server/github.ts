@@ -296,9 +296,12 @@ export class GitHub extends Forge {
 
   /** Assigns the issue to `as` (else the office's own gh), which moves it to In progress on the board. */
   async claim(issue: number, as?: ForgeAs): Promise<string | undefined> {
+    const answered = this.issues.claim(issue);
     try {
       await this.onRepo(['issue', 'edit', String(issue), '--add-assignee', '@me'], as);
+      answered(true);
     } catch (err) {
+      answered(false);
       return (err as Error).message;
     }
     void this.issues.refresh();
@@ -359,3 +362,6 @@ export class GitHub extends Forge {
     }));
   }
 }
+
+export { Claims } from './claims.js';
+export { gh, MergeWatch } from './forge.js';

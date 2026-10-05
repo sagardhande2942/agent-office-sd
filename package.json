@@ -6,6 +6,9 @@
   "bin": {
     "agent-office": "bin/agent-office.js"
   },
+  "imports": {
+    "#tests/css": "./tests/support/css.mjs"
+  },
   "files": [
     "bin",
     "dist"

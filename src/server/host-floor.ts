@@ -139,6 +139,7 @@ export class HostFloors {
     state('cars', { state: floor.garage.state() });
     state('meeting', { state: floor.meetings.state() });
     state('tv', { state: floor.tv.state() });
+    state('helper', { helpers: floor.helpers.states() });
     // The two boards and the dungeon joined them when riding onto a hosted floor became a thing: the
     // office builds the view someone walks into out of exactly these, so a board or a jail that is
     // read but never reported is a room that arrives empty for no reason anyone can see.

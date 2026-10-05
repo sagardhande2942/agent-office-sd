@@ -1,6 +1,7 @@
-# Agent Office in a container, the way deploy/railway.sh runs it on Railway, deploy/fly.sh on Fly.io
-# and deploy/dokploy.sh on Dokploy. Any Docker host works the same way: mount a volume at /data and
-# publish port 22 (or the port in AGENT_OFFICE_SSHD_PORT, which deploy/fly.sh sets to 2222).
+# Agent Office in a container, the way deploy/railway.sh runs it on Railway, deploy/fly.sh on Fly.io,
+# deploy/dokploy.sh on Dokploy and deploy/coolify.sh on Coolify. Any Docker host works the same way:
+# mount a volume at /data and publish port 22 (or the port in AGENT_OFFICE_SSHD_PORT, which
+# deploy/fly.sh sets to 2222).
 #
 # The office listens on 127.0.0.1:4600 inside the container and is never published. sshd on port 22
 # is the only way in: the keys in AGENT_OFFICE_ADMIN_KEYS get a shell as agentoffice, the user that
@@ -27,7 +28,7 @@ ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8
 # CLI answers to the same `bb` and shares no command with ours, so it is checked for with `bb pr`
 # rather than trusted because something called bb is on the path.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssh-server sudo tini procps ca-certificates curl git less build-essential python3 \
+  && apt-get install -y --no-install-recommends openssh-server sudo tini procps iproute2 ca-certificates curl git less build-essential python3 \
   && install -d -m 755 /etc/apt/keyrings \
   && curl -fsSLo /etc/apt/keyrings/githubcli-archive-keyring.gpg https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \

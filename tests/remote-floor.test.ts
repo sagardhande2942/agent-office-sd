@@ -352,3 +352,13 @@ test('hosted report delivery forwards a report request without an arbitrary prom
   floor.deliver({ t: 'result', floorId: 'f1', seq: host.sent[0].seq as number, value: '' });
   assert.equal(await delivered, '');
 });
+
+
+test('hosted helper paths survive an arriving floor view and clear on removal', () => {
+  const floor = make(fakeHost());
+  const helpers = [{hostId:'worker',workerId:'helper',path:[[0,0],[1,1]],speed:2,face:0,phase:'reading'}];
+  floor.deliver({t:'event',floorId:'f1',seq:0,msg:{t:'helper',helpers}});
+  assert.deepEqual(floor.helpers.states(),helpers);
+  floor.deliver({t:'event',floorId:'f1',seq:0,msg:{t:'helper',helpers:[]}});
+  assert.deepEqual(floor.helpers.states(),[]);
+});

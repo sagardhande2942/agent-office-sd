@@ -170,6 +170,7 @@ if (a[0] === 'repo' && a[1] === 'clone') {
   fs.mkdirSync(dest, { recursive: true });
   require('node:child_process').execFileSync('git', ['init', '-q', '-b', 'main', dest]);
   require('node:child_process').execFileSync('git', ['-C', dest, 'remote', 'add', 'origin', 'git@bitbucket.org:' + full + '.git']);
+  require('node:child_process').execFileSync('git', ['-C', dest, '-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '--allow-empty', '-qm', 'Initial checkout']);
   out({ success: true, repository: full, path: dest });
 }
 out('');
@@ -215,7 +216,7 @@ test('the elevator lists a personal workspace’s repositories, and the ones it 
 test('a floor can be added by a full name on a workspace bb cannot be given by name', async (t) => {
   const building = personal(t);
   const r = await building.add('tradai/mock_server', 'Sam', () => {}, 'bitbucket');
-  assert.equal(typeof r, 'object', 'the name is asked about and cloned both ways bb understands it');
+  assert.equal(typeof r, 'object', String(r));
   const def = r as FloorDef;
   assert.equal(def.repo, 'tradai/mock_server', 'the full name is what the floor records');
   assert.equal(path.basename(def.dir), 'mock_server');
