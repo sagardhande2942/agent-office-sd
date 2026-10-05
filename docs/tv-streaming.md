@@ -245,3 +245,5 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
 - **The switch stays where it was left.** Turning the TV off doesn't turn the lights back on,
   because a switch is a switch; the **💡 Lights back up** row, or **E** at the plate, is how you
   undo it, and the state is kept in `tv.json` with everything else about the screen.
+
+TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
