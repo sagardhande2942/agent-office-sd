@@ -211,3 +211,15 @@ test('TV mutations notify floor subscribers, including theatre without moving pl
     assert.equal(states.length,6);
   } finally { rmSync(dir,{recursive:true,force:true}); }
 });
+
+
+test('TV masking sees past the whiteboard walking envelope but still hides its solid panel', async () => {
+  const {whiteboardOcclusion}=await import('../src/client/features/whiteboard/occlusion.js');
+  const {blocks}=await import('../src/client/tv-projection.js');
+  const {Vector3}=await import('three');
+  const eye=new Vector3(2,1.6,-8),clear=new Vector3(18,1.6,-1),covered=new Vector3(18,1.6,1);
+  const walking={minX:3.2,maxX:7.6,minZ:-5.88,maxZ:-4.92,top:3.05};
+  assert.equal(blocks(eye,clear,walking),true);
+  assert.equal(whiteboardOcclusion().some(c=>blocks(eye,clear,c)),false);
+  assert.equal(whiteboardOcclusion().some(c=>blocks(eye,covered,c)),true);
+});

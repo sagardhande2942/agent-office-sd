@@ -247,3 +247,5 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
   undo it, and the state is kept in `tv.json` with everything else about the screen.
 
 TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
+
+At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.

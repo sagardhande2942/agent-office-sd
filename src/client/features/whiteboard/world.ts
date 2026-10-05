@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { whiteboardOcclusion } from './occlusion';
 import { WHITEBOARD } from '../../../shared/layout';
 import { mesh, roundedBox, textPlane, toon } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
@@ -84,7 +85,7 @@ export function buildWhiteboard(): WhiteboardStand {
   plaque.position.set(0, bottom + height + 0.2, 0.05);
   group.add(plaque);
 
-  const colliders: Collider[] = [{ minX: x - post - 0.1, maxX: x + post + 0.1, minZ: z - 0.48, maxZ: z + 0.48, top: bottom + height + 0.35 }];
+  const colliders: Collider[] = [{ minX: x - post - 0.1, maxX: x + post + 0.1, minZ: z - 0.48, maxZ: z + 0.48, top: bottom + height + 0.35, occlusion: whiteboardOcclusion() }];
   const interactable: Interactable = { kind: 'whiteboard', x, z: z + 1.7, radius: 2.3 };
   group.userData.interact = interactable;
 

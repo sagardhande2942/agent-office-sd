@@ -23,8 +23,8 @@ export const CATCH_UP = 1.5;
 /** How often that's checked (ms). */
 export const TICK = 500;
 /** The grid the picture's occlusion is worked out on: one cell per mask pixel (the TV is 16:9 too). */
-export const MASK_W = 32;
-export const MASK_H = 18;
+export const MASK_W = 96;
+export const MASK_H = 54;
 /** How often that's worked out (ms). People move slowly, and building the mask isn't free. */
 export const MASK_TICK = 80;
 /** The link on the TV, as it plays here: the element itself, and where it is against everyone else's. */
@@ -538,7 +538,7 @@ export class TvScreen {
     }
     const out: Collider[] = [];
     const scratch = this.scratch;
-    for (const c of colliders) {
+    for (const c of colliders.flatMap(c => c.glass || c.fence ? [] : c.occlusion ?? [c])) {
       // Glass you can see a TV through; a fence is only there to stop you walking into something.
       if (c.glass || c.fence) continue;
       let minX = Infinity;
