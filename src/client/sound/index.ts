@@ -16,6 +16,7 @@ import { soda, fridgeDoor } from '../features/fridge/sound';
  */
 import type { GongWhy } from '../../shared/protocol';
 import { birdsong, Fridge, nightCrickets, startRoomTone, startWind } from './ambience';
+import { intercom } from '../features/boss/sound';
 import { ding } from './alerts';
 import { arcade } from '../features/cabinet/sound';
 import { ball, type BallSound } from '../features/basketball/sound';
@@ -274,6 +275,9 @@ export class OfficeSound {
   needsYou(again = false) {
     needsYou(this.a, again);
   }
+
+  /** Reviewed Boss prompt requests use the muted alerts bus. */
+  intercom() { intercom(this.a); }
 
   /** The smartphone's double ring for a call you place: returns a stop for hanging up mid-dial. */
   phoneRing(): () => void {
