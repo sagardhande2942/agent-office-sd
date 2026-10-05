@@ -472,3 +472,5 @@ Sending a worker home also stops and removes its helper before cleaning up the w
 See [the upstream integration notes](docs/upstream-integration.md) for the imported features and preserved fork behavior.
 
 Press **J** or choose **Smartphone** in the menu to find workers and helpers, open their terminals, send a prompt or review a helper report. Messages may queue while a worker is busy; replies and approvals are handled in the terminal. Phone history lasts for this browser session.
+
+The garage uses Blender-built Lambo and Ferrari models with wheel arches, detailed wheels and roof-off cockpits. Drive them with the existing E/WASD controls. If the model asset fails to load, the original cars remain available. The build includes the models; Blender is only needed to regenerate them (see [Blender models](blender/README.md)).
