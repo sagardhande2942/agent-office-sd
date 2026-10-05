@@ -470,3 +470,5 @@ Helpers carry a laptop showing their own terminal. Aim at the helper or its lapt
 Sending a worker home also stops and removes its helper before cleaning up the worker’s checkout. Sending only the helper home leaves the host worker and its worktree intact.
 
 See [the upstream integration notes](docs/upstream-integration.md) for the imported features and preserved fork behavior.
+
+Press **J** or choose **Smartphone** in the menu to find workers and helpers, open their terminals, send a prompt or review a helper report. Messages may queue while a worker is busy; replies and approvals are handled in the terminal. Phone history lasts for this browser session.

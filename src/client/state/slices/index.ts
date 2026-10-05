@@ -1,3 +1,4 @@
+import { smartphone } from './smartphone';
 import { helpers } from './helpers';
 import { tv } from './tv';
 // Every slice of the store, the core's included, in the one order the store runs them in: the order
@@ -65,4 +66,5 @@ export const SLICES: readonly Slice[] = [
   team,
   accounts,
   signins,
+  smartphone,
 ];
