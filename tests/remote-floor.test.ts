@@ -377,3 +377,23 @@ test('Boss prompts refuse legacy hosts and carry snapshot guards to capable host
   assert.match((await floor.workers.prompt('a','hello','QA',guard))!,/Update the floor host/);
   assert.equal(host.sent.length,1);
 });
+
+
+test('breaks refuse legacy hosts, travel to capable hosts and reset on reconnect', async () => {
+  const host = fakeHost();
+  const floor = make(host);
+  const ready = { floorId: 'f1', name: 'API', seats: 2, accepting: false, workers: [], forge: 'github' as const };
+  floor.deliver({ t: 'ready', floor: ready });
+  assert.match((await floor.workers.rest('worker', true))!, /Update the floor host/);
+  assert.equal(host.sent.length, 0);
+  floor.deliver({ t: 'ready', floor: { ...ready, workerBreaks: true } });
+  const pending = floor.workers.rest('worker', true);
+  assert.equal(host.sent[0].t, 'worker.rest');
+  assert.equal(host.sent[0].workerId, 'worker');
+  assert.equal(host.sent[0].on, true);
+  floor.deliver({ t: 'result', floorId: 'f1', seq: host.sent[0].seq as number, value: undefined });
+  assert.equal(await pending, undefined);
+  floor.deliver({ t: 'ready', floor: ready });
+  assert.match((await floor.workers.rest('worker', false))!, /Update the floor host/);
+  assert.equal(host.sent.length, 1);
+});

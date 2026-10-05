@@ -5,6 +5,7 @@ import { isAsleep, isBusy } from '../../shared/status.js';
 import { helperDesk, helperId, isHelperId, plainText } from '../../shared/helper.js';
 import type { DeskDef } from '../../shared/layout.js';
 import type { ForgeKind } from '../../shared/protocol.js';
+import { takeBreak, breakOver } from './breaks.js';
 import { validBossPrompt, validBossGuard, type BossGuard } from '../../shared/boss.js';
 import { officePrompt } from '../prompts.js';
 const FINDING_LINES = 180;
@@ -182,15 +183,12 @@ export class WorkerManager {
     if (picked && (picked.provider !== 'custom' || this.defaultProvider === 'custom')) return picked;
     return { provider: this.defaultProvider };
   }
-
   list(): WorkerInfo[] {
     return [...this.workers.values()].map((w) => w.info);
   }
-
   get(id: string): WorkerInfo | undefined {
     return this.workers.get(id)?.info;
   }
-
   /**
    * Whether a worker has written to its terminal since `at`: work the office can see even when a
    * provider reports no status (the meetings use it so a panel isn't cut off as "never started").
@@ -973,7 +971,9 @@ export class WorkerManager {
     return true;
   }
 
+  rest(id:string,on:boolean):string|undefined { const w=this.workers.get(id); if(!w) return 'No such worker'; const err=takeBreak(w.info,on); if(err) return err; this.persist(); this.emitUpdate(w); }
   private emitUpdate(w: Worker) {
+    breakOver(w.info,w.info);
     this.events.update({ ...w.info });
   }
   private handleOf(w:Worker):WorkerHandle { return workerHandle(w,{

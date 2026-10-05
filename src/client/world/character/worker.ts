@@ -142,7 +142,7 @@ export class Worker {
     this.bulbMesh = mesh(new THREE.SphereGeometry(0.075, 12, 10), this.bulb, 0, 1.2, 0, false);
     this.body.add(this.bulbMesh);
     const arm = (x: number) => {
-      const pivot = new THREE.Group();
+      const pivot = Object.assign(new THREE.Group(), { name: x < 0 ? 'armL' : 'armR' });
       pivot.position.set(x, 0.55, 0.05);
       pivot.add(mesh(new THREE.CapsuleGeometry(0.055, 0.16, 4, 8), skin, 0, -0.12, 0));
       this.body.add(pivot);
