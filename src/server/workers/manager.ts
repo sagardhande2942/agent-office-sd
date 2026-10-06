@@ -535,7 +535,6 @@ export class WorkerManager {
   stageHelperReport(id: string, helperName: string, text: string, messageId?: string): void { return helperOps.stageHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, helperName, text, messageId); }
   clearHelperReport(id: string, messageId: string): void { return helperOps.clearHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, messageId); }
   async deliverHelperReport(id: string, by?: string): Promise<string | undefined> { return helperOps.deliverHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist(),events:this.events,prompt:(id:string,text:string,by?:string)=>this.prompt(id,text,by)}, id, by); }
-
   prompt(id: string, text: string, by?: string, guard?: BossGuard): string | undefined {
     const w = this.workers.get(id);
     if (!w) return 'No such worker';
