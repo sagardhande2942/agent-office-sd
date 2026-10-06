@@ -65,6 +65,7 @@ interface Pending {
  */
 export class RemoteFloor implements FloorActions {
   readonly dir: string;
+  readonly helpers = { states: () => (this.mirror.get('helper') ?? []) as import('../shared/helper.js').HelperState[] };
   private seq = 0;
   private pending = new Map<number, Pending>();
   /** The last thing each read returned, kept so a read never has to cross the socket. */
@@ -208,7 +209,7 @@ export class RemoteFloor implements FloorActions {
     // Whatever the floor would have emitted locally, remembered under the event's own name so the
     // reads can find it. Worker updates are kept apart from the mirror: they describe a worker rather
     // than a floor's furniture, and the office asks for them by id.
-    const payload = msg.msg as { t?: string; worker?: WorkerInfo; workerId?: string; state?: unknown; items?: unknown; plan?: unknown; ball?: unknown; cars?: unknown } | undefined;
+    const payload = msg.msg as { t?: string; worker?: WorkerInfo; workerId?: string; state?: unknown; items?: unknown; plan?: unknown; ball?: unknown; cars?: unknown; helpers?: unknown } | undefined;
     if (!payload?.t) return;
     if (payload.t === 'worker.update' && payload.worker) {
       this.known.set(payload.worker.id, payload.worker);
@@ -219,7 +220,7 @@ export class RemoteFloor implements FloorActions {
     } else {
       // What a read answers with is the payload, not the frame around it: a `queue` event carries
       // `{ t: 'queue', state }`, and `queue.state()` must return the state.
-      this.mirror.set(payload.t, payload.state ?? payload.items ?? payload.plan ?? payload.ball ?? payload.cars ?? payload);
+      this.mirror.set(payload.t, payload.state ?? payload.items ?? payload.plan ?? payload.ball ?? payload.cars ?? payload.helpers ?? payload);
     }
   }
 

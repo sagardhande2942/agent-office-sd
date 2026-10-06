@@ -1,7 +1,11 @@
+import { Drop, WetGlass } from './sky-wetglass';
+export { type Drop, WetGlass } from './sky-wetglass';
+import { gradientDome, moonTexture, blobTexture } from './sky-pictures';
+export { gradientDome, moonTexture, blobTexture } from './sky-pictures';
 import * as THREE from 'three';
 import { FLOOR, SLAB, STREET_Y, WALL_HEIGHT, WALL_T, WING, wingMinZ } from '../../shared/layout';
 import type { SkyState, Theme, Weather } from '../../shared/protocol';
-import { guessPlace, skyTime, sunPosition } from '../../shared/sun';
+import { guessPlace, skyNow, sunPosition } from '../../shared/sun';
 import type { NightParts } from './outside';
 
 /*
@@ -17,14 +21,14 @@ import type { NightParts } from './outside';
  * same lines darken the ground outside when it's wet and lay snow on whatever faces up out there.
  */
 
-const MAX_LAMPS = 24;
-const DEG = Math.PI / 180;
+export const MAX_LAMPS = 24;
+export const DEG = Math.PI / 180;
 /**
  * How much of the room's own light the theatre switch takes away, at full (see skyRoomLight): enough
  * that the picture on the TV is clearly the brightest thing in the office, and the people in it are
  * lit by it, but a shape by the window is still a shape and not a hole in the dark.
  */
-const THEATRE_DIM = 0.84;
+export const THEATRE_DIM = 0.84;
 /**
  * The furthest off the haze ever is, however high up you are: past that nothing's built (the grass
  * and the road round the office end there, the city round the roof just past it), so it hides that.
@@ -34,15 +38,15 @@ export const HAZE_MAX = 300;
  * The haze thins out with height over the street: past HAZE_CLEAR meters up, every HAZE_ABOVE
  * meters more you see as far again as down on the street (from the roof of six floors, 3.4 times).
  */
-const HAZE_CLEAR = 6;
-const HAZE_ABOVE = 17.5;
+export const HAZE_CLEAR = 6;
+export const HAZE_ABOVE = 17.5;
 /**
  * How much of the outdoor fog is left on anything inside the office, where the room's own walls are
  * the only thing between you and the far end of it (see HAZE): the weather is out of doors, and a
  * foggy afternoon shouldn't haze the desks. Enough still hangs in the air for the room to read as a
  * room rather than as a photograph.
  */
-const INDOOR_FOG = 0.1;
+export const INDOOR_FOG = 0.1;
 
 /**
  * How far off something's lost in the haze (with the fog's far edge down on the street at `far`),
@@ -65,9 +69,9 @@ export function hazeAt(depth: number, near: number, far: number, above: number, 
   return out * THREE.MathUtils.lerp(1, INDOOR_FOG, indoor);
 }
 /** The building, walls included: the office upstairs and the garage under it. */
-const B = { minX: FLOOR.minX - WALL_T, maxX: FLOOR.maxX + WALL_T, minZ: FLOOR.minZ - WALL_T, maxZ: FLOOR.maxZ + WALL_T } as const;
+export const B = { minX: FLOOR.minX - WALL_T, maxX: FLOOR.maxX + WALL_T, minZ: FLOOR.minZ - WALL_T, maxZ: FLOOR.maxZ + WALL_T } as const;
 
-const uniforms = {
+export const uniforms = {
   /** Off while drawing your hands in first person, which live in a scene of their own. */
   skyOn: { value: 1 },
   /** Off up on the roof, where the office and the garage (which are under your feet there) aren't lit. */
@@ -95,18 +99,18 @@ const uniforms = {
   skyWing: { value: new THREE.Vector4(1, 0, 1, 0) },
 };
 
-const v3 = (x: number, y: number, z: number) => `vec3(${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)})`;
+export const v3 = (x: number, y: number, z: number) => `vec3(${x.toFixed(3)}, ${y.toFixed(3)}, ${z.toFixed(3)})`;
 /** The office's walls, where the room you're in stops and the shaft up through its open top goes on. */
-const WALL_TOP = WALL_HEIGHT + 0.005;
+export const WALL_TOP = WALL_HEIGHT + 0.005;
 /** How far up that shaft counts as the office, five floors or so of the open middle of the building. */
-const SHAFT_TOP = 40;
+export const SHAFT_TOP = 40;
 
 /**
  * Which room a fragment is in, for every material with fog and every lit one: the lamps (SURFACE) and
  * the haze (HAZE) both need to know, and the haze is also wanted by the unlit ones (glass, signs,
  * outlines), which get nothing else.
  */
-const ROOM_PARS = /* glsl */ `
+export const ROOM_PARS = /* glsl */ `
 varying vec3 vSkyWorld;
 uniform float skyOn;
 uniform float skyInside;
@@ -133,7 +137,7 @@ float skyInOffice( vec3 p ) { return skyInsideOf( p, ${SHAFT_TOP.toFixed(1)} ); 
 float skyRoomLight( float indoor ) { return 1.0 - ${THEATRE_DIM} * skyTheatre * indoor; }
 `;
 
-const PARS = /* glsl */ `
+export const PARS = /* glsl */ `
 uniform vec3 skyOffice;
 uniform vec3 skyGarage;
 uniform int skyLampCount;
@@ -166,7 +170,7 @@ vec3 skyLampsAt( vec3 p, vec3 n ) {
 `;
 
 /** Wet ground is darker; snow covers what faces up. Only outdoors. Runs before the lights. */
-const SURFACE = /* glsl */ `
+export const SURFACE = /* glsl */ `
 vec3 skyN = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
 float skyIndoor = skyOn * skyInside * skyInOffice( vSkyWorld );
 float skyGar = skyOn * skyInside * skyInGarage( vSkyWorld );
@@ -176,7 +180,7 @@ material.diffuseColor = mix( material.diffuseColor, vec3( 0.93, 0.96, 1.0 ), sky
 `;
 
 /** The lamps' light, added to what the sun and the sky give, then the room's light turned down. */
-const LIGHT = (screen: boolean) => /* glsl */ `
+export const LIGHT = (screen: boolean) => /* glsl */ `
 if ( skyOn > 0.0 ) {
   vec3 skyLight = skyIndoor * skyOffice * ( 0.65 + 0.35 * skyN.y ) + ( 1.0 - skyIndoor ) * ( skyGar * skyGarage + skyLampsAt( vSkyWorld, skyN ) );
   reflectedLight.indirectDiffuse += skyLight * BRDF_Lambert( material.diffuseColor );${screen ? '' : `
@@ -190,7 +194,7 @@ if ( skyOn > 0.0 ) {
 }
 `;
 
-const WORLD = /* glsl */ `
+export const WORLD = /* glsl */ `
 {
   vec4 skyW = vec4( transformed, 1.0 );
   #ifdef USE_BATCHING
@@ -211,20 +215,20 @@ const WORLD = /* glsl */ `
  * Inside the office it is only ever a tenth of that (see INDOOR_FOG): the weather is out of doors,
  * so a foggy afternoon leaves the desks, the workers and the far wall as clear as any other day.
  */
-const HAZE_PARS_VERTEX = /* glsl */ `
+export const HAZE_PARS_VERTEX = /* glsl */ `
 #ifdef USE_FOG
   varying float vSkyFogY;
 #endif
 `;
 
 /** How high the vertex is: the view matrix undone (its rotation's transpose), from the camera. */
-const HAZE_VERTEX = /* glsl */ `
+export const HAZE_VERTEX = /* glsl */ `
 #ifdef USE_FOG
   vSkyFogY = dot( viewMatrix[ 1 ].xyz, mvPosition.xyz ) + cameraPosition.y;
 #endif
 `;
 
-const HAZE_PARS = /* glsl */ `
+export const HAZE_PARS = /* glsl */ `
 #ifdef USE_FOG
   varying float vSkyFogY;
   uniform float skyStreet;
@@ -241,12 +245,12 @@ const HAZE_PARS = /* glsl */ `
  * because a screen share is painted on that mesh rather than over the canvas, and the one thing
  * the switch must never take away is the picture itself.
  */
-const UNLIT_ROOM = /* glsl */ `
+export const UNLIT_ROOM = /* glsl */ `
   gl_FragColor.rgb *= skyRoomLight( skyInOffice( vSkyWorld ) * skyOn * skyInside );
 `;
 
 /** The haze over a lit or unlit material, with the theatre dim after it unless it's a screen. */
-const HAZE = (unlitRoom: string) => /* glsl */ `
+export const HAZE = (unlitRoom: string) => /* glsl */ `
 #ifdef USE_FOG
   #ifdef FOG_EXP2
     float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
@@ -298,12 +302,12 @@ THREE.Material.prototype.onBeforeCompile = function (shader) {
 
 // ---- The sky ------------------------------------------------------------------------------------
 
-const LABEL: Record<Weather, string> = { clear: 'Clear', cloudy: 'Cloudy', rain: 'Rain', storm: 'Thunderstorm', snow: 'Snow', fog: 'Fog' };
-const ICON: Record<Weather, string> = { clear: '☀️', cloudy: '☁️', rain: '🌧️', storm: '⛈️', snow: '🌨️', fog: '🌫️' };
+export const LABEL: Record<Weather, string> = { clear: 'Clear', cloudy: 'Cloudy', rain: 'Rain', storm: 'Thunderstorm', snow: 'Snow', fog: 'Fog' };
+export const ICON: Record<Weather, string> = { clear: '☀️', cloudy: '☁️', rain: '🌧️', storm: '⛈️', snow: '🌨️', fog: '🌫️' };
 
 /** "🌙 Clear · 9:41 PM outside · Berlin, Germany, 11 °C", for Settings: the time of day in the sky (see skyTime). */
 export function describeSky(s: SkyState, now = Date.now()): string {
-  const sky = skyTime(now, s.utcOffset);
+  const sky = skyNow(now, s);
   const night = sunPosition(sky, s.lat, s.lon).el < -4 * DEG;
   const icon = s.weather === 'clear' && night ? '🌙' : ICON[s.weather];
   const time = new Date(sky + s.utcOffset * 60_000).toLocaleTimeString([], { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
@@ -311,17 +315,17 @@ export function describeSky(s: SkyState, now = Date.now()): string {
   return `${icon} ${LABEL[s.weather]} · ${time} outside${where}`;
 }
 
-const lerp = THREE.MathUtils.lerp;
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
-const smooth = (a: number, b: number, x: number) => {
+export const lerp = THREE.MathUtils.lerp;
+export const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+export const smooth = (a: number, b: number, x: number) => {
   const t = clamp01((x - a) / (b - a));
   return t * t * (3 - 2 * t);
 };
-const rand = (a: number, b: number) => a + Math.random() * (b - a);
+export const rand = (a: number, b: number) => a + Math.random() * (b - a);
 /** Eases `x` toward `to`, most of the way in `secs`. */
-const ease = (x: number, to: number, dt: number, secs: number) => x + (to - x) * (1 - Math.exp(-dt / secs));
+export const ease = (x: number, to: number, dt: number, secs: number) => x + (to - x) * (1 - Math.exp(-dt / secs));
 
-const C = {
+export const C = {
   day: new THREE.Color('#bfe3ff'),
   dusk: new THREE.Color('#ffb48c'),
   night: new THREE.Color('#0b1431'),
@@ -347,7 +351,7 @@ const C = {
 };
 
 /** Halloween's sky: a bruised purple overhead going blood orange at the horizon, and a big harvest moon. */
-const SPOOKY = {
+export const SPOOKY = {
   day: new THREE.Color('#6f5b8e'),
   dusk: new THREE.Color('#ff5a1f'),
   night: new THREE.Color('#24102f'),
@@ -372,79 +376,10 @@ const SPOOKY = {
 export const SPOOKY_MOON = { el: 21 * DEG, az: 182 * DEG } as const;
 
 /** The way to (el, az) from the middle of the sky. */
-const skyward = (el: number, az: number, out: THREE.Vector3) => out.set(Math.cos(el) * Math.sin(az), Math.sin(el), -Math.cos(el) * Math.cos(az));
-
-/** A dome behind everything, shading from the horizon up to the zenith, with a glow low down and round the moon: Halloween's. */
-function gradientDome(): THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial> {
-  const mat = new THREE.ShaderMaterial({
-    uniforms: {
-      top: { value: new THREE.Color() },
-      horizon: { value: new THREE.Color() },
-      glow: { value: new THREE.Color() },
-      glowK: { value: 0 },
-      moonDir: { value: new THREE.Vector3(0, 0, 1) },
-      moonGlow: { value: new THREE.Color() },
-      opacity: { value: 0 },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vDir;
-      void main() {
-        vDir = position;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-      }`,
-    fragmentShader: /* glsl */ `
-      uniform vec3 top;
-      uniform vec3 horizon;
-      uniform vec3 glow;
-      uniform float glowK;
-      uniform vec3 moonDir;
-      uniform vec3 moonGlow;
-      uniform float opacity;
-      varying vec3 vDir;
-      void main() {
-        vec3 d = normalize( vDir );
-        vec3 c = mix( horizon, top, smoothstep( 0.0, 0.6, d.y ) );
-        c = mix( c, glow, glowK * exp( -abs( d.y ) * 7.0 ) );
-        float m = max( dot( d, moonDir ), 0.0 );
-        c += moonGlow * ( pow( m, 60.0 ) * 0.9 + pow( m, 10.0 ) * 0.14 );
-        gl_FragColor = vec4( c, opacity );
-        #include <colorspace_fragment>
-      }`,
-    side: THREE.BackSide,
-    transparent: true,
-    depthWrite: false,
-    fog: false,
-  });
-  // The outline pass would paint the inside of the dome over in ink.
-  mat.userData.outlineParameters = { visible: false };
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(185, 32, 16), mat);
-  dome.renderOrder = -1;
-  dome.frustumCulled = false;
-  dome.visible = false;
-  return dome;
-}
-
-/** A pale moon with darker seas on it. */
-function moonTexture(): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 256;
-  c.height = 128;
-  const g = c.getContext('2d')!;
-  g.fillStyle = '#ffffff';
-  g.fillRect(0, 0, 256, 128);
-  for (let i = 0; i < 26; i++) {
-    g.fillStyle = `rgba(120, 110, 130, ${0.12 + Math.random() * 0.2})`;
-    g.beginPath();
-    g.ellipse(Math.random() * 256, 20 + Math.random() * 88, 6 + Math.random() * 18, 5 + Math.random() * 12, Math.random() * 3, 0, Math.PI * 2);
-    g.fill();
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
+export const skyward = (el: number, az: number, out: THREE.Vector3) => out.set(Math.cos(el) * Math.sin(az), Math.sin(el), -Math.cos(el) * Math.cos(az));
 
 /** How strong the sun and the sky's light are on a clear day, which is what the lamps make up for. */
-const FULL_DAY = 1.5 + 0.5 + 0.6 * 2.2;
+export const FULL_DAY = 1.5 + 0.5 + 0.6 * 2.2;
 
 export interface SkyLights {
   sun: THREE.DirectionalLight;
@@ -452,25 +387,11 @@ export interface SkyLights {
   ambient: THREE.AmbientLight;
 }
 
-/** Soft round blob, for halos and snowflakes. */
-function blobTexture(inner: number): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d')!;
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, 'rgba(255,255,255,1)');
-  grad.addColorStop(inner, 'rgba(255,255,255,0.35)');
-  grad.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
-  return new THREE.CanvasTexture(c);
-}
-
 /** The back office, walls included, when the floor you're on is built out into one (see Sky.setWing). */
-let wingBox: { minX: number; maxX: number; minZ: number; maxZ: number } | null = null;
+export let wingBox: { minX: number; maxX: number; minZ: number; maxZ: number } | null = null;
 
 /** Is (x, z) under the building, where no rain or snow falls? */
-const sheltered = (x: number, z: number) =>
+export const sheltered = (x: number, z: number) =>
   (x > B.minX - 0.05 && x < B.maxX + 0.05 && z > B.minZ - 0.05 && z < B.maxZ + 0.05) || (!!wingBox && x > wingBox.minX - 0.05 && x < wingBox.maxX + 0.05 && z > wingBox.minZ - 0.05 && z < wingBox.maxZ);
 
 /**
@@ -479,7 +400,7 @@ const sheltered = (x: number, z: number) =>
  * room — there are none in there until it's been built out anyway. This is the shader's own
  * `skyInOffice` in numbers, for the halos, which are points and so aren't lit at all.
  */
-function indoors(p: THREE.Vector3): boolean {
+export function indoors(p: THREE.Vector3): boolean {
   if (p.y < 0.05) return false;
   if (p.x > FLOOR.minX && p.x < FLOOR.maxX && p.z > FLOOR.minZ && p.z < FLOOR.maxZ) return true;
   return p.x > WING.minX && p.x < WING.maxX && p.z > FLOOR.minZ - WING.rows * WING.row && p.z < FLOOR.minZ;
@@ -754,7 +675,7 @@ export class Sky {
   /** The time of day in the sky (see skyTime), or the previewed hour today. */
   private now(): number {
     const h = this.preview.hour;
-    if (h === undefined) return skyTime(this.clock(), this.state.utcOffset);
+    if (h === undefined) return skyNow(this.clock(), this.state);
     const off = this.state.utcOffset * 60_000;
     const midnight = Math.floor((this.clock() + off) / 86_400_000) * 86_400_000;
     return midnight - off + h * 3_600_000;
@@ -1006,88 +927,5 @@ export class Sky {
       pos.needsUpdate = true;
       this.flakes.geometry.setDrawRange(0, snowN);
     }
-  }
-}
-
-interface Drop {
-  x: number;
-  y: number;
-  r: number;
-  /** Running down the glass this fast (px/s), or 0 while it clings. */
-  vy: number;
-  trail: number;
-  age: number;
-  life: number;
-}
-
-/** Raindrops on the windows: they land, cling, now and then run down, and dry off after the rain. */
-class WetGlass {
-  private readonly canvas = document.createElement('canvas');
-  private readonly g: CanvasRenderingContext2D;
-  private readonly tex: THREE.CanvasTexture;
-  private drops: Drop[] = [];
-  private since = 0;
-  private spawn = 0;
-
-  constructor(private mat: THREE.MeshBasicMaterial) {
-    // 90 cm of glass square (see wetPane in office.ts).
-    this.canvas.width = this.canvas.height = 256;
-    this.g = this.canvas.getContext('2d')!;
-    this.tex = new THREE.CanvasTexture(this.canvas);
-    this.tex.colorSpace = THREE.SRGBColorSpace;
-    this.tex.wrapS = this.tex.wrapT = THREE.RepeatWrapping;
-    mat.map = this.tex;
-    mat.needsUpdate = true;
-  }
-
-  update(dt: number, rain: number, lit: number) {
-    this.since += dt;
-    this.spawn += rain * 70 * dt;
-    for (; this.spawn >= 1; this.spawn--) {
-      if (this.drops.length < 220) this.drops.push({ x: rand(0, 256), y: rand(0, 256), r: rand(1.6, 4.4), vy: 0, trail: 0, age: 0, life: rand(4, 12) });
-    }
-    for (const d of this.drops) {
-      d.age += dt;
-      if (!d.vy && d.r > 3.4 && Math.random() < dt * 0.4) d.vy = rand(50, 140);
-      if (d.vy) {
-        d.y += d.vy * dt;
-        d.trail = Math.min(d.trail + d.vy * dt, 70);
-      }
-    }
-    this.drops = this.drops.filter((d) => d.age < d.life && d.y < 256 + 80);
-    this.mat.visible = this.drops.length > 0;
-    // A dozen redraws a second is plenty for drops.
-    if (!this.mat.visible || this.since < 0.08) return;
-    this.since = 0;
-    this.mat.color.setScalar(lit);
-    const g = this.g;
-    g.clearRect(0, 0, 256, 256);
-    for (const d of this.drops) {
-      const fade = Math.min(1, (d.life - d.age) / 1.5);
-      // Near an edge, draw it on the other side too, so the glass tiles without seams.
-      for (const ox of d.x < 8 ? [0, 256] : d.x > 248 ? [0, -256] : [0]) {
-        for (const oy of [0, -256]) {
-          const x = d.x + ox;
-          const y = d.y + oy;
-          if (y + d.r < -80 || y - d.r - d.trail > 256) continue;
-          if (d.trail > 0) {
-            g.fillStyle = `rgba(225, 238, 255, ${0.22 * fade})`;
-            g.fillRect(x - d.r * 0.35, y - d.trail, d.r * 0.7, d.trail);
-          }
-          g.fillStyle = `rgba(214, 230, 250, ${0.5 * fade})`;
-          g.beginPath();
-          g.ellipse(x, y, d.r, d.r * 1.15, 0, 0, Math.PI * 2);
-          g.fill();
-          g.strokeStyle = `rgba(30, 50, 80, ${0.5 * fade})`;
-          g.lineWidth = 1;
-          g.stroke();
-          g.fillStyle = `rgba(255, 255, 255, ${0.85 * fade})`;
-          g.beginPath();
-          g.arc(x - d.r * 0.35, y - d.r * 0.4, d.r * 0.32, 0, Math.PI * 2);
-          g.fill();
-        }
-      }
-    }
-    this.tex.needsUpdate = true;
   }
 }

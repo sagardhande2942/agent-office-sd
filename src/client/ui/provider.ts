@@ -1,24 +1,11 @@
-import type { AgentChoice, AgentEffort, AgentProvider, ClaudeModel, ProjectInfo, Usage } from '../../shared/protocol';
-import { AGENT_EFFORTS, CLAUDE_MODELS } from '../../shared/protocol';
+import './provider.css';
+import type { AgentChoice, AgentEffort, AgentProvider, ProjectInfo, Usage, WorkerInfo } from '../../shared/protocol';
+import { AGENT_EFFORTS, isAgentEffort } from '../../shared/protocol';
+import { AGENT_PROVIDERS, CLAUDE_MODEL_NAMES, PROVIDER_META, claudeModelName, isAgentProvider, isClaudeModel, takesEffort, type ModelOption } from '../../shared/providers';
 import { store } from '../state';
 import { h } from './dom';
 
-export const PROVIDER_LABEL: Record<AgentProvider, string> = {
-  claude: 'Claude Code',
-  opencode: 'OpenCode',
-  codex: 'Codex',
-  grok: 'Grok',
-  muse: 'Muse Code',
-  dsh: 'DeepSeek Harness',
-  custom: 'Custom',
-};
-
-export const CLAUDE_MODEL_LABEL: Record<ClaudeModel, string> = {
-  fable: 'Fable',
-  opus: 'Opus',
-  sonnet: 'Sonnet',
-  haiku: 'Haiku',
-};
+export const PROVIDER_LABEL = Object.fromEntries(AGENT_PROVIDERS.map((p) => [p, PROVIDER_META[p].label])) as Record<AgentProvider, string>;
 
 export const EFFORT_LABEL: Record<AgentEffort, string> = {
   low: 'Low',
@@ -28,20 +15,35 @@ export const EFFORT_LABEL: Record<AgentEffort, string> = {
   max: 'Max',
 };
 
-/** A short badge for the task card / sidebar: "Opus", "Opus · High", or the raw OpenCode/Grok/Muse/DeepSeek Harness model id. */
-export function modelBadge(provider: AgentProvider | undefined, model: string | undefined, effort: AgentEffort | undefined): string | undefined {
-  if (!model && !effort) return undefined;
-  if (provider === 'claude' || provider === 'grok' || provider === 'muse' || provider === 'dsh') {
-    const label = provider === 'claude' && model && model in CLAUDE_MODEL_LABEL ? CLAUDE_MODEL_LABEL[model as ClaudeModel] : model;
-    const parts = [label, effort ? EFFORT_LABEL[effort] : undefined].filter((v): v is string => !!v);
-    return parts.length ? parts.join(' · ') : undefined;
-  }
-  return model;
+/** Claude Code's models go by their names, and so does a custom --agent's, which is read the same way. */
+const namesClaude = (provider: AgentProvider | undefined) => provider === 'claude' || provider === 'custom';
+
+/** What a model is called: "Opus 5.5" for Claude Code's `opus` or `claude-opus-5-5`, and the id itself for the others. */
+export function modelName(provider: AgentProvider | undefined, model: string): string {
+  if (!namesClaude(provider)) return model;
+  return isClaudeModel(model) ? CLAUDE_MODEL_NAMES[model] : (claudeModelName(model) ?? model);
+}
+
+/**
+ * A short badge for the task card / sidebar: "Opus 5.5", "Opus 5.5 · High", "gpt-5.5 · High".
+ * `runs` is the model its session says it's on (Usage.model): for Claude Code that's surer than
+ * what an alias stands for, and it's there for a worker left on the default too.
+ */
+export function modelBadge(provider: AgentProvider | undefined, model: string | undefined, effort: AgentEffort | undefined, runs?: string): string | undefined {
+  const id = namesClaude(provider) ? (runs ?? model) : (model ?? runs);
+  const parts = [id ? modelName(provider, id) : undefined, effort && takesEffort(provider) ? EFFORT_LABEL[effort] : undefined].filter((v): v is string => !!v);
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
+/** What a worker runs, in a line: "Claude Code · Opus 5.5 · High", or only "Codex" for one on its defaults that hasn't said. */
+export function engineLabel(w: Pick<WorkerInfo, 'provider' | 'model' | 'effort' | 'usage'>, project: ProjectInfo | null): string {
+  const badge = modelBadge(w.provider, w.model, w.effort, w.usage?.model);
+  return badge ? `${providerLabel(w.provider, project)} · ${badge}` : providerLabel(w.provider, project);
 }
 
 /** Providers the server says this project can start. */
 export function supportedProviders(project: ProjectInfo | null): AgentProvider[] {
-  const values = project?.agentProviders?.filter((p): p is AgentProvider => p === 'claude' || p === 'opencode' || p === 'codex' || p === 'grok' || p === 'muse' || p === 'dsh' || p === 'custom') ?? [];
+  const values = project?.agentProviders?.filter(isAgentProvider) ?? [];
   if (values.length) return [...new Set(values)];
   return project?.defaultProvider && PROVIDER_LABEL[project.defaultProvider] ? [project.defaultProvider] : ['claude'];
 }
@@ -60,23 +62,16 @@ export function providerLabel(provider: AgentProvider | undefined, project: Proj
 }
 
 export function providerUsageTracked(provider: AgentProvider | undefined, project: ProjectInfo | null, usage?: Usage): boolean {
-  const selected = resolvedProvider(provider, project);
-  return selected === 'claude' || ((selected === 'opencode' || selected === 'codex' || selected === 'grok' || selected === 'muse' || selected === 'dsh' || selected === 'custom') && usage !== undefined);
+  return !!PROVIDER_META[resolvedProvider(provider, project)].usage.tracked || usage !== undefined;
 }
 
 export type ProviderUsageState = 'tracked' | 'waiting' | 'untracked';
 
 /** Distinguishes a provider with no first report from one whose metrics are intentionally unavailable. */
 export function providerUsageState(provider: AgentProvider | undefined, project: ProjectInfo | null, usage?: Usage): ProviderUsageState {
-  const selected = resolvedProvider(provider, project);
-  if (selected === 'claude') return usage ? 'tracked' : 'waiting';
-  if (selected === 'opencode') return usage ? 'tracked' : 'waiting';
-  if (selected === 'codex') return usage ? 'tracked' : 'waiting';
-  if (selected === 'grok') return usage ? 'tracked' : 'untracked';
-  if (selected === 'muse') return usage ? 'tracked' : 'untracked';
-  if (selected === 'dsh') return usage ? 'tracked' : 'waiting';
-  if (selected === 'custom') return usage ? 'tracked' : 'untracked';
-  return 'untracked';
+  const { tracked, reports } = PROVIDER_META[resolvedProvider(provider, project)].usage;
+  if (usage) return 'tracked';
+  return tracked || reports ? 'waiting' : 'untracked';
 }
 
 /**
@@ -84,20 +79,11 @@ export function providerUsageState(provider: AgentProvider | undefined, project:
  * workers list and the queue so all three say the same thing.
  */
 export function providerWaitingLabel(provider: AgentProvider | undefined, project: ProjectInfo | null): string {
-  const selected = resolvedProvider(provider, project);
-  if (selected === 'opencode') return 'waiting for metrics';
-  if (selected === 'codex' || selected === 'dsh') return 'waiting for first report';
-  return '';
+  return PROVIDER_META[resolvedProvider(provider, project)].usage.waiting ?? '';
 }
 
 export function providerUsageNote(provider: AgentProvider): string {
-  if (provider === 'claude') return 'Office usage and budget track Claude Code.';
-  if (provider === 'codex') return 'Review Office hooks in /hooks to enable tracking. Codex reports root-session tokens; subagents are excluded and cost is unavailable.';
-  if (provider === 'grok') return 'Grok spend is not metered by the office; token totals stay in the worker terminal.';
-  if (provider === 'muse') return 'Muse spend is not metered by the office; token totals stay in the worker terminal.';
-  if (provider === 'dsh') return 'DeepSeek Harness reports context usage over ACP after its first turn; cost may be unavailable.';
-  if (provider === 'custom') return 'Usage is untracked unless compatible Claude Code hooks report it.';
-  return 'OpenCode reports model/provider estimates; they are not billing, and arrive after the first report.';
+  return PROVIDER_META[provider].usage.note;
 }
 
 /**
@@ -121,11 +107,11 @@ export function choiceLabel(choice: AgentChoice): string {
 export interface ProviderPicker {
   element: HTMLElement;
   value(): AgentProvider;
-  /** The optional initial model override: an OpenCode provider/model id, a Claude model alias, a Grok/Muse model id, or a DeepSeek Harness catalog id. */
+  /** The model picked for it, when one was: an id its provider takes (a Claude Code alias, an OpenCode provider/model, a Codex model). */
   model(): string | undefined;
-  /** The optional Claude, Grok, Muse or DeepSeek Harness reasoning effort. */
+  /** The reasoning effort picked for it, when one was (Pi calls it thinking). */
   effort(): AgentEffort | undefined;
-  /** Reports a visible field error for an invalid nonempty OpenCode model. */
+  /** Reports a visible field error for a typed model its provider doesn't take. */
   valid(): boolean;
 }
 
@@ -136,75 +122,41 @@ export interface AgentFields extends ProviderPicker {
   choice(): AgentChoice;
 }
 
-const MODEL_MAX = 256;
-const GROK_MODEL_MAX = 64;
-const MUSE_MODEL_MAX = 128;
-const DSH_MODEL_MAX = 256;
-let modelList: string[] | null = null;
-let modelListAt = 0;
-let modelRequest: Promise<string[]> | null = null;
-let grokModelList: string[] | null = null;
-let grokModelListAt = 0;
-let grokModelRequest: Promise<string[]> | null = null;
+/** Each provider's models as its CLI listed them, kept a minute; one that couldn't be listed isn't asked again for as long. */
+const catalogues = new Map<AgentProvider, { list?: ModelOption[]; failed?: boolean; at: number; request?: Promise<void> }>();
+const CATALOGUE_TTL_MS = 60_000;
 
-function validModel(value: string): boolean {
-  if (value.length === 0 || value.length > MODEL_MAX || /[\s\p{Cc}\p{Cf}]/u.test(value)) return false;
-  const parts = value.split('/');
-  return parts.length >= 2 && /^[A-Za-z0-9_.][A-Za-z0-9_.-]*$/.test(parts[0]) && parts.slice(1).every((part) => part.length > 0);
-}
-
-function validGrokModel(value: string): boolean {
-  return value.length > 0 && value.length <= GROK_MODEL_MAX && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && !/[\s\p{Cc}\p{Cf}]/u.test(value);
-}
-
-function validMuseModel(value: string): boolean {
-  return value.length > 0 && value.length <= MUSE_MODEL_MAX && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value) && !/[\s\p{Cc}\p{Cf}]/u.test(value);
-}
-
-function fetchGrokModels(): Promise<string[]> {
-  if (grokModelList && Date.now() - grokModelListAt < 60_000) return Promise.resolve(grokModelList);
-  if (grokModelRequest) return grokModelRequest;
-  grokModelRequest = fetch('/api/agents/grok/models', { credentials: 'same-origin', cache: 'no-store' })
+/** Asks for a provider's models, unless what's here is fresh: then there's nothing to wait for. */
+function loadCatalogue(provider: AgentProvider): Promise<void> | undefined {
+  const c = catalogues.get(provider) ?? { at: 0 };
+  catalogues.set(provider, c);
+  if ((c.list || c.failed) && Date.now() - c.at < CATALOGUE_TTL_MS) return undefined;
+  c.request ??= fetch(`/api/agents/${provider}/models`, { credentials: 'same-origin', cache: 'no-store' })
     .then(async (res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = (await res.json()) as { models?: unknown };
-      const models = Array.isArray(body.models) ? body.models.filter((m): m is string => typeof m === 'string' && validGrokModel(m)) : [];
-      grokModelList = [...new Set(models)];
-      grokModelListAt = Date.now();
-      return grokModelList;
+      const valid = PROVIDER_META[provider].validModel;
+      const seen = new Set<string>();
+      c.list = (Array.isArray(body.models) ? (body.models as Partial<ModelOption>[]) : [])
+        .filter((m): m is ModelOption => !!m && !!valid?.(m.id) && !seen.has(m.id) && !!seen.add(m.id))
+        .map((m) => ({ id: m.id, name: typeof m.name === 'string' ? m.name : undefined, efforts: Array.isArray(m.efforts) ? m.efforts.filter(isAgentEffort) : undefined }));
+      c.failed = false;
+    })
+    .catch(() => {
+      c.failed = true;
     })
     .finally(() => {
-      grokModelRequest = null;
+      c.at = Date.now();
+      c.request = undefined;
     });
-  return grokModelRequest;
-}
-
-/** DeepSeek Harness ids are opaque catalog values (see server/agents.ts), so bound length and controls only. */
-function validDshModel(value: string): boolean {
-  return value.length > 0 && value.length <= DSH_MODEL_MAX && !/[\p{Cc}\p{Cf}]/u.test(value);
-}
-
-function fetchOpenCodeModels(): Promise<string[]> {
-  if (modelList && Date.now() - modelListAt < 60_000) return Promise.resolve(modelList);
-  if (modelRequest) return modelRequest;
-  modelRequest = fetch('/api/agents/opencode/models', { credentials: 'same-origin', cache: 'no-store' })
-    .then(async (res) => {
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = (await res.json()) as { models?: unknown };
-      const models = Array.isArray(body.models) ? body.models.filter((m): m is string => typeof m === 'string' && validModel(m)) : [];
-      modelList = [...new Set(models)];
-      modelListAt = Date.now();
-      return modelList;
-    })
-    .finally(() => {
-      modelRequest = null;
-    });
-  return modelRequest;
+  return c.request;
 }
 
 /**
  * The provider, model and effort fields: a provider selector that never offers a provider outside
- * the server's metadata, with a model (and, for Claude, Grok or Muse, reasoning effort) picker underneath.
+ * the server's metadata, with its model and reasoning effort underneath. Which of those a provider
+ * takes, and how its model is asked for, is its row in the provider table (shared/providers.ts), so
+ * a provider added there gets its fields here.
  */
 export function agentFields(project: ProjectInfo | null, id: string, initial: AgentChoice, label = 'Provider'): AgentFields {
   const options = supportedProviders(project);
@@ -212,192 +164,111 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
   const select = h('select.provider-select', { id, 'aria-label': 'Worker provider' }) as HTMLSelectElement;
   for (const provider of options) select.append(h('option', { value: provider }, PROVIDER_LABEL[provider]));
   const note = h('small.provider-note');
-  const modelInput = h('input', {
-    type: 'text',
-    id: `${id}-model`,
-    list: `${id}-models`,
-    placeholder: 'Default (OpenCode settings)',
-    'aria-label': 'OpenCode model',
-    autocomplete: 'off',
-    maxlength: MODEL_MAX,
-  }) as HTMLInputElement;
-  const modelHint = h('small.provider-model-hint', {}, 'Optional provider/model override; suggestions load when OpenCode is selected.');
-  const modelListEl = h('datalist', { id: `${id}-models` });
-  const modelChoice = h('div.provider-model', {}, h('label', { for: `${id}-model` }, 'OpenCode model'), modelInput, modelListEl, modelHint);
-
-  const claudeModelSelect = h('select', { id: `${id}-claude-model`, 'aria-label': 'Claude model' }) as HTMLSelectElement;
-  claudeModelSelect.append(h('option', { value: '' }, 'Default (--agent-args)'));
-  for (const m of CLAUDE_MODELS) claudeModelSelect.append(h('option', { value: m }, CLAUDE_MODEL_LABEL[m]));
-  const effortSelect = h('select', { id: `${id}-effort`, 'aria-label': 'Reasoning effort' }) as HTMLSelectElement;
+  // A model is picked from a list or typed in, by provider: the two controls take turns.
+  const modelLabel = h('label', {}, 'Model') as HTMLLabelElement;
+  const modelSelect = h('select', { id: `${id}-model` }) as HTMLSelectElement;
+  const modelInput = h('input', { type: 'text', id: `${id}-model-id`, list: `${id}-models`, autocomplete: 'off', spellcheck: 'false' }) as HTMLInputElement;
+  const suggestions = h('datalist', { id: `${id}-models` });
+  const effortLabel = h('label', { for: `${id}-effort` }, 'Effort');
+  const effortSelect = h('select', { id: `${id}-effort` }) as HTMLSelectElement;
   effortSelect.append(h('option', { value: '' }, 'Default'));
   for (const e of AGENT_EFFORTS) effortSelect.append(h('option', { value: e }, EFFORT_LABEL[e]));
-  const claudeChoice = h(
-    'div.provider-model.claude-model',
-    {},
-    h('label', { for: `${id}-claude-model` }, 'Model'),
-    claudeModelSelect,
-    h('label', { for: `${id}-effort` }, 'Effort'),
-    effortSelect,
-    h('small.provider-model-hint', {}, 'The cost panel tracks each model separately.'),
-  );
+  const hint = h('small.provider-model-hint');
+  const fields = h('div.provider-model', {}, modelLabel, modelSelect, modelInput, suggestions, effortLabel, effortSelect, hint);
+  const element = h('div.provider-choice', {}, h('label', { for: id }, label), select, note, fields);
 
-  const grokModelSelect = h('select', { id: `${id}-grok-model`, 'aria-label': 'Grok model' }) as HTMLSelectElement;
-  grokModelSelect.append(h('option', { value: '' }, 'Default (Grok settings)'));
-  const grokEffortSelect = h('select', { id: `${id}-grok-effort`, 'aria-label': 'Grok reasoning effort' }) as HTMLSelectElement;
-  grokEffortSelect.append(h('option', { value: '' }, 'Default'));
-  for (const e of AGENT_EFFORTS) grokEffortSelect.append(h('option', { value: e }, EFFORT_LABEL[e]));
-  const grokHint = h('small.provider-model-hint', {}, 'Suggestions load from `grok models` when Grok is selected.');
-  const grokChoice = h(
-    'div.provider-model.grok-model',
-    {},
-    h('label', { for: `${id}-grok-model` }, 'Model'),
-    grokModelSelect,
-    h('label', { for: `${id}-grok-effort` }, 'Effort'),
-    grokEffortSelect,
-    grokHint,
-  );
-
-  const museModelInput = h('input', {
-    type: 'text',
-    id: `${id}-muse-model`,
-    placeholder: 'Default (Muse settings)',
-    'aria-label': 'Muse model',
-    autocomplete: 'off',
-    maxlength: MUSE_MODEL_MAX,
-  }) as HTMLInputElement;
-  const museEffortSelect = h('select', { id: `${id}-muse-effort`, 'aria-label': 'Muse reasoning effort' }) as HTMLSelectElement;
-  museEffortSelect.append(h('option', { value: '' }, 'Default'));
-  for (const e of AGENT_EFFORTS) museEffortSelect.append(h('option', { value: e }, EFFORT_LABEL[e]));
-  const museChoice = h(
-    'div.provider-model.muse-model',
-    {},
-    h('label', { for: `${id}-muse-model` }, 'Model'),
-    museModelInput,
-    h('label', { for: `${id}-muse-effort` }, 'Effort'),
-    museEffortSelect,
-    h('small.provider-model-hint', {}, 'Optional model id (for example muse-spark-1.3-contributor) and effort for this worker.'),
-  );
-
-  const dshModelInput = h('input', {
-    type: 'text',
-    id: `${id}-dsh-model`,
-    placeholder: 'Default (DSH profile)',
-    'aria-label': 'DeepSeek Harness model',
-    autocomplete: 'off',
-    maxlength: DSH_MODEL_MAX,
-  }) as HTMLInputElement;
-  const dshEffortSelect = h('select', { id: `${id}-dsh-effort`, 'aria-label': 'DeepSeek Harness reasoning effort' }) as HTMLSelectElement;
-  dshEffortSelect.append(h('option', { value: '' }, 'Default'));
-  for (const e of AGENT_EFFORTS) dshEffortSelect.append(h('option', { value: e }, EFFORT_LABEL[e]));
-  const dshChoice = h(
-    'div.provider-model.dsh-model',
-    {},
-    h('label', { for: `${id}-dsh-model` }, 'Model'),
-    dshModelInput,
-    h('label', { for: `${id}-dsh-effort` }, 'Effort'),
-    dshEffortSelect,
-    h('small.provider-model-hint', {}, 'Optional model id from DeepSeek Harness\u2019s catalog, and effort; leave empty to use the profile default.'),
-  );
-
-  const element = h('div.provider-choice', {}, h('label', { for: id }, label), select, note, modelChoice, claudeChoice, grokChoice, museChoice, dshChoice);
-  const fillGrokModels = (models: string[], selected?: string) => {
-    const keep = selected && validGrokModel(selected) ? selected : '';
-    grokModelSelect.replaceChildren(h('option', { value: '' }, 'Default (Grok settings)'));
-    const seen = new Set<string>();
-    for (const model of models) {
-      if (!validGrokModel(model) || seen.has(model)) continue;
-      seen.add(model);
-      grokModelSelect.append(h('option', { value: model }, model));
-    }
-    if (keep && !seen.has(keep)) grokModelSelect.append(h('option', { value: keep }, keep));
-    grokModelSelect.value = keep;
+  const value = () => (options.includes(select.value as AgentProvider) ? (select.value as AgentProvider) : fallback);
+  const meta = () => PROVIDER_META[value()];
+  /** Its models: the ones it always has, or the ones its CLI listed. */
+  const known = () => meta().models?.fixed ?? catalogues.get(value())?.list ?? [];
+  /** Typed in: for a provider whose model is, and for one whose list couldn't be had. */
+  const typed = () => meta().models?.pick === 'typed' || !!(meta().models?.catalog && catalogues.get(value())?.failed);
+  /** The model id the fields are on, whichever control is showing. */
+  let chosen = '';
+  /**
+   * Puts both controls on `id`: the list gets it as an option of its own when it isn't one of the
+   * provider's (a saved one, or the list is still on its way). What's being typed is left alone.
+   */
+  const pick = (id: string) => {
+    const models = known();
+    chosen = id;
+    modelSelect.replaceChildren(h('option', { value: '' }, meta().models?.unset ?? 'Default'), ...models.map((m) => h('option', { value: m.id }, m.name ?? m.id)));
+    if (id && !models.some((m) => m.id === id)) modelSelect.append(h('option', { value: id }, id));
+    modelSelect.value = id;
+    if (modelInput.value.trim() !== id) modelInput.value = id;
+    suggestions.replaceChildren(...models.map((m) => h('option', { value: m.id, label: m.name })));
   };
-  /** OpenCode's model suggestions, asked for only once someone can see the field. */
-  const loadModels = () => {
-    if (select.value === 'grok') {
-      if (!element.isConnected || element.closest('.hidden')) return;
-      grokHint.textContent = grokModelList ? 'Optional model and effort for this worker.' : 'Loading Grok models…';
-      void fetchGrokModels()
-        .then((models) => {
-          fillGrokModels(models, grokModelSelect.value);
-          grokHint.textContent = 'Optional model and effort for this worker.';
-        })
-        .catch(() => {
-          grokHint.textContent = 'Model list unavailable; leave Default or pick a known Grok model id.';
-        });
-      return;
-    }
-    if (select.value !== 'opencode' || !element.isConnected || element.closest('.hidden')) return;
-    modelHint.textContent = modelList ? 'Optional provider/model override; choose a suggestion or enter one manually.' : 'Loading OpenCode models… You can enter a provider/model manually.';
-    void fetchOpenCodeModels()
-      .then((models) => {
-        modelListEl.replaceChildren(...models.map((model) => h('option', { value: model })));
-        modelHint.textContent = 'Optional provider/model override; choose a suggestion or enter one manually.';
-      })
-      .catch(() => {
-        modelHint.textContent = 'Model suggestions unavailable; enter a provider/model manually if needed.';
-      });
+  /** The efforts on offer: the ones the model picked takes, where its catalogue says. */
+  const paintEffort = () => {
+    const efforts = known().find((o) => o.id === chosen)?.efforts;
+    for (const option of effortSelect.options) option.disabled = !!option.value && !!efforts && !efforts.includes(option.value as AgentEffort);
+    if (effortSelect.selectedOptions[0]?.disabled) effortSelect.value = '';
+    effortSelect.disabled = efforts?.length === 0;
+    effortSelect.title = efforts?.length === 0 ? 'This model has no reasoning effort to pick' : '';
   };
-  const setModelVisibility = (provider: AgentProvider) => {
-    const openCode = provider === 'opencode';
-    note.textContent = providerUsageNote(provider);
-    modelChoice.classList.toggle('hidden', !openCode);
-    modelInput.disabled = !openCode;
-    claudeChoice.classList.toggle('hidden', provider !== 'claude');
-    grokChoice.classList.toggle('hidden', provider !== 'grok');
-    museChoice.classList.toggle('hidden', provider !== 'muse');
-    dshChoice.classList.toggle('hidden', provider !== 'dsh');
-    loadModels();
+  /** Shows the fields the provider takes. */
+  const paint = () => {
+    const m = meta();
+    const field = m.models;
+    const catalogue = catalogues.get(value());
+    note.textContent = providerUsageNote(value());
+    modelLabel.classList.toggle('hidden', !field);
+    modelSelect.classList.toggle('hidden', !field || typed());
+    modelInput.classList.toggle('hidden', !field || !typed());
+    modelLabel.htmlFor = typed() ? modelInput.id : modelSelect.id;
+    for (const control of [modelSelect, modelInput]) control.setAttribute('aria-label', `${m.label} model`);
+    modelInput.placeholder = field?.unset ?? '';
+    modelInput.maxLength = field?.max ?? 256;
+    effortLabel.textContent = m.effortLabel ?? 'Effort';
+    effortLabel.classList.toggle('hidden', !m.takesEffort);
+    effortSelect.classList.toggle('hidden', !m.takesEffort);
+    effortSelect.setAttribute('aria-label', m.effortLabel ? `${m.label} ${m.effortLabel.toLowerCase()} level` : `${m.label} reasoning effort`);
+    if (!field) hint.textContent = m.unpicked ?? '';
+    else if (field.catalog && catalogue?.request) hint.textContent = `Loading ${m.label} models…`;
+    else if (field.catalog && catalogue?.failed) hint.textContent = `${m.label}’s models couldn’t be listed: leave it empty for its default, or type a model id.`;
+    else hint.textContent = field.hint;
+    fields.classList.toggle('hidden', !field && !m.takesEffort && !hint.textContent);
+    paintEffort();
+  };
+  /** Asks the provider's CLI for its models, only once someone can see the fields. */
+  const load = () => {
+    const provider = value();
+    if (!meta().models?.catalog || !element.isConnected || element.closest('.hidden')) return;
+    const loading = loadCatalogue(provider);
+    if (!loading) return;
+    paint();
+    void loading.then(() => {
+      if (value() !== provider) return;
+      pick(chosen);
+      paint();
+    });
   };
   const set = (c: AgentChoice) => {
     select.value = options.includes(c.provider) ? c.provider : options.includes(fallback) ? fallback : options[0];
-    const claude = select.value === 'claude';
-    const grok = select.value === 'grok';
-    const muse = select.value === 'muse';
-    const dsh = select.value === 'dsh';
-    claudeModelSelect.value = claude && c.model && (CLAUDE_MODELS as readonly string[]).includes(c.model) ? c.model : '';
-    effortSelect.value = claude && c.effort ? c.effort : '';
-    fillGrokModels(grokModelList ?? [], grok ? c.model : undefined);
-    grokEffortSelect.value = grok && c.effort ? c.effort : '';
-    museModelInput.value = muse && c.model ? c.model : '';
-    museEffortSelect.value = muse && c.effort ? c.effort : '';
-    dshModelInput.value = dsh && c.model ? c.model : '';
-    dshEffortSelect.value = dsh && c.effort ? c.effort : '';
-    modelInput.value = select.value === 'opencode' && c.model ? c.model : '';
+    const mine = select.value === c.provider;
+    pick(mine && c.model && meta().validModel?.(c.model) ? c.model : '');
     modelInput.setCustomValidity('');
-    museModelInput.setCustomValidity('');
-    dshModelInput.setCustomValidity('');
-    setModelVisibility(select.value as AgentProvider);
+    effortSelect.value = mine && c.effort && meta().takesEffort ? c.effort : '';
+    paint();
+    load();
   };
   set(initial);
-  select.addEventListener('change', () => setModelVisibility(select.value as AgentProvider));
-  modelInput.addEventListener('focus', loadModels);
-  modelInput.addEventListener('input', () => modelInput.setCustomValidity(''));
-  museModelInput.addEventListener('input', () => museModelInput.setCustomValidity(''));
-  dshModelInput.addEventListener('input', () => dshModelInput.setCustomValidity(''));
-  const value = () => (options.includes(select.value as AgentProvider) ? (select.value as AgentProvider) : fallback);
-  const effort = () => {
-    if (select.value === 'claude' && effortSelect.value) return effortSelect.value as AgentEffort;
-    if (select.value === 'grok' && grokEffortSelect.value) return grokEffortSelect.value as AgentEffort;
-    if (select.value === 'muse' && museEffortSelect.value) return museEffortSelect.value as AgentEffort;
-    if (select.value === 'dsh' && dshEffortSelect.value) return dshEffortSelect.value as AgentEffort;
-    return undefined;
-  };
-  const model = () => {
-    if (select.value === 'claude') return claudeModelSelect.value || undefined;
-    if (select.value === 'grok') return grokModelSelect.value || undefined;
-    if (select.value === 'muse') {
-      const v = museModelInput.value;
-      return validMuseModel(v) ? v : undefined;
-    }
-    if (select.value === 'dsh') {
-      const v = dshModelInput.value;
-      return validDshModel(v) ? v : undefined;
-    }
-    if (select.value !== 'opencode') return undefined;
-    const v = modelInput.value;
-    return validModel(v) ? v : undefined;
-  };
+  // Another provider's model and effort mean nothing to this one: it starts on its own defaults.
+  select.addEventListener('change', () => set({ provider: value() }));
+  modelSelect.addEventListener('change', () => {
+    pick(modelSelect.value);
+    paintEffort();
+  });
+  modelInput.addEventListener('input', () => {
+    chosen = modelInput.value.trim();
+    modelInput.setCustomValidity('');
+    paintEffort();
+  });
+  // Fields put on their provider before anyone could see them (in ⚙️ Settings) ask once they're on the page, or once they're used.
+  setTimeout(load, 0);
+  fields.addEventListener('focusin', load);
+  const model = () => (chosen && meta().validModel?.(chosen) ? chosen : undefined);
+  const effort = () => (meta().takesEffort && isAgentEffort(effortSelect.value) && !effortSelect.selectedOptions[0]?.disabled ? effortSelect.value : undefined);
   return {
     element,
     value,
@@ -406,32 +277,8 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
     set,
     choice: () => ({ provider: value(), ...(model() ? { model: model() } : {}), ...(effort() ? { effort: effort() } : {}) }),
     valid: () => {
-      if (select.value === 'muse') {
-        if (!museModelInput.value) {
-          museModelInput.setCustomValidity('');
-          return true;
-        }
-        const okay = validMuseModel(museModelInput.value);
-        museModelInput.setCustomValidity(okay ? '' : 'Use a Muse model id without whitespace or control characters (up to 128 characters).');
-        if (!okay) museModelInput.reportValidity();
-        return okay;
-      }
-      if (select.value === 'dsh') {
-        if (!dshModelInput.value) {
-          dshModelInput.setCustomValidity('');
-          return true;
-        }
-        const okay = validDshModel(dshModelInput.value);
-        dshModelInput.setCustomValidity(okay ? '' : 'Use a DeepSeek Harness catalog model id of up to 256 characters without control characters.');
-        if (!okay) dshModelInput.reportValidity();
-        return okay;
-      }
-      if (select.value !== 'opencode' || !modelInput.value) {
-        modelInput.setCustomValidity('');
-        return true;
-      }
-      const okay = validModel(modelInput.value);
-      modelInput.setCustomValidity(okay ? '' : 'Use provider/model format without whitespace or control characters (up to 256 characters).');
+      const okay = !chosen || !!meta().validModel?.(chosen);
+      modelInput.setCustomValidity(okay ? '' : (meta().models?.invalid ?? 'That isn’t a model id this provider takes.'));
       if (!okay) modelInput.reportValidity();
       return okay;
     },
