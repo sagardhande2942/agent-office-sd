@@ -109,7 +109,7 @@ agent-office tui                            # join the running office from your 
 agent-office setup                          # the first-start walkthrough again (office stopped)
 ```
 
-For a terminal-only client, start the office with `agent-office --no-open`, then run `agent-office tui` in another terminal. It shares floors, workers and live terminals with the 3D and lite views. See [docs/cli.md](docs/cli.md) for commands and remote connections.
+For a terminal-only client, start the office with `agent-office --no-open`, then run `agent-office tui` in another terminal. Its live desk grid shares floors, workers and terminals with the 3D and lite views: use arrows to select a desk, Enter to open it, and Tab for boards. See [docs/cli.md](docs/cli.md) for commands and remote connections.
 
 Every option is in [docs/configuration.md](docs/configuration.md). Choosing models and providers per worker is in [docs/agents.md](docs/agents.md).
 

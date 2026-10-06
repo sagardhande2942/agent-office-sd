@@ -1,12 +1,16 @@
 import readline from 'node:readline';
 import { WebSocket } from 'ws';
-import { DESKS, WING_DESKS } from '../shared/layout.js';
+import { PANELS, gridColumns, plain, renderDashboard, seats, type Dashboard, type Panel } from './tui-dashboard.js';
+export { plain } from './tui-dashboard.js';
 import { isAgentProvider, type ClientMsg, type FloorInfo, type FloorView, type ServerMsg, type WorkerInfo } from '../shared/protocol.js';
 
 const HELP = `Usage: agent-office tui [--office http://localhost:4600] [--name NAME] [--floor ID]
 
 Join a running office from your terminal. Password: AGENT_OFFICE_PASSWORD, or a hidden prompt.
 Use --name for an account login; omit it for the shared office password.
+
+Live dashboard: arrows select desks, Enter opens a worker, Tab changes panels.
+Press : for the command prompt; Ctrl+] leaves an attached terminal.
 
 Commands:
   workers / floors / go <floor ID or name>
@@ -17,11 +21,6 @@ Commands:
   help / quit
 
 The office keeps running when you leave. Requires an interactive terminal.`;
-
-/** Strip terminal controls from untrusted dashboard labels. PTY output is intentionally raw. */
-export function plain(value: string): string {
-  return value.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/[\x00-\x1f\x7f-\x9f]/g, '');
-}
 
 async function passwordPrompt(): Promise<string> {
   process.stdout.write('Office password: ');
@@ -85,38 +84,50 @@ export async function tuiCommand(argv: string[]): Promise<number> {
 function session(ws: WebSocket): Promise<number> {
   return new Promise((resolve) => {
     let view: FloorView | undefined, floors: FloorInfo[] = [], attached: string | undefined;
-    let rl: readline.Interface | undefined, finished = false;
+    let finished = false, active = false;
+    const dashboard: Dashboard = { floors, selected: 0, panel: 'office', offset: 0, notice: 'Connecting to the office...' };
     const send = (message: ClientMsg) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
-    const print = (text: string) => { if (!attached) { console.log(plain(text)); rl?.prompt(true); } };
-    const workers = () => print(`\n${view?.project?.dir ?? 'No project floor'}\n${view?.workers.map((w) => `${w.id}  ${w.name}  ${w.status}  ${w.task?.name ?? w.activity ?? ''}`).join('\n') || 'No workers. Use hire <provider> [prompt].'}`);
+    const draw = () => {
+      if (attached || finished || !active) return;
+      dashboard.view = view; dashboard.floors = floors;
+      dashboard.selected = Math.max(0, Math.min(dashboard.selected, seats(view).length - 1));
+      process.stdout.write('\x1b[?25l\x1b[H\x1b[2J' + renderDashboard(dashboard, process.stdout.columns || 80, process.stdout.rows || 24));
+    };
+    const print = (text: string) => { dashboard.notice = plain(text); draw(); };
+    const panel = (next: Panel) => { dashboard.panel = next; dashboard.offset = 0; draw(); };
+    const workers = () => panel('office');
     const worker = (key: string): WorkerInfo => {
       const matches = view?.workers.filter((w) => w.id === key || w.name.toLowerCase() === key.toLowerCase()) ?? [];
       if (matches.length !== 1) throw new Error('Use a unique worker ID or name from workers');
       return matches[0];
     };
-    const resize = () => { if (attached) send({ t: 'term.resize', workerId: attached, cols: process.stdout.columns, rows: process.stdout.rows }); };
+    const resize = () => { if (attached) send({ t: 'term.resize', workerId: attached, cols: process.stdout.columns || 80, rows: process.stdout.rows || 24 }); else draw(); };
     const detach = () => {
       if (!attached) return;
       send({ t: 'worker.detach', workerId: attached }); attached = undefined;
-      process.stdin.off('data', terminalInput); process.stdin.setRawMode(false);
-      process.stdout.write('\x1b[0m\x1b[?25h\x1b[?1049l');
-      openPrompt(); workers();
+      process.stdout.write('\x1b[0m\x1b[?25l');
+      draw();
     };
-    const terminalInput = (chunk: Buffer) => {
+    const input = (chunk: Buffer) => {
+      if (!attached) return;
       const data = chunk.toString(), escape = data.indexOf('\x1d');
-      if (escape >= 0) { if (escape > 0 && attached) send({ t: 'term.input', workerId: attached, data: data.slice(0, escape) }); detach(); }
-      else if (attached) send({ t: 'term.input', workerId: attached, data });
+      if (escape >= 0) { if (escape > 0) send({ t: 'term.input', workerId: attached, data: data.slice(0, escape) }); detach(); }
+      else send({ t: 'term.input', workerId: attached, data });
     };
     const done = (code: number) => {
       if (finished) return;
-      finished = true; detach(); rl?.close(); process.stdin.pause();
+      finished = true; detach();
+      process.stdin.off('data', input); process.stdin.off('keypress', keypress);
+      if (process.stdin.isTTY) process.stdin.setRawMode(false);
+      process.stdin.pause();
+      if (active) process.stdout.write('\x1b[0m\x1b[?25h\x1b[?1049l');
       process.stdout.off('resize', resize); process.off('SIGTERM', stop); process.off('SIGINT', stop);
       ws.close(); const timer = setTimeout(() => ws.terminate(), 1000); timer.unref(); resolve(code);
     };
     const stop = () => done(0);
     process.on('SIGTERM', stop); process.on('SIGINT', stop); process.stdout.on('resize', resize);
-    ws.on('error', (err) => { print(err.message); done(1); });
-    ws.on('close', () => { if (!finished) { print('Disconnected from the office. Run agent-office tui to reconnect.'); done(1); } });
+    ws.on('error', (err) => { done(1); console.error(`agent-office tui: ${err.message}`); });
+    ws.on('close', () => { if (!finished) { done(1); console.error('Disconnected from the office. Run agent-office tui to reconnect.'); } });
     ws.on('message', (raw) => {
       let msg: ServerMsg;
       try { msg = JSON.parse(String(raw)); } catch { return; }
@@ -124,10 +135,14 @@ function session(ws: WebSocket): Promise<number> {
         detach(); view = msg;
         if (msg.t === 'welcome') {
           floors = msg.floors;
-          openPrompt();
-          print('Agent Office CLI — type help for commands.');
+          active = true;
+          process.stdout.write('\x1b[?1049h\x1b[?25l');
+          readline.emitKeypressEvents(process.stdin);
+          process.stdin.setRawMode(true);
+          process.stdin.on('data', input); process.stdin.on('keypress', keypress); process.stdin.resume();
+          print('Welcome. Select a desk with arrows; Enter opens its terminal.');
         }
-        workers();
+        dashboard.selected = 0; dashboard.offset = 0; draw();
       } else if (msg.t === 'floors') floors = msg.floors;
       else if (msg.t === 'worker.update' && view) {
         view.workers = [...view.workers.filter((w) => w.id !== msg.worker.id), msg.worker];
@@ -142,26 +157,68 @@ function session(ws: WebSocket): Promise<number> {
       else if (msg.t === 'plan' && view) view.plan = msg.plan;
       else if (msg.t === 'toast') print(`${msg.level}: ${msg.text}`);
       else if (msg.t === 'chat') print(`${msg.name}: ${msg.text}`);
+      if (['floors', 'worker.remove', 'gh.issues', 'gh.pulls', 'queue', 'plan'].includes(msg.t)) draw();
     });
-    function openPrompt() {
-      if (finished) return;
-      rl = readline.createInterface({ input: process.stdin, output: process.stdout, prompt: 'office> ' });
-      rl.on('SIGINT', stop);
-      const current = rl;
-      rl.on('close', () => { if (rl === current) done(0); });
-      rl.on('line', (line) => {
-        if (attached) return;
-        try { command(line.trim()); } catch (err) { print((err as Error).message); }
-        if (!attached && !finished) rl?.prompt();
-      });
+    function keypress(text: string | undefined, key: readline.Key) {
+      if (attached || finished) return;
+      if (key.ctrl && key.name === 'c') return done(0);
+      if (dashboard.command !== undefined) {
+        if (key.name === 'escape') dashboard.command = undefined;
+        else if (key.name === 'return') {
+          const line = dashboard.command; dashboard.command = undefined;
+          try { command(line.trim()); } catch (err) { print((err as Error).message); }
+        } else if (key.name === 'backspace') dashboard.command = dashboard.command.slice(0, -1);
+        else if (key.ctrl && key.name === 'u') dashboard.command = '';
+        else if (text && !key.ctrl && !key.meta) dashboard.command += plain(text);
+        return draw();
+      }
+      const all = seats(view), seat = all[dashboard.selected];
+      const begin = (value: string) => { dashboard.command = value; draw(); };
+      if (key.name === 'escape') return panel('office');
+      if (key.name === 'tab') return panel(PANELS[(PANELS.indexOf(dashboard.panel) + (key.shift ? PANELS.length - 1 : 1)) % PANELS.length]);
+      if (['up', 'down', 'left', 'right'].includes(key.name ?? '')) {
+        const direction = key.name === 'up' || key.name === 'left' ? -1 : 1;
+        if (dashboard.panel === 'office') dashboard.selected = Math.max(0, Math.min(all.length - 1, dashboard.selected + direction * (key.name === 'up' || key.name === 'down' ? gridColumns(process.stdout.columns || 80) : 1)));
+        else {
+          const count = dashboard.panel === 'floors' ? floors.length : dashboard.panel === 'issues' ? view?.issues.items.length : dashboard.panel === 'pulls' ? view?.pulls.items.length : dashboard.panel === 'queue' ? view?.queue.tasks.length : 13;
+          dashboard.offset = Math.max(0, Math.min(Math.max(0, (count ?? 0) - 1), dashboard.offset + direction));
+        }
+        return draw();
+      }
+      if (key.name === 'return') {
+        if (dashboard.panel === 'floors') {
+          const floor = floors[dashboard.offset]; if (floor && !floor.cloning) send({ t: 'floor.go', floor: floor.id });
+          return panel('office');
+        }
+        if (dashboard.panel !== 'office') return;
+        if (seat?.worker) return command('attach ' + seat.worker.id);
+        if (seat) return begin('hire ');
+      }
+      if (text === 'q') return done(0);
+      if (text === ':') return begin('');
+      if (text === 'h') return begin('hire ');
+      if (text === 'p' && seat?.worker) return begin('prompt ' + seat.worker.id + ' ');
+      if (text === 'r' && seat?.worker) return command('resume ' + seat.worker.id);
+      if (text === 'c') return begin('chat ');
+      if (text === 'f') return panel('floors');
+      if (text === 'i') return panel('issues');
+      if (text === 'b') return panel('pulls');
+      if (text === 't') return panel('queue');
+      if (text === '?') return panel('help');
+      if (text === 'n') {
+        const waiting = all.filter((s) => s.worker?.status === 'needs_input' || s.worker?.status === 'done');
+        const current = waiting.findIndex((s) => s.id === seat?.id);
+        if (waiting.length) dashboard.selected = all.indexOf(waiting[(current + 1) % waiting.length]);
+        panel('office');
+      }
     }
     function command(line: string) {
       const [cmd, key = '', ...tail] = line.split(/\s+/), text = tail.join(' ');
       if (!cmd) return;
       if (cmd === 'quit' || cmd === 'exit') return done(0);
-      if (cmd === 'help') return print(HELP);
+      if (cmd === 'help') return panel('help');
       if (cmd === 'workers') return workers();
-      if (cmd === 'floors') return print(floors.map((f) => `${f.id === view?.floor ? '*' : ' '} ${f.id}  ${f.name}`).join('\n'));
+      if (cmd === 'floors') return panel('floors');
       if (cmd === 'go') {
         const target = [key, ...tail].join(' ');
         const found = floors.filter((f) => f.id === target || f.name === target);
@@ -171,7 +228,9 @@ function session(ws: WebSocket): Promise<number> {
       if (!view?.floor) throw new Error('Add a project in the browser, then select it with go');
       if (cmd === 'hire') {
         if (!isAgentProvider(key)) throw new Error('Provider: claude, codex, opencode, grok, muse, dsh or custom');
-        const desk = [...DESKS, ...WING_DESKS.filter((d) => d.wing! <= view!.plan.wing)].find((d) => !view!.workers.some((w) => w.deskId === d.id));
+        const all = seats(view);
+        const selected = all[dashboard.selected];
+        const desk = selected && !selected.worker ? selected : all.find((s) => !s.worker);
         if (!desk) throw new Error('No empty desk on this floor');
         return send({ t: 'worker.spawn', deskId: desk.id, provider: key, prompt: text || undefined });
       }
@@ -179,16 +238,12 @@ function session(ws: WebSocket): Promise<number> {
         const body = [key, ...tail].join(' ').trim(); if (!body) throw new Error('Provide some text');
         return send(cmd === 'chat' ? { t: 'chat', text: body } : { t: 'queue.add', prompt: body });
       }
-      if (cmd === 'issues' || cmd === 'pulls') {
-        const state = cmd === 'issues' ? view.issues : view.pulls;
-        return print(state.items.map((item) => `#${item.number} ${item.title}`).join('\n') || 'No items');
-      }
-      if (cmd === 'queue') return print(view.queue.tasks.map((t) => `${t.status}  ${t.title}`).join('\n') || 'Queue is empty');
+      if (cmd === 'issues' || cmd === 'pulls' || cmd === 'queue') return panel(cmd);
       if (['attach', 'prompt', 'resume', 'pr'].includes(cmd)) {
         const w = worker(key);
         if (cmd === 'attach') {
-          attached = w.id; const previous = rl; rl = undefined; previous?.close(); process.stdin.setRawMode(true); process.stdin.on('data', terminalInput); process.stdin.resume();
-          process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
+          attached = w.id;
+          process.stdout.write('\x1b[0m\x1b[?25h\x1b[2J\x1b[H');
           send({ t: 'worker.attach', workerId: w.id }); resize(); return;
         }
         if (cmd === 'prompt') { if (!text) throw new Error('Provide a prompt'); return send({ t: 'worker.prompt', workerId: w.id, prompt: text }); }
