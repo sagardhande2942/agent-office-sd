@@ -17,6 +17,7 @@ Commands:
   hire <provider> [prompt]     Hire at the first empty desk
   attach <worker ID or name>  Live terminal; Ctrl+] returns to the office
   prompt <worker> <text> / resume <worker> / pr <worker>
+  home <worker> [--cleanup auto|keep|worktree|all]  Send a worker home
   messages [request-id]       Read tracked worker requests and replies
   issues / pulls / queue / enqueue <prompt> / chat <text>
   help / quit
@@ -205,6 +206,10 @@ function session(ws: WebSocket): Promise<number> {
       if (text === 'h') return begin('hire ');
       if (text === 'p' && seat?.worker) return begin('prompt ' + seat.worker.id + ' ');
       if (text === 'r' && seat?.worker) return command('resume ' + seat.worker.id);
+      if (text === 'x' && dashboard.panel === 'office' && seat?.worker) {
+        dashboard.notice = `Send ${plain(seat.worker.name)} home: Enter confirms, Esc cancels. Auto cleanup preserves unpushed work; use --cleanup keep to keep everything.`;
+        return begin('home ' + seat.worker.id);
+      }
       if (text === 'c') return begin('chat ');
       if (text === 'm') return panel('messages');
       if (text === 'f') return panel('floors');
@@ -247,6 +252,15 @@ function session(ws: WebSocket): Promise<number> {
         return send(cmd === 'chat' ? { t: 'chat', text: body } : { t: 'queue.add', prompt: body });
       }
       if (cmd === 'issues' || cmd === 'pulls' || cmd === 'queue') return panel(cmd);
+      if (cmd === 'home') {
+        if (tail.length && (tail.length !== 2 || tail[0] !== '--cleanup' || !['auto', 'keep', 'worktree', 'all'].includes(tail[1]))) {
+          throw new Error('Usage: home <worker> [--cleanup auto|keep|worktree|all]');
+        }
+        const w = worker(key);
+        const cleanup = tail[1];
+        send({ t: 'worker.kill', workerId: w.id, ...(cleanup && cleanup !== 'auto' ? { cleanup: cleanup as 'keep' | 'worktree' | 'all' } : {}) });
+        return print(`Sending ${w.name} home...`);
+      }
       if (['attach', 'prompt', 'resume', 'pr'].includes(cmd)) {
         const w = worker(key);
         if (cmd === 'attach') {
