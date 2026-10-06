@@ -53,6 +53,8 @@ Type commands after pressing `:`:
 
 Worker commands accept an exact ID or a single-word name. Use IDs for names with spaces or duplicate names. The hire providers are `claude`, `codex`, `opencode`, `grok`, `muse`, `dsh` and `custom`. Hiring uses the floor's shared checkout; queue tasks follow the office's existing queue rules.
 
+Workers using a shared checkout show deletion choices as unavailable and keep the checkout and branch when sent home. Meeting checkout cleanup is managed by the meeting.
+
 Terminal input, including Ctrl+C, goes to the attached worker. Ctrl+] detaches. Resizing your terminal resizes the shared worker terminal for all viewers. Outside attachment, `q` or Ctrl+C exits the client. Esc returns to the desk grid; while attached, Esc goes to the worker like other terminal keys. Exiting leaves the server and workers running. If disconnected, rerun the command to sign in again.
 
 This first CLI view requires an interactive terminal and an existing project floor. Add floors using the browser office. Voice, whiteboards, spatial activities and account administration remain in the existing interfaces.

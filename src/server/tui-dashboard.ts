@@ -76,7 +76,13 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
         `Branch: ${worker.worktree.branch}`, `Path: ${worker.worktree.path}`, '',
         'Deleting removes local work in the selected worktrees.',
         'Up/Down or 1/2/3: choose | Enter: send home | Esc: cancel');
-    } else body.push('Enter: send home | Esc: cancel');
+    } else body.push(
+      '  1. Delete worktree + branch [unavailable]',
+      '  2. Delete worktree only [unavailable]',
+      '> 3. Keep checkout and branch',
+      worker.meeting ? 'Meeting workers share their checkout; cleanup is managed by the meeting.' : 'This worker uses the shared checkout; it has no private worktree to delete.',
+      'Sending home stops its session and keeps the checkout and branch.',
+      'Enter: send home | Esc: cancel');
     body = body.map((line) => fit(line, width));
   } else if (state.panel === 'office' && all.length) {
     const columns = gridColumns(width), cardWidth = Math.min(24, width), side = width >= 100;
@@ -116,6 +122,6 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     body = body.slice(start, start + bodyHeight).map((line) => fit(line, width));
   }
   lines.push(...Array.from({ length: bodyHeight }, (_, i) => body[i] ?? ''));
-  lines.push('-'.repeat(width), fit(state.notice, width), fit(state.home ? 'Up/Down choose | Enter send home | Esc cancel' : state.command !== undefined ? ':' + state.command.slice(-Math.max(0, width - 2)) + '_' : 'Arrows select | Enter open | Tab panels | f floors | x send home | : command | q quit', width));
+  lines.push('-'.repeat(width), fit(state.notice, width), fit(state.home ? (state.home.worker.worktree && !state.home.worker.meeting ? 'Up/Down choose | Enter send home | Esc cancel' : 'Enter send home (keep checkout) | Esc cancel') : state.command !== undefined ? ':' + state.command.slice(-Math.max(0, width - 2)) + '_' : 'Arrows select | Enter open | Tab panels | f floors | x send home | : command | q quit', width));
   return lines.slice(0, height).join('\r\n');
 }

@@ -72,3 +72,13 @@ test('send-home choices stay visible in a small terminal', () => {
     assert.ok(rendered.split('\r\n').every((line) => plain(line).length <= width));
   }
 });
+
+test('send-home explains unavailable cleanup for shared and meeting checkouts', () => {
+  for (const worker of [view.workers[0], { ...view.workers[0], meeting: 'meeting-1', worktree: { path: '/meeting', branch: 'meeting', base: 'main' } }]) {
+    const rendered = renderDashboard({ ...state, home: { worker, cleanup: 'keep' } }, 120, 30);
+    assert.match(rendered, /1\. Delete worktree \+ branch \[unavailable\]/);
+    assert.match(rendered, /2\. Delete worktree only \[unavailable\]/);
+    assert.match(rendered, /> 3\. Keep checkout and branch/);
+    assert.doesNotMatch(rendered, /Up\/Down choose/);
+  }
+});
