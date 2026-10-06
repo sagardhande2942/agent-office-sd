@@ -66,12 +66,14 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     const { worker, cleanup } = state.home;
     const many = (worker.repos?.length ?? 0) > 0;
     const noun = many ? 'worktrees' : 'worktree';
-    body = [`Send ${worker.name} home?`, 'Stops the session for everyone and frees the desk.', ''];
+    body = [`Send ${worker.name} home?`];
     if (worker.worktree && !worker.meeting) {
-      body.push(`Branch: ${worker.worktree.branch}`, `Path: ${worker.worktree.path}`, '',
-        `${cleanup === 'all' ? '>' : ' '} 1. Delete the ${noun} and ${many ? 'their' : 'its'} branch`,
-        `${cleanup === 'worktree' ? '>' : ' '} 2. Delete the ${noun}, keep the branch`,
-        `${cleanup === 'keep' ? '>' : ' '} 3. ${many ? 'Keep them all' : 'Keep both'}`, '',
+      body.push(
+        `${cleanup === 'all' ? '>' : ' '} 1. Delete ${noun} + branch`,
+        `${cleanup === 'worktree' ? '>' : ' '} 2. Delete ${noun} only`,
+        `${cleanup === 'keep' ? '>' : ' '} 3. ${many ? 'Keep them all' : 'Keep both'}`,
+        'Option 2 keeps the branch.',
+        `Branch: ${worker.worktree.branch}`, `Path: ${worker.worktree.path}`, '',
         'Deleting removes local work in the selected worktrees.',
         'Up/Down or 1/2/3: choose | Enter: send home | Esc: cancel');
     } else body.push('Enter: send home | Esc: cancel');

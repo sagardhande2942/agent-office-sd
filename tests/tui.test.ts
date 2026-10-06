@@ -60,3 +60,15 @@ test('empty office stays within a narrow terminal', () => {
   assert.ok(rendered.split('\r\n').every((line) => plain(line).length <= 24));
   assert.equal(plain('नमस्ते'), 'नमस्ते', 'prompt text preserves Unicode');
 });
+
+test('send-home choices stay visible in a small terminal', () => {
+  const worker = { ...view.workers[0], worktree: { path: '/project/ada', branch: 'office/ada', base: 'main' } };
+  for (const [width, height] of [[120, 30], [80, 24], [32, 12]]) {
+    const rendered = renderDashboard({ ...state, home: { worker, cleanup: 'keep' } }, width, height);
+    assert.match(rendered, /1\. Delete worktree \+ branch/);
+    assert.match(rendered, /2\. Delete worktree only/);
+    assert.match(rendered, /> 3\. Keep both/);
+    assert.equal(rendered.split('\r\n').length, height);
+    assert.ok(rendered.split('\r\n').every((line) => plain(line).length <= width));
+  }
+});
