@@ -1,5 +1,7 @@
 # Terminal office
 
+For shell commands, flags, dashboard keys and Cloud Shell restart instructions, see [cmd.txt](../cmd.txt).
+
 The CLI is a third view of the same office, alongside 3D and `/lite`. Run the server first, then join it in another terminal:
 
 ```sh
