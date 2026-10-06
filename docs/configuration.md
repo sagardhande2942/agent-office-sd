@@ -54,3 +54,7 @@ agent-office accounts [list | invite [name] [--admin] | revoke <name> | role <na
   Invite, list and revoke people's own accounts, and switch the shared password
   off or on. Works while the office runs.
 ```
+
+## Terminal office client
+
+`agent-office tui` joins a running office without opening a browser. Use `--office <http(s) origin>` for a remote server, `--name <account>` for account login, and `--floor <id>` for the initial floor. See [cli.md](cli.md) for commands and password handling.

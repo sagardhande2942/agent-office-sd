@@ -6,6 +6,10 @@ import { startServer } from './server.js';
 import { tildify } from './building.js';
 
 const argv = process.argv.slice(2);
+if (argv[0] === 'tui') {
+  const { tuiCommand } = await import('./tui.js');
+  process.exit(await tuiCommand(argv.slice(1)));
+}
 if (argv[0] === 'prune') {
   const { prune } = await import('./prune.js');
   process.exit(await prune(argv.slice(1)));
