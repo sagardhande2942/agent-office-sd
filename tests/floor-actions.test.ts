@@ -35,7 +35,7 @@ test('every member of FloorWorkers is one server.ts actually calls', () => {
   // The hook handlers and a few internals are called by the office's own machinery, not by a
   // floor-scoped case; they stay on WorkerManager rather than travelling.
   const officeOnly = new Set([
-    'authenticate', 'clearHelperReport', 'detachAll', 'drop', 'fetchBase', 'fullScreens', 'handleCodexHook',
+    'authenticate', 'submitCompletion', 'clearHelperReport', 'detachAll', 'drop', 'fetchBase', 'fullScreens', 'handleCodexHook',
     'handleGrokHook', 'handleHook', 'handleMuseHook', 'handleOpenCodeHook', 'officeDefault',
     'owners', 'wakeAll',
   ]);

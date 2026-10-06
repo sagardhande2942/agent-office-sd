@@ -1,3 +1,4 @@
+import { submitCompletion } from './completion.js';
 import {holdOffline} from './offline.js';
 import { workerHandle } from './handle.js';
 import * as helperOps from './helpers.js';
@@ -532,6 +533,7 @@ export class WorkerManager {
     w.info.lastInput = { by, at: now };
     return true;
   }
+  submitCompletion(id: string, body: unknown, branch?: string): string | undefined { return submitCompletion(this.ctx, id, body, branch); }
   stageHelperReport(id: string, helperName: string, text: string, messageId?: string): void { return helperOps.stageHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, helperName, text, messageId); }
   clearHelperReport(id: string, messageId: string): void { return helperOps.clearHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, messageId); }
   async deliverHelperReport(id: string, by?: string): Promise<string | undefined> { return helperOps.deliverHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist(),events:this.events,prompt:(id:string,text:string,by?:string)=>this.prompt(id,text,by)}, id, by); }
@@ -590,12 +592,10 @@ export class WorkerManager {
     w.lastLines = [];
     this.emitUpdate(w);
   }
-
   /** Claude Code hook callback (a custom --agent that speaks Claude Code's hooks reports here too). */
   handleHook(workerId: string, token: string, event: string, payload: any, holdStop = false): boolean {
     return this.handleProviderHook('claude', workerId, token, event, payload, holdStop);
   }
-
   /** Native Codex lifecycle hooks register the root rollout for bounded metric reads. */
   handleCodexHook(workerId: string, token: string, event: string, payload: unknown, holdStop = false): boolean {
     return this.handleProviderHook('codex', workerId, token, event, payload, holdStop);
@@ -980,7 +980,7 @@ export class WorkerManager {
       setStatus: (status) => this.setStatus(w, status),
       emit: () => this.emitUpdate(w),
       persist: () => this.persist(),
-      notePrompt: (prompt) => this.tasks.notePrompt(w, prompt),
+      notePrompt: (prompt, newTurn) => this.tasks.notePrompt(w, prompt, newTurn),
       noteTool: (tool) => this.tasks.noteTool(w, tool),
       notePr: (command, output) => this.prs.noteOwn(w, command, output),
       clearTask: () => this.tasks.clear(w),

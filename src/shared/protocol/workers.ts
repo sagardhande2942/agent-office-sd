@@ -1,3 +1,4 @@
+import type { CompletionReport } from '../completion.js';
 import type { BossGuard } from '../boss.js';
 import type { HelperState } from '../helper.js';
 // Workers at their desks: what they are, their worktrees and their terminals.
@@ -90,6 +91,8 @@ export interface WorkerInfo {
   action?: WorkerAction;
   /** Written by a small model from its prompts and recent tool calls (see server/tasks.ts). */
   task?: WorkerTask;
+  completionRevision?: number;
+  completion?: CompletionReport;
   /** Reported session tokens and cost, when the provider supplies them (agents only). */
   usage?: Usage;
   /** Who last typed into its terminal (or sent it a prompt), and when. */

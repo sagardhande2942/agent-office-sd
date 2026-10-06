@@ -1,4 +1,6 @@
+import { renderCompletionReport } from './completion';
 import './queue.css';
+
 import type { AgentProvider, QueueTask, Usage } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store } from '../state';
@@ -134,11 +136,13 @@ export function openQueue(net: Net, actions: QueueActions) {
       buttons.push(h('button.btn', { type: 'button', title: 'Put it back on the queue', onclick: () => net.send({ t: 'queue.retry', taskId: t.id }) }, '↻ Requeue'));
       buttons.push(h('button.btn', { type: 'button', title: 'Forget it', 'aria-label': 'Remove', onclick: () => net.send({ t: 'queue.remove', taskId: t.id }) }, '✕'));
     }
+    const checklist = t.status === 'done' ? h('section.completion-report', {'aria-label':'Completion checklist'}) : null;
+    if (checklist) renderCompletionReport(checklist, t.completion);
     return h(
       'li',
       { class: t.status },
       pos ? h('span.pos', {}, pos) : null,
-      h('div.queue-main', {}, taskTitle(t), h('div.queue-meta', {}, meta.join(' · '))),
+      h('div.queue-main', {}, taskTitle(t), h('div.queue-meta', {}, meta.join(' · ')), checklist),
       h('div.queue-actions', {}, ...buttons),
     );
   };

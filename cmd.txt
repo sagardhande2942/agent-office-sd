@@ -292,3 +292,16 @@ HELPER REPORT HANDLING AND ACTIVE-TASK NOTICES
     plugin appends notices to root tool results. No new flags are needed. These
     notices request a response during the current task, after the tool finishes.
     Launch/resume workers to load updated hooks. Other providers check explicitly.
+
+COMPLETION CHECKLIST
+  office-workers completion [--json]
+    Read your current task revision and completion report (JSON output).
+  office-workers complete [--json] < report.json
+    Submit JSON: revision, summary, checks [{name,status,evidence}], files,
+    pr or prNote; filesNote is required when files is empty. Optional commit.
+    Status: passed/failed/skipped. Failed checks need attention; skips need reasons.
+    Explicit revision rejects stale prepared reports; omitted revision is read
+    immediately before submission. This records evidence; it does not run checks,
+    publish PRs or mark work finished. See docs/completion-checklist.md.
+  MCP: worker_completion / submit_worker_completion
+    Read first; submission requires the returned revision.

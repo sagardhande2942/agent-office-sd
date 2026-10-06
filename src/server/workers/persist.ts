@@ -1,3 +1,4 @@
+import { restoreCompletion } from '../completion.js';
 // workers.json: every worker as the office last saw it, to pick them all back up after a restart.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import type { AgentProvider, WorkerInfo, WorkerStatus, WorkerTask } from '../../shared/protocol.js';
@@ -37,6 +38,8 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     sessionId: info.sessionId,
     activity: info.activity,
     task: info.task,
+    completionRevision: info.completionRevision,
+    completion: info.completion,
     pr: info.pr,
     pastPrs: info.pastPrs,
     meeting: info.meeting,
@@ -95,6 +98,8 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         sessionId: s.sessionId,
         activity: s.activity,
         task: validTask(s.task),
+        completionRevision: Number.isSafeInteger(s.completionRevision) && s.completionRevision! >= 0 ? s.completionRevision : 0,
+        completion: restoreCompletion(s.completion, s.completionRevision ?? 0),
         pr: s.pr && typeof s.pr.number === 'number' && typeof s.pr.url === 'string' ? { number: s.pr.number, url: s.pr.url } : undefined,
         pastPrs: Array.isArray(s.pastPrs) && s.pastPrs.every((n: unknown) => typeof n === 'number') && s.pastPrs.length ? s.pastPrs : undefined,
         usage: usage?.persisted ? reportedUsage(s.usage) : usage?.transcript && tracker.transcript ? trackerUsage(tracker) : undefined,

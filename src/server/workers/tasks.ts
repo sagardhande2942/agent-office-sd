@@ -38,11 +38,17 @@ export class WorkerTasks {
   }
 
   /** A new message for the worker: show it right away, and have its task (re)named. */
-  notePrompt(w: Worker, prompt: string) {
+  notePrompt(w: Worker, prompt: string, newTurn = false) {
     if (w.info.kind !== 'agent') return;
     const clean = prompt.replace(/\s+/g, ' ').trim();
-    // Bare slash commands (/model, /compact), repeats and the office's own carry-on aren't new work.
-    if (!clean || /^\/\S+$/.test(clean) || w.prompts.at(-1) === clean || clean === CARRY_ON_PROMPT) return;
+    // Native turns invalidate evidence even when their prompt repeats; duplicate bridge calls do not.
+    if (!clean || /^\/\S+$/.test(clean) || clean === CARRY_ON_PROMPT) return;
+    const repeated = w.prompts.at(-1) === clean;
+    if (repeated && !newTurn) return;
+    w.info.completionRevision = (w.info.completionRevision ?? 0) + 1;
+    delete w.info.completion;
+    this.ctx.persist();
+    if (repeated) { this.ctx.emit(w); return; }
     w.prompts = [...w.prompts, clean].slice(-TASK_PROMPTS);
     const hadTask = !!w.info.task;
     if (!hadTask) w.info.task = fallbackTask(clean);
@@ -62,11 +68,14 @@ export class WorkerTasks {
   /** A new conversation (/clear, another session): a new task. */
   clear(w: Worker) {
     w.taskEpoch++;
+    w.info.completionRevision = (w.info.completionRevision ?? 0) + 1;
+    delete w.info.completion;
+    this.ctx.persist();
     w.prompts = [];
     w.tools = [];
     w.toolsSinceNamed = 0;
     this.namer.forget(w.info.id);
-    if (!w.info.task) return;
+    if (!w.info.task) { this.ctx.emit(w); this.ctx.persist(); return; }
     w.info.task = undefined;
     this.ctx.emit(w);
     this.ctx.persist();

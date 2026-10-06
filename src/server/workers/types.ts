@@ -148,7 +148,7 @@ export interface WorkerHandle<S = unknown> {
   /** Saves every worker (workers.json). */
   persist(): void;
   /** A new message for it: shown right away, and its task (re)named. */
-  notePrompt(prompt: string): void;
+  notePrompt(prompt: string, newTurn?: boolean): void;
   /** A tool call it made, for naming its task. */
   noteTool(tool: string): void;
   /** A shell command it ran and what that printed: a pull request it opened that way is its own (see WorkerPrs.noteOwn). */

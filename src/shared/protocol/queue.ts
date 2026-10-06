@@ -1,3 +1,4 @@
+import type { CompletionReport } from '../completion.js';
 // The floor's task queue.
 
 import type { AgentEffort, AgentProvider } from './agents.js';
@@ -6,6 +7,7 @@ export type TaskStatus = 'queued' | 'running' | 'done';
 
 /** A task on the 📋 queue whiteboard: a GitHub issue or free text, seated to a worker by itself. */
 export interface QueueTask {
+  completion?: CompletionReport;
   id: string;
   provider?: AgentProvider;
   /** Model requested for this task, instead of the office's configured default: an id its provider takes (see WorkerInfo.model). */

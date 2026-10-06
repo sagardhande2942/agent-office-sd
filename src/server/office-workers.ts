@@ -1,3 +1,4 @@
+import type { CompletionReport } from '../shared/completion.js';
 // The office's workers, for the agents working in it: what `office-workers` and the agent-office MCP
 // server (bin/office-workers.js) get from the /office/workers endpoint on the loopback hook port, and
 // how their requests are read. The endpoint itself is in server.ts, next to the board agents' queue.
@@ -12,6 +13,7 @@ import { landedWork, notLeaving } from './leave-on-merge.js';
 
 /** One worker as an agent sees it: enough to pick the ones to send home, and say why. */
 export interface WorkerRow {
+  completion?: CompletionReport;
   id: string;
   name: string;
   kind: 'agent' | 'shell';
@@ -71,6 +73,7 @@ export function workerRow(w: WorkerInfo, view: PullsView, me?: string): WorkerRo
   const activity = clip(w.activity);
   return {
     id: w.id,
+    ...(w.completion ? {completion:w.completion} : {}),
     name: w.name,
     kind: w.kind,
     ...(w.provider ? { provider: w.provider } : {}),

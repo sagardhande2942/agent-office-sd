@@ -94,7 +94,7 @@ export function reduceStatus(h: WorkerHandle<StatusState>, payload: OpenCodeStat
   if (payload.prompt) {
     info.activity = truncate(payload.prompt, 80);
     info.action = undefined;
-    h.notePrompt(payload.prompt);
+    h.notePrompt(payload.prompt, true);
   } else if (payload.tool) {
     info.activity = truncate(payload.tool, 80);
     info.action = toolAction(payload.tool);

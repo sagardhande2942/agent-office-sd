@@ -422,3 +422,20 @@ test("a queue worker that switches to a branch of its own takes its task's branc
   }]);
   assert.equal(q.state().tasks[0].pr?.number, 242);
 });
+
+
+test('finished queue tasks retain a completion snapshot after worker removal and restart; retries clear it', (t) => {
+  const f = fixture(); t.after(() => f.close());
+  const q = f.open(); q.add('Build API', 'Tester');
+  const w = f.workers[0];
+  w.completion = {revision:1,summary:'API implemented',checks:[{name:'Tests',status:'passed',evidence:'42 tests pass'}],files:['src/api.ts'],prNote:'Local-only work',submittedAt:100,status:'ready'};
+  w.status='done'; q.onWorker(w);
+  assert.equal(q.state().tasks[0].completion?.summary,'API implemented');
+  w.completion.summary='A different task';
+  assert.equal(q.state().tasks[0].completion?.summary,'API implemented','snapshot must not track later worker mutations');
+  f.workers.splice(0,1); q.onWorkerGone(w.id); q.shutdown();
+  const restored=f.open();
+  assert.equal(restored.state().tasks[0].completion?.checks[0].evidence,'42 tests pass');
+  restored.retry(restored.state().tasks[0].id);
+  assert.equal(restored.state().tasks[0].completion,undefined);
+});

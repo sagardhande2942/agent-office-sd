@@ -1,3 +1,4 @@
+import { completionLabel } from '../shared/completion';
 import { openCommunications } from './ui/communications';
 // The 2D view (/lite): the office without the 3D, for a phone or a computer the 3D office is too
 // much for. Every worker on the floor and how it's doing, the ones waiting on someone first; its
@@ -152,13 +153,14 @@ function workerCard(w: WorkerInfo): HTMLElement {
       : asleep
         ? '💤 Asleep: open it to wake it up'
         : w.status === 'done'
-          ? w.task?.summary && `✅ ${w.task.summary}`
+          ? w.completion?.status === 'needs-attention' ? `⚠️ Checks need attention · ${w.completion.summary}` : w.task?.summary && `Turn finished · ${w.task.summary}`
           : (w.task?.summary ?? w.activity);
   const sub = [
     w.kind === 'agent' ? `⚙️ ${providerLabel(w.provider, store.project)}${badge ? ` · ${badge}` : ''}` : '🐚 shell',
     desk && (desk.station ? `📌 ${desk.label}` : desk.label),
     w.worktree && `🌿 ${w.worktree.branch}`,
     w.pr && `🔀 PR #${w.pr.number}`,
+    w.kind === 'agent' && !w.helper && completionLabel(w.completion),
     w.lastInput && `⌨️ ${w.lastInput.by} ${timeAgo(w.lastInput.at)}`,
   ].filter(Boolean);
   return h(

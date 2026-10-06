@@ -477,6 +477,7 @@ Helpers carry a laptop showing their own terminal. Aim at the helper or its lapt
 
 Sending a worker home also stops and removes its helper before cleaning up the worker’s checkout. Sending only the helper home leaves the host worker and its worktree intact.
 
+Workers can record a **completion checklist** with actual check results, changed files and a PR link (or reasons they do not apply). Inspect it in worker terminals, lite cards, CLI worker details and finished queue tasks. Failed checks remain visible as needing attention; a ready terminal alone is not proof of success. See [completion checklists](docs/completion-checklist.md) for CLI/MCP submission and lifecycle.
 See [the upstream integration notes](docs/upstream-integration.md) for the imported features and preserved fork behavior.
 
 Press **J** or choose **Smartphone** in the menu to find workers and helpers, open their terminals, send a prompt or review a helper report. Messages may queue while a worker is busy; replies and approvals are handled in the terminal. Phone history lasts for this browser session.
@@ -488,3 +489,4 @@ Open **Boss Control Center** from the menu or the Workers panel’s **Boss** but
 TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
 
 At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
+

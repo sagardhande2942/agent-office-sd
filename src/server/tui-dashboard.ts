@@ -1,3 +1,4 @@
+import { completionLabel } from '../shared/completion.js';
 import { contextLabel } from '../shared/communications.js';
 import { builtDesks } from '../shared/layout.js';
 import type { FloorInfo, FloorView, WorkerInfo, WorktreeCleanup } from '../shared/protocol.js';
@@ -100,7 +101,7 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     }
     if (side) {
       const w = all[selected]?.worker;
-      const details = w ? ['SELECTED WORKER', w.name, w.id, `Status: ${w.status}`, `Agent: ${w.provider ?? w.kind}`, '', w.task?.name ?? '', w.task?.summary ?? w.activity ?? '', '', `By: ${w.createdBy}`, w.pr ? `PR #${w.pr.number}` : '', 'Enter: live terminal', 'p: prompt   r: resume', 'x: send home'] : ['EMPTY DESK', all[selected]?.label ?? '', '', 'Enter: hire here', '', 'h: hire an agent', ': command prompt'];
+      const details = w ? ['SELECTED WORKER', w.name, w.id, `Status: ${w.status}`, completionLabel(w.completion), ...(w.completion ? [w.completion.summary, ...w.completion.checks.map(c => `${c.status}: ${c.name} — ${c.evidence}`), `Files: ${w.completion.files.join(', ') || w.completion.filesNote}`, w.completion.pr ?? w.completion.prNote ?? ''] : []), `Agent: ${w.provider ?? w.kind}`, '', w.task?.name ?? '', w.task?.summary ?? w.activity ?? '', '', `By: ${w.createdBy}`, w.pr ? `PR #${w.pr.number}` : '', 'Enter: live terminal', 'p: prompt   r: resume', 'x: send home'] : ['EMPTY DESK', all[selected]?.label ?? '', '', 'Enter: hire here', '', 'h: hire an agent', ': command prompt'];
       const gridWidth = width - 34;
       body = Array.from({ length: bodyHeight }, (_, i) => {
         const grid = body[i] ?? '';
