@@ -1,4 +1,6 @@
 import { PLAN_CRITERIA, DEFAULT_PLAN_WEIGHTS, type PlanWeights, type DetailedPlan, type PlanRating, type PlanReviewActivity, type PlanReviewRequest } from '../shared/plan-review.js';
+import { isAgentProvider, takesModel } from '../shared/providers.js';
+import { planModelIdentity } from '../shared/plan-providers.js';
 import { isAgentEffort, type AgentChoice } from '../shared/protocol.js';
 import { validateWorkerModel, validateWorkerEffort } from './agents.js';
 
@@ -7,17 +9,17 @@ function text(v:unknown,label:string,min=1,max=12000):string { if(typeof v!=='st
 function list<T>(v:unknown,label:string,map:(item:any)=>T,min=1,max=30):T[] { if(!Array.isArray(v)||v.length<min||v.length>max)throw Error(`${label} needs ${min}–${max} entries`);return v.map(map); }
 export function planningChoice(v:unknown):AgentChoice {
   const c=object(v,'model choice');
-  if(c.provider!=='claude'&&c.provider!=='opencode')throw Error('Planning supports Claude Code and OpenCode 1.x with restricted read-only tools; other models can be selected through OpenCode');
+  if(!isAgentProvider(c.provider)||!takesModel(c.provider))throw Error('Choose a coding agent with selectable models for planning');
   const bad=validateWorkerModel('agent',c.provider,c.model)??validateWorkerEffort('agent',c.provider,c.effort);
   if(bad)throw Error(bad);
-  if(!c.model)throw Error('Choose an explicit model for every planning worker and reviewer');
+  if(takesModel(c.provider)&&!c.model)throw Error('Choose an explicit model for every planning worker and reviewer');
   return {provider:c.provider,model:c.model,...(isAgentEffort(c.effort)?{effort:c.effort}:{})};
 }
 export function readPlanRequest(value:unknown):PlanReviewRequest & {weights:PlanWeights;minutes:number;constraints:string} {
   const b=object(value,'activity'), candidates=list(b.candidates,'candidates',planningChoice,1,5);
   if(new Set(candidates.map(c=>`${c.provider}:${c.model}`.toLowerCase())).size!==candidates.length)throw Error('Each candidate must use a different explicit model');
   // Claude aliases and the matching OpenCode alias are also the same model choice.
-  const identities=candidates.map(c=>c.provider==='claude'?`anthropic/${c.model}`:`${c.model}`.toLowerCase());
+  const identities=candidates.map(c=>planModelIdentity(c.provider,c.model));
   if(new Set(identities).size!==identities.length)throw Error('Candidate model aliases must be distinct');
   const w=object(b.weights??DEFAULT_PLAN_WEIGHTS,'weights'),weights={} as PlanWeights;
   for(const c of PLAN_CRITERIA){if(!Number.isInteger(w[c.id])||w[c.id]<0||w[c.id]>100)throw Error('Weights must be whole numbers between 0 and 100');weights[c.id]=w[c.id];}

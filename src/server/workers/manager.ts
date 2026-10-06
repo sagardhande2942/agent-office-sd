@@ -1,4 +1,4 @@
-import { planningSeat, planningVersion, promotePlanWorker } from './plan-review.js';
+import { planningSeat, planningVersion, planningPrompt, promotePlanWorker } from './plan-review.js';
 import type { PlanReviewWorker } from '../../shared/plan-review.js';
 import { submitCompletion } from './completion.js';
 import {holdOffline} from './offline.js';
@@ -690,7 +690,7 @@ export class WorkerManager {
     }
     const shell = defaultShell();
     const isShell = info.kind === 'shell';
-    if (!isShell && prompt && !info.planReview?.locked) prompt = `${prompt}\n\n${WORKER_COORDINATION}`;
+    if (!isShell && prompt) prompt = info.planReview?.locked ? planningPrompt(info, prompt) : `${prompt}\n\n${WORKER_COORDINATION}`;
     const adapter = isShell ? undefined : providerAdapter(info.provider);
     const configured = !isShell && info.provider === this.defaultProvider;
     const cwd = this.cwd(info);
