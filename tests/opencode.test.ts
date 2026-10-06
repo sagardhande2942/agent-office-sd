@@ -329,3 +329,29 @@ test('planning plugin denies edits, commands, delegation and unrelated MCP tools
  process.env.AGENT_OFFICE_PLAN_ROLE='reviewer';assert.throws(()=>hooks['tool.execute.before']({tool:'agent-office_submit_candidate_plan'}),/planning session/);
  }finally{if(previous===undefined)delete process.env.AGENT_OFFICE_PLAN_ROLE;else process.env.AGENT_OFFICE_PLAN_ROLE=previous;for(const [k,v]of Object.entries(before)){if(v===undefined)delete process.env[k];else process.env[k]=v;}rmSync(dir,{recursive:true,force:true});}
 });
+
+test('planning uses native Plan with role-scoped tools while promotion restores normal launch permissions', () => {
+  const setup={plugin:'/data/agent-office-opencode.mjs',mcpScript:'/bin/office-workers.js'};
+  const launch=(role:'candidate'|'reviewer',locked=true,resumeSessionId?:string)=>{
+    const info={model:'opencode/mimo-v2.6-flash-free',planReview:{id:'activity',role,locked}};
+    const plan=opencode.launch({h:{info,state:{}} as never,args:[],prompt:'Plan only',setup,resumeSessionId});
+    const env:Record<string,string>={};plan.finishEnv!(env);
+    return {args:plan.args,config:JSON.parse(env.OPENCODE_CONFIG_CONTENT)};
+  };
+  for(const role of ['candidate','reviewer'] as const){
+    const planning=launch(role);
+    assert.deepEqual(planning.args.slice(0,2),['--agent','plan']);
+    assert.equal(planning.config.agent.office_plan,undefined);
+    assert.equal(planning.config.permission.bash,'ask');
+    assert.equal(planning.config.permission['*'],'deny');
+    assert.equal(planning.config.permission.read,'allow');
+    assert.equal(planning.config.permission.agent_office_submit_candidate_plan,undefined);
+    assert.equal(planning.config.permission['agent-office_submit_candidate_plan'],role==='candidate'?'allow':undefined);
+    assert.equal(planning.config.permission['agent-office_submit_plan_review'],role==='reviewer'?'allow':undefined);
+    assert.equal(launch(role,true,'ses_restart').args[1],'plan');
+  }
+  const implemented=launch('candidate',false);
+  assert.ok(!implemented.args.includes('--agent'));
+  assert.equal(implemented.config.permission,undefined);
+  assert.equal(implemented.config.agent,undefined);
+});
