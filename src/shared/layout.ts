@@ -1,3 +1,5 @@
+import { plantByWing, plantsAt, greenPlantKind, streetBelow, roofDrop, seatPlace, seatAt, seatHere, elevatorSpot, inElevator } from './layout-places.js';
+export { plantByWing, plantsAt, greenPlantKind, streetBelow, roofDrop, seatPlace, seatAt, seatHere, elevatorSpot, inElevator } from './layout-places.js';
 // Static office layout shared by the server (validation) and client (rendering).
 // Units are meters; +y is up. The office floor spans FLOOR.minX..maxX / minZ..maxZ at y = 0,
 // upstairs over a garage whose floor is level with the street (STREET_Y).
@@ -23,11 +25,11 @@ export interface DeskDef {
   wing?: number;
 }
 
-const DESK_WIDTH = 2.2;
-const DESK_DEPTH = 1.1;
+export const DESK_WIDTH = 2.2;
+export const DESK_DEPTH = 1.1;
 export const DESK_SIZE = { width: DESK_WIDTH, depth: DESK_DEPTH, height: 0.78 } as const;
 
-function buildDesks(): DeskDef[] {
+export function buildDesks(): DeskDef[] {
   const desks: DeskDef[] = [];
   const clusterX = [-10.5, -1.5];
   // Each pod is two back-to-back rows; the far row faces +z (rotY = PI).
@@ -172,19 +174,25 @@ export const STAIRS = { fromX: 3, toX: LOFT.minX, minZ: 11.2, maxZ: FLOOR.maxZ, 
  * north wall, facing the lounge.
  */
 export const MEETING_ROOM = { minX: LOFT.minX + 0.15, maxX: FLOOR.maxX, minZ: LOFT.minZ + 0.15, maxZ: FLOOR.maxZ, height: LOFT.y - 0.25, door: { x0: 10, x1: 11.4 } } as const;
-export const MEETING_TABLE = { x: 13.7, z: 10.55, width: 3.6, depth: 1.2, height: 0.76 } as const;
+export const MEETING_TABLE = { x: 13.7, z: 10.5, width: 4.2, depth: 1.7, height: 0.76 } as const;
+/**
+ * A laptop at the meeting table: its size next to the model's, and how far toward its chair it lies
+ * from the place (x, z) it's at. With the place this far in from the table's edge, two open laptops
+ * facing each other across the table have room between the backs of their lids.
+ */
+export const MEETING_LAPTOP = { scale: 1, z: 0.07, in: 0.45 } as const;
 /**
  * The chairs round the meeting table, in the order a meeting fills them: the head of the table at its
- * west end (whoever leads or writes the meeting up), then two down each side. (x, z) is where the
- * laptop sits on the table; the chair is out from it the way a desk's is (deskSeat).
+ * west end (whoever leads or writes the meeting up), then two down each side. (x, z) is its place at
+ * the table, where its laptop goes (MEETING_LAPTOP); the chair is out from it the way a desk's is (deskSeat).
  */
 export const MEETING_SEATS: DeskDef[] = (
   [
-    [MEETING_TABLE.x - MEETING_TABLE.width / 2 + 0.35, MEETING_TABLE.z, -Math.PI / 2],
-    [MEETING_TABLE.x - 0.6, MEETING_TABLE.z - MEETING_TABLE.depth / 2 + 0.35, Math.PI],
-    [MEETING_TABLE.x - 0.6, MEETING_TABLE.z + MEETING_TABLE.depth / 2 - 0.35, 0],
-    [MEETING_TABLE.x + 1.1, MEETING_TABLE.z - MEETING_TABLE.depth / 2 + 0.35, Math.PI],
-    [MEETING_TABLE.x + 1.1, MEETING_TABLE.z + MEETING_TABLE.depth / 2 - 0.35, 0],
+    [MEETING_TABLE.x - MEETING_TABLE.width / 2 + MEETING_LAPTOP.in, MEETING_TABLE.z, -Math.PI / 2],
+    [MEETING_TABLE.x - 0.65, MEETING_TABLE.z - MEETING_TABLE.depth / 2 + MEETING_LAPTOP.in, Math.PI],
+    [MEETING_TABLE.x - 0.65, MEETING_TABLE.z + MEETING_TABLE.depth / 2 - MEETING_LAPTOP.in, 0],
+    [MEETING_TABLE.x + 1.15, MEETING_TABLE.z - MEETING_TABLE.depth / 2 + MEETING_LAPTOP.in, Math.PI],
+    [MEETING_TABLE.x + 1.15, MEETING_TABLE.z + MEETING_TABLE.depth / 2 - MEETING_LAPTOP.in, 0],
   ] as const
 ).map(([x, z, rotY], i) => ({ id: `meeting-${i + 1}`, x, z, rotY, label: i === 0 ? 'Head of the table' : `Meeting chair ${i + 1}`, room: true }));
 /** The board on the meeting room's back (south) wall that shows the meeting's output file as it's written. */
@@ -302,16 +310,6 @@ export const PLANTS: readonly (readonly [x: number, z: number, scale: number])[]
   [3.9, -1.4, 0.95],
 ];
 
-/** A plant by the north wall east of the gong, in the way into the back office: put away once it's built. */
-export function plantByWing([x, z]: readonly [number, number, number]): boolean {
-  return x > WING.minX && z < FLOOR.minZ + 1.5;
-}
-
-/** The plants standing on a floor built out `level` rows (see WING). */
-export function plantsAt(level: number): readonly (readonly [x: number, z: number, scale: number])[] {
-  return level > 0 ? PLANTS.filter((p) => !plantByWing(p)) : PLANTS;
-}
-
 /**
  * The potted greenery built in code (world/plants.ts) rather than modelled in Blender: the tall
  * palms and figs and the peace lilies. A row of them takes turns with the species (see
@@ -319,11 +317,6 @@ export function plantsAt(level: number): readonly (readonly [x: number, z: numbe
  */
 export type GreenKind = 'areca_palm' | 'fiddle_fig' | 'peace_lily';
 export const GREEN_KINDS = ['areca_palm', 'fiddle_fig', 'peace_lily'] as const satisfies readonly GreenKind[];
-
-/** The code-built species for the `i`th of a row of them (see GREEN_PLANTS). */
-export function greenPlantKind(i: number): GreenKind {
-  return GREEN_KINDS[i % GREEN_KINDS.length];
-}
 
 /**
  * The code-built plants standing on the office floor: where, and how big. They fill the gaps the
@@ -386,11 +379,6 @@ export const SLAB = 0.3;
 export const STOREY = WALL_HEIGHT + SLAB;
 /** How thick the outside walls are. They stand just outside FLOOR. */
 export const WALL_T = 0.3;
-
-/** How far below floor `index` of the building (0 is the bottom one) the street is. */
-export function streetBelow(index: number): number {
-  return STREET_Y - Math.max(0, index) * STOREY;
-}
 
 export type Side = 'north' | 'south' | 'east' | 'west';
 
@@ -462,18 +450,6 @@ export const GOLF_HOLE = { x: -5, z: 58, green: 5.5, fairway: [-11, 0] } as cons
  * the balcony doors.
  */
 export const PARACHUTE = { jump: { x: BALCONY_DOOR.u, z: BALCONY.maxZ - 0.45 }, railTop: 1.09, out: 1.2, east: [0.6, 1.8] } as const;
-
-// ---- The rooftop bar (see shared/rooftop.ts) ------------------------------------------------------
-// The roof of the building, level with the office floor's y = 0 and the same size, so the elevator
-// comes up in its usual spot. A glass railing runs round the edge, and the city is far below.
-
-/**
- * How far below the roof the street is, with `floors` floors under it: the building is this tall.
- * The roof stands a STOREY over the top floor, where a floor above it would be.
- */
-export function roofDrop(floors: number): number {
-  return -streetBelow(Math.max(1, floors));
-}
 /** The DJ's stage, against the north edge west of the elevator, with the dance floor in front of it. */
 export const STAGE = { minX: -8, maxX: 2, minZ: FLOOR.minZ, maxZ: -9.2, height: 0.6 } as const;
 /** Where the DJ stands behind the decks, facing the dance floor (+z). */
@@ -491,7 +467,7 @@ export const ROOF_TABLES: readonly { x: number; z: number }[] = [
   { x: 6, z: 10.8 },
 ];
 /** Sun loungers along the south edge, looking out over the street. */
-const LOUNGERS = [-2.2, 0.6, 3.4];
+export const LOUNGERS = [-2.2, 0.6, 3.4];
 
 /**
  * Something to sit on, standing at x, z on the floor at `y` (the loft's, for what's up there). You
@@ -564,36 +540,6 @@ export interface SeatPlace {
   out: number;
 }
 
-export function seatPlace(seat: SeatDef, i: number): SeatPlace {
-  const fx = Math.sin(seat.rotY);
-  const fz = Math.cos(seat.rotY);
-  const along = seat.places[i] ?? 0;
-  return {
-    key: `${seat.id}:${i}`,
-    seatId: seat.id,
-    x: seat.x + fx * seat.depth + fz * along,
-    y: seat.y,
-    z: seat.z + fz * seat.depth - fx * along,
-    rotY: seat.rotY,
-    hips: seat.hips,
-    out: seat.out,
-  };
-}
-
-/** The place a peer's `seat` names, or undefined if there's no such place. */
-export function seatAt(key: string): SeatPlace | undefined {
-  const m = /^([\w-]+):(\d+)$/.exec(key);
-  const seat = m ? SEATING_BY_ID.get(m[1]) : undefined;
-  const i = Number(m?.[2]);
-  return seat && i < seat.places.length ? seatPlace(seat, i) : undefined;
-}
-
-/** The place `key` names, if it's somewhere you can sit from where you are: up on the roof, or down on a floor. */
-export function seatHere(key: string, onRoof: boolean): SeatPlace | undefined {
-  const place = seatAt(key);
-  return place && !!SEATING_BY_ID.get(place.seatId)!.roof === onRoof ? place : undefined;
-}
-
 /**
  * The elevator: a shaft against the north wall, between the PR board and the gong, with its
  * doors facing into the room. Every floor has it in the same spot, so you step out where you got in.
@@ -608,18 +554,6 @@ export const ELEVATOR_CAR = {
   minZ: FLOOR.minZ,
   maxZ: ELEVATOR_FRONT - ELEVATOR.wall,
 } as const;
-
-/** Somewhere inside the car, facing the doors (+z), a little apart from anyone else arriving. */
-export function elevatorSpot(): { x: number; z: number } {
-  return {
-    x: ELEVATOR.x + (Math.random() - 0.5) * 0.7,
-    z: (ELEVATOR_CAR.minZ + ELEVATOR_CAR.maxZ) / 2 + (Math.random() - 0.5) * 0.6,
-  };
-}
-
-export function inElevator(x: number, z: number): boolean {
-  return x > ELEVATOR_CAR.minX && x < ELEVATOR_CAR.maxX && z > ELEVATOR_CAR.minZ && z < ELEVATOR_CAR.maxZ;
-}
 
 /**
  * The ladder to the floors above and below: against the west wall at `z`, up through a hatch in the

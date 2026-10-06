@@ -3,35 +3,12 @@ import { FORGE_CLI, FORGE_LABEL } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store, workerForPull } from '../state';
 import { h, openModal, timeAgo } from './dom';
-import { labelChip, openIssue, openLabels, openPull } from './pull';
+import { openIssue } from './github/issue-window';
+import { labelChip, openLabels } from './github/labels';
+import { inProgress } from './github/progress';
+import type { BoardActions } from './github/prompts';
+import { openPull } from './github/pull-window';
 import { providerLabel } from './provider';
-import type { MeetingPreset } from './meeting';
-import { officePrompt } from './prompts';
-
-export interface BoardActions {
-  /** Start a worker on a ready-made prompt (shown for editing first). */
-  assign(prompt: string, title: string): void;
-  /** Your own prompt about an issue or PR; `context` goes first so the worker knows which. */
-  ask(context: string, title: string): void;
-  /** Walks you to the desk a pull request came from. */
-  goToDesk(deskId: string): void;
-  /** Put an issue on the 📋 task queue; a worker is seated for it when there's room. */
-  queue(prompt: string, title: string, issue: number, provider?: AgentProvider, model?: string, effort?: AgentEffort): void;
-  /** Take the issue's card off the board, to carry to a desk or the queue (not on the 2D view, where there's nobody to carry it). */
-  pickUp?(issue: GhIssue): void;
-  /** Call a meeting about it: the meeting room's form, filled in. */
-  meeting(preset: MeetingPreset): void;
-}
-
-/** The task a worker gets for an issue, from the board, a carried card or the queue (the 'issue.work' prompt). */
-export function issuePrompt(it: Pick<GhIssue, 'number' | 'title'> & { url?: string }): string {
-  return officePrompt('issue.work', issueVars(it));
-}
-
-/** What an issue's prompts fill in. A carried card has no URL, but the board usually knows it. */
-export function issueVars(it: Pick<GhIssue, 'number' | 'title'> & { url?: string }) {
-  return { number: it.number, title: it.title, url: it.url ?? store.issues.items.find((i) => i.number === it.number)?.url ?? '' };
-}
 
 const TILTS = ['-1.2deg', '0.8deg', '-0.4deg', '1.4deg', '0deg', '-0.9deg'];
 const NOTE_COLORS = ['#fff7b0', '#ffd6e0', '#caffbf', '#bde0fe', '#ffe5b4'];
@@ -49,11 +26,11 @@ const byUpdated = (a: { updatedAt: string }, b: { updatedAt: string }) => b.upda
 
 function issueColumns(items: GhIssue[]): Column<GhIssue>[] {
   const open = items.filter((i) => i.state === 'OPEN');
-  const inProgress = open.filter((i) => i.assignees.length > 0 || i.labels.some((l) => /progress|doing|wip|started/i.test(l.name)) || store.taskForIssue(i.number)?.status === 'running');
-  const todo = open.filter((i) => !inProgress.includes(i));
+  const started = open.filter((i) => inProgress(i, store.taskForIssue(i.number)));
+  const todo = open.filter((i) => !started.includes(i));
   return [
     { key: 'open', title: '📥 Open', items: todo },
-    { key: 'progress', title: '🚧 In progress', items: inProgress },
+    { key: 'progress', title: '🚧 In progress', items: started },
     { key: 'closed', title: '✅ Closed', items: items.filter((i) => i.state !== 'OPEN').sort(byUpdated), max: 40 },
   ];
 }
@@ -307,7 +284,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
       for (const col of issueColumns(store.issues.items)) {
         body.append(
           column(col, all, (it, i) =>
-            card(it.number, it.title, [...labelChips(it.labels), queueChip(it.number), it.assignees.length ? `👤 ${it.assignees.join(', ')}` : `by ${it.author}`, it.comments ? `💬 ${it.comments}` : '', timeAgo(it.updatedAt)], i, () => openIssue(it, net, actions), () => openLabels('issue', it, net)),
+            card(it.number, it.title, [...labelChips(it.labels), queueChip(it.number), it.assignees.length ? `👤 ${it.assignees.join(', ')}` : it.taken ? '🤖 handed to a worker' : `by ${it.author}`, it.comments ? `💬 ${it.comments}` : '', timeAgo(it.updatedAt)], i, () => openIssue(it, net, actions), () => openLabels('issue', it, net)),
           ),
         );
       }

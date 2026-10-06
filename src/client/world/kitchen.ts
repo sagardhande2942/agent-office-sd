@@ -1,9 +1,11 @@
+declare module './types' { interface OfficeHandles { fridge: Fridge; } }
 import * as THREE from 'three';
 import { buildFridge, type Fridge } from './fridge';
 import { model, paintModel, palette } from './models';
 import { herbPot, tablePlant } from './plants';
 import { toon } from './toon';
-import type { Collider, Interactable } from './office';
+import type { Collider, Interactable } from './types';
+import type { Fixture } from './office/fixture';
 
 // The kitchen corner against the south wall: a counter with a wooden top and a sink under the window,
 // a chunky espresso machine (E at it pours you a cup, see main.ts) and a round-shouldered retro fridge
@@ -75,3 +77,13 @@ export function buildKitchen(): Kitchen {
   ];
   return { group, colliders, interactable, fridge };
 }
+
+/** The kitchen corner: the counter, the coffee machine and the fridge. */
+export const kitchen: Fixture<'fridge'> = (site) => {
+  const built = buildKitchen();
+  // Counter, coffee machine and fridge, in front of the south wall.
+  site.wall('south', -14.5, 0.55, 5.1, 1.1);
+  site.wall('south', -15.7, 0.9, 0.6, 1.8);
+  site.wall('south', -11.3, 1.1, 1.1, 2.2);
+  return { group: built.group, colliders: built.colliders, interactables: [built.interactable, built.fridge.interactable], handle: { fridge: built.fridge }, update: (_t, dt) => built.fridge.update(dt) };
+};

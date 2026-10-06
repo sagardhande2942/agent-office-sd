@@ -1,3 +1,4 @@
+import type { BossGuard } from '../shared/boss.js';
 import http from 'node:http';
 import { Floor, type FloorContext } from './floor.js';
 import { Ledger } from './usage.js';
@@ -139,6 +140,7 @@ export class HostFloors {
     state('cars', { state: floor.garage.state() });
     state('meeting', { state: floor.meetings.state() });
     state('tv', { state: floor.tv.state() });
+    state('helper', { helpers: floor.helpers.states() });
     // The two boards and the dungeon joined them when riding onto a hosted floor became a thing: the
     // office builds the view someone walks into out of exactly these, so a board or a jail that is
     // read but never reported is a room that arrives empty for no reason anyone can see.
@@ -176,6 +178,8 @@ export class HostFloors {
         // into it from here, and it cannot work either out from its own disk.
         branch: floor.project.branch,
         providers: floor.project.agentProviders,
+        bossGuard: true,
+        workerBreaks: true,
         projectsDir: this.projectsDir,
         workers: floor.workers.list().map((w) => ({ id: w.id, status: w.status, deskId: w.deskId })),
       },
@@ -262,10 +266,12 @@ export class HostFloors {
     switch (msg.t) {
       case 'worker.spawn':
         return await floor.workers.spawn(s('deskId'), s('by'), s('prompt') || undefined, m.worktree === true, m.kind as never, m.provider as never, s('model') || undefined, m.effort as never, undefined, s('owner') || undefined);
+      case 'worker.rest':
+        return floor.workers.rest(s('workerId'),m.on===true);
       case 'worker.resume':
         return await floor.workers.resume(s('workerId'), s('prompt') || undefined);
       case 'worker.prompt':
-        return m.helperReport === true ? await floor.workers.deliverHelperReport(s('workerId'), s('by') || undefined) : await floor.workers.prompt(s('workerId'), s('text'), s('by') || undefined);
+        return m.helperReport === true ? await floor.workers.deliverHelperReport(s('workerId'), s('by') || undefined) : await floor.workers.prompt(s('workerId'), s('text'), s('by') || undefined, m.guard as BossGuard | undefined);
       case 'worker.kill': {
         return floor.sendHome(s('workerId'), m.cleanup as never);
       }
