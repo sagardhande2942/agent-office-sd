@@ -134,7 +134,7 @@ function session(ws: WebSocket): Promise<number> {
       let msg: ServerMsg;
       try { msg = JSON.parse(String(raw)); } catch { return; }
       if (msg.t === 'welcome' || msg.t === 'floor.enter') {
-        detach(); view = msg;
+        detach(); dashboard.home = undefined; view = msg;
         if (msg.t === 'welcome') {
           floors = msg.floors;
           active = true;
@@ -151,6 +151,7 @@ function session(ws: WebSocket): Promise<number> {
         print(`${msg.worker.name}: ${msg.worker.status}`);
       } else if (msg.t === 'worker.remove' && view) {
         if (attached === msg.workerId) detach();
+        if (dashboard.home?.worker.id === msg.workerId) dashboard.home = undefined;
         view.workers = view.workers.filter((w) => w.id !== msg.workerId);
       } else if ((msg.t === 'term.snapshot' || msg.t === 'term.data') && attached === msg.workerId) process.stdout.write(msg.data);
       else if (msg.t === 'gh.issues' && view) view.issues = msg.state;
@@ -165,6 +166,20 @@ function session(ws: WebSocket): Promise<number> {
     function keypress(text: string | undefined, key: readline.Key) {
       if (attached || finished) return;
       if (key.ctrl && key.name === 'c') return done(0);
+      if (dashboard.home) {
+        const choice = dashboard.home;
+        const options = ['all', 'worktree', 'keep'] as const;
+        if (key.name === 'escape') { dashboard.home = undefined; dashboard.notice = 'Send home cancelled.'; }
+        else if (key.name === 'return') {
+          dashboard.home = undefined;
+          send({ t: 'worker.kill', workerId: choice.worker.id, ...(choice.worker.worktree && !choice.worker.meeting ? { cleanup: choice.cleanup } : {}) });
+          return print(`Sending ${choice.worker.name} home...`);
+        } else if (choice.worker.worktree && !choice.worker.meeting) {
+          if (text && ['1', '2', '3'].includes(text)) choice.cleanup = options[Number(text) - 1];
+          else if (key.name === 'up' || key.name === 'down') choice.cleanup = options[(options.indexOf(choice.cleanup) + (key.name === 'up' ? 2 : 1)) % options.length];
+        }
+        return draw();
+      }
       if (dashboard.command !== undefined) {
         if (key.name === 'escape') dashboard.command = undefined;
         else if (key.name === 'return') {
@@ -206,10 +221,7 @@ function session(ws: WebSocket): Promise<number> {
       if (text === 'h') return begin('hire ');
       if (text === 'p' && seat?.worker) return begin('prompt ' + seat.worker.id + ' ');
       if (text === 'r' && seat?.worker) return command('resume ' + seat.worker.id);
-      if (text === 'x' && dashboard.panel === 'office' && seat?.worker) {
-        dashboard.notice = `Send ${plain(seat.worker.name)} home: Enter confirms, Esc cancels. Auto cleanup preserves unpushed work; use --cleanup keep to keep everything.`;
-        return begin('home ' + seat.worker.id);
-      }
+      if (text === 'x' && dashboard.panel === 'office' && seat?.worker) return command('home ' + seat.worker.id);
       if (text === 'c') return begin('chat ');
       if (text === 'm') return panel('messages');
       if (text === 'f') return panel('floors');
@@ -257,6 +269,7 @@ function session(ws: WebSocket): Promise<number> {
           throw new Error('Usage: home <worker> [--cleanup auto|keep|worktree|all]');
         }
         const w = worker(key);
+        if (!tail.length) { dashboard.home = { worker: w, cleanup: 'keep' }; return draw(); }
         const cleanup = tail[1];
         send({ t: 'worker.kill', workerId: w.id, ...(cleanup && cleanup !== 'auto' ? { cleanup: cleanup as 'keep' | 'worktree' | 'all' } : {}) });
         return print(`Sending ${w.name} home...`);
