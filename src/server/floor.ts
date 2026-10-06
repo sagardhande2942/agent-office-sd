@@ -1,3 +1,4 @@
+import type { CommunicationsState } from '../shared/communications.js';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -37,6 +38,7 @@ type ToastLevel = 'info' | 'warn' | 'error';
 
 /** What a floor needs from the building around it. */
 export interface FloorContext {
+  communications?(floor: Floor): CommunicationsState;
   agentCmd: string;
   agentArgs: string[];
   /** The DSH profile DeepSeek Harness workers boot (see server/dsh.ts). */
@@ -291,6 +293,7 @@ export class Floor {
         update: (state) => ctx.emit(this, { t: 'meeting', state }),
         toast: (text, level) => ctx.toast(this, text, level),
         hiringPaused: () => ctx.ledger.hiringPaused,
+        communications: () => ctx.communications?.(this) ?? { messages: [] },
         postReview: (pr, file, owner) => {
           const as = ctx.forgeAs(owner, kind);
           return typeof as === 'string' ? Promise.reject(new Error(as)) : this.forge.review(pr, file, as);

@@ -10,6 +10,8 @@ export interface WorkerMessage {
   to: { id: string; name: string };
   text: string;
   context: MessageContext;
+  /** Assigned by the office to requests from meeting participants; replies inherit it. */
+  meeting?: { id: string; round: number };
   at: number;
   expiresAt: number;
   deliveredAt?: number;
@@ -29,4 +31,12 @@ export function messageStatus(message: Omit<WorkerMessage, 'status'>, now = Date
 }
 export function contextLabel(context: MessageContext): string {
   return [context.branch && `branch: ${context.branch}`, context.commit && `commit: ${context.commit}`, context.files?.length && `files: ${context.files.join(', ')}`].filter(Boolean).join(' · ');
+}
+
+/** Threads explicitly linked to a meeting, including handoffs to workers outside its table. */
+export function meetingMessages(messages: WorkerMessage[], id: string): WorkerMessage[] {
+  return messages.filter((m) => m.meeting?.id === id);
+}
+export function unresolvedRequests(messages: WorkerMessage[]): WorkerMessage[] {
+  return messages.filter((m) => m.kind === 'request' && !['completed', 'expired'].includes(m.status));
 }

@@ -1,3 +1,4 @@
+import { meetingMessages, unresolvedRequests, contextLabel, type CommunicationsState } from '../shared/communications.js';
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { closeSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -37,6 +38,7 @@ export interface MeetingTrees {
 }
 
 export interface MeetingEvents {
+  communications?(): CommunicationsState;
   update(state: MeetingState): void;
   toast(text: string, level: 'info' | 'warn' | 'error'): void;
   /** Why nobody may be hired right now (today's budget is spent), if that's so. */
@@ -230,6 +232,16 @@ export class MeetingRoom {
     return undefined;
   }
 
+  /** Only a completed output waiting on communication can be explicitly released. */
+  finishAnyway(id: string, by: string): string | undefined {
+    const m = this.current;
+    if (!m || m.id !== id || m.status !== 'running' || !m.waitingForCommunications) return 'This meeting is not waiting for communication';
+    m.communicationOverride = { by, at: Date.now() };
+    this.finish(m, true);
+    this.changed();
+    return undefined;
+  }
+
   /** Sends the last meeting's workers home and clears the table. */
   clear(by: string): string | undefined {
     const m = this.current;
@@ -292,6 +304,12 @@ export class MeetingRoom {
     if (m.status !== 'running') {
       // Everyone went home one by one: tidy the worktree away after them.
       if (!m.cleared && m.seats.every((s) => !s.workerId || !byId.has(s.workerId))) void this.dismiss(m);
+      return;
+    }
+    if (m.waitingForCommunications) {
+      if (m.tokens > m.budget) return this.halt(m, `over budget: ${fmtTokens(m.tokens)} of ${fmtTokens(m.budget)} tokens`);
+      this.finish(m);
+      if (this.dirty) this.changed();
       return;
     }
     // Only a seat that still owes this step a part needs its worker. A reviewer whose part is written
@@ -421,7 +439,22 @@ export class MeetingRoom {
   }
 
   /** The output is written. Commit it on the meeting's branch, or post the review on its pull request. */
-  private finish(m: Meeting) {
+  private finish(m: Meeting, allowUnresolved = false) {
+    if (this.readPreview(m)) this.dirty = true;
+    const state = this.events.communications?.() ?? { messages: [] };
+    const outstanding = unresolvedRequests(meetingMessages(state.messages, m.id));
+    if (!allowUnresolved && (state.error || outstanding.length)) {
+      if (!m.waitingForCommunications || m.coordinationError !== state.error) {
+        m.waitingForCommunications = true;
+        m.coordinationError = state.error;
+        this.events.toast(state.error ?? `Meeting output is ready; ${outstanding.length} request(s) still need resolution. Read Messages or finish anyway.`, 'warn');
+        this.dirty = true;
+      }
+      return;
+    }
+    m.waitingForCommunications = false;
+    m.coordinationError = undefined;
+    this.dirty = true;
     m.status = 'done';
     m.finishedAt = Date.now();
     m.turns = [];
@@ -577,7 +610,7 @@ export class MeetingRoom {
 
   /** A part, as the prompt that hands it over. */
   private ask(m: Meeting, part: Part): string {
-    return `Round ${m.round} of ${m.rounds}, ${part.doing}. ${part.ask}`;
+    return `Round ${m.round} of ${m.rounds}, ${part.doing}. ${part.ask}\nCheck office-workers inbox --json before writing your final notes for this round. Requests involving this table are tracked with the meeting and round; unresolved requests hold completion until resolved, expired, or explicitly overridden.`;
   }
 
   /** The parts of step `step` of round `round`, or null when that round has no such step. */
@@ -701,10 +734,18 @@ export class MeetingRoom {
   private keepNotes(m: Meeting) {
     try {
       const to = path.join(this.dataDir, 'meetings', m.id);
+      mkdirSync(to, { recursive: true });
       const from = path.join(this.cwd(m), m.notes);
       if (path.resolve(from) !== path.resolve(to) && existsSync(from)) cpSync(from, to, { recursive: true });
       const out = path.join(this.cwd(m), m.output);
       if (existsSync(out)) cpSync(out, path.join(to, `output-${path.basename(m.output)}`));
+      const state = this.events.communications?.() ?? { messages: [] };
+      const messages = meetingMessages(state.messages, m.id);
+      const unresolved = unresolvedRequests(messages);
+      writeFileSync(path.join(to, 'communications.json'), JSON.stringify({ meetingId: m.id, savedAt: Date.now(), override: m.communicationOverride, error: state.error, unresolved: unresolved.map((r) => r.id), messages }, null, 2), { mode: 0o600 });
+      const lines = [`# Communication record: ${m.title}`, '', `Meeting: ${m.id}`, `Unresolved requests at save: ${unresolved.length}`, ...(m.communicationOverride ? [`Finished anyway by ${m.communicationOverride.by} at ${new Date(m.communicationOverride.at).toISOString()}`] : []), ...(state.error ? [state.error] : []), '', 'Decisions remain in the meeting output; this record preserves requests and replies, not inferred decisions.', ''];
+      for (const message of messages) lines.push(`## ${message.kind} · round ${message.meeting?.round} · ${message.status}`, `${message.from.name} → ${message.to.name}`, `ID: ${message.id} · thread: ${message.threadId}`, '', message.text, '', contextLabel(message.context), '');
+      writeFileSync(path.join(to, 'communications.md'), lines.join('\n'), { mode: 0o600 });
     } catch {
       // the notes are a courtesy; the meeting is over either way
     }

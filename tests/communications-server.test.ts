@@ -18,8 +18,7 @@ test('authenticated workers coordinate without prompting and observers receive p
     const ada = await floor.workers.spawn('desk-1', 'tester', undefined, false, 'agent', 'custom');
     const grace = await floor.workers.spawn('desk-2', 'tester', undefined, false, 'agent', 'custom');
     assert.ok(typeof ada !== 'string' && typeof grace !== 'string');
-    const saved = JSON.parse(readFileSync(path.join(dir, '.agent-office/workers.json'), 'utf8'));
-    const token = (id: string) => saved.find((w: { id: string }) => w.id === id).hookToken;
+    const token = (id: string) => JSON.parse(readFileSync(path.join(dir, '.agent-office/workers.json'), 'utf8')).find((w: { id: string }) => w.id === id).hookToken;
     const port = (office.server.address() as { port: number }).port;
     const origin = `http://localhost:${port}`;
     const login = await fetch(origin + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'test-inbox' }) });
@@ -59,6 +58,24 @@ test('authenticated workers coordinate without prompting and observers receive p
     const shell = await floor.workers.spawn('desk-3', 'tester', undefined, false, 'shell'); assert.ok(typeof shell !== 'string');
     assert.equal((await call(grace.id, 'request', { worker: shell.id, prompt: 'Never execute this' })).status, 400);
     assert.equal((await call(grace.id, 'request', { worker: 'another-floor-worker', prompt: 'Wrong floor' })).status, 400);
+    // The office derives meeting membership and round, never trusting supplied links.
+    const spoof = await call(grace.id, 'request', { worker: ada.id, prompt: 'Not a meeting', meeting: { id: 'forged', round: 9 } });
+    assert.equal(spoof.body.message.meeting, undefined);
+    assert.equal(await floor.meetings.start({ pattern: 'debate', prompt: 'Agree API contract', roles: [], rounds: 2, provider: 'custom' }, 'tester'), undefined);
+    const meeting = floor.meetings.state().current!;
+    const [seatA, seatB] = meeting.seats.map((s) => s.workerId!);
+    const linked = await call(seatA, 'request', { worker: seatB, prompt: 'Fields?', key: 'meeting-contract', meeting: { id: 'forged', round: 99 } });
+    assert.equal(linked.status, 200);
+    assert.deepEqual(linked.body.message.meeting, { id: meeting.id, round: 1 });
+    const incoming = await call(ada.id, 'request', { worker: seatA, prompt: 'External dependency' });
+    assert.deepEqual(incoming.body.message.meeting, { id: meeting.id, round: 1 });
+    const answer = await call(seatB, 'reply', { id: linked.body.message.id, prompt: 'id, name' });
+    assert.deepEqual(answer.body.message.meeting, linked.body.message.meeting);
+    const files = path.join(dir, '.agent-office/communications', Buffer.from(floor.id).toString('hex'), 'communications.json');
+    const stored = JSON.parse(readFileSync(files, 'utf8'));
+    assert.deepEqual(stored.find((m: any) => m.id === answer.body.message.id).meeting, linked.body.message.meeting);
+    assert.ok(floor.meetings.finishAnyway('forged', 'tester'));
+
   } finally {
     ws?.terminate(); office.shutdown();
     await new Promise((resolve) => setTimeout(resolve, 300));

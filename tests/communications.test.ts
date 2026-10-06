@@ -136,3 +136,22 @@ test('retention removes completed threads together, preserving active requests',
     assert.ok(state.messages.every((m) => state.messages.some((root) => root.id === m.threadId && root.kind === 'request')));
   } finally { f.close(); }
 });
+
+test('meeting links survive restart and retries across rounds; replies preserve the original round', () => {
+  const f = fixture();
+  try {
+    const request = f.ledger.request(grace, ada, { prompt: 'Confirm contract', key: 'meeting-users' }, { id: 'meeting-1', round: 1 });
+    const restored = f.reload();
+    assert.deepEqual(restored.get(request.id)?.meeting, { id: 'meeting-1', round: 1 });
+    const retry = restored.request(grace, ada, { prompt: 'Confirm contract', key: 'meeting-users' }, { id: 'meeting-1', round: 2 });
+    assert.equal(retry.id, request.id);
+    assert.equal(retry.meeting?.round, 1);
+    const reply = restored.reply(ada, request.id, { prompt: 'id, name', meeting: { id: 'forged', round: 7 } });
+    assert.deepEqual(reply.meeting, request.meeting);
+    assert.deepEqual(f.reload().get(reply.id)?.meeting, request.meeting);
+    const malformed = JSON.parse(readFileSync(path.join(f.dir, 'communications.json'), 'utf8'));
+    malformed[0].meeting.round = 0;
+    writeFileSync(path.join(f.dir, 'communications.json'), JSON.stringify(malformed));
+    assert.throws(f.reload, /Invalid meeting link/);
+  } finally { f.close(); }
+});

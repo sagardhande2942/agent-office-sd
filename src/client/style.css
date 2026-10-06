@@ -1360,3 +1360,9 @@ a.when:hover { text-decoration: underline; }
 .hint .hint-action { display: inline-flex; align-items: center; gap: 6px; border: 0; padding: 0; background: transparent; color: inherit; font: inherit; cursor: pointer; }
 .hint .hint-action:focus-visible { outline: 2px solid #ffd166; outline-offset: 4px; }
 .hint .hint-action { pointer-events: auto; }
+
+@media (max-width: 640px) {
+  .meeting-window footer { flex-wrap: wrap; }
+  .meeting-window footer .grow { flex: 1 0 100%; }
+  .meeting-window footer .btn { flex: 1; }
+}

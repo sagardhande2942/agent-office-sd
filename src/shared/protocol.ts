@@ -516,6 +516,11 @@ export interface Meeting {
   /** False when a worker's provider reports no cost, so `cost` leaves it out. */
   costKnown: boolean;
   status: MeetingStatus;
+  /** All output is written, but linked requests still need resolution. */
+  waitingForCommunications?: boolean;
+  coordinationError?: string;
+  /** Explicit completion despite outstanding requests, recorded in saved notes. */
+  communicationOverride?: { by: string; at: number };
   /** Why it stopped short. */
   reason?: string;
   calledBy: string;
@@ -1264,6 +1269,7 @@ export type ClientMsg =
   | ({ t: 'meeting.start' } & MeetingRequest)
   /** Stop the meeting that's running; its workers stay at the table. */
   | { t: 'meeting.stop' }
+  | { t: 'meeting.finish'; id: string; allowUnresolved: true }
   /** Send the last meeting's workers home and clear the table. */
   | { t: 'meeting.clear' }
   /** Set the office's Slack / Discord webhook; '' removes it. */

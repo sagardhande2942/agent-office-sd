@@ -400,6 +400,7 @@ export class HostFloors {
       case 'meeting.start':
       case 'meeting.stop':
       case 'meeting.clear':
+      case 'meeting.finish':
         // A meeting needs the room's people, which this machine does not know. Refused by kind; the
         // office refuses it too.
         return 'a meeting needs everyone in one building';
