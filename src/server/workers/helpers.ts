@@ -7,16 +7,26 @@ import type { DeskDef } from '../../shared/layout.js';
 import type { AgentProvider, AgentEffort, WorkerInfo } from '../../shared/protocol.js';
 import type { Worker, WorkerContext } from './types.js';
 import type { WorkerManager } from './manager.js';
-interface HelpContext { workers:WorkerContext['workers']; emitUpdate(w:Worker):void; persist():void; get:WorkerManager['get']; spawn:WorkerManager['spawn']; prompt:WorkerManager['prompt']; finding:WorkerManager['finding']; prompts:WorkerContext['prompts']; scrollback:{load(id:string):string|undefined}; }
+interface HelpContext { events?: import('./types.js').WorkerEvents; workers:WorkerContext['workers']; emitUpdate(w:Worker):void; persist():void; get:WorkerManager['get']; spawn:WorkerManager['spawn']; prompt:WorkerManager['prompt']; finding:WorkerManager['finding']; prompts:WorkerContext['prompts']; scrollback:{load(id:string):string|undefined}; }
 const FINDING_LINES=180;
-export function stageHelperReport(ctx:Pick<HelpContext,'workers'|'emitUpdate'|'persist'>, id: string, helperName: string, text: string): void {
+export function stageHelperReport(ctx: Pick<HelpContext,'workers'|'emitUpdate'|'persist'>, id: string, helperName: string, text: string, messageId?: string): void {
     const w = ctx.workers.get(id);
     if (!w) return;
-    w.info.helperReport = { helperName, text: text.slice(0, 20000), state: 'pending' };
+    w.info.helperReport = { helperName, text: text.slice(0, 20000), ...(messageId ? { messageId } : {}), state: 'pending' };
     ctx.emitUpdate(w);
     ctx.persist();
   }
-export async function deliverHelperReport(ctx:Pick<HelpContext,'workers'|'emitUpdate'|'persist'|'prompt'>, id: string, by?: string): Promise<string | undefined> {
+
+  /** Clear only the matching report, never a newer helper's findings. */
+export function clearHelperReport(ctx: Pick<HelpContext,'workers'|'emitUpdate'|'persist'>, id: string, messageId: string): void {
+    const w = ctx.workers.get(id);
+    if (w?.info.helperReport?.messageId !== messageId) return;
+    delete w.info.helperReport;
+    ctx.emitUpdate(w); ctx.persist();
+  }
+
+  /** Interrupt only on request, wait for an idle status, then submit the saved report once. */
+export async function deliverHelperReport(ctx: Pick<HelpContext,'workers'|'emitUpdate'|'persist'|'prompt'|'events'>, id: string, by?: string): Promise<string | undefined> {
     const w = ctx.workers.get(id);
     const report = w?.info.helperReport;
     if (!w || !report) return 'No helper report available';
@@ -26,10 +36,14 @@ export async function deliverHelperReport(ctx:Pick<HelpContext,'workers'|'emitUp
     if (w.info.status === 'needs_input') return 'Answer the worker’s question or permission request first';
     if (w.info.status === 'starting' || isAsleep(w.info.status)) return 'Wait for the worker to be running';
     if (isBusy(w.info.status) && !w.dsh && !['claude', 'opencode', 'codex'].includes(w.info.provider ?? '')) return 'This provider must be interrupted manually in its terminal first';
+    const delivery = (phase: 'claim' | 'complete' | 'release') => report.messageId ? ctx.events?.helperReportDelivery?.(id, report.messageId, phase) : undefined;
+    const claimed = delivery('claim');
+    if (claimed) return claimed;
     report.state = 'interrupting';
     report.error = undefined;
     ctx.emitUpdate(w);
     const fail = (error: string) => {
+      delivery('release');
       report.state = 'failed'; report.error = error;
       ctx.emitUpdate(w); ctx.persist(); return error;
     };
@@ -42,8 +56,8 @@ export async function deliverHelperReport(ctx:Pick<HelpContext,'workers'|'emitUp
       const deadline = Date.now() + 6000;
       while (isBusy(w.info.status) && Date.now() < deadline) {
         await new Promise(resolve => setTimeout(resolve, 100));
-        if (ctx.workers.get(id) !== w) return 'Worker disappeared during interruption';
-        if (w.info.helperReport !== report) return 'A newer report arrived during interruption; retry with that report';
+        if (ctx.workers.get(id) !== w) { delivery('release'); return 'Worker disappeared during interruption'; }
+        if (w.info.helperReport !== report) { delivery('release'); return 'A newer report arrived during interruption; retry with that report'; }
       }
       if (isBusy(w.info.status)) return fail('The worker did not stop. Interrupt it manually, then retry; the report was not queued');
     }
@@ -51,9 +65,12 @@ export async function deliverHelperReport(ctx:Pick<HelpContext,'workers'|'emitUp
     const error = ctx.prompt(id, report.text, by);
     if (error) return fail(error);
     report.state = 'submitted';
+    const completed = delivery('complete');
     ctx.emitUpdate(w); ctx.persist();
+    if (completed) return `Report submitted, but inbox synchronization failed: ${completed}`;
     return undefined;
   }
+
 export function sendHelper(ctx:Pick<HelpContext,'get'|'prompts'|'finding'|'spawn'>, hostId: string, by: string, provider?: AgentProvider, model?: string, effort?: AgentEffort, owner?: string): WorkerInfo | string {
     const host = ctx.get(hostId);
     if (!host) return 'No such worker';

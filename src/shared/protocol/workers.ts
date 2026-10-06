@@ -111,7 +111,7 @@ export interface WorkerInfo {
    * `helper` message, whose path every browser walks identically.
    */
   helper?: { hostId: string; hostName: string };
-  helperReport?: { helperName: string; text: string; state: 'pending' | 'interrupting' | 'submitted' | 'failed'; error?: string };
+  helperReport?: { messageId?: string; helperName: string; text: string; state: 'pending' | 'interrupting' | 'submitted' | 'failed'; error?: string };
 }
 
 /** Where the branch of a worker whose worktree was deleted still is (see WorkerInfo.lost). */

@@ -1,3 +1,4 @@
+import { checkpointOutput } from './checkpoints.js';
 // The loopback-only server for the workers' own calls: their agents' hook events, and the office's
 // queue and workers for the board agents and the office-workers command.
 import http from 'node:http';
@@ -42,8 +43,9 @@ export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Serv
     const workers = ctx.workerFloor(workerId)?.workers;
     if (!workers) return send(res, 401, {});
     const event = url.searchParams.get('event') ?? '';
-    const ok = workers.handleProviderHook(route as AgentProvider, workerId, token, event, payload);
-    send(res, ok ? 200 : 401, {});
+    const output = checkpointOutput(ctx, workerId, token, route, event, payload);
+    const ok = workers.handleProviderHook(route as AgentProvider, workerId, token, event, payload, output.decision === 'block');
+    send(res, ok ? 200 : 401, ok ? output : {});
   });
   // Workers' terminals outlive a restart of the office (see ptys.ts) with this address in their
   // environment, so listen where the last office did when that port is free.

@@ -67,7 +67,7 @@ function tracker(s: CodexState): ToolTracker {
 }
 
 /** Native Codex lifecycle hooks register the root rollout for bounded metric reads. */
-function codexHook(h: WorkerHandle<CodexState>, event: string, payload: unknown): boolean {
+function codexHook(h: WorkerHandle<CodexState>, event: string, payload: unknown, holdStop = false): boolean {
   const report = normalizeCodexHook(event, payload);
   if (!report) return false;
   const s = h.state;
@@ -82,6 +82,7 @@ function codexHook(h: WorkerHandle<CodexState>, event: string, payload: unknown)
       h.scheduleScan();
     },
     tools: tracker(s),
+    holdStop,
   });
 }
 

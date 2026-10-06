@@ -10,7 +10,8 @@ export function openCommunications(openTerminal: (workerId: string) => void) {
   const close = h('button.btn.close', { type: 'button', 'aria-label': 'Close' }, '✕');
   const el = h('div.modal.communication-modal', { role: 'dialog', 'aria-label': 'Worker communications', style: 'width:min(850px,100%)' },
     h('header', {}, h('h2', {}, '📬 Worker communications'), filter, close), body,
-    h('footer', {}, 'Delivered = read from inbox. Completed = requester acknowledged a reply, not proof of integration.'));
+    h('footer', {}, 'Completed = reply acknowledged, or helper report handled through inbox/terminal. This does not confirm a fix or integration.'));
+
   const open = new Set<string>();
   const render = () => {
     const messages = store.communications.messages;
@@ -28,8 +29,9 @@ export function renderCommunicationList(body: HTMLElement, messages: WorkerMessa
   const error = options.error;
   const roots = messages.filter((m) => m.kind === 'request' && (!options.unresolved || !['completed', 'expired'].includes(m.status))).reverse();
   const record = (m: WorkerMessage) => h('div.communication-record', {},
-    h('p.communication-meta', {}, `${m.from.name} → ${m.to.name} · ${m.status}${m.meeting ? ` · round ${m.meeting.round}` : ''} · ${timeAgo(m.at)}`),
+    h('p.communication-meta', {}, `${m.from.name} → ${m.to.name}${m.helperReport ? ' · helper report' : ''} · ${m.status}${m.meeting ? ` · round ${m.meeting.round}` : ''} · ${timeAgo(m.at)}`),
     h('pre', {}, m.text), contextLabel(m.context) ? h('p.communication-context', {}, contextLabel(m.context)) : null,
+    m.helperReport?.handledVia ? h('p.communication-meta', {}, `Handled through ${m.helperReport.handledVia} · fixing not confirmed`) : null,
     h('code.communication-id', {}, m.id),
     h('p.communication-meta', {}, `Expires ${new Date(m.expiresAt).toLocaleString()}${m.deliveredAt ? ' · inbox read' : ''}${m.acknowledgedAt ? ' · acknowledged' : ''}`));
   body.replaceChildren(...(roots.length ? roots.map((m) => {

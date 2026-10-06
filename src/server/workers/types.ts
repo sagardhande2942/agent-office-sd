@@ -111,6 +111,7 @@ export interface Worker {
 }
 
 export interface WorkerEvents {
+  helperReportDelivery?(workerId: string, messageId: string, phase: 'claim' | 'complete' | 'release'): string | undefined;
   update(info: WorkerInfo): void;
   /** It's gone (sent home), and what it was as it went. */
   remove(workerId: string, info?: WorkerInfo): void;

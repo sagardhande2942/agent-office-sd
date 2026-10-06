@@ -532,9 +532,9 @@ export class WorkerManager {
     w.info.lastInput = { by, at: now };
     return true;
   }
-  stageHelperReport(id: string, helperName: string, text: string): void { return helperOps.stageHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, helperName, text); }
-  async deliverHelperReport(id: string, by?: string): Promise<string | undefined> { return helperOps.deliverHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist(),prompt:(id:string,text:string,by?:string)=>this.prompt(id,text,by)}, id, by); }
-
+  stageHelperReport(id: string, helperName: string, text: string, messageId?: string): void { return helperOps.stageHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, helperName, text, messageId); }
+  clearHelperReport(id: string, messageId: string): void { return helperOps.clearHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, messageId); }
+  async deliverHelperReport(id: string, by?: string): Promise<string | undefined> { return helperOps.deliverHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist(),events:this.events,prompt:(id:string,text:string,by?:string)=>this.prompt(id,text,by)}, id, by); }
   prompt(id: string, text: string, by?: string, guard?: BossGuard): string | undefined {
     const w = this.workers.get(id);
     if (!w) return 'No such worker';
@@ -592,13 +592,13 @@ export class WorkerManager {
   }
 
   /** Claude Code hook callback (a custom --agent that speaks Claude Code's hooks reports here too). */
-  handleHook(workerId: string, token: string, event: string, payload: any): boolean {
-    return this.handleProviderHook('claude', workerId, token, event, payload);
+  handleHook(workerId: string, token: string, event: string, payload: any, holdStop = false): boolean {
+    return this.handleProviderHook('claude', workerId, token, event, payload, holdStop);
   }
 
   /** Native Codex lifecycle hooks register the root rollout for bounded metric reads. */
-  handleCodexHook(workerId: string, token: string, event: string, payload: unknown): boolean {
-    return this.handleProviderHook('codex', workerId, token, event, payload);
+  handleCodexHook(workerId: string, token: string, event: string, payload: unknown, holdStop = false): boolean {
+    return this.handleProviderHook('codex', workerId, token, event, payload, holdStop);
   }
 
   /** Grok lifecycle hooks, isolated under the office's GROK_HOME so they never edit ~/.grok. */
@@ -620,12 +620,12 @@ export class WorkerManager {
    * An event on the hook route /hooks/`route` (see ProviderAdapter.hook): taken only from a running
    * agent whose provider reports there, with its hook token. Says whether it was taken.
    */
-  handleProviderHook(route: AgentProvider, workerId: string, token: string, event: string, payload: unknown): boolean {
+  handleProviderHook(route: AgentProvider, workerId: string, token: string, event: string, payload: unknown, holdStop = false): boolean {
     const hook = providerAdapter(route)?.hook;
     const w = this.workers.get(workerId);
     const own = w && providerAdapter(w.info.provider);
     if (!hook || !w || !w.pty || w.info.kind !== 'agent' || !own || (own.hooksAs ?? own.id) !== route || !safeEq(token, w.hookToken)) return false;
-    return hook.handle(this.handleOf(w), event, payload);
+    return hook.handle(this.handleOf(w), event, payload, holdStop);
   }
 
   /**

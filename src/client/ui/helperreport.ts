@@ -1,3 +1,4 @@
+import './helperreport.css';
 import type { WorkerInfo } from '../../shared/protocol';
 import { isAsleep, isBusy } from '../../shared/status';
 import { h } from './dom';
@@ -11,7 +12,7 @@ export function renderHelperReport(panel: HTMLElement, worker: WorkerInfo, deliv
   const status = report.state === 'submitted' ? 'Submitted after the worker stopped · reading not confirmed'
     : report.state === 'interrupting' ? 'Stopping the current turn…'
     : report.state === 'failed' ? report.error ?? 'Delivery failed; findings retained'
-    : 'Findings ready · not queued in the agent';
+    : report.messageId ? 'Available in the worker inbox · either path handles this report once' : 'Findings ready · inbox unavailable; terminal delivery retained';
   const button = h('button.btn.primary', { type: 'button', disabled: report.state === 'submitted' || report.state === 'interrupting' || isAsleep(worker.status) || worker.status === 'starting' || worker.status === 'needs_input' }, isBusy(worker.status) ? 'Interrupt and deliver report' : 'Deliver report');
   button.addEventListener('click', deliver);
   panel.replaceChildren(h('strong', {}, `🆘 ${report.helperName}'s report`), h('span', {}, status), button,

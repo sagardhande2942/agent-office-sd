@@ -39,6 +39,8 @@ type ToastLevel = 'info' | 'warn' | 'error';
 /** What a floor needs from the building around it. */
 export interface FloorContext {
   communications?(floor: Floor): CommunicationsState;
+  helperReport?(floor: Floor, helper: WorkerInfo, host: WorkerInfo, text: string): string;
+  helperReportDelivery?(floor: Floor, workerId: string, messageId: string, phase: 'claim' | 'complete' | 'release'): string | undefined;
   agentCmd: string;
   agentArgs: string[];
   /** The DSH profile DeepSeek Harness workers boot (see server/dsh.ts). */
@@ -216,6 +218,7 @@ export class Floor {
           this.helpers?.forget(workerId);
           ctx.workerChanged(this, workerId);
         },
+        helperReportDelivery: (workerId, messageId, phase) => ctx.helperReportDelivery?.(this, workerId, messageId, phase),
         data: (workerId, data, viewers) => ctx.termData(workerId, data, viewers),
         screen: (workerId, frame) => ctx.emit(this, { t: 'screen', workerId, ...frame }, true),
         toast: (text, level) => ctx.toast(this, text, level),
@@ -430,7 +433,12 @@ export class Floor {
     if (host.kind === 'shell') {
       this.ctx.emit(this, { t: 'chat', from: worker.id, name: worker.name, color: worker.color, text: `Help for ${host.name}:\n${finding}`, at: Date.now() });
     } else {
-      this.workers.stageHelperReport(host.id, worker.name, report || finding);
+      let messageId: string | undefined;
+      const content = (report || finding).slice(0, 20000);
+      try { messageId = this.ctx.helperReport?.(this, worker, host, content); }
+      catch (err) { this.ctx.toast(this, `Helper inbox unavailable: ${(err as Error).message}. The terminal report is retained.`, 'warn'); }
+      this.workers.stageHelperReport(host.id, worker.name, content, messageId);
+      if (messageId && this.ctx.communications?.(this).messages.some((m) => m.id === messageId && m.status === 'completed')) this.workers.clearHelperReport(host.id, messageId);
       this.ctx.toast(this, `🆘 ${worker.name}'s findings for ${host.name} are ready — open the worker's terminal to deliver them`);
     }
     this.helpers.reported(worker.id);

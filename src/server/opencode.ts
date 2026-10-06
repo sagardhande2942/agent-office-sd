@@ -112,12 +112,13 @@ export const OPENCODE_PLUGIN_SOURCE = String.raw`export default async function A
   async function send(value) {
     if (!value) return;
     try {
-      await fetch(url + "/hooks/opencode?worker=" + encodeURIComponent(worker), {
+      const response = await fetch(url + "/hooks/opencode?worker=" + encodeURIComponent(worker), {
         method: "POST",
         headers: { authorization: "Bearer " + token, "content-type": "application/json" },
         body: JSON.stringify(value),
         signal: AbortSignal.timeout(2500),
       });
+      if (response.ok) return await response.json();
     } catch {}
   }
   function detail(value) {
@@ -317,6 +318,13 @@ export const OPENCODE_PLUGIN_SOURCE = String.raw`export default async function A
         await send({ type: "prompt", sessionId: input.sessionID, status: "working", ...(prompt ? { prompt } : {}) });
       });
     },
+    "tool.execute.after": (input, output) => enqueue(async () => {
+      if (input.sessionID !== rootSession || children.has(input.sessionID)) return;
+      const response = await send({ type: "checkpoint", sessionId: input.sessionID });
+      const context = response?.hookSpecificOutput?.additionalContext;
+      if (typeof context === "string" && context.length <= 10000 && typeof output?.output === "string") output.output += "\n\n" + context;
+    }),
+
     "tool.execute.before": (input) => enqueue(() => {
       if (input.sessionID === rootSession && !children.has(input.sessionID)) {
         return send({ type: "tool", sessionId: input.sessionID, tool: input.tool, status: pending.size ? "needs_input" : "working" });

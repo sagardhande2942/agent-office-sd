@@ -37,6 +37,9 @@ export class Communications {
       if (!Array.isArray(stored) || stored.length > MESSAGE_KEEP || stored.some((m) => !m || typeof m.id !== 'string' || typeof m.threadId !== 'string' || !['request', 'reply'].includes(m.kind) || typeof m.text !== 'string' || typeof m.from?.id !== 'string' || typeof m.from?.name !== 'string' || typeof m.to?.id !== 'string' || typeof m.to?.name !== 'string' || !Number.isFinite(m.at) || !Number.isFinite(m.expiresAt))) throw new Error('Invalid communications ledger');
       for (const m of stored) {
         m.context = messageContext(m.context);
+        if (m.helperReport !== undefined && (!m.helperReport || typeof m.helperReport.workerId !== 'string' || !m.helperReport.workerId || (m.helperReport.handledVia !== undefined && !['inbox', 'terminal'].includes(m.helperReport.handledVia)) || (m.helperReport.terminalClaimed !== undefined && typeof m.helperReport.terminalClaimed !== 'boolean'))) throw new Error('Invalid helper report');
+        // An office restart cannot leave a terminal delivery claim locked forever.
+        if (m.helperReport) delete m.helperReport.terminalClaimed;
         if (m.meeting !== undefined && (!m.meeting || typeof m.meeting.id !== 'string' || !m.meeting.id || !Number.isInteger(m.meeting.round) || m.meeting.round < 1)) throw new Error('Invalid meeting link');
         for (const field of ['deliveredAt', 'acknowledgedAt', 'answeredAt', 'completedAt']) if (m[field] !== undefined && !Number.isFinite(m[field])) throw new Error('Invalid communication receipt');
       }
@@ -59,9 +62,31 @@ export class Communications {
     if (from.id === to.id) throw new Error('Send a request to another worker');
     return this.create(from, to, body, undefined, meeting);
   }
+  report(from: Actor, to: Actor, content: string, context: MessageContext, meeting?: MeetingLink): WorkerMessage {
+    return this.create(from, to, { prompt: content, context, key: `helper-report:${from.id}` }, undefined, meeting, { workerId: from.id });
+  }
+  /** Reserve the manual path while it waits for a busy agent to stop. */
+  terminalReport(actor: Actor, id: string, phase: 'claim' | 'complete' | 'release'): WorkerMessage {
+    const next = structuredClone(this.messages), m = next.find((item) => item.id === id);
+    if (!m?.helperReport || m.to.id !== actor.id) throw new Error('Unknown helper report for this worker');
+    if (phase === 'complete' && m.completedAt !== undefined && m.helperReport.handledVia === 'terminal') return this.get(id)!;
+    if (phase === 'claim') {
+      if (m.completedAt !== undefined) throw new Error('Helper report already handled');
+      if (m.helperReport.terminalClaimed) throw new Error('Helper report delivery already in progress');
+      m.helperReport.terminalClaimed = true;
+    } else {
+      if (phase === 'complete') {
+        if (!m.helperReport.terminalClaimed) throw new Error('Helper report delivery was not claimed');
+        m.deliveredAt ??= this.now(); m.completedAt ??= this.now(); m.helperReport.handledVia = 'terminal';
+      }
+      delete m.helperReport.terminalClaimed;
+    }
+    this.save(next); return this.get(id)!;
+  }
   reply(from: Actor, id: string, body: Record<string, unknown>): WorkerMessage {
     const target = this.get(id);
     if (!target || target.kind !== 'request') throw new Error('Reply to a request ID from your inbox');
+    if (target.helperReport) throw new Error('Acknowledge a helper report; its helper may have left');
     if (target.to.id !== from.id) throw new Error('Only the recipient can reply to this request');
     return this.create(from, target.from, body, target);
   }
@@ -69,9 +94,12 @@ export class Communications {
     const next = structuredClone(this.messages), m = next.find((item) => item.id === id);
     if (!m) throw new Error('Unknown message ID');
     if (m.to.id !== actor.id) throw new Error('Only the recipient can acknowledge this message');
+    if (m.helperReport && m.completedAt !== undefined) return this.get(id)!;
+    if (m.helperReport?.terminalClaimed) throw new Error('Helper report is being delivered through the terminal');
     if (messageStatus(m, this.now()) === 'expired') throw new Error('Message has expired');
     if (m.acknowledgedAt === undefined) {
       m.deliveredAt ??= this.now(); m.acknowledgedAt = this.now();
+      if (m.helperReport) { m.completedAt ??= this.now(); m.helperReport.handledVia = 'inbox'; }
       if (m.kind === 'reply') {
         const root = next.find((item) => item.id === m.threadId);
         if (root) root.completedAt ??= this.now();
@@ -80,8 +108,8 @@ export class Communications {
     }
     return this.get(id)!;
   }
-  private create(from: Actor, to: Actor, body: Record<string, unknown>, target?: WorkerMessage, meeting = target?.meeting): WorkerMessage {
-    const content = text(body.prompt, 4000, 'prompt', true)!;
+  private create(from: Actor, to: Actor, body: Record<string, unknown>, target?: WorkerMessage, meeting = target?.meeting, helperReport?: WorkerMessage['helperReport']): WorkerMessage {
+    const content = text(body.prompt, helperReport ? 20000 : 4000, 'prompt', true)!;
     const context = messageContext(body.context);
     const key = text(body.key, 80, 'key');
     const minutes = body.ttlMinutes ?? 1440;
@@ -101,7 +129,7 @@ export class Communications {
       for (let i = next.length - 1; i >= 0; i--) if (next[i].threadId === root.id) next.splice(i, 1);
     }
     const id = randomUUID(), at = this.now();
-    const m: Stored = { id, threadId: target?.threadId ?? id, ...(target ? { replyTo: target.id } : {}), kind: target ? 'reply' : 'request', from: { ...from }, to: { ...to }, text: content, context, ...(meeting ? { meeting: { ...meeting } } : {}), at, expiresAt: at + (minutes as number) * 60_000, ...(key ? { key } : {}) };
+    const m: Stored = { id, threadId: target?.threadId ?? id, ...(target ? { replyTo: target.id } : {}), kind: target ? 'reply' : 'request', from: { ...from }, to: { ...to }, text: content, context, ...(helperReport ? { helperReport: { ...helperReport } } : {}), ...(meeting ? { meeting: { ...meeting } } : {}), at, expiresAt: at + (minutes as number) * 60_000, ...(key ? { key } : {}) };
     if (target) {
       const root = next.find((item) => item.id === target.threadId)!;
       root.deliveredAt ??= at; root.answeredAt ??= at;

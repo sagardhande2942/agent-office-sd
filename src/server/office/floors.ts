@@ -1,3 +1,4 @@
+import { communications } from './communications.js';
 import type { FloorActions } from '../floor-actions.js';
 import { RemoteFloor } from '../remote-floor.js';
 import { existsSync } from 'node:fs';
@@ -87,6 +88,15 @@ export function floorHelpers(ctx: Ctx): FloorHelpers {
 export async function openFloors(ctx: Ctx, hookPort: number): Promise<FloorsOpen> {
   const { cfg, floors, clients } = ctx;
   const floorContext: FloorContext = {
+    helperReport: (floor, helper, host, text) => {
+      const meeting = floor.meetings.state().current;
+      const link = meeting?.status === 'running' && meeting.seats.some(s => s.workerId === host.id) ? { id: meeting.id, round: meeting.round } : undefined;
+      return communications(ctx, floor).report(helper, host, text, { branch: host.worktree?.branch ?? floor.project.branch }, link).id;
+    },
+    helperReportDelivery: (floor, workerId, messageId, phase) => {
+      try { const actor = floor.workers.get(workerId); if (!actor) return 'Worker no longer exists'; communications(ctx, floor).terminalReport(actor, messageId, phase); }
+      catch (err) { return (err as Error).message; }
+    },
     communications: floor => communicationsView(ctx, floor) ?? { messages: [] },
     agentCmd: cfg.agentCmd,
     agentArgs: cfg.agentArgs,

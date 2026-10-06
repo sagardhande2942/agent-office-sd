@@ -65,6 +65,7 @@ function openCodeHook(h: WorkerHandle<StatusState>, _event: string, payload: unk
     h.persist();
     return true;
   }
+  if (payload && typeof payload === 'object' && 'type' in payload && payload.type === 'checkpoint') return 'sessionId' in payload && typeof payload.sessionId === 'string' && payload.sessionId === info.sessionId;
   return isOpenCodeHookEvent(payload) && reduceStatus(h, payload);
 }
 

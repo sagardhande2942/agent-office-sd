@@ -1,3 +1,4 @@
+import { syncHelperReports, reconcileHelperReports } from './helper-reports.js';
 import path from 'node:path';
 import { Communications } from '../communications.js';
 import type { Ctx } from './context.js';
@@ -11,10 +12,13 @@ export function communications(ctx: Ctx, floor: FloorActions): Communications {
   let ledger = ledgers.get(floor.id);
   if (!ledger) {
     ledger = new Communications(path.join(ctx.cfg.dataDir, 'communications', Buffer.from(floor.id).toString('hex')), state => {
+      syncHelperReports(floor, state);
       for (const c of ctx.clients.values()) if (c.peer.floor === floor.id) ctx.sendTo(c, { t: 'communications', state });
     });
     ledgers.set(floor.id, ledger);
+    syncHelperReports(floor, ledger.state());
   }
+  reconcileHelperReports(floor, ledger);
   return ledger;
 }
 

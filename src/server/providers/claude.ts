@@ -54,7 +54,7 @@ process.stdin.on('end', () => {
   url.searchParams.set('worker', process.env.AGENT_OFFICE_WORKER_ID);
   url.searchParams.set('event', event);
   const send = (tries) => {
-    const req = http.request(url, { method: 'POST', timeout: 3000, headers: { authorization: 'Bearer ' + process.env.AGENT_OFFICE_HOOK_TOKEN, 'content-type': 'application/json' } }, (res) => res.resume());
+    const req = http.request(url, { method: 'POST', timeout: 3000, headers: { authorization: 'Bearer ' + process.env.AGENT_OFFICE_HOOK_TOKEN, 'content-type': 'application/json' } }, (res) => { let output = ''; res.on('data', chunk => { if (output.length < 20000) output += chunk; }); res.on('end', () => { if (res.statusCode === 200 && output.length <= 20000) process.stdout.write(output); }); });
     req.on('error', (err) => {
       if (err.code === 'ECONNREFUSED' && tries > 1) setTimeout(() => send(tries - 1), 1000);
     });
@@ -73,8 +73,8 @@ process.stdin.on('end', () => {
       `--data-binary @- "$AGENT_OFFICE_HOOK_URL/hooks/claude?worker=$AGENT_OFFICE_WORKER_ID&event=${event}"`;
     const command =
       `if [ -z "$AGENT_OFFICE_WORKER_ID" ] || [ -z "$AGENT_OFFICE_HOOK_URL" ]; then exit 0; fi; ` +
-      `if command -v curl >/dev/null 2>&1; then ${curl} >/dev/null 2>&1; ` +
-      `else ${shq(process.execPath)} ${shq(nodeHook)} ${event} >/dev/null 2>&1; fi; true`;
+      `if command -v curl >/dev/null 2>&1; then ${curl} 2>/dev/null; ` +
+      `else ${shq(process.execPath)} ${shq(nodeHook)} ${event} 2>/dev/null; fi; true`;
     hooks[event] = [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command }] }];
   }
   // Looking at the office's workers doesn't need anyone's say-so; hiring and sending home still asks.
@@ -117,7 +117,7 @@ function noteOutcome(h: WorkerHandle, payload: any, failed: boolean) {
  * malformed payload still counts as the event. The trust and login screens are also read off its
  * screen (see blocked), so only a prompt or its session starting clears bootBlocked here.
  */
-function claudeHook(h: WorkerHandle, event: string, payload: any): boolean {
+function claudeHook(h: WorkerHandle, event: string, payload: any, holdStop = false): boolean {
   const { info } = h;
   const now = Date.now();
   if (payload?.session_id && typeof payload.session_id === 'string' && payload.session_id !== info.sessionId) {
@@ -174,7 +174,7 @@ function claudeHook(h: WorkerHandle, event: string, payload: any): boolean {
       notified(h, payload?.notification_type, now);
       break;
     case 'Stop':
-      h.setStatus('done');
+      if (!holdStop) h.setStatus('done');
       break;
   }
   return true;

@@ -50,7 +50,7 @@ export interface ProviderHook<S> {
   /** A body that isn't JSON is turned away (400); otherwise it still counts as the event, with nothing in it. */
   strictJson: boolean;
   /** One event from one of its workers (running, with the right token). Says whether it was taken. */
-  handle(h: WorkerHandle<S>, event: string, payload: unknown): boolean;
+  handle(h: WorkerHandle<S>, event: string, payload: unknown, holdStop?: boolean): boolean;
 }
 
 export interface ProviderUsage<S> {
