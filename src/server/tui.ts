@@ -1,6 +1,6 @@
 import readline from 'node:readline';
 import { WebSocket } from 'ws';
-import { PANELS, gridColumns, plain, renderDashboard, seats, type Dashboard, type Panel } from './tui-dashboard.js';
+import { PANELS, communicationLines, gridColumns, plain, renderDashboard, seats, type Dashboard, type Panel } from './tui-dashboard.js';
 export { plain } from './tui-dashboard.js';
 import { isAgentProvider, type ClientMsg, type FloorInfo, type FloorView, type ServerMsg, type WorkerInfo } from '../shared/protocol.js';
 
@@ -17,6 +17,8 @@ Commands:
   hire <provider> [prompt]     Hire at the first empty desk
   attach <worker ID or name>  Live terminal; Ctrl+] returns to the office
   prompt <worker> <text> / resume <worker> / pr <worker>
+  home <worker> [--cleanup auto|keep|worktree|all]  Send a worker home
+  messages [request-id]       Read tracked worker requests and replies
   issues / pulls / queue / enqueue <prompt> / chat <text>
   help / quit
 
@@ -94,7 +96,7 @@ function session(ws: WebSocket): Promise<number> {
       process.stdout.write('\x1b[?25l\x1b[H\x1b[2J' + renderDashboard(dashboard, process.stdout.columns || 80, process.stdout.rows || 24));
     };
     const print = (text: string) => { dashboard.notice = plain(text); draw(); };
-    const panel = (next: Panel) => { dashboard.panel = next; dashboard.offset = 0; draw(); };
+    const panel = (next: Panel) => { dashboard.panel = next; dashboard.offset = 0; dashboard.thread = undefined; draw(); };
     const workers = () => panel('office');
     const worker = (key: string): WorkerInfo => {
       const matches = view?.workers.filter((w) => w.id === key || w.name.toLowerCase() === key.toLowerCase()) ?? [];
@@ -132,7 +134,7 @@ function session(ws: WebSocket): Promise<number> {
       let msg: ServerMsg;
       try { msg = JSON.parse(String(raw)); } catch { return; }
       if (msg.t === 'welcome' || msg.t === 'floor.enter') {
-        detach(); view = msg;
+        detach(); dashboard.home = undefined; view = msg;
         if (msg.t === 'welcome') {
           floors = msg.floors;
           active = true;
@@ -149,19 +151,35 @@ function session(ws: WebSocket): Promise<number> {
         print(`${msg.worker.name}: ${msg.worker.status}`);
       } else if (msg.t === 'worker.remove' && view) {
         if (attached === msg.workerId) detach();
+        if (dashboard.home?.worker.id === msg.workerId) dashboard.home = undefined;
         view.workers = view.workers.filter((w) => w.id !== msg.workerId);
       } else if ((msg.t === 'term.snapshot' || msg.t === 'term.data') && attached === msg.workerId) process.stdout.write(msg.data);
       else if (msg.t === 'gh.issues' && view) view.issues = msg.state;
       else if (msg.t === 'gh.pulls' && view) view.pulls = msg.state;
+      else if (msg.t === 'communications' && view) view.communications = msg.state;
       else if (msg.t === 'queue' && view) view.queue = msg.state;
       else if (msg.t === 'plan' && view) view.plan = msg.plan;
       else if (msg.t === 'toast') print(`${msg.level}: ${msg.text}`);
       else if (msg.t === 'chat') print(`${msg.name}: ${msg.text}`);
-      if (['floors', 'worker.remove', 'gh.issues', 'gh.pulls', 'queue', 'plan'].includes(msg.t)) draw();
+      if (['communications', 'floors', 'worker.remove', 'gh.issues', 'gh.pulls', 'queue', 'plan'].includes(msg.t)) draw();
     });
     function keypress(text: string | undefined, key: readline.Key) {
       if (attached || finished) return;
       if (key.ctrl && key.name === 'c') return done(0);
+      if (dashboard.home) {
+        const choice = dashboard.home;
+        const options = ['all', 'worktree', 'keep'] as const;
+        if (key.name === 'escape') { dashboard.home = undefined; dashboard.notice = 'Send home cancelled.'; }
+        else if (key.name === 'return') {
+          dashboard.home = undefined;
+          send({ t: 'worker.kill', workerId: choice.worker.id, ...(choice.worker.worktree && !choice.worker.meeting ? { cleanup: choice.cleanup } : {}) });
+          return print(`Sending ${choice.worker.name} home...`);
+        } else if (choice.worker.worktree && !choice.worker.meeting) {
+          if (text && ['1', '2', '3'].includes(text)) choice.cleanup = options[Number(text) - 1];
+          else if (key.name === 'up' || key.name === 'down') choice.cleanup = options[(options.indexOf(choice.cleanup) + (key.name === 'up' ? 2 : 1)) % options.length];
+        }
+        return draw();
+      }
       if (dashboard.command !== undefined) {
         if (key.name === 'escape') dashboard.command = undefined;
         else if (key.name === 'return') {
@@ -174,18 +192,22 @@ function session(ws: WebSocket): Promise<number> {
       }
       const all = seats(view), seat = all[dashboard.selected];
       const begin = (value: string) => { dashboard.command = value; draw(); };
-      if (key.name === 'escape') return panel('office');
+      if (key.name === 'escape') { if (dashboard.thread) return panel('messages'); return panel('office'); }
       if (key.name === 'tab') return panel(PANELS[(PANELS.indexOf(dashboard.panel) + (key.shift ? PANELS.length - 1 : 1)) % PANELS.length]);
       if (['up', 'down', 'left', 'right'].includes(key.name ?? '')) {
         const direction = key.name === 'up' || key.name === 'left' ? -1 : 1;
         if (dashboard.panel === 'office') dashboard.selected = Math.max(0, Math.min(all.length - 1, dashboard.selected + direction * (key.name === 'up' || key.name === 'down' ? gridColumns(process.stdout.columns || 80) : 1)));
         else {
-          const count = dashboard.panel === 'floors' ? floors.length : dashboard.panel === 'issues' ? view?.issues.items.length : dashboard.panel === 'pulls' ? view?.pulls.items.length : dashboard.panel === 'queue' ? view?.queue.tasks.length : 13;
+          const count = dashboard.panel === 'floors' ? floors.length : dashboard.panel === 'issues' ? view?.issues.items.length : dashboard.panel === 'pulls' ? view?.pulls.items.length : dashboard.panel === 'queue' ? view?.queue.tasks.length : dashboard.panel === 'messages' ? (dashboard.thread ? communicationLines({ ...dashboard, view }, process.stdout.columns || 80).length : view?.communications?.messages.filter((m) => m.kind === 'request').length) : 13;
           dashboard.offset = Math.max(0, Math.min(Math.max(0, (count ?? 0) - 1), dashboard.offset + direction));
         }
         return draw();
       }
       if (key.name === 'return') {
+        if (dashboard.panel === 'messages' && !dashboard.thread) {
+          dashboard.thread = view?.communications?.messages.filter((m) => m.kind === 'request').reverse()[dashboard.offset]?.id;
+          dashboard.offset = 0; return draw();
+        }
         if (dashboard.panel === 'floors') {
           const floor = floors[dashboard.offset]; if (floor && !floor.cloning) send({ t: 'floor.go', floor: floor.id });
           return panel('office');
@@ -199,7 +221,9 @@ function session(ws: WebSocket): Promise<number> {
       if (text === 'h') return begin('hire ');
       if (text === 'p' && seat?.worker) return begin('prompt ' + seat.worker.id + ' ');
       if (text === 'r' && seat?.worker) return command('resume ' + seat.worker.id);
+      if (text === 'x' && dashboard.panel === 'office' && seat?.worker) return command('home ' + seat.worker.id);
       if (text === 'c') return begin('chat ');
+      if (text === 'm') return panel('messages');
       if (text === 'f') return panel('floors');
       if (text === 'i') return panel('issues');
       if (text === 'b') return panel('pulls');
@@ -217,6 +241,7 @@ function session(ws: WebSocket): Promise<number> {
       if (!cmd) return;
       if (cmd === 'quit' || cmd === 'exit') return done(0);
       if (cmd === 'help') return panel('help');
+      if (cmd === 'messages') { panel('messages'); dashboard.thread = key || undefined; return draw(); }
       if (cmd === 'workers') return workers();
       if (cmd === 'floors') return panel('floors');
       if (cmd === 'go') {
@@ -239,6 +264,16 @@ function session(ws: WebSocket): Promise<number> {
         return send(cmd === 'chat' ? { t: 'chat', text: body } : { t: 'queue.add', prompt: body });
       }
       if (cmd === 'issues' || cmd === 'pulls' || cmd === 'queue') return panel(cmd);
+      if (cmd === 'home') {
+        if (tail.length && (tail.length !== 2 || tail[0] !== '--cleanup' || !['auto', 'keep', 'worktree', 'all'].includes(tail[1]))) {
+          throw new Error('Usage: home <worker> [--cleanup auto|keep|worktree|all]');
+        }
+        const w = worker(key);
+        if (!tail.length) { dashboard.home = { worker: w, cleanup: 'keep' }; return draw(); }
+        const cleanup = tail[1];
+        send({ t: 'worker.kill', workerId: w.id, ...(cleanup && cleanup !== 'auto' ? { cleanup: cleanup as 'keep' | 'worktree' | 'all' } : {}) });
+        return print(`Sending ${w.name} home...`);
+      }
       if (['attach', 'prompt', 'resume', 'pr'].includes(cmd)) {
         const w = worker(key);
         if (cmd === 'attach') {

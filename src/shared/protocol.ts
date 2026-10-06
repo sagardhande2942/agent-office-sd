@@ -17,6 +17,7 @@ import type { SettingsClientMsg, SettingsServerMsg } from './protocol/settings.j
 import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, DogClientMsg, JukeboxClientMsg, ToysServerMsg, WhiteboardClientMsg } from './protocol/toys.js';
 import type { UsageClientMsg, UsageServerMsg } from './protocol/usage.js';
 import type { WorkerClientMsg, WorkerServerMsg } from './protocol/workers.js';
+import type { CommunicationsServerMsg } from './protocol/communications.js';
 
 export * from './protocol/accounts.js';
 export * from './protocol/agents.js';
@@ -31,6 +32,7 @@ export * from './protocol/settings.js';
 export * from './protocol/toys.js';
 export * from './protocol/usage.js';
 export * from './protocol/workers.js';
+export * from './protocol/communications.js';
 
 export type ClientMsg =
   | TvClientMsg
@@ -57,6 +59,7 @@ export type ClientMsg =
   | DogClientMsg;
 
 export type ServerMsg =
+  | CommunicationsServerMsg
   | PresenceServerMsg
   | RooftopServerMsg
   | WorkerServerMsg

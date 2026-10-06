@@ -1,3 +1,4 @@
+import { WORKER_COORDINATION } from '../src/server/prompts.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -109,7 +110,7 @@ test('Pi worker launches, authenticates hooks, resumes its own session, and rest
   const first = launches[0].opts;
   assert.equal(first.file, file);
   assert.ok(first.args.includes(path.join(data, 'pi-sessions', worker.id)));
-  assert.deepEqual(first.args.slice(-6), ['--model', 'openai/gpt-4.1', '--thinking', 'high', '--', '- fix login']);
+  assert.deepEqual(first.args.slice(-6), ['--model', 'openai/gpt-4.1', '--thinking', 'high', '--', '- fix login\n\n' + WORKER_COORDINATION]);
   assert.match(readFileSync(writePiExtension(data), 'utf8'), /agent_settled/);
   const token = first.env.AGENT_OFFICE_HOOK_TOKEN;
   const piHook = (id: string, key: string, payload: unknown) => workers.handleProviderHook('pi', id, key, '', payload);

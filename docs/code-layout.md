@@ -44,6 +44,8 @@ They're in `core/registry.ts`, and each is a field of `ctx`. Every registration 
 
 ### Stylesheets
 
+Features can add a menu action to `HUD_ACTIONS` in `ui/menu.ts` during installation, before the HUD mounts. The communications feature uses this list, its state slice, and its own install function to supply the Messages action without adding feature logic to the HUD.
+
 `style.css` is the 3D office's sheet. It pulls in `styles/base.css` (the colors, the reset, panels, buttons and the window frame, which the 2D view's `lite.css` loads too), `styles/hud.css` and `styles/loading.css`. Every other sheet sits next to its module and comes in with it. A module's sheet loads in no fixed order against `base.css`, so a module rule that overrides a base rule of the same specificity has to be more specific, or live at the end of `base.css` with the others there.
 
 ## Server

@@ -35,6 +35,7 @@ import { theme } from './theme';
 import { upgrade } from './upgrade';
 import { usage } from './usage';
 import { whiteboard } from './whiteboard';
+import { communications } from './communications';
 
 export const SLICES: readonly Slice[] = [
   helpers,
@@ -67,4 +68,5 @@ export const SLICES: readonly Slice[] = [
   accounts,
   signins,
   smartphone,
+  communications,
 ];

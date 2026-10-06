@@ -24,6 +24,7 @@ import { usageHandlers } from './usage.js';
 import { whiteboardHandlers, whiteboardHooks, whiteboardView } from './whiteboard.js';
 import { jailView, workerHandlers, workerHooks, workersView } from './workers.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
+import { communicationsView } from './communications.js';
 
 /** Each domain's handlers put together, in alphabetical order. */
 export const handlers: HandlerMap<ClientMsg> = {
@@ -59,6 +60,7 @@ export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whi
 
 /** What someone arriving on a floor is sent (see office/views.ts): a piece from each feature, in the order it has always gone out. */
 export const views: ViewPieces = {
+  communications: communicationsView,
   tv: tvView,
   helpers: helpersView,
   project: projectView,

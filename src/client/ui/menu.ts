@@ -31,6 +31,9 @@ export interface HudAction {
   run: () => void;
 }
 
+/** Feature actions registered before the HUD is mounted. */
+export const HUD_ACTIONS: HudAction[] = [];
+
 const PANELS: { id: HudPanel; icon: string; label: string; what: string }[] = [
   { id: 'workers', icon: '🤖', label: 'Workers', what: 'Every desk and what it’s up to' },
   { id: 'people', icon: '👥', label: 'People', what: 'Who’s here, on which floor' },
@@ -61,6 +64,7 @@ export interface Hud {
  * and the panels you choose to show. Everything else waits in the menu, so the office stays in view.
  */
 export function mountHud(actions: HudAction[], settings: Settings, save: () => void): Hud {
+  actions = [...actions, ...HUD_ACTIONS];
   const dock = $('dock');
   const labelOf = (a: HudAction) => (typeof a.label === 'string' ? a.label : a.label());
   const iconOf = (a: HudAction) => (typeof a.icon === 'string' ? a.icon : a.icon());

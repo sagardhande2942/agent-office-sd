@@ -159,7 +159,7 @@ test('answers MCP: the handshake, its tools, and a call', async () => {
   assert.equal((await handleMcp({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '1999-01-01' } }, io))?.result.protocolVersion, '2025-11-25');
   assert.equal(await handleMcp({ jsonrpc: '2.0', method: 'notifications/initialized' }, io), undefined);
   const tools = await handleMcp({ jsonrpc: '2.0', id: 3, method: 'tools/list' }, io);
-  assert.deepEqual(tools?.result.tools.map((t: { name: string }) => t.name), ['list_workers', 'hire_worker', 'send_home', 'tell_worker', 'link_pr', 'get_helper']);
+  assert.deepEqual(tools?.result.tools.map((t: { name: string }) => t.name), ['list_workers', 'hire_worker', 'send_home', 'tell_worker', 'link_pr', 'get_helper', 'worker_inbox', 'request_worker', 'reply_worker', 'ack_worker_message']);
   // A helper goes to a worker, so the call needs only who it is for and, at most, which agent it is.
   const helped = await handleMcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'get_helper', arguments: { worker: 'Byte' } } }, io);
   assert.match(helped?.result.content[0].text, /Brought .* over to help Byte/);
@@ -305,4 +305,34 @@ test("Codex is told to pass the office's variables on to the MCP server", () => 
     'mcp_servers.agent-office.args=["/opt/app/bin/office-workers.js","mcp"]',
     'mcp_servers.agent-office.env_vars=["AGENT_OFFICE_HOOK_URL","AGENT_OFFICE_WORKER_ID","AGENT_OFFICE_HOOK_TOKEN"]',
   ]);
+});
+
+test('tracked communication commands and MCP tools carry context and worker authentication', async () => {
+  assert.deepEqual(parseArgs(['inbox', '--json']), { cmd: 'inbox', json: true });
+  assert.deepEqual(parseArgs(['request', 'Ada', '--prompt', 'Fields?', '--branch', 'frontend', '--files', 'a.ts,b.ts', '--key', 'users', '--ttl-minutes', '10']), {
+    cmd: 'request', json: false, worker: 'Ada', prompt: 'Fields?', context: { branch: 'frontend', files: ['a.ts', 'b.ts'] }, key: 'users', ttlMinutes: 10,
+  });
+  assert.throws(() => parseArgs(['reply']), /one message ID/);
+  assert.throws(() => parseArgs(['request', 'Ada', '--ttl-minutes', '0']), /ttl-minutes/);
+  assert.equal(buildRequest('inbox', OFFICE).method, 'GET');
+  assert.equal(buildRequest('ack', OFFICE, { id: 'm1' }).url, 'http://127.0.0.1:4455/office/workers/ack?worker=w1');
+  const seen: { url: string; body: any }[] = [];
+  const io = { env: ENV, fetch: (async (url: string, init: RequestInit) => {
+    assert.equal((init.headers as Record<string, string>).authorization, 'Bearer tok');
+    seen.push({ url: String(url), body: init.body ? JSON.parse(String(init.body)) : undefined });
+    return new Response(JSON.stringify({ messages: [], message: { id: 'm1' } }), { status: 200 });
+  }) as unknown as typeof fetch };
+  for (const [name, arguments_] of [['worker_inbox', {}], ['request_worker', { worker: 'Ada', prompt: 'Fields?', context: { commit: 'abcdef1' } }], ['reply_worker', { id: 'm1', prompt: '{ id }' }], ['ack_worker_message', { id: 'm2' }]] as const) {
+    const answer = await handleMcp({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: arguments_ } }, io);
+    assert.equal(answer?.result.isError, undefined);
+  }
+  assert.match(seen[0].url, /\/inbox\?/); assert.match(seen[1].url, /\/request\?/);
+  assert.equal(typeof seen[1].body.key, 'string'); assert.deepEqual(seen[1].body.context, { commit: 'abcdef1' });
+});
+
+test('inbox output cannot execute another worker terminal controls', async () => {
+  const { formatMessages } = await import('../bin/office-workers.js');
+  const output = formatMessages([{ id: 'm1', status: 'pending', from: { name: '\x1b]0;evil\x07Ada' }, to: { name: 'Grace' }, text: '\x1b[2JHello\nनमस्ते', context: {} }]);
+  assert.ok(!output.includes('\x1b')); assert.ok(!output.includes('evil'));
+  assert.match(output, /Hello\nनमस्ते/);
 });

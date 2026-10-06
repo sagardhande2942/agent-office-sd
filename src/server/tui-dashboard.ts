@@ -1,7 +1,8 @@
+import { contextLabel } from '../shared/communications.js';
 import { builtDesks } from '../shared/layout.js';
-import type { FloorInfo, FloorView, WorkerInfo } from '../shared/protocol.js';
+import type { FloorInfo, FloorView, WorkerInfo, WorktreeCleanup } from '../shared/protocol.js';
 
-export const PANELS = ['office', 'issues', 'pulls', 'queue', 'floors', 'help'] as const;
+export const PANELS = ['office', 'issues', 'pulls', 'queue', 'messages', 'floors', 'help'] as const;
 export type Panel = typeof PANELS[number];
 export interface Seat { id: string; label: string; worker?: WorkerInfo }
 export interface Dashboard {
@@ -12,6 +13,8 @@ export interface Dashboard {
   offset: number;
   notice: string;
   command?: string;
+  thread?: string;
+  home?: { worker: WorkerInfo; cleanup: WorktreeCleanup };
 }
 
 /** Dashboard text is untrusted; only attached PTYs may emit terminal controls. */
@@ -35,6 +38,20 @@ export function gridColumns(width: number): number {
   return Math.max(1, Math.floor((gridWidth + 1) / 25));
 }
 
+export function communicationLines(state: Dashboard, width: number): string[] {
+  const messages = state.view?.communications?.messages ?? [];
+  const roots = messages.filter((m) => m.kind === 'request').reverse();
+  if (!state.thread) return roots.length ? roots.map((m, i) => `${i === state.offset ? '>' : ' '} [${m.status}] ${m.from.name} -> ${m.to.name}: ${m.text}`) : [state.view?.communications?.error ?? 'No worker requests yet. Enter opens a selected thread.'];
+  const root = messages.find((m) => m.id === state.thread);
+  if (!root) return ['Request no longer retained.'];
+  return [root, ...messages.filter((m) => m.threadId === root.id && m.id !== root.id)].flatMap((m) => [
+    `${m.from.name} -> ${m.to.name} [${m.status}]`, m.id, ...m.text.split('\n'), contextLabel(m.context), '',
+  ]).flatMap((line) => {
+    const clean = plain(line).replace(/[^\x20-\x7e]/g, '?');
+    return Array.from({ length: Math.max(1, Math.ceil(clean.length / width)) }, (_, i) => clean.slice(i * width, (i + 1) * width));
+  });
+}
+
 /** Pure renderer: every row fits the terminal, and the selected desk stays in view. */
 export function renderDashboard(state: Dashboard, width: number, height: number): string {
   width = Math.max(1, Math.floor(width)); height = Math.max(1, Math.floor(height));
@@ -45,7 +62,29 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
   const lines = [fit(`AGENT OFFICE / ${name}    ${view?.workers.length ?? 0} workers | ${attention} need attention | Desk ${all.length ? selected + 1 : 0}/${all.length}`, width),
     fit(PANELS.map((p) => p === state.panel ? `[${p.toUpperCase()}]` : p).join('   '), width), '-'.repeat(width)];
   let body: string[] = [];
-  if (state.panel === 'office' && all.length) {
+  if (state.home) {
+    const { worker, cleanup } = state.home;
+    const many = (worker.repos?.length ?? 0) > 0;
+    const noun = many ? 'worktrees' : 'worktree';
+    body = [`Send ${worker.name} home?`];
+    if (worker.worktree && !worker.meeting) {
+      body.push(
+        `${cleanup === 'all' ? '>' : ' '} 1. Delete ${noun} + branch`,
+        `${cleanup === 'worktree' ? '>' : ' '} 2. Delete ${noun} only`,
+        `${cleanup === 'keep' ? '>' : ' '} 3. ${many ? 'Keep them all' : 'Keep both'}`,
+        'Option 2 keeps the branch.',
+        `Branch: ${worker.worktree.branch}`, `Path: ${worker.worktree.path}`, '',
+        'Deleting removes local work in the selected worktrees.',
+        'Up/Down or 1/2/3: choose | Enter: send home | Esc: cancel');
+    } else body.push(
+      '  1. Delete worktree + branch [unavailable]',
+      '  2. Delete worktree only [unavailable]',
+      '> 3. Keep checkout and branch',
+      worker.meeting ? 'Meeting workers share their checkout; cleanup is managed by the meeting.' : 'This worker uses the shared checkout; it has no private worktree to delete.',
+      'Sending home stops its session and keeps the checkout and branch.',
+      'Enter: send home | Esc: cancel');
+    body = body.map((line) => fit(line, width));
+  } else if (state.panel === 'office' && all.length) {
     const columns = gridColumns(width), cardWidth = Math.min(24, width), side = width >= 100;
     const pageRows = Math.max(1, Math.floor(bodyHeight / 5));
     const start = Math.floor(Math.floor(selected / columns) / pageRows) * pageRows * columns;
@@ -61,7 +100,7 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     }
     if (side) {
       const w = all[selected]?.worker;
-      const details = w ? ['SELECTED WORKER', w.name, w.id, `Status: ${w.status}`, `Agent: ${w.provider ?? w.kind}`, '', w.task?.name ?? '', w.task?.summary ?? w.activity ?? '', '', `By: ${w.createdBy}`, w.pr ? `PR #${w.pr.number}` : '', 'Enter: live terminal', 'p: prompt   r: resume'] : ['EMPTY DESK', all[selected]?.label ?? '', '', 'Enter: hire here', '', 'h: hire an agent', ': command prompt'];
+      const details = w ? ['SELECTED WORKER', w.name, w.id, `Status: ${w.status}`, `Agent: ${w.provider ?? w.kind}`, '', w.task?.name ?? '', w.task?.summary ?? w.activity ?? '', '', `By: ${w.createdBy}`, w.pr ? `PR #${w.pr.number}` : '', 'Enter: live terminal', 'p: prompt   r: resume', 'x: send home'] : ['EMPTY DESK', all[selected]?.label ?? '', '', 'Enter: hire here', '', 'h: hire an agent', ': command prompt'];
       const gridWidth = width - 34;
       body = Array.from({ length: bodyHeight }, (_, i) => {
         const grid = body[i] ?? '';
@@ -76,12 +115,13 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     body = board?.items.map((item) => `#${item.number}  ${item.title}`) ?? [];
     if (!body.length) body = [board?.error ?? 'No items on this board.'];
   } else if (state.panel === 'queue') body = view?.queue.tasks.map((t) => `${t.status.padEnd(8)} ${t.title} ${t.workerName ? '(' + t.workerName + ')' : ''}`) ?? [];
-  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt selected worker    r: resume worker', 'i: issues    b: pull requests    t: task queue', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, issues, pulls, queue, floors, workers, quit'];
+  else if (state.panel === 'messages') body = communicationLines(state, width);
+  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt    r: resume    x: send home (choose cleanup)', 'i: issues    b: pull requests    t: task queue    m: messages', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'home <worker> [--cleanup auto|keep|worktree|all],', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, messages [request-id], issues, pulls, queue, floors, quit'];
   if (state.panel !== 'office') {
-    const start = state.panel === 'floors' ? Math.floor(state.offset / bodyHeight) * bodyHeight : state.offset;
+    const start = state.panel === 'floors' || (state.panel === 'messages' && !state.thread) ? Math.floor(state.offset / bodyHeight) * bodyHeight : state.offset;
     body = body.slice(start, start + bodyHeight).map((line) => fit(line, width));
   }
   lines.push(...Array.from({ length: bodyHeight }, (_, i) => body[i] ?? ''));
-  lines.push('-'.repeat(width), fit(state.notice, width), fit(state.command !== undefined ? ':' + state.command.slice(-Math.max(0, width - 2)) + '_' : 'Arrows select | Enter open | Tab panels | f floors | h hire | : command | q quit', width));
+  lines.push('-'.repeat(width), fit(state.notice, width), fit(state.home ? (state.home.worker.worktree && !state.home.worker.meeting ? 'Up/Down choose | Enter send home | Esc cancel' : 'Enter send home (keep checkout) | Esc cancel') : state.command !== undefined ? ':' + state.command.slice(-Math.max(0, width - 2)) + '_' : 'Arrows select | Enter open | Tab panels | f floors | x send home | : command | q quit', width));
   return lines.slice(0, height).join('\r\n');
 }

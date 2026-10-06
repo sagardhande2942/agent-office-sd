@@ -17,7 +17,7 @@ test('dashboard navigation, terminal input, floor switching and cleanup over a P
   const messages: { t: string; data?: string; floor?: string }[] = [];
   const view = {
     floor: 'test', project: { dir: '/project' }, plan: { wing: 0, labels: {} },
-    workers: [{ id: 'w1', deskId: 'desk-1', name: 'Ada', status: 'needs_input', provider: 'codex' }],
+    workers: [{ id: 'w1', deskId: 'desk-1', name: 'Ada', status: 'needs_input', provider: 'codex', worktree: { path: '/project/ada', branch: 'office/ada', base: 'main' } }],
     issues: { items: [{ number: 12, title: 'Fix login' }] }, pulls: { items: [] }, queue: { tasks: [] },
   };
   wss.on('connection', (ws, req) => {
@@ -50,7 +50,20 @@ test('dashboard navigation, terminal input, floor switching and cleanup over a P
     child.write('f'); await expect('[FLOORS]');
     child.write('\x1b[B\r'); await expect('AGENT OFFICE / API');
     child.resize(32, 12); await expect('AGENT OFFICE');
+    child.resize(120, 30); await expect('AGENT OFFICE');
+    child.write('x'); await expect('Keep both');
+    child.write('\x1b'); await expect('AGENT OFFICE');
+    assert.equal(messages.filter((m) => m.t === 'worker.kill').length, 0);
+    child.write(':home w1 --cleanup invalid\r'); await expect('Usage: home');
+    assert.equal(messages.filter((m) => m.t === 'worker.kill').length, 0);
+    child.write('x'); await expect('Keep both');
+    child.write('2\r'); await expect('Sending Ada home');
+    child.write(':home Ada --cleanup keep\r'); await expect('Sending Ada home');
     child.write('q'); assert.equal(await exited, 0);
+    assert.deepEqual(messages.filter((m) => m.t === 'worker.kill'), [
+      { t: 'worker.kill', workerId: 'w1', cleanup: 'worktree' },
+      { t: 'worker.kill', workerId: 'w1', cleanup: 'keep' },
+    ]);
     assert.deepEqual(messages.filter((m) => m.t === 'term.input').map((m) => m.data), ['hello\x03']);
     assert.ok(messages.some((m) => m.t === 'worker.detach'));
     assert.ok(messages.some((m) => m.t === 'floor.go' && m.floor === 'api'));

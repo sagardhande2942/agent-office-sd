@@ -7,7 +7,7 @@ import type { DeskDef } from '../../shared/layout.js';
 import type { ForgeKind } from '../../shared/protocol.js';
 import { takeBreak, breakOver } from './breaks.js';
 import { validBossPrompt, validBossGuard, type BossGuard } from '../../shared/boss.js';
-import { officePrompt } from '../prompts.js';
+import { officePrompt, WORKER_COORDINATION } from '../prompts.js';
 const FINDING_LINES = 180;
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -692,9 +692,9 @@ export class WorkerManager {
         if (w.term === term) w.fresh = term.registerMarker(0);
       });
     }
-
     const shell = defaultShell();
     const isShell = info.kind === 'shell';
+    if (!isShell && prompt) prompt = `${prompt}\n\n${WORKER_COORDINATION}`;
     const adapter = isShell ? undefined : providerAdapter(info.provider);
     const configured = !isShell && info.provider === this.defaultProvider;
     const cwd = this.cwd(info);

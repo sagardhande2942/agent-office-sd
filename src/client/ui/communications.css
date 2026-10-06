@@ -1,0 +1,18 @@
+.communication-list { display: flex; flex-direction: column; gap: 12px; }
+.communication-thread { border: 2px solid var(--ink); border-radius: 10px; background: var(--paper); padding: 12px; }
+.communication-thread summary { cursor: pointer; font-weight: 800; overflow-wrap: anywhere; }
+.communication-record { border-top: 1px solid var(--muted); margin-top: 12px; padding-top: 6px; }
+.communication-record pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.5; }
+.communication-meta, .communication-context { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.communication-id { font-size: 11px; overflow-wrap: anywhere; }
+.communication-status { display: inline-block; background: #fff0bd; border-radius: 6px; padding: 3px 8px; font-size: 12px; }
+.communication-status[data-status="completed"] { background: #cef5d8; }
+.communication-status[data-status="answered"] { background: #cdeafa; }
+.communication-status[data-status="expired"] { background: #e7e7e7; }
+.communication-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.communication-modal footer { font-size: 12px; line-height: 1.5; }
+.communication-modal select { max-width: 45%; }
+@media (max-width: 520px) {
+  .communication-modal header { flex-wrap: wrap; }
+  .communication-modal select { order: 3; flex-basis: 100%; max-width: 100%; }
+}

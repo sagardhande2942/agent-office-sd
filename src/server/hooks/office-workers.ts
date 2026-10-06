@@ -60,6 +60,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
       leaveOnMerge: ctx.leaveOnMerge.on,
       providers: floor.project.agentProviders,
       defaultProvider: floor.workers.officeDefault.provider,
+      coordination: 'Use office-workers request for tracked messages, inbox between tasks, reply <request-id>, and ack <reply-id>. Messages do not interrupt terminals.',
       freeDesk: free?.id ?? null,
       ...(ctx.ledger.hiringPaused ? { hiringPaused: ctx.ledger.hiringPaused } : {}),
       workers: list.map((w) => workerRow(w, view, me.id)),

@@ -9,6 +9,8 @@ import { officeQueue } from './office-queue.js';
 import { officeWorkers } from './office-workers.js';
 import { providerHook } from '../providers/index.js';
 import type { AgentProvider } from '../../shared/providers.js';
+import { workerCommunications } from './communications.js';
+import { workerHelper } from './helper.js';
 
 /** Starts the hook server, and says which port it listens on. */
 export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Server; hookPort: number }> {
@@ -20,6 +22,8 @@ export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Serv
       return send(res, 400, {});
     }
     if (url.pathname === '/office/queue') return officeQueue(ctx, req, res, url);
+    if (url.pathname === '/office/workers/helper') return workerHelper(ctx, req, res, url);
+    if (['inbox', 'request', 'reply', 'ack'].some(action => url.pathname === `/office/workers/${action}`)) return workerCommunications(ctx, req, res, url);
     if (url.pathname === '/office/workers' || url.pathname.startsWith('/office/workers/')) return officeWorkers(ctx, req, res, url);
     // Each provider with hooks has its route, /hooks/<provider> (see providers/).
     const route = url.pathname.startsWith('/hooks/') ? url.pathname.slice('/hooks/'.length) : '';
