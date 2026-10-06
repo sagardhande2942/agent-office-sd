@@ -214,10 +214,17 @@ export function writeClaudeMcpConfig(dataDir: string, script: string): string {
 }
 
 /** Codex's -c overrides for the MCP server, with the office's variables passed on to it. */
-export function codexMcpArgs(script: string): string[] {
+export function codexMcpArgs(script: string, role?: 'candidate' | 'reviewer'): string[] {
   // TOML basic strings and arrays read JSON's.
   const key = `mcp_servers.${MCP_NAME}`;
-  return ['-c', `${key}.command=${JSON.stringify(process.execPath)}`, '-c', `${key}.args=${JSON.stringify([script, 'mcp'])}`, '-c', `${key}.env_vars=${JSON.stringify(MCP_ENV)}`];
+  const env = role ? [...MCP_ENV, 'AGENT_OFFICE_PLAN_ROLE'] : MCP_ENV;
+  const args = ['-c', `${key}.command=${JSON.stringify(process.execPath)}`, '-c', `${key}.args=${JSON.stringify([script, 'mcp'])}`, '-c', `${key}.env_vars=${JSON.stringify(env)}`];
+  if (role) {
+    const tools = ['plan_review_state', ...(role === 'candidate' ? ['submit_candidate_plan'] : ['request_plan_clarification', 'submit_plan_review'])];
+    args.push('-c', `${key}.enabled_tools=${JSON.stringify(tools)}`);
+    for (const tool of tools) args.push('-c', `${key}.tools.${tool}.approval_mode="approve"`);
+  }
+  return args;
 }
 
 /** OpenCode's `mcp` config entry for the MCP server; OpenCode hands it its environment. */
