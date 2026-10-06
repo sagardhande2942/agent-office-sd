@@ -8,6 +8,8 @@ import type { FloorPalette } from '../../shared/floors';
 
 export interface Collider {
   glass?: boolean;
+  /** Visible solid parts for media masking; movement still uses this collider’s full bounds. */
+  occlusion?: readonly Collider[];
   minX: number;
   maxX: number;
   minZ: number;

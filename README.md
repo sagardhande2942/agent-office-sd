@@ -481,3 +481,5 @@ The garage uses Blender-built Lambo and Ferrari models with wheel arches, detail
 Open **Boss Control Center** from the menu or the Workers panel’s **Boss** button, or sit in the boss chair and press E. It shows live worker status and reported spend, opens terminals/helper reports, reviews agent broadcast or auto-assign prompts, and exports a local floor report. Send-home uses the existing worktree choices. **Play Minesweeper** remains available. See [features](docs/features.md) and the [PR295 security review](docs/security/pr-295.md).
 
 TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
+
+At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
