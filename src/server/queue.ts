@@ -1,3 +1,4 @@
+import { restoreCompletion } from './completion.js';
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -245,7 +246,10 @@ export class TaskQueue {
       if (t.status !== 'running' || !t.workerId) continue;
       const w = byId.get(t.workerId);
       if (!w) this.finish(t, 'killed');
-      else if (FINISHED.has(w.status)) done = this.finish(t, w.status === 'done' ? 'done' : 'exited') || done;
+      else if (FINISHED.has(w.status)) {
+        if (w.completion) t.completion = structuredClone(w.completion);
+        done = this.finish(t, w.status === 'done' ? 'done' : 'exited') || done;
+      }
       else continue;
       changed = true;
     }
@@ -400,6 +404,7 @@ export class TaskQueue {
           startedAt: s.startedAt,
           finishedAt: s.finishedAt,
           outcome: s.outcome,
+          completion: restoreCompletion(s.completion, s.completion?.revision ?? 0),
           error: s.error,
           pr: s.pr,
         };

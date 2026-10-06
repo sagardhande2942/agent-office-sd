@@ -1,3 +1,4 @@
+import type { CompletionReport } from './completion.js';
 import type { CommunicationsState } from './communications.js';
 // Wire protocol between browser and server. Every WebSocket frame is one JSON object.
 
@@ -141,6 +142,9 @@ export interface WorkerInfo {
   action?: WorkerAction;
   /** Written by a small model from its prompts and recent tool calls (see server/tasks.ts). */
   task?: WorkerTask;
+  /** Checklist belongs to this prompt revision; an idle terminal is not proof of completion. */
+  completionRevision?: number;
+  completion?: CompletionReport;
   /** Reported session tokens and cost, when the provider supplies them (agents only). */
   usage?: Usage;
   /** Who last typed into its terminal (or sent it a prompt), and when. */
@@ -408,6 +412,8 @@ export type TaskStatus = 'queued' | 'running' | 'done';
 
 /** A task on the 📋 queue whiteboard: a GitHub issue or free text, seated to a worker by itself. */
 export interface QueueTask {
+  /** Evidence captured when the worker finished its turn; retained after it leaves. */
+  completion?: CompletionReport;
   id: string;
   provider?: AgentProvider;
   /** Model requested for this task, instead of the office's configured default: an OpenCode provider/model id, or a Claude model alias. */

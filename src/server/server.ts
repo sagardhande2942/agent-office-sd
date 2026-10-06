@@ -385,7 +385,15 @@ export async function startServer(cfg: Config) {
     const actor = workers.authenticate(workerId, token);
     const root = !data.agent_id && !data.agent_type && (!data.session_id || !actor?.sessionId || data.session_id === actor.sessionId || event === 'SessionStart');
     const native = ['/hooks/claude', '/hooks/codex'].includes(url.pathname);
-    const output = actor && root && native && (url.pathname !== '/hooks/codex' || (actor.provider === 'codex' && normalizeCodexHook(event, payload))) && actor.helperReport?.state !== 'interrupting' ? checkpoints.output(workerId, event, communicationView(floor), data.stop_hook_active === true) : {};
+    const nativeActor = actor?.kind === 'agent' && (url.pathname === '/hooks/claude' ? actor.provider === 'claude' || actor.provider === 'custom' : url.pathname === '/hooks/codex' && actor.provider === 'codex' && !!normalizeCodexHook(event, payload));
+    let output = actor && root && nativeActor && actor.helperReport?.state !== 'interrupting' ? checkpoints.output(workerId, event, communicationView(floor), data.stop_hook_active === true) : {};
+    if (actor && root && nativeActor && event === 'Stop' && !data.stop_hook_active && output.decision !== 'block' && !actor.helper && !actor.meeting && !DESK_BY_ID.get(actor.deskId)?.station && (actor.prompt || actor.task) && actor.helperReport?.state !== 'interrupting') {
+      const revision = actor.completionRevision ?? 0;
+      if ((!actor.completion || actor.completion.status === 'needs-attention') && completionStops.get(actor.id) !== revision) {
+        completionStops.set(actor.id, revision);
+        output = { decision:'block', reason:'Before claiming this task is complete, record its completion checklist with office-workers complete (JSON on stdin) or submit_worker_completion. Read office-workers completion --json / worker_completion for the current revision. Include summary, checks [{name,status:passed|failed|skipped,evidence}], files (or filesNote), and pr URL (or prNote). Report failed checks and reasons honestly; do not claim success if checks failed. A checklist is reported evidence, not independent verification.' };
+      }
+    }
     const holdStop = output.decision === 'block';
     const ok = url.pathname === '/hooks/opencode'
       ? workers.handleOpenCodeHook(workerId, token, payload)
@@ -447,6 +455,7 @@ export async function startServer(cfg: Config) {
    */
   const communicationStores = new Map<string, Communications>();
   const checkpoints = new CommunicationCheckpoints();
+  const completionStops = new Map<string, number>();
   const syncHelperReports = (floor: FloorActions, state: ReturnType<Communications['state']>) => {
     if (!(floor instanceof Floor)) return;
     for (const message of state.messages) if (message.helperReport && message.status === 'completed') floor.workers.clearHelperReport(message.to.id, message.id);
@@ -505,16 +514,23 @@ export async function startServer(cfg: Config) {
         workers: list.map((w) => workerRow(w, view, me.id)),
       });
     }
+    if (req.method === 'GET' && action === '/completion') return send(res, 200, { revision: me.completionRevision ?? 0, report: me.completion ?? null });
     if (req.method === 'GET' && action === '/inbox') {
       try { return send(res, 200, communications(floor).inbox({ id: me.id, name: me.name })); }
       catch (err) { return send(res, 400, { error: (err as Error).message }); }
     }
-    if (req.method !== 'POST' || !['', '/home', '/tell', '/helper', '/request', '/reply', '/ack'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home, /office/workers/tell or /office/workers/helper, GET /office/workers/inbox, POST /office/workers/request, /reply or /ack' });
+    if (req.method !== 'POST' || !['', '/home', '/tell', '/helper', '/request', '/reply', '/ack', '/complete'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home, /office/workers/tell or /office/workers/helper, GET /office/workers/inbox, POST /office/workers/request, /reply or /ack, GET /office/workers/completion, POST /office/workers/complete' });
     let body: unknown;
     try {
       body = JSON.parse((await readBody(req)) || '{}');
     } catch {
       return send(res, 400, { error: 'Send JSON' });
+    }
+
+    if (action === '/complete') {
+      if (!(floor instanceof Floor)) return send(res, 400, { error: 'Completion checklists require a local floor' });
+      const error = floor.workers.submitCompletion(me.id, body, floor.project.branch);
+      return error ? send(res, 400, { error }) : send(res, 200, { revision: me.completionRevision ?? 0, report: me.completion });
     }
 
     if (['/request', '/reply', '/ack'].includes(action)) {

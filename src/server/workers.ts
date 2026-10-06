@@ -1,3 +1,4 @@
+import { readCompletion, restoreCompletion } from './completion.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, accessSync, chmodSync, mkdirSync, readdirSync, rmdirSync, unlinkSync, constants } from 'node:fs';
 import { execFile, execFileSync } from 'node:child_process';
@@ -1327,7 +1328,7 @@ export class WorkerManager {
         w.info.action = undefined;
         if (typeof payload?.prompt === 'string') {
           w.info.activity = truncate(payload.prompt, 80);
-          this.notePrompt(w, payload.prompt);
+          this.notePrompt(w, payload.prompt, true);
         }
         if (w.info.status !== 'working') this.setStatus(w, 'working');
         else this.emitUpdate(w);
@@ -1406,7 +1407,7 @@ export class WorkerManager {
         w.info.action = undefined;
         if (report.prompt) {
           w.info.activity = truncate(report.prompt, 80);
-          this.notePrompt(w, report.prompt);
+          this.notePrompt(w, report.prompt, true);
         }
         this.setStatus(w, 'working');
         break;
@@ -1471,7 +1472,7 @@ export class WorkerManager {
         w.info.action = undefined;
         if (report.prompt) {
           w.info.activity = truncate(report.prompt, 80);
-          this.notePrompt(w, report.prompt);
+          this.notePrompt(w, report.prompt, true);
         }
         this.setStatus(w, 'working');
         break;
@@ -1535,7 +1536,7 @@ export class WorkerManager {
         w.info.action = undefined;
         if (report.prompt) {
           w.info.activity = truncate(report.prompt, 80);
-          this.notePrompt(w, report.prompt);
+          this.notePrompt(w, report.prompt, true);
         }
         this.setStatus(w, 'working');
         break;
@@ -1611,7 +1612,7 @@ export class WorkerManager {
     if (payload.prompt) {
       w.info.activity = truncate(payload.prompt, 80);
       w.info.action = undefined;
-      this.notePrompt(w, payload.prompt);
+      this.notePrompt(w, payload.prompt, true);
     } else if (payload.tool) {
       w.info.activity = truncate(payload.tool, 80);
       w.info.action = toolAction(payload.tool);
@@ -1626,12 +1627,30 @@ export class WorkerManager {
     return true;
   }
 
+  /** Record the agent’s evidence without claiming the office independently checked it. */
+  submitCompletion(id: string, body: unknown, branch?: string): string | undefined {
+    const w = this.workers.get(id);
+    if (!w || w.info.kind !== 'agent' || w.info.helper) return 'Only a regular agent can submit its completion checklist';
+    try {
+      const report = readCompletion(body, w.info.completionRevision ?? 0);
+      w.info.completion = { ...report, branch: w.info.worktree?.branch ?? branch, task: w.info.task?.name ?? w.info.prompt };
+      this.emitUpdate(w); this.persist();
+    } catch (err) { return (err as Error).message; }
+  }
+
   /** A new message for the worker: show it right away, and have its task (re)named. */
-  private notePrompt(w: Worker, prompt: string) {
+  private notePrompt(w: Worker, prompt: string, newTurn = false) {
     if (w.info.kind !== 'agent') return;
     const clean = prompt.replace(/\s+/g, ' ').trim();
-    // Bare slash commands (/model, /compact), repeats and the office's own carry-on aren't new work.
-    if (!clean || /^\/\S+$/.test(clean) || w.prompts.at(-1) === clean || clean === CARRY_ON_PROMPT) return;
+    // Bare slash commands and carry-on preserve evidence. Duplicate bridge calls are
+    // deduplicated; a native user-prompt event starts a turn even when text repeats.
+    if (!clean || /^\/\S+$/.test(clean) || clean === CARRY_ON_PROMPT) return;
+    const repeated = w.prompts.at(-1) === clean;
+    if (repeated && !newTurn) return;
+    w.info.completionRevision = (w.info.completionRevision ?? 0) + 1;
+    delete w.info.completion;
+    this.persist();
+    if (repeated) { this.emitUpdate(w); return; }
     w.prompts = [...w.prompts, clean].slice(-TASK_PROMPTS);
     const hadTask = !!w.info.task;
     if (!hadTask) w.info.task = fallbackTask(clean);
@@ -1676,11 +1695,14 @@ export class WorkerManager {
 
   private clearTask(w: Worker) {
     w.taskEpoch++;
+    w.info.completionRevision = (w.info.completionRevision ?? 0) + 1;
+    delete w.info.completion;
+    this.persist();
     w.prompts = [];
     w.tools = [];
     w.toolsSinceNamed = 0;
     this.namer.forget(w.info.id);
-    if (!w.info.task) return;
+    if (!w.info.task) { this.emitUpdate(w); this.persist(); return; }
     w.info.task = undefined;
     this.emitUpdate(w);
     this.persist();
@@ -2396,6 +2418,8 @@ process.stdin.on('end', () => {
       pr: info.pr,
       meeting: info.meeting,
       helperReport: info.helperReport,
+      completionRevision: info.completionRevision,
+      completion: info.completion,
       workedMs: workedMs(info),
       tracker: info.kind === 'agent' ? tracker : undefined,
       usage: info.provider === 'opencode' || info.provider === 'codex' || info.provider === 'dsh' ? info.usage : undefined,
@@ -2448,6 +2472,8 @@ process.stdin.on('end', () => {
           sessionId: s.sessionId,
           activity: s.activity,
           task: validTask(s.task),
+          completionRevision: Number.isSafeInteger(s.completionRevision) && s.completionRevision! >= 0 ? s.completionRevision : 0,
+          completion: restoreCompletion(s.completion, s.completionRevision ?? 0),
           pr: s.pr && typeof s.pr.number === 'number' && typeof s.pr.url === 'string' ? { number: s.pr.number, url: s.pr.url } : undefined,
           usage: provider === 'opencode' || provider === 'codex' || provider === 'dsh' ? reportedUsage(s.usage) : (provider === 'claude' || provider === 'custom') && tracker.transcript ? trackerUsage(tracker) : undefined,
           cols: 100,

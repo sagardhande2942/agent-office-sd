@@ -1366,3 +1366,8 @@ a.when:hover { text-decoration: underline; }
   .meeting-window footer .grow { flex: 1 0 100%; }
   .meeting-window footer .btn { flex: 1; }
 }
+
+.completion-report { color: var(--ink); flex: 0 0 auto; padding: 8px 14px; border-bottom: 2px solid var(--ink); background: var(--paper); max-height: 35vh; overflow: auto; }
+.completion-report summary { cursor: pointer; font-weight: 700; }
+.completion-report pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.completion-report p { overflow-wrap: anywhere; margin: 6px 0; }

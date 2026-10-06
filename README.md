@@ -404,3 +404,5 @@ At a regular worker’s desk, press U or click **U — Bring a helper** to open 
 Helpers carry a laptop showing their own terminal. Aim at the helper or its laptop and press **E**, or click **Open helper terminal** in the hint. You can also open the helper by name in the Workers list. **Needs you** means its agent is waiting: answer the question or approve/reject the permission request inside that helper’s terminal. Close it with Esc or ✕ to return to the office.
 
 Sending a worker home also stops and removes its helper before cleaning up the worker’s checkout. Sending only the helper home leaves the host worker and its worktree intact.
+
+Workers can record a **completion checklist** with actual check results, changed files and a PR link (or reasons they do not apply). Inspect it in worker terminals, lite cards, CLI worker details and finished queue tasks. Failed checks remain visible as needing attention; a ready terminal alone is not proof of success. See [completion checklists](docs/completion-checklist.md) for CLI/MCP submission and lifecycle.

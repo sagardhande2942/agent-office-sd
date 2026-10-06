@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readCompletion, restoreCompletion } from '../src/server/completion.js';
+import { parseArgs, buildRequest, handleMcp, main } from '../bin/office-workers.js';
+import { Readable } from 'node:stream';
+const report = {revision:2,summary:'API implemented',checks:[{name:'npm test',status:'passed',evidence:'42 tests passed, exit 0'}],files:['src/api.ts'],pr:'https://github.com/example/project/pull/3'};
+test('completion evidence is bounded, task-scoped and failures cannot become ready',()=>{
+ const result=readCompletion({...report,status:'ready',submittedAt:1},2,100);
+ assert.equal(result.submittedAt,100);assert.equal(result.status,'ready');
+ assert.equal(readCompletion({...report,checks:[{...report.checks[0],status:'failed'}]},2).status,'needs-attention');
+ assert.throws(()=>readCompletion(report,3),/Task changed/);
+ assert.throws(()=>readCompletion({...report,revision:-1},-1),/Task changed/);
+ for(const patch of [{checks:[]},{checks:[{name:'test',status:'skipped',evidence:''}]},{files:[]},{pr:undefined},{pr:'javascript:alert(1)'},{pr:'https://user:secret@example.com/pr'},{commit:'invalid'},{checks:[report.checks[0],report.checks[0]]}]) assert.throws(()=>readCompletion({...report,...patch},2));
+ const skipped=readCompletion({...report,files:[],filesNote:'Documentation review only',pr:undefined,prNote:'No changes to publish',checks:[{name:'Tests',status:'skipped',evidence:'Read-only review; no code changed'}]},2);
+ assert.equal(skipped.checks[0].status,'skipped');
+ assert.deepEqual(restoreCompletion(result,2),result);assert.equal(restoreCompletion(result,3),undefined);
+});
+test('completion CLI uses authenticated GET/read and POST/write; prepared revisions are preserved',async()=>{
+ assert.deepEqual(parseArgs(['completion','--json']),{cmd:'completion',json:true});
+ assert.equal(parseArgs(['complete']).cmd,'complete');
+ const env={AGENT_OFFICE_HOOK_URL:'http://127.0.0.1:1',AGENT_OFFICE_WORKER_ID:'ada',AGENT_OFFICE_HOOK_TOKEN:'token'};
+ const office={url:env.AGENT_OFFICE_HOOK_URL,worker:'ada',token:'token'};
+ assert.equal(buildRequest('completion',office).method,'GET');assert.equal(buildRequest('complete',office,report).method,'POST');
+ const sent:any[]=[];const fetch=async(url:any,init:any)=>{sent.push({url,init});return Response.json({revision:2,report});};
+ const out:string[]=[];
+ assert.equal(await main(['complete'],{env,fetch,stdin:Readable.from([JSON.stringify(report)]),stdout:{write:(s:string)=>out.push(s)},stderr:{write:()=>{}}}),0);
+ assert.equal(sent.length,1);assert.equal(JSON.parse(sent[0].init.body).revision,2);
+ sent.length=0;
+ const {revision:_revision,...withoutRevision}=report;
+ assert.equal(await main(['complete'],{env,fetch,stdin:Readable.from([JSON.stringify(withoutRevision)]),stdout:{write:()=>{}},stderr:{write:()=>{}}}),0);
+ assert.equal(sent.length,2);assert.equal(sent[0].init.method,'GET');assert.equal(JSON.parse(sent[1].init.body).revision,2);
+ const mcp=await handleMcp({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'worker_completion',arguments:{}}},{env,fetch});assert.ok(mcp?.result);
+});
