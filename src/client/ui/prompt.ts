@@ -19,9 +19,11 @@ export interface PromptOptions {
   worktreeOption?: boolean;
   /** Offer the configured agent provider choice (only when hiring a new worker). */
   providerOption?: boolean;
+  /** Whether they opened that choice and picked a provider, rather than leaving it on the default. */
+  picked?: boolean;
   /** Other floors' projects a new worker in its own worktree can work in too (see WorkerInfo.repos). */
   repoOptions?: { id: string; name: string }[];
-  onSubmit(text: string, opts: { worktree: boolean; provider?: AgentProvider; model?: string; effort?: AgentEffort; repos: string[] }): void;
+  onSubmit(text: string, opts: { worktree: boolean; provider?: AgentProvider; model?: string; effort?: AgentEffort; picked?: boolean; repos: string[] }): void;
 }
 
 const WT_KEY = 'agent-office.worktree';
@@ -98,7 +100,7 @@ export function openPrompt(opts: PromptOptions) {
       }
     }
     const worktree = !!opts.worktreeOption && wtBox.checked;
-    opts.onSubmit(text, { worktree, provider: provider?.value(), model: provider?.model(), effort: provider?.effort(), repos: worktree ? repos.value() : [] });
+    opts.onSubmit(text, { worktree, provider: provider?.value(), model: provider?.model(), effort: provider?.effort(), picked: !!provider?.picked(), repos: worktree ? repos.value() : [] });
   };
   form.addEventListener('submit', (e) => {
     e.preventDefault();

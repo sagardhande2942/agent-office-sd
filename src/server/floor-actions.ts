@@ -24,6 +24,7 @@
  */
 
 import type {
+  AgentChoice,
   AgentEffort,
   AgentProvider,
   ChangesState,
@@ -136,8 +137,8 @@ export interface FloorWorkers {
     repos?: RepoSource[],
     via?: 'herald',
   ): Awaitable<WorkerInfo | string>;
-  /** A board agent on a station desk: told what it is there for before its first request. */
-  station(deskId: string, by: string, text: string, owner?: string): Awaitable<{ info: WorkerInfo; hired: boolean } | string>;
+  /** A board agent on a station desk: told what it is there for before its first request, on `choice`'s agent when there is one. */
+  station(deskId: string, by: string, text: string, owner?: string, choice?: AgentChoice): Awaitable<{ info: WorkerInfo; hired: boolean } | string>;
   resume(id: string, prompt?: string): Awaitable<string | undefined>;
   prompt(id: string, text: string, by?: string, guard?: BossGuard): Awaitable<string | undefined>;
   deliverHelperReport(id: string, by?: string): Awaitable<string | undefined>;

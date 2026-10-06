@@ -111,6 +111,8 @@ export interface ProviderPicker {
   model(): string | undefined;
   /** The reasoning effort picked for it, when one was (Pi calls it thinking). */
   effort(): AgentEffort | undefined;
+  /** Whether they opened the fields and chose a provider, rather than leaving it on the office default. */
+  picked(): boolean;
   /** Reports a visible field error for a typed model its provider doesn't take. */
   valid(): boolean;
 }
@@ -277,6 +279,8 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
     value,
     effort,
     model,
+    // The fields themselves are the explicit choice; the picker wrapping them is what may be untouched.
+    picked: () => true,
     set,
     choice: () => ({ provider: value(), ...(model() ? { model: model() } : {}), ...(effort() ? { effort: effort() } : {}) }),
     valid: () => {
@@ -325,6 +329,8 @@ export function providerPicker(project: ProjectInfo | null, id: string, label = 
     value: () => (editing ? fields.value() : officeChoice(project).provider),
     model: () => (editing ? fields.model() : officeChoice(project).model),
     effort: () => (editing ? fields.effort() : officeChoice(project).effort),
+    /** Whether they opened the fields and chose one, rather than taking the office default as it stands. */
+    picked: () => editing,
     valid: () => !editing || fields.valid(),
   };
 }

@@ -431,6 +431,10 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   await warned('Unknown agent provider');
   a.send({ t: 'meeting.start', pattern: 'debate', prompt: 'x', roles: [], provider: 'nope' });
   await warned('Unknown agent provider');
+  a.send({ t: 'station.prompt', deskId: 'station-manager', prompt: 'How is the floor?', provider: 'nope' });
+  await warned('Unknown agent provider');
+  a.send({ t: 'station.prompt', deskId: 'desk-1', prompt: 'Fix it', provider: 'claude' });
+  await warned('There is no agent to ask there');
   a.send({ t: 'queue.move', taskId: 'nope', delta: 1 });
   a.send({ t: 'changes.watch', workerId: 'nope' });
   a.send({ t: 'changes.unwatch', workerId: 'nope' });

@@ -241,7 +241,10 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
       placeholder: `e.g. ${info.example}`,
       submitLabel: 'Send ✨',
       warning: w ? undefined : pressureNote(store.machine),
-      onSubmit: (text) => net.send({ t: 'station.prompt', deskId, prompt: text }),
+      // The agent it starts on, when this hire brings it: the office default, or whichever one you
+      // pick here. Asking one that's already there goes to the agent that is, whatever it runs on.
+      providerOption: !w,
+      onSubmit: (text, opts) => net.send({ t: 'station.prompt', deskId, prompt: text, ...(opts.picked ? { provider: opts.provider, ...(opts.model ? { model: opts.model } : {}), ...(opts.effort ? { effort: opts.effort } : {}) } : {}) }),
     });
   }
 
