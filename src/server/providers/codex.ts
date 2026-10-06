@@ -70,7 +70,6 @@ function tracker(s: CodexState): ToolTracker {
 function codexHook(h: WorkerHandle<CodexState>, event: string, payload: unknown, holdStop = false): boolean {
   const report = normalizeCodexHook(event, payload);
   if (!report) return false;
-  if (event === 'Stop' && holdStop) { h.setStatus('working'); return true; }
   const s = h.state;
   return reduceLifecycle(h, report, {
     onSessionSwitch() {
@@ -83,6 +82,7 @@ function codexHook(h: WorkerHandle<CodexState>, event: string, payload: unknown,
       h.scheduleScan();
     },
     tools: tracker(s),
+    holdStop,
   });
 }
 

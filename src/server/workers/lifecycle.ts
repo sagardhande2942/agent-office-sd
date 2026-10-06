@@ -46,6 +46,8 @@ export interface ToolTracker {
 
 /** Where a provider's lifecycle differs (see reduceLifecycle). */
 export interface LifecycleOptions {
+  /** A native inbox continuation holds this turn open without discarding pending tools. */
+  holdStop?: boolean;
   /** Another session replaced the one the worker had, and its task was cleared. */
   onSessionSwitch?(): void;
   /** Each event it takes, once its session is settled. */
@@ -144,6 +146,7 @@ export function reduceLifecycle(h: WorkerHandle, report: LifecycleReport, o: Lif
       notified(h, report.notificationType);
       break;
     case 'Stop':
+      if (o.holdStop) { busy(); break; }
     case 'StopFailure':
     case 'StopCancelled':
     case 'Interrupt':
