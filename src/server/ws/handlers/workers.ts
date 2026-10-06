@@ -52,6 +52,13 @@ export const workerHandlers = {
     const w = workerOf(ctx, msg.workerId);
     ctx.warn(c, w ? await w.floor.workers.resume(w.wid) : 'No such worker');
   },
+  async 'worker.rest'(ctx, c, msg) {
+    const w=workerOf(ctx,msg.workerId);
+    if(!w || ctx.floorOf(c)?.id!==w.floor.id) return ctx.warn(c,'Choose a worker on your current floor');
+    const err=await w.floor.workers.rest(w.wid,msg.on===true);
+    if(err) return ctx.warn(c,err);
+    ctx.toastFloor(w.floor,`${c.peer.name} ${msg.on ? 'sent' : 'recalled'} ${w.info.name}${msg.on ? ' on a break' : ' to its desk'}`);
+  },
   async 'worker.kill'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);

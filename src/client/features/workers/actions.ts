@@ -8,7 +8,7 @@ import { STATION_AGENT, deskSeat, type DeskDef } from '../../../shared/layout';
 import { canLabel } from '../../../shared/floorplan';
 import { officeFull, pressureNote } from '../../../shared/machine';
 import type { AgentEffort, AgentProvider, WorkerInfo } from '../../../shared/protocol';
-import { isAsleep, isBusy } from '../../../shared/status';
+import { canRest, isAsleep, isBusy } from '../../../shared/status';
 import type { Ctx, Hint } from '../../core/context';
 import type { CoreState } from '../../core/ctx';
 import { seatBuilt } from '../../core/floors';
@@ -433,7 +433,7 @@ function deskHint(deskId: string): Hint {
     const spent = w.kind === 'agent' && w.usage ? usageLabel(w.usage, workerProvider) : '';
     const shell = w.kind === 'shell';
     return {
-      k: w.status + w.id + (w.pr?.number ?? '') + (w.repos?.map((r) => r.pr?.number ?? '-').join() ?? '') + (w.prOpening ? '!' : '') + doing + spent + (sign ?? ''),
+      k: w.status + w.id + (w.resting ? 'z' : '') + (w.pr?.number ?? '') + (w.repos?.map((r) => r.pr?.number ?? '-').join() ?? '') + (w.prOpening ? '!' : '') + doing + spent + (sign ?? ''),
       parts: [
         h('span.title', {}, `${sign ? `🪧 ${sign} · ` : ''}${w.name} · ${STATUS_LABEL[w.status]}`),
         doing ? aside(doing) : '',
@@ -443,6 +443,8 @@ function deskHint(deskId: string): Hint {
         isAsleep(w.status) ? key('R', shell ? 'Restart' : 'Resume') : key('P', shell ? 'Run command' : 'Prompt'),
         w.repos?.length ? reposKey(w) : w.pr ? key('O', `PR #${w.pr.number}`) : w.prOpening ? aside('⏳ Opening PR…') : prReady(w) ? key('O', 'Open PR') : '',
         helperKey(w),
+        // Z itself is features/breaks'.
+        plan().style === 'office' && canRest(w, !!plan().byId.get(w.deskId)?.station) ? key('Z', w.resting ? 'Back to work' : 'Take a break') : '',
         key('X', 'Send home'),
         labelKey,
       ],

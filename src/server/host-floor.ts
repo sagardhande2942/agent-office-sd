@@ -179,6 +179,7 @@ export class HostFloors {
         branch: floor.project.branch,
         providers: floor.project.agentProviders,
         bossGuard: true,
+        workerBreaks: true,
         projectsDir: this.projectsDir,
         workers: floor.workers.list().map((w) => ({ id: w.id, status: w.status, deskId: w.deskId })),
       },
@@ -265,6 +266,8 @@ export class HostFloors {
     switch (msg.t) {
       case 'worker.spawn':
         return await floor.workers.spawn(s('deskId'), s('by'), s('prompt') || undefined, m.worktree === true, m.kind as never, m.provider as never, s('model') || undefined, m.effort as never, undefined, s('owner') || undefined);
+      case 'worker.rest':
+        return floor.workers.rest(s('workerId'),m.on===true);
       case 'worker.resume':
         return await floor.workers.resume(s('workerId'), s('prompt') || undefined);
       case 'worker.prompt':

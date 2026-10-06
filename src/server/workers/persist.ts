@@ -40,6 +40,7 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     pr: info.pr,
     pastPrs: info.pastPrs,
     meeting: info.meeting,
+    resting: info.resting,
     workedMs: workedMs(info),
     tracker: info.kind === 'agent' ? tracker : undefined,
     usage: providerAdapter(info.provider)?.usage?.persisted ? info.usage : undefined,

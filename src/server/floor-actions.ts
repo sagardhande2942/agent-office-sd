@@ -103,6 +103,7 @@ export interface FloorForge {
 export interface FloorWorkers {
   // Reads: answered from the roster and worker updates the floor streams upward, so a hosted floor
   // costs no round trip for any of them.
+  rest(id: string, on: boolean): Awaitable<string | undefined>;
   list(): WorkerInfo[];
   get(id: string): WorkerInfo | undefined;
   ownerOf(id: string): string | undefined;
