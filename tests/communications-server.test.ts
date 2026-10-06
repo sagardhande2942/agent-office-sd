@@ -75,6 +75,53 @@ test('authenticated workers coordinate without prompting and observers receive p
     const stored = JSON.parse(readFileSync(files, 'utf8'));
     assert.deepEqual(stored.find((m: any) => m.id === answer.body.message.id).meeting, linked.body.message.meeting);
     assert.ok(floor.meetings.finishAnyway('forged', 'tester'));
+    const hook = async (id: string, event: string, payload: object = {}, suppliedToken = token(id)) => {
+      const res = await fetch(`http://127.0.0.1:${office.hookPort}/hooks/claude?worker=${id}&event=${event}`, { method:'POST', headers:{authorization:`Bearer ${suppliedToken}`, 'content-type':'application/json'}, body:JSON.stringify(payload) });
+      return { status:res.status, body:await res.json() as any };
+    };
+    await hook(ada.id,'SessionStart',{session_id:'ada-root'});
+    await hook(ada.id,'UserPromptSubmit',{session_id:'ada-root',prompt:'Build API'});
+    await call(grace.id, 'request', { worker: ada.id, prompt: 'New dependency during work' });
+    const duringTask = await hook(ada.id,'PostToolUse',{session_id:'ada-root',tool_name:'Bash'});
+    assert.equal(duringTask.status,200);
+    assert.match(duringTask.body.hookSpecificOutput.additionalContext,/CURRENT task/);
+    assert.equal(floor.workers.get(ada.id)!.status,'working');
+    assert.equal((await hook(ada.id,'PostToolUse',{session_id:'ada-root'},'bad')).status,401);
+    const stop = await hook(ada.id,'Stop',{session_id:'ada-root'});
+    assert.equal(stop.body.decision,'block');
+    assert.equal(floor.workers.get(ada.id)!.status,'working','continuation must not mark task done');
+    // A helper report uses both channels; reading alone leaves the manual card, ack removes it.
+    floor.workers.finding = () => 'Found the API contract mismatch in users.ts';
+    const helper = floor.workers.sendHelper(ada.id,'tester','custom'); assert.ok(typeof helper !== 'string');
+    (floor as any).onHelperUpdate({...helper,status:'done'});
+    const reportId = floor.workers.get(ada.id)!.helperReport!.messageId!;
+    assert.ok(reportId);
+    await floor.workers.kill(helper.id);
+    await call(ada.id,'inbox');
+    assert.equal(floor.workers.get(ada.id)!.helperReport!.messageId,reportId);
+    assert.equal((await call(ada.id,'ack',{id:reportId})).status,200);
+    assert.equal(floor.workers.get(ada.id)!.helperReport,undefined);
+    assert.ok(await floor.workers.deliverHelperReport(ada.id,'tester'),'the other path no longer exists');
+    const helper2 = floor.workers.sendHelper(ada.id,'tester','custom'); assert.ok(typeof helper2 !== 'string');
+    (floor as any).onHelperUpdate({...helper2,status:'done'});
+    const manualId = floor.workers.get(ada.id)!.helperReport!.messageId!;
+    floor.workers.get(ada.id)!.status='done';
+    let submissions=0;floor.workers.prompt=()=>{submissions++;return undefined;};
+    assert.equal(await floor.workers.deliverHelperReport(ada.id,'tester'),undefined);
+    assert.equal(submissions,1);assert.equal(floor.workers.get(ada.id)!.helperReport,undefined);
+    const manual=(await call(ada.id,'inbox')).body.messages.find((m:any)=>m.id===manualId);
+    assert.equal(manual.status,'completed');assert.equal(manual.helperReport.handledVia,'terminal');
+    assert.ok(await floor.workers.deliverHelperReport(ada.id,'tester'));assert.equal(submissions,1);
+    await floor.workers.kill(helper2.id);
+    const helper3 = floor.workers.sendHelper(ada.id,'tester','custom'); assert.ok(typeof helper3 !== 'string');
+    (floor as any).onHelperUpdate({...helper3,status:'done'});
+    const recoveredId = floor.workers.get(ada.id)!.helperReport!.messageId!;
+    floor.workers.get(ada.id)!.helperReport!.state='submitted';
+    const recovered = (await call(ada.id,'inbox')).body.messages.find((m:any)=>m.id===recoveredId);
+    assert.equal(recovered.status,'completed'); assert.equal(recovered.helperReport.handledVia,'terminal');
+    assert.equal(floor.workers.get(ada.id)!.helperReport,undefined); assert.equal(submissions,1,'reconciliation must never submit again');
+
+
 
   } finally {
     ws?.terminate(); office.shutdown();

@@ -1,3 +1,5 @@
+import { normalizeCodexHook } from './codex.js';
+import { CommunicationCheckpoints } from './communication-checkpoints.js';
 import { Communications } from './communications.js';
 import http from 'node:http';
 import https from 'node:https';
@@ -378,16 +380,26 @@ export async function startServer(cfg: Config) {
     const workers = workerFloor(workerId)?.workers;
     if (!workers) return send(res, 401, {});
     const event = url.searchParams.get('event') ?? '';
+    const floor = workerFloor(workerId)!;
+    const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+    const actor = workers.authenticate(workerId, token);
+    const root = !data.agent_id && !data.agent_type && (!data.session_id || !actor?.sessionId || data.session_id === actor.sessionId || event === 'SessionStart');
+    const native = ['/hooks/claude', '/hooks/codex'].includes(url.pathname);
+    const output = actor && root && native && (url.pathname !== '/hooks/codex' || (actor.provider === 'codex' && normalizeCodexHook(event, payload))) && actor.helperReport?.state !== 'interrupting' ? checkpoints.output(workerId, event, communicationView(floor), data.stop_hook_active === true) : {};
+    const holdStop = output.decision === 'block';
     const ok = url.pathname === '/hooks/opencode'
       ? workers.handleOpenCodeHook(workerId, token, payload)
       : url.pathname === '/hooks/codex'
-        ? workers.handleCodexHook(workerId, token, event, payload)
+        ? workers.handleCodexHook(workerId, token, event, payload, holdStop)
         : url.pathname === '/hooks/grok'
           ? workers.handleGrokHook(workerId, token, event, payload)
           : url.pathname === '/hooks/muse'
             ? workers.handleMuseHook(workerId, token, event, payload)
-            : workers.handleHook(workerId, token, event, payload);
-    send(res, ok ? 200 : 401, {});
+            : workers.handleHook(workerId, token, event, payload, holdStop);
+    if (!ok) return send(res, 401, {});
+    if (native) return send(res, 200, output);
+    if (url.pathname === '/hooks/opencode' && data.type === 'checkpoint') return send(res, 200, checkpoints.output(workerId, 'PostToolUse', communicationView(floor)));
+    send(res, 200, {});
   });
   /**
    * The task queue, for the board agents (see stations.ts, which tells them how): GET lists it, POST
@@ -434,13 +446,30 @@ export async function startServer(cfg: Config) {
    * worker's own hook token says who's asking, and the floor hears who did what, as from anyone.
    */
   const communicationStores = new Map<string, Communications>();
+  const checkpoints = new CommunicationCheckpoints();
+  const syncHelperReports = (floor: FloorActions, state: ReturnType<Communications['state']>) => {
+    if (!(floor instanceof Floor)) return;
+    for (const message of state.messages) if (message.helperReport && message.status === 'completed') floor.workers.clearHelperReport(message.to.id, message.id);
+  };
   const communications = (floor: FloorActions) => {
     let ledger = communicationStores.get(floor.id);
     if (!ledger) {
       ledger = new Communications(path.join(cfg.dataDir, 'communications', Buffer.from(floor.id).toString('hex')), (state) => {
+        syncHelperReports(floor, state);
         for (const c of clients.values()) if (c.peer.floor === floor.id) sendTo(c, { t: 'communications', state });
       });
       communicationStores.set(floor.id, ledger);
+      syncHelperReports(floor, ledger.state());
+    }
+    // Recover a submitted terminal report if the office stopped before its ledger commit.
+    if (floor instanceof Floor) for (const worker of floor.workers.list()) {
+      const report = worker.helperReport;
+      if (report?.state !== 'submitted' || !report.messageId) continue;
+      const message = ledger.get(report.messageId);
+      if (!message?.helperReport) continue;
+      if (message.completedAt !== undefined) { floor.workers.clearHelperReport(worker.id, message.id); continue; }
+      if (!message.helperReport.terminalClaimed) ledger.terminalReport(worker, message.id, 'claim');
+      ledger.terminalReport(worker, message.id, 'complete');
     }
     return ledger;
   };
@@ -746,6 +775,15 @@ export async function startServer(cfg: Config) {
 
   const floorContext: FloorContext = {
     communications: communicationView,
+    helperReport: (floor, helper, host, text) => {
+      const meeting = floor.meetings.state().current;
+      const link = meeting?.status === 'running' && meeting.seats.some((s) => s.workerId === host.id) ? { id: meeting.id, round: meeting.round } : undefined;
+      return communications(floor).report(helper, host, text, { branch: host.worktree?.branch ?? floor.project.branch }, link).id;
+    },
+    helperReportDelivery: (floor, workerId, messageId, phase) => {
+      try { const actor = floor.workers.get(workerId); if (!actor) return 'Worker no longer exists'; communications(floor).terminalReport(actor, messageId, phase); }
+      catch (err) { return (err as Error).message; }
+    },
     agentCmd: cfg.agentCmd,
     agentArgs: cfg.agentArgs,
     dshProfile: cfg.dshProfile,

@@ -201,6 +201,7 @@ interface Worker {
 }
 
 export interface WorkerEvents {
+  helperReportDelivery?(workerId: string, messageId: string, phase: 'claim' | 'complete' | 'release'): string | undefined;
   update(info: WorkerInfo): void;
   /** It's gone (sent home), and what it was as it went. */
   remove(workerId: string, info?: WorkerInfo): void;
@@ -1050,12 +1051,20 @@ export class WorkerManager {
   }
 
   /** Hold findings outside the agent's queue until someone chooses to deliver them. */
-  stageHelperReport(id: string, helperName: string, text: string): void {
+  stageHelperReport(id: string, helperName: string, text: string, messageId?: string): void {
     const w = this.workers.get(id);
     if (!w) return;
-    w.info.helperReport = { helperName, text: text.slice(0, 20000), state: 'pending' };
+    w.info.helperReport = { helperName, text: text.slice(0, 20000), ...(messageId ? { messageId } : {}), state: 'pending' };
     this.emitUpdate(w);
     this.persist();
+  }
+
+  /** Clear only the matching report, never a newer helper's findings. */
+  clearHelperReport(id: string, messageId: string): void {
+    const w = this.workers.get(id);
+    if (w?.info.helperReport?.messageId !== messageId) return;
+    delete w.info.helperReport;
+    this.emitUpdate(w); this.persist();
   }
 
   /** Interrupt only on request, wait for an idle status, then submit the saved report once. */
@@ -1069,10 +1078,14 @@ export class WorkerManager {
     if (w.info.status === 'needs_input') return 'Answer the worker’s question or permission request first';
     if (w.info.status === 'starting' || isAsleep(w.info.status)) return 'Wait for the worker to be running';
     if (isBusy(w.info.status) && !w.dsh && !['claude', 'opencode', 'codex'].includes(w.info.provider ?? '')) return 'This provider must be interrupted manually in its terminal first';
+    const delivery = (phase: 'claim' | 'complete' | 'release') => report.messageId ? this.events?.helperReportDelivery?.(id, report.messageId, phase) : undefined;
+    const claimed = delivery('claim');
+    if (claimed) return claimed;
     report.state = 'interrupting';
     report.error = undefined;
     this.emitUpdate(w);
     const fail = (error: string) => {
+      delivery('release');
       report.state = 'failed'; report.error = error;
       this.emitUpdate(w); this.persist(); return error;
     };
@@ -1085,8 +1098,8 @@ export class WorkerManager {
       const deadline = Date.now() + 6000;
       while (isBusy(w.info.status) && Date.now() < deadline) {
         await new Promise(resolve => setTimeout(resolve, 100));
-        if (this.workers.get(id) !== w) return 'Worker disappeared during interruption';
-        if (w.info.helperReport !== report) return 'A newer report arrived during interruption; retry with that report';
+        if (this.workers.get(id) !== w) { delivery('release'); return 'Worker disappeared during interruption'; }
+        if (w.info.helperReport !== report) { delivery('release'); return 'A newer report arrived during interruption; retry with that report'; }
       }
       if (isBusy(w.info.status)) return fail('The worker did not stop. Interrupt it manually, then retry; the report was not queued');
     }
@@ -1094,7 +1107,9 @@ export class WorkerManager {
     const error = this.prompt(id, report.text, by);
     if (error) return fail(error);
     report.state = 'submitted';
+    const completed = delivery('complete');
     this.emitUpdate(w); this.persist();
+    if (completed) return `Report submitted, but inbox synchronization failed: ${completed}`;
     return undefined;
   }
 
@@ -1283,7 +1298,7 @@ export class WorkerManager {
   }
 
   /** Claude Code hook callback. */
-  handleHook(workerId: string, token: string, event: string, payload: any): boolean {
+  handleHook(workerId: string, token: string, event: string, payload: any, holdStop = false): boolean {
     const w = this.workers.get(workerId);
     if (!w || !w.pty || w.info.kind !== 'agent' || (w.info.provider !== 'claude' && w.info.provider !== 'custom') || !safeEq(token, w.hookToken)) return false;
     const now = Date.now();
@@ -1347,14 +1362,14 @@ export class WorkerManager {
         }
         break;
       case 'Stop':
-        this.setStatus(w, 'done');
+        if (!holdStop) this.setStatus(w, 'done');
         break;
     }
     return true;
   }
 
   /** Native Codex lifecycle hooks register the root rollout for bounded metric reads. */
-  handleCodexHook(workerId: string, token: string, event: string, payload: unknown): boolean {
+  handleCodexHook(workerId: string, token: string, event: string, payload: unknown, holdStop = false): boolean {
     const w = this.workers.get(workerId);
     if (!w || !w.pty || w.info.kind !== 'agent' || w.info.provider !== 'codex' || !safeEq(token, w.hookToken)) return false;
     const report = normalizeCodexHook(event, payload);
@@ -1423,6 +1438,7 @@ export class WorkerManager {
         break;
       case 'Stop':
       case 'Interrupt':
+        if (event === 'Stop' && holdStop) { busy(); break; }
         clearPending();
         this.setStatus(w, 'done');
         break;
@@ -1572,6 +1588,9 @@ export class WorkerManager {
       this.emitUpdate(w);
       this.persist();
       return true;
+    }
+    if (payload && typeof payload === 'object' && 'type' in payload && payload.type === 'checkpoint') {
+      return 'sessionId' in payload && typeof payload.sessionId === 'string' && payload.sessionId === w.info.sessionId;
     }
     if (!isOpenCodeHookEvent(payload)) return false;
     if (w.info.sessionId && w.info.sessionId !== payload.sessionId && !(payload.type === 'session' && payload.status === 'starting')) return false;
@@ -2294,7 +2313,11 @@ process.stdin.on('end', () => {
   url.searchParams.set('worker', process.env.AGENT_OFFICE_WORKER_ID);
   url.searchParams.set('event', event);
   const send = (tries) => {
-    const req = http.request(url, { method: 'POST', timeout: 3000, headers: { authorization: 'Bearer ' + process.env.AGENT_OFFICE_HOOK_TOKEN, 'content-type': 'application/json' } }, (res) => res.resume());
+    const req = http.request(url, { method: 'POST', timeout: 3000, headers: { authorization: 'Bearer ' + process.env.AGENT_OFFICE_HOOK_TOKEN, 'content-type': 'application/json' } }, (res) => {
+      let output = '';
+      res.on('data', (chunk) => { if (output.length < 20000) output += chunk; });
+      res.on('end', () => { if (res.statusCode === 200 && output.length <= 20000) process.stdout.write(output); });
+    });
     req.on('error', (err) => {
       if (err.code === 'ECONNREFUSED' && tries > 1) setTimeout(() => send(tries - 1), 1000);
     });
@@ -2313,8 +2336,8 @@ process.stdin.on('end', () => {
         `--data-binary @- "$AGENT_OFFICE_HOOK_URL/hooks/claude?worker=$AGENT_OFFICE_WORKER_ID&event=${event}"`;
       const command =
         `if [ -z "$AGENT_OFFICE_WORKER_ID" ] || [ -z "$AGENT_OFFICE_HOOK_URL" ]; then exit 0; fi; ` +
-        `if command -v curl >/dev/null 2>&1; then ${curl} >/dev/null 2>&1; ` +
-        `else ${shq(process.execPath)} ${shq(nodeHook)} ${event} >/dev/null 2>&1; fi; true`;
+        `if command -v curl >/dev/null 2>&1; then ${curl} 2>/dev/null; ` +
+        `else ${shq(process.execPath)} ${shq(nodeHook)} ${event} 2>/dev/null; fi; true`;
       hooks[event] = [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command }] }];
     }
     // Looking at the office's workers doesn't need anyone's say-so; hiring and sending home still asks.

@@ -278,3 +278,17 @@ or expired. Use Finish anyway and confirm to record an explicit override;
 Stop meeting ends the meeting without completing it.
 Saved records: .agent-office/meetings/<meeting-id>/communications.md and
 communications.json, alongside the meeting output. See docs/communications.md.
+
+HELPER REPORT HANDLING AND ACTIVE-TASK NOTICES
+  office-workers inbox --json
+    Read queued requests, replies and helper reports (records delivery only).
+  office-workers ack MESSAGE_ID [--json]
+    Accept a helper report and remove its manual delivery card. Ordinary requests
+    still need a reply; acknowledging a reply completes its parent request.
+  Existing terminal button: Deliver report / Interrupt and deliver report
+    Handles the same helper report once and completes its inbox record. Failed
+    interruption retains both paths. A report being delivered cannot be acked.
+  Claude Code/Codex notify at native tool checkpoints; the existing OpenCode
+    plugin appends notices to root tool results. No new flags are needed. These
+    notices request a response during the current task, after the tool finishes.
+    Launch/resume workers to load updated hooks. Other providers check explicitly.

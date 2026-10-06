@@ -6,6 +6,8 @@ export interface WorkerMessage {
   threadId: string;
   replyTo?: string;
   kind: 'request' | 'reply';
+  /** Helper reports use acknowledgment as completion; they need no reply to the departed helper. */
+  helperReport?: { workerId: string; handledVia?: 'inbox' | 'terminal'; terminalClaimed?: boolean };
   from: { id: string; name: string };
   to: { id: string; name: string };
   text: string;

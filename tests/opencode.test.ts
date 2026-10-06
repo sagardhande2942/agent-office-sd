@@ -106,6 +106,19 @@ test('writes a loadable plugin module that forwards root events and excludes sub
     await hooks.event({ event: { type: 'session.status', properties: { sessionID: 'ses_root', status: { type: 'idle' } } } });
     assert.deepEqual(sent.at(-1), { type: 'session', sessionId: 'ses_root', status: 'done' });
 
+    globalThis.fetch = (async (_url, init) => {
+      sent.push(JSON.parse(String(init?.body)));
+      return Response.json({hookSpecificOutput:{hookEventName:'PostToolUse',additionalContext:'Read the office inbox during this task'}});
+    }) as typeof fetch;
+    const toolOutput = {output:'Original tool result'};
+    await selected['tool.execute.after']({sessionID:'saved'},toolOutput);
+    assert.match(toolOutput.output,/Original tool result/);
+    assert.match(toolOutput.output,/Read the office inbox during this task/);
+    const childOutput = {output:'Child result'};
+    await selected['tool.execute.after']({sessionID:'child'},childOutput);
+    assert.equal(childOutput.output,'Child result');
+    assert.equal((sent.at(-1) as any).type,'checkpoint');
+
     sent.length = 0;
     const event = (type: string, properties: Record<string, unknown>) => selected.event({ event: { type, properties: { sessionID: 'saved', ...properties } } });
     await event('permission.asked', { id: 'permission-1', permission: 'edit' });

@@ -155,3 +155,32 @@ test('meeting links survive restart and retries across rounds; replies preserve 
     assert.throws(f.reload, /Invalid meeting link/);
   } finally { f.close(); }
 });
+
+test('helper report inbox acknowledgment completes without a reply; terminal delivery is mutually exclusive', () => {
+  const f = fixture();
+  try {
+    const helper = { id: 'helper-1', name: 'Helper' };
+    const report = f.ledger.report(helper, ada, 'Diagnosis: missing dependency', { branch: 'api' });
+    assert.equal(f.ledger.inbox(ada).messages[0].status, 'delivered');
+    assert.equal(f.ledger.get(report.id)?.status, 'delivered', 'reading does not clear the manual path');
+    assert.throws(() => f.ledger.reply(ada, report.id, { prompt: 'Done' }), /Acknowledge a helper report/);
+    f.ledger.acknowledge(ada, report.id);
+    assert.equal(f.ledger.get(report.id)?.status, 'completed');
+    assert.equal(f.ledger.get(report.id)?.helperReport?.handledVia, 'inbox');
+    assert.throws(() => f.ledger.terminalReport(ada, report.id, 'claim'), /already handled/);
+    const second = f.ledger.report({ id: 'helper-2', name: 'Helper' }, ada, 'Next finding', {});
+    f.ledger.terminalReport(ada, second.id, 'claim');
+    assert.throws(() => f.ledger.acknowledge(ada, second.id), /being delivered/);
+    assert.throws(() => f.ledger.terminalReport(ada, second.id, 'claim'), /already in progress/);
+    f.ledger.terminalReport(ada, second.id, 'release');
+    assert.equal(f.ledger.get(second.id)?.status, 'pending');
+    f.ledger.terminalReport(ada, second.id, 'claim');
+    f.ledger.terminalReport(ada, second.id, 'complete');
+    assert.equal(f.ledger.get(second.id)?.helperReport?.handledVia, 'terminal');
+    assert.equal(f.ledger.get(second.id)?.acknowledgedAt, undefined, 'terminal submission does not fabricate agent acknowledgment');
+    f.ledger.acknowledge(ada, second.id);
+    assert.equal(f.ledger.get(second.id)?.helperReport?.handledVia, 'terminal', 'late acknowledgment does not rewrite the winning path');
+    assert.equal(f.reload().get(second.id)?.status, 'completed');
+    assert.throws(() => f.ledger.terminalReport(grace, report.id, 'claim'), /Unknown helper report/);
+  } finally { f.close(); }
+});

@@ -116,7 +116,7 @@ const MAX_ID = 160;
 const MAX_TEXT = 20000;
 const allowed = (value, max) => typeof value === 'string' && value.trim() && value.trim().length <= max ? value.trim() : undefined;
 const hasText = (value) => typeof value === 'string' && value.trim().length > 0;
-const finish = (ok) => { if (ok) process.stdout.write('{}'); };
+const finish = (ok, output = {}) => { if (ok) process.stdout.write(JSON.stringify(output)); };
 const event = process.argv[2];
 let size = 0;
 let overflow = false;
@@ -148,6 +148,7 @@ process.stdin.on('end', async () => {
   if (tool) body.tool_name = tool;
   if (toolUseId) body.tool_use_id = toolUseId;
   if (turn) body.turn_id = turn;
+  if (event === 'Stop' && input.stop_hook_active === true) body.stop_hook_active = true;
   if (transcript) body.transcript_path = transcript;
   const base = process.env.AGENT_OFFICE_HOOK_URL;
   const token = process.env.AGENT_OFFICE_HOOK_TOKEN;
@@ -163,7 +164,14 @@ process.stdin.on('end', async () => {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(2000),
     });
-    finish(response.ok);
+    if (!response.ok) return finish(false);
+    const raw = await response.text();
+    if (raw.length > 20000) return finish(true);
+    let output; try { output = raw ? JSON.parse(raw) : {}; } catch { return finish(true); }
+    const context = output?.hookSpecificOutput;
+    if (context?.hookEventName === event && typeof context.additionalContext === 'string' && context.additionalContext.length <= 10000) return finish(true, { hookSpecificOutput: { hookEventName: event, additionalContext: context.additionalContext } });
+    if (event === 'Stop' && output?.decision === 'block' && typeof output.reason === 'string' && output.reason.length <= 10000) return finish(true, { decision: 'block', reason: output.reason });
+    finish(true);
   } catch { finish(false); }
 });
 `;

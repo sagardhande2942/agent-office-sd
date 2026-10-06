@@ -71,7 +71,7 @@ test('helper forwards only the bounded root event fields to the authenticated br
       received.url = req.url;
       received.authorization = req.headers.authorization;
       received.body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      res.writeHead(200).end();
+      res.writeHead(200).end(JSON.stringify({ hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: 'Office inbox: check now during this task' } }));
     });
   });
   try {
@@ -99,7 +99,7 @@ test('helper forwards only the bounded root event fields to the authenticated br
         tool_input: { command: 'private' }, hook_event_name: 'forged',
       }));
     });
-    assert.equal(stdout, '{}');
+    assert.deepEqual(JSON.parse(stdout), { hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: 'Office inbox: check now during this task' } });
     assert.equal(received.authorization, 'Bearer hook-token');
     assert.equal(received.url, '/hooks/codex?worker=worker-1&event=UserPromptSubmit');
     assert.deepEqual(received.body, {

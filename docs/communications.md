@@ -2,7 +2,7 @@
 
 Workers can coordinate on the same local project floor through persistent inboxes, without typing into another agent's active terminal. Use tracked requests when a frontend worker depends on an API worker, when asking for a review, or when handing off a branch. The existing `office-workers tell` command still sends an immediate terminal prompt.
 
-A worker must check its inbox at a suitable point, such as between tasks or while waiting for a dependency. Messages do not wake stopped workers or interrupt a busy agent. The office appends standing coordination instructions to agent launch prompts, including inbox checks and handling messages by ID and receipt without repeating completed work. This is agent guidance, not automatic polling. The MCP server also explains that behavior in its instructions and tools, and `office-workers list` returns a coordination hint.
+Running Claude Code and Codex workers receive native inbox notices after tool calls, including failed tool calls, and at session/prompt checkpoints. The existing OpenCode plugin adds notices to root tool results. Workers are instructed to read their inbox and respond before further substantive work on the current task. A notice alone never marks a message delivered or acknowledged. Claude Code and Codex also get one continuation request when they try to finish with actionable messages; repeated stop hooks are guarded against loops. Messages do not wake stopped workers, cancel running tools, or type into terminals. A single long-running tool must finish before its notice can appear; agent response still depends on the agent following the instructions. Other providers retain explicit inbox checks and standing coordination guidance. The MCP server also explains that behavior in its instructions and tools, and `office-workers list` returns a coordination hint.
 
 ## Example: Grace asks Ada for the API contract
 
@@ -78,7 +78,7 @@ The office keeps one atomic `communications.json` ledger per floor under its dat
 
 A sender may have at most 50 unresolved requests. Each floor retains at most 500 messages; older completed or expired threads are removed together to make room. Unresolved threads are not silently discarded. If only unresolved threads fill the ledger, new messages are refused until threads finish or expire. Repeated acknowledgments and retained idempotency keys do not duplicate messages. Observers receive status updates at most 30 seconds after deadline expiry.
 
-This release supports office-local worker messaging on the same floor. Cross-floor routing, remote floor-host messaging, automatic inbox polling, and automatic integration status are future work.
+This release supports office-local worker messaging on the same floor. Cross-floor routing, remote floor-host messaging, continuous inbox polling, and automatic integration status are future work.
 
 ## Relationship to terminal scrollback
 
@@ -88,7 +88,7 @@ This release supports office-local worker messaging on the same floor. Cross-flo
 
 Requests involving an active meeting participant are automatically linked to that meeting and its current round. This includes requests to workers elsewhere on the same local floor and requests sent into the table. The office assigns the link from its roster; workers cannot supply a meeting ID to claim membership. Replies retain the original request's meeting and round, even if the meeting has moved on. Existing requests made before a meeting starts are not retroactively linked.
 
-Open the meeting room in lite or 3D and choose **Messages**. It shows only that meeting's threads, response context, round and delivery/acknowledgment status, with an unresolved filter and participant terminal buttons. Viewing is observational and never creates agent receipts. Meeting prompts remind workers to check their inbox before writing round notes; checks remain agent guidance, without automatic polling or terminal interruption.
+Open the meeting room in lite or 3D and choose **Messages**. It shows only that meeting's threads, response context, round and delivery/acknowledgment status, with an unresolved filter and participant terminal buttons. Viewing is observational and never creates agent receipts. Meeting prompts remind workers to check their inbox before writing round notes; native tool checkpoints also notify supported running workers during their current task, without terminal interruption.
 
 After all round output is written, the meeting waits if a linked request remains pending, delivered, acknowledged or answered. Requester acknowledgment of a reply completes the request; expiration also releases the wait. The office rechecks every three seconds. Requests from another meeting do not block it. A communication-ledger error also holds completion rather than silently ignoring missing records. Token budgets still apply while waiting.
 
@@ -97,3 +97,13 @@ Choose **Finish anyway** and confirm to complete with outstanding requests. This
 When a meeting finishes or stops, its saved notes at `.agent-office/meetings/<meeting-id>/` include `communications.md` and `communications.json`: a snapshot of retained requests/replies, context, statuses, unresolved IDs and any explicit override or ledger error. The meeting output is saved alongside them and remains the source of decisions; message replies are not automatically treated as decisions or proof of integration. Snapshots reflect the moment the meeting ended; later replies do not rewrite them. The floor ledger retains its existing 500-message bound. Hosted-floor messaging and cross-floor routing remain outside this feature.
 
 Meeting message views: [desktop screenshot](meeting-communications-desktop.png) · [mobile screenshot](meeting-communications-mobile.png).
+
+## Helper reports: inbox and manual delivery
+
+A finished helper publishes one report (up to 20,000 characters) to its host worker’s inbox and the existing terminal delivery card. The helper can leave immediately: its name and findings remain in the ledger. Read the report with `office-workers inbox --json`, then acknowledge its ID with `office-workers ack MESSAGE_ID` (or `ack_worker_message`). Acknowledging the helper report completes it directly and clears the manual card; do not send a reply to the departed helper. Reading the inbox alone leaves both paths available.
+
+Manual **Deliver report** / **Interrupt and deliver report** reserves that same report while delivery is in progress. The inbox cannot acknowledge it concurrently. Successful submission marks it completed with `handledVia: terminal` and clears the card; failed interruption releases the reservation for retry or inbox handling. Inbox handling records `handledVia: inbox`. Neither route confirms that a suggested fix was implemented. Ordinary worker request/reply acknowledgments retain their existing behavior.
+
+Native hook/plugin changes take effect when a worker is newly launched or resumed; an already-running agent process may still have its previous configuration. Shell helpers continue to publish only to office chat.
+
+![Helper report available in the inbox and terminal delivery card](helper-inbox-report.png)
