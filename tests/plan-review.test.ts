@@ -18,7 +18,7 @@ function fixture(){
 const turn=()=>new Promise(r=>setImmediate(r));
 test('plan request validates 1–5 distinct models and frozen rubric; detailed plans cover every requirement',()=>{
  assert.equal(readPlanRequest(request).weights.coverage,35);
- for(const patch of [{candidates:[]},{candidates:Array(6).fill(request.candidates[0])},{candidates:[request.candidates[0],request.candidates[0]]},{candidates:[{provider:'codex',model:'x'}]},{weights:{coverage:36,feasibility:25,detail:20,verification:15,simplicity:5}},{minutes:0}])assert.throws(()=>readPlanRequest({...request,...patch}));
+ for(const patch of [{candidates:[]},{candidates:Array(6).fill(request.candidates[0])},{candidates:[request.candidates[0],request.candidates[0]]},{candidates:[{provider:'unknown',model:'x'}]},{weights:{coverage:36,feasibility:25,detail:20,verification:15,simplicity:5}},{minutes:0}])assert.throws(()=>readPlanRequest({...request,...patch}));
  assert.deepEqual(readDetailedPlan(plan,request.requirements),plan);
  for(const patch of [{design:'do it'},{steps:[plan.steps[0]]},{requirements:[]},{verification:[]}])assert.throws(()=>readDetailedPlan({...plan,...patch},request.requirements));
 });

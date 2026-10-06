@@ -22,6 +22,7 @@ export const cursor: ProviderAdapter<undefined, CursorSetup> = {
     addCursorHooks(cwd, setup.hook, info.id);
     // The office made this folder for it. Cursor's own permission prompts stay as they are.
     args.push('--trust');
+    if (info.planReview?.locked) args.push('--mode=plan');
     // Its chat id is the first one its hooks name. A resumed chat keeps the model it had.
     if (resumeSessionId) args.push(`--resume=${resumeSessionId}`);
     else if (info.model) args.push('--model', info.model);
