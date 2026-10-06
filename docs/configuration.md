@@ -63,3 +63,7 @@ agent-office tunnel [office@address | url] [--port <n>] [--office-port <n>] [--n
   the worker stops it. Given an SSH address it opens the tunnel to the office too.
   See docs/tunnel.md.
 ```
+
+## Terminal office client
+
+`agent-office tui` joins a running office without opening a browser. Use `--office <http(s) origin>` for a remote server, `--name <account>` for account login, and `--floor <id>` for the initial floor. See [cli.md](cli.md) for commands and password handling.

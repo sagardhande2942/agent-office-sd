@@ -105,8 +105,11 @@ agent-office --password 'correct horse'     # choose the password
 agent-office --port 4700
 agent-office --agent pi                     # default agent: claude, codex, opencode, grok, muse, dsh, pi or cursor-agent
 agent-office --no-open                      # print the sign-in link instead of opening a browser
+agent-office tui                            # join the running office from your terminal
 agent-office setup                          # the first-start walkthrough again (office stopped)
 ```
+
+For a terminal-only client, start the office with `agent-office --no-open`, then run `agent-office tui` in another terminal. It shares floors, workers and live terminals with the 3D and lite views. See [docs/cli.md](docs/cli.md) for commands and remote connections.
 
 Every option is in [docs/configuration.md](docs/configuration.md). Choosing models and providers per worker is in [docs/agents.md](docs/agents.md).
 
