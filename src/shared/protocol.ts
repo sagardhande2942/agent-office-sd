@@ -152,6 +152,11 @@ export interface WorkerInfo {
    */
   workedMs?: number;
   workingSince?: number;
+  /**
+   * When its terminal last produced output (ms). Never persisted, so a restored worker has none and
+   * is never called stalled; it's what "stalled" is worked out from (see blockersOf).
+   */
+  lastOutputAt?: number;
   /** Sent out by a map's herald (the castle's Hand of the King), so every browser has it run to its seat from beside them. */
   via?: 'herald';
 }
@@ -426,6 +431,8 @@ export interface QueueTask {
   error?: string;
   /** The pull request that closes the issue, or was opened from the worker's branch. */
   pr?: { number: number; url: string; state: string; title: string };
+  /** Tasks it waits on, by id: it isn't seated until they've all finished with `outcome: 'done'`. */
+  dependsOn?: string[];
 }
 
 export interface QueueState {

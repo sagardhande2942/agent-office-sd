@@ -1797,6 +1797,7 @@ export class WorkerManager {
           if (w.dsh !== session) return;
           term.write(data);
           w.outputAt = Date.now();
+          info.lastOutputAt = w.outputAt;
           w.screenDirty = true;
           w.unsaved = true;
           if (w.viewers.size) this.events.data(info.id, data, [...w.viewers.keys()]);
@@ -1934,6 +1935,7 @@ export class WorkerManager {
     proc.onData((data) => {
       term.write(data);
       w.outputAt = Date.now();
+      info.lastOutputAt = w.outputAt;
       w.screenDirty = true;
       w.unsaved = true;
       if (w.viewers.size) this.events.data(info.id, data, [...w.viewers.keys()]);

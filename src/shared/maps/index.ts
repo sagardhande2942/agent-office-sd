@@ -15,7 +15,10 @@ export const OFFICE_MAP = 'office';
 /** The maps that come with the office, besides the office itself. */
 export const BUILTIN_MAPS: readonly MapConfig[] = [CASTLE, CYBERPUNK];
 
-const STATION_KINDS: readonly StationKind[] = ['issues', 'pulls', 'queue'];
+/** The lecterns every map has to say where; the Manager's is optional (see MapConfig.stations). */
+const STATION_KINDS: readonly Exclude<StationKind, 'manager'>[] = ['issues', 'pulls', 'queue'];
+/** Which station kinds get a lectern when a map says nothing about them: the three that are always there. */
+const MAPPED_STATION_KINDS: readonly StationKind[] = ['issues', 'pulls', 'queue', 'manager'];
 /** How far in from a table's edge a seat's place setting is; the worker sits 0.85 out from it (see deskSeat), on the bench. */
 const PLACE_IN = 0.35;
 /** How far out from a table's edge the middle of the bench down that side is. */
@@ -200,9 +203,9 @@ export function planMap(input: unknown): MapPlan {
   const desks: DeskDef[] = named.slice(0, MAP_DESKS.length).map((d, i) => ({ ...d, id: MAP_DESKS[i].id }));
   const overflow: DeskDef[] = named.slice(MAP_DESKS.length).map((d, i) => ({ ...d, id: BEANBAGS[i].id }));
 
-  // The board agents' lecterns.
+  // The board agents' lecterns: the three every map says where, and the Manager's when it has a place.
   if (!isObj(c.stations)) throw new MapError('it needs stations: where the Issues, PR and Queue agents stand');
-  const stations: DeskDef[] = STATION_KINDS.map((kind) => {
+  const stations: DeskDef[] = MAPPED_STATION_KINDS.filter((kind) => kind === 'manager' ? c.stations.manager != null : true).map((kind) => {
     const p = place(c.stations[kind], `stations.${kind}`);
     const def = { id: `station-${kind}`, station: kind, x: p.x, z: p.z, rotY: p.rotY, label: STATION_AGENT[kind].name };
     // The agent stands behind its lectern: that's in the hall too.

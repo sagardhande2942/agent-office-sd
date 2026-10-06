@@ -2,56 +2,16 @@
 // server (bin/office-workers.js) get from the /office/workers endpoint on the loopback hook port, and
 // how their requests are read. The endpoint itself is in server.ts, next to the board agents' queue.
 
-import { writeFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentEffort, AgentProvider, GhPull, QueueTask, WorkerInfo, WorkerStatus, WorktreeCleanup } from '../shared/protocol.js';
+import type { AgentEffort, AgentProvider, GhPull, QueueTask, WorkerInfo, WorktreeCleanup } from '../shared/protocol.js';
 import { isAgentEffort, isAgentProvider } from '../shared/protocol.js';
 import { DESK_BY_ID, STATION_AGENT } from '../shared/layout.js';
-import { workerPr } from '../shared/status.js';
+import { blockersOf } from '../shared/manager.js';
+import { workerPr, type PullsView, type WorkerRow } from '../shared/status.js';
 import { landedWork, notLeaving } from './leave-on-merge.js';
 
-/** One worker as an agent sees it: enough to pick the ones to send home, and say why. */
-export interface WorkerRow {
-  id: string;
-  name: string;
-  kind: 'agent' | 'shell';
-  provider?: AgentProvider;
-  model?: string;
-  desk: string;
-  status: WorkerStatus;
-  /** The board it stands by, for a board agent ("PR agent"). */
-  board?: string;
-  /** At the meeting room's table, called to a meeting. */
-  meeting?: true;
-  /** The worker asking. */
-  you?: true;
-  /** What it's on, as the office summed it up, else its first prompt. */
-  task?: string;
-  /** Its latest prompt or tool call. */
-  activity?: string;
-  hiredBy: string;
-  hiredAt: string;
-  /** People with its terminal open. */
-  viewers?: string[];
-  /** `deleted`: its folder was deleted outside the office, so it can't start until someone rebuilds it at its desk. */
-  worktree?: { path: string; branch: string; deleted?: true };
-  /** Other floors' projects it works in too, each on its own worktree. */
-  repos?: { name: string; branch: string; pr?: number }[];
-  /** Its pull request: one still open wins, else one that merged (see workerPr). */
-  pr?: { number: number; state: 'open' | 'merged'; title?: string; url?: string };
-  /** A pull request of its merged and none is open: its work landed, and it can go home. */
-  merged: boolean;
-  /** Its work landed, but it doesn't go home by itself yet, and why (see notLeaving). */
-  staying?: string;
-}
-
-/** What a floor knows about its workers' pull requests. */
-export interface PullsView {
-  pulls: GhPull[];
-  tasks: QueueTask[];
-  /** Another floor's pull requests, for a worker across repositories. */
-  pullsOf?: (floor: string) => GhPull[] | undefined;
-}
+export type { PullsView, WorkerRow } from '../shared/status.js';
 
 /** How long a task or activity line gets. */
 const LINE = 160;
@@ -61,7 +21,12 @@ const clip = (s: string | undefined): string | undefined => {
   return t ? (t.length > LINE ? `${t.slice(0, LINE - 1)}…` : t) : undefined;
 };
 
-export function workerRow(w: WorkerInfo, view: PullsView, me?: string): WorkerRow {
+/**
+ * The row for one worker, as `office-workers list` and the floor report (`shared/manager.ts`) show it.
+ * `at` is when the floor is being looked at: what a worker's blockers are worked out from (see
+ * blockersOf), so a `list` and a `status` of the same moment agree.
+ */
+export function workerRow(w: WorkerInfo, view: PullsView, me?: string, at = Date.now()): WorkerRow {
   const seat = DESK_BY_ID.get(w.deskId);
   const pr = workerPr(w, view.pulls, view.tasks);
   const pull = pr && view.pulls.find((p) => p.number === pr.number);
@@ -90,7 +55,34 @@ export function workerRow(w: WorkerInfo, view: PullsView, me?: string): WorkerRo
     ...(pr ? { pr: { number: pr.number, state: pr.state, ...(pull ? { title: pull.title, url: pull.url } : {}) } } : {}),
     merged: !!landed,
     ...(staying ? { staying } : {}),
+    ...(w.lastOutputAt ? { lastOutputAt: w.lastOutputAt } : {}),
+    blockers: blockersOf(w, view.tasks.find((t) => t.workerId === w.id), at),
   };
+}
+
+/** One thing the Manager agent posted about the floor: its standup, or a question for everyone. */
+export interface ManagerNote {
+  at: number;
+  /** Who posted it. */
+  worker: string;
+  kind: 'standup' | 'question';
+  text: string;
+}
+
+/**
+ * Keeps what the Manager agent posts (POST /office/workers/report) in the floor's
+ * `.agent-office/manager.jsonl`, one JSON line each, readable only by whoever owns the floor (0600),
+ * beside the queue's own `queue.json`. Disk issues don't take the office down: the note still goes out
+ * to the floor, and the answer says where it should have been kept.
+ */
+export function writeManagerNote(projectDir: string, note: ManagerNote): string {
+  const file = path.join(projectDir, '.agent-office', 'manager.jsonl');
+  try {
+    appendFileSync(file, `${JSON.stringify(note)}\n`, { mode: 0o600 });
+  } catch {
+    // disk issues shouldn't take the office down
+  }
+  return file;
 }
 
 /**

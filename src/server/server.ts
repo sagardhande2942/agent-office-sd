@@ -11,7 +11,7 @@ import { Auth, type Session } from './auth.js';
 import { Accounts } from './accounts.js';
 import { MAX_REPOS, childEnv, resolveCommand, type RepoSource } from './workers.js';
 import { SignIns, type ForgeAs } from './signins.js';
-import { agentProviders, configuredProvider, OPEN_CODE_MODEL_MAX } from './agents.js';
+import { agentProviders, configuredProvider, validateWorkerEffort, validateWorkerModel, OPEN_CODE_MODEL_MAX } from './agents.js';
 import { createGrokModelCatalogue, createOpenCodeModelCatalogue } from './models.js';
 import { Tailnet } from './tailnet.js';
 import { Team } from './team.js';
@@ -33,13 +33,14 @@ import { Themes } from './theme.js';
 import { Maps } from './maps.js';
 import { OfficePrompts } from './prompts.js';
 import { LeaveOnMerge, notLeaving } from './leave-on-merge.js';
-import { findWorker, readHireRequest, readHomeRequest, workerRow, type PullsView } from './office-workers.js';
+import { findWorker, readHireRequest, readHomeRequest, workerRow, writeManagerNote, type PullsView } from './office-workers.js';
 import { RELAY_LOGIN, relayRequest, relayUpgrade, signInPage, stoppedPage, tunneledPort } from './relay.js';
 import { ChatLog } from './history.js';
 import { Arcade, HighScores } from './cabinet.js';
-import type { ChatLine, ClientMsg, ForgeKind, FloorInfo, FloorView, Me, MeetingRequest, PeerInfo, SearchResults, ServerMsg, ServicesState, SignInKind, WorkerInfo } from '../shared/protocol.js';
+import type { AgentEffort, AgentProvider, ChatLine, ClientMsg, ForgeKind, FloorInfo, FloorView, Me, MeetingRequest, PeerInfo, SearchResults, ServerMsg, ServicesState, SignInKind, WorkerInfo } from '../shared/protocol.js';
 import { FORGE_COMMENT_MAX, FORGE_LABEL, GH_LABEL_MAX, isAgentEffort, isAgentProvider } from '../shared/protocol.js';
 import { DESK_BY_ID, elevatorSpot, nextFreeSeat, streetBelow } from '../shared/layout.js';
+import { managerHash, managerReport, shouldNudge, type ManagerReport } from '../shared/manager.js';
 import { OFFICE_MAP, seatHereOn } from '../shared/maps/index.js';
 import { EMPTY_PLAN } from '../shared/floorplan.js';
 import { JUKEBOX_TUNES, isStreamTrack } from '../shared/jukebox.js';
@@ -117,6 +118,10 @@ interface Client {
 const SLOW_CLIENT_BYTES = 8 * 1024 * 1024;
 /** The least time between two 'term.typing' notes from one person in one terminal. */
 const TYPING_GAP_MS = 500;
+/** How often the office looks at every floor to see whether the Manager agent has something to tell. */
+const NUDGE_MS = 60_000;
+/** Where the Manager agent stands (STATIONS in shared/layout.ts), the one the office prompts by itself. */
+const STAFF_DESK = 'station-manager';
 /** The quickest anyone throws one dart after another, or one axe (ms): a page's own wait is longer. */
 const TOSS_EVERY: Record<BarGame, number> = { darts: 250, axe: 700 };
 
@@ -363,6 +368,7 @@ export async function startServer(cfg: Config) {
       return send(res, 400, {});
     }
     if (url.pathname === '/office/queue') return officeQueue(req, res, url);
+    if (url.pathname === '/office/report') return officeReport(req, res, url);
     if (url.pathname === '/office/workers' || url.pathname.startsWith('/office/workers/')) return officeWorkers(req, res, url);
     if (req.method !== 'POST' || !['/hooks/claude', '/hooks/opencode', '/hooks/codex', '/hooks/grok', '/hooks/muse'].includes(url.pathname)) return send(res, 404, { ok: false });
     let payload: unknown = {};
@@ -404,7 +410,11 @@ export async function startServer(cfg: Config) {
       const q = floor.queue.state();
       return {
         maxWorkers: q.maxWorkers,
-        tasks: q.tasks.map((t) => ({ id: t.id, title: t.title, status: t.status, outcome: t.outcome, issue: t.issue, addedBy: t.addedBy, worker: t.workerName, branch: t.branch, pr: t.pr, error: t.error })),
+        tasks: q.tasks.map((t) => ({
+          id: t.id, title: t.title, status: t.status, outcome: t.outcome, issue: t.issue, addedBy: t.addedBy, worker: t.workerName, branch: t.branch, pr: t.pr, error: t.error,
+          agent: { ...(t.provider ? { provider: t.provider } : {}), ...(t.model ? { model: t.model } : {}), ...(t.effort ? { effort: t.effort } : {}) },
+          ...(t.dependsOn?.length ? { dependsOn: t.dependsOn } : {}),
+        })),
       };
     };
     if (req.method === 'GET') return send(res, 200, view());
@@ -413,25 +423,74 @@ export async function startServer(cfg: Config) {
       return err ? send(res, 400, { error: err }) : send(res, 200, view());
     }
     if (req.method !== 'POST') return send(res, 405, { error: 'GET, POST or DELETE' });
-    let body: { prompt?: unknown; title?: unknown; issue?: unknown };
+    let body: { prompt?: unknown; title?: unknown; issue?: unknown; provider?: unknown; model?: unknown; effort?: unknown; depends?: unknown; retry?: unknown };
     try {
       body = JSON.parse(await readBody(req));
     } catch {
       return send(res, 400, { error: 'Send JSON: {"title": "…", "prompt": "…", "issue": 12}' });
     }
+    // A finished task put back on the queue (office-queue retry), keeping the agent it was queued with.
+    if (body?.retry) {
+      const err = floor.queue.retry(url.searchParams.get('task') ?? '');
+      if (err) return send(res, 400, { error: err });
+      const task = floor.queue.state().tasks.find((t) => t.id === url.searchParams.get('task'))!;
+      toastFloor(floor, `📋 The ${agent.name} requeued ${task.issue !== undefined ? `issue #${task.issue}` : `“${task.title}”`}`);
+      return send(res, 200, { ok: true, task: { id: task.id, title: task.title, status: task.status } });
+    }
     const issue = Number.isInteger(body?.issue) && (body.issue as number) > 0 ? (body.issue as number) : undefined;
+    // Which agent the task should start on, refused here before the queue sees it.
+    const provider = typeof body?.provider === 'string' && body.provider.trim() ? (body.provider.trim() as AgentProvider) : undefined;
+    if (body?.provider !== undefined && !isAgentProvider(provider)) return send(res, 400, { error: 'Unknown agent provider' });
+    const model = typeof body?.model === 'string' && body.model.trim() ? body.model.trim() : undefined;
+    const modelError = validateWorkerModel('agent', provider, model);
+    if (modelError) return send(res, 400, { error: modelError });
+    const effort = body?.effort;
+    const effortError = validateWorkerEffort('agent', provider, effort);
+    if (effortError) return send(res, 400, { error: effortError });
+    // Tasks it waits on, which have to be on the queue already.
+    const depends = Array.isArray(body?.depends) ? body.depends.filter((d): d is string => typeof d === 'string' && !!d.trim()).map((d) => d.trim()) : undefined;
     // Its tasks run as whoever the board agent runs as.
-    const err = floor.queue.add(str(body?.prompt, 20000), agent.name, str(body?.title, 200) || undefined, issue, undefined, undefined, undefined, await floor.workers.ownerOf(agent.id));
+    const err = floor.queue.add(str(body?.prompt, 20000), agent.name, str(body?.title, 200) || undefined, issue, provider, model, effort as AgentEffort | undefined, await floor.workers.ownerOf(agent.id), depends);
     if (err) return send(res, 400, { error: err });
     const task = floor.queue.state().tasks.at(-1)!;
     toastFloor(floor, `📋 The ${agent.name} queued ${issue !== undefined ? `issue #${issue}` : `“${task.title}”`}`);
     send(res, 200, { ok: true, task: { id: task.id, title: task.title, status: task.status } });
   };
+  /** The floor as one manager sees it (shared/manager.ts): workers, tasks, blockers and verdicts. */
+  const floorReport = (floor: Floor): ManagerReport => {
+    const tasks = floor.queue.state().tasks;
+    const pulls = floor.forge.pulls.items;
+    const crew = floor.workers.list();
+    return managerReport({
+      workers: crew,
+      rows: crew.map((w) => workerRow(w, { pulls, tasks, pullsOf: (id) => anyFloor(id)?.forge.pulls.items }, undefined, Date.now())),
+      tasks,
+      pulls,
+      floor: { id: floor.id, name: floor.def.name, ...(floor.def.repo ? { repo: floor.def.repo } : {}), branch: floor.project.branch ?? '' },
+      maxWorkers: floor.queue.limit,
+      freeDesk: nextFreeSeat((id) => floor.workers.deskOccupied(id), floor.plan.wing)?.id ?? null,
+      ...(ledger.hiringPaused ? { hiringPaused: ledger.hiringPaused } : {}),
+      now: Date.now(),
+    });
+  };
+  /**
+   * The floor report, for any worker on it: `office-workers status`, the read-only MCP tool
+   * `floor_status`, and what the office nudges the Manager agent with (see NUDGE_MS below).
+   */
+  const officeReport = async (req: http.IncomingMessage, res: http.ServerResponse, url: URL) => {
+    const workerId = url.searchParams.get('worker') ?? '';
+    const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    const floor = workerFloor(workerId);
+    if (!floor || !floor.workers.authenticate(workerId, token)) return send(res, 401, { error: 'Send your own AGENT_OFFICE_WORKER_ID as ?worker= and AGENT_OFFICE_HOOK_TOKEN as the bearer token' });
+    if (req.method !== 'GET') return send(res, 405, { error: 'GET /office/report' });
+    send(res, 200, floorReport(floor));
+  };
   /**
    * The floor's workers, for any worker on it (see office-workers.ts, and bin/office-workers.js, the
    * command and MCP server that call it): GET lists them, POST hires one, POST /home sends some home
-   * (its worktree and branch go too, unless they hold work), POST /tell types a prompt to one. The
-   * worker's own hook token says who's asking, and the floor hears who did what, as from anyone.
+   * (its worktree and branch go too, unless they hold work), POST /tell types a prompt to one,
+   * POST /report posts the manager's standup or a question for the floor. The worker's own hook token
+   * says who's asking, and the floor hears who did what, as from anyone.
    */
   const officeWorkers = async (req: http.IncomingMessage, res: http.ServerResponse, url: URL) => {
     const workerId = url.searchParams.get('worker') ?? '';
@@ -460,7 +519,7 @@ export async function startServer(cfg: Config) {
         workers: list.map((w) => workerRow(w, view, me.id)),
       });
     }
-    if (req.method !== 'POST' || !['', '/home', '/tell'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home or /office/workers/tell' });
+    if (req.method !== 'POST' || !['', '/home', '/tell', '/report'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home, /office/workers/tell or /office/workers/report' });
     let body: unknown;
     try {
       body = JSON.parse((await readBody(req)) || '{}');
@@ -468,9 +527,26 @@ export async function startServer(cfg: Config) {
       return send(res, 400, { error: 'Send JSON' });
     }
 
+    // The manager's standup or a question for the floor: kept in the floor's manager.jsonl and shown to everyone.
+    if (action === '/report') {
+      const b = (body ?? {}) as { kind?: unknown; text?: unknown };
+      const kind = b.kind === 'question' ? 'question' : b.kind === 'standup' || b.kind === undefined ? 'standup' : undefined;
+      if (!kind) return send(res, 400, { error: '--kind is standup or question' });
+      const text = str(b.text, 20_000).replace(/\r\n?/g, '\n').trim();
+      if (!text) return send(res, 400, { error: 'Say what to report: text' });
+      const file = writeManagerNote(floor.dir, { at: Date.now(), worker: who, kind, text });
+      if (kind === 'question') toastFloor(floor, `❓ The ${who} asks: ${text.split('\n')[0].slice(0, 160)}`, 'warn');
+      else toastFloor(floor, `🧭 The ${who}'s standup: ${text.split('\n')[0].slice(0, 160)}`);
+      return send(res, 200, { ok: true, kind, file });
+    }
+
     if (action === '/home') {
       const ask = readHomeRequest(body);
       if (typeof ask === 'string') return send(res, 400, { error: ask });
+      // A board agent may not throw away work that isn't on GitHub; that's the person's decision.
+      if (ask.cleanup === 'all' && DESK_BY_ID.get(me.deskId)?.station) {
+        return send(res, 403, { error: 'Ask a person before deleting work that is not on GitHub' });
+      }
       type Outcome = { worker: string; id?: string; went?: boolean; note?: string; error?: string; skipped?: string };
       const results: Outcome[] = [];
       const going: { w: WorkerInfo; why?: string }[] = [];
@@ -2715,6 +2791,27 @@ case 'jukebox.place': {
     }
   };
 
+  /**
+   * The nudge: once a minute, look at every floor's report, and when what needs telling has changed,
+   * prompt the Manager agent at its kiosk once. The hash is what was last prompted for, so a quiet
+   * floor is never nudged twice for the same thing (see managerHash).
+   */
+  const nudged = new Map<string, string>();
+  const nudge = setInterval(() => {
+    for (const floor of floors.values()) {
+      let hash: string;
+      try {
+        hash = managerHash(floorReport(floor));
+      } catch {
+        continue;
+      }
+      if (!shouldNudge(nudged.get(floor.id), hash, !!floor.workers.get(STAFF_DESK))) continue;
+      nudged.set(floor.id, hash);
+      // Told by nobody, and refused when nobody is there or it is mid-question: that's fine.
+      void floor.workers.station(STAFF_DESK, 'The office', `The floor has changed and something on it needs telling. Read it with office-workers status, then say what's completed, what's ongoing and what needs a decision, and post it with office-workers report --kind standup. If nothing needs you, say so in a line.`);
+    }
+  }, NUDGE_MS);
+
   const resync = setInterval(async () => {
     for (const c of clients.values()) {
       if (!c.stale.size || c.ws.bufferedAmount > SLOW_CLIENT_BYTES / 8) continue;
@@ -2755,6 +2852,7 @@ case 'jukebox.place': {
   const shutdown = (keep = false) => {
     clearInterval(heartbeat);
     clearInterval(resync);
+    clearInterval(nudge);
     clearTimeout(floorsTimer);
     arcade.flush();
     upgrader.stop();

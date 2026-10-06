@@ -7,7 +7,7 @@ import path from 'node:path';
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { TOOLS, UsageError, buildRequest, formatHome, formatWorkers, handleMcp, main, parseArgs } from '../bin/office-workers.js';
+import { MCP_READ_ONLY, TOOLS, UsageError, buildRequest, formatHome, formatReport, formatWorkers, handleMcp, main, parseArgs } from '../bin/office-workers.js';
 import { codexMcpArgs, findWorker, readHireRequest, readHomeRequest, workerRow } from '../src/server/office-workers.js';
 import { notLeaving } from '../src/server/leave-on-merge.js';
 import type { GhPull, WorkerInfo } from '../src/shared/protocol.js';
@@ -27,6 +27,65 @@ function worker(id: string, more: Partial<WorkerInfo> = {}): WorkerInfo {
 const pull = (number: number, state: string, headRefName: string, headRefOid?: string): GhPull => ({
   number, title: `PR ${number}`, state, isDraft: false, url: `https://github.com/acme/app/pull/${number}`, author: '', labels: [], reviewDecision: '',
   headRefName, headRefOid, baseRefName: 'main', createdAt: '', updatedAt: '', additions: 0, deletions: 0, checks: 'none', body: '', closes: [],
+});
+
+test('parses status and report, and says what is wrong with them', () => {
+  assert.deepEqual(parseArgs(['status']), { cmd: 'status', json: false });
+  assert.deepEqual(parseArgs(['status', '--json']), { cmd: 'status', json: true });
+  assert.deepEqual(parseArgs(['report']), { cmd: 'report', kind: 'standup', json: false });
+  assert.deepEqual(parseArgs(['report', '--kind', 'question', '--text', 'Which one?']), { cmd: 'report', kind: 'question', text: 'Which one?', json: false });
+  const bad: [string[], RegExp][] = [
+    [['status', 'x'], /status takes no arguments/],
+    [['report', '--kind', 'shout'], /--kind is standup or question/],
+    [['report', 'now'], /report takes no arguments/],
+  ];
+  for (const [argv, message] of bad) assert.throws(() => parseArgs(argv), (e: Error) => e instanceof UsageError && message.test(e.message), argv.join(' '));
+});
+
+test('builds the report and standup requests', () => {
+  const auth = { authorization: 'Bearer tok' };
+  assert.deepEqual(buildRequest('status', OFFICE), { method: 'GET', url: 'http://127.0.0.1:4455/office/report?worker=w1', headers: auth, timeout: 15_000 });
+  assert.deepEqual(buildRequest('report', OFFICE, { kind: 'standup', text: 'All done' }), {
+    method: 'POST', url: 'http://127.0.0.1:4455/office/workers/report?worker=w1', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ kind: 'standup', text: 'All done' }), timeout: undefined,
+  });
+});
+
+test('the report reads as a standup: completed with verdicts, ongoing, and what needs a person', () => {
+  const report = {
+    floor: { id: 'f1', name: 'app', repo: 'acme/app', branch: 'main' },
+    at: 25 * 60_000,
+    queue: { maxWorkers: 2, freeDesk: 'desk-2', hiringPaused: 'out of budget' },
+    workers: [{ id: 'w1', name: 'Mochi', desk: 'Desk 1', status: 'working', hiredBy: 'Ada', hiredAt: '', merged: false, kind: 'agent', blockers: [{ kind: 'stalled', why: 'nothing on its terminal for 12 min' }] }],
+    tasks: [
+      { id: 't1', title: 'Fix login', status: 'done', agent: { provider: 'codex', model: 'gpt-6.1-sol' }, verification: 'verified', pr: { number: 4, url: 'https://x/4', checks: 'pass' } },
+      { id: 't2', title: 'Dark mode', status: 'done', agent: { provider: 'claude' }, verification: 'needs-review', pr: { number: 5, url: 'https://x/5', checks: 'fail' } },
+      { id: 't3', title: 'Add tests', status: 'running', agent: { provider: 'codex' }, workerName: 'Byte', blockedBy: ['Fix login'] },
+    ],
+    completed: [
+      { id: 't1', title: 'Fix login', status: 'done', agent: { provider: 'codex', model: 'gpt-6.1-sol' }, verification: 'verified', pr: { number: 4, url: 'https://x/4', checks: 'pass' } },
+      { id: 't2', title: 'Dark mode', status: 'done', agent: { provider: 'claude' }, verification: 'needs-review', pr: { number: 5, url: 'https://x/5', checks: 'fail' } },
+    ],
+    ongoing: [{ id: 't3', title: 'Add tests', status: 'running', agent: { provider: 'codex' }, workerName: 'Byte', startedAt: 0, blockedBy: ['Fix login'] }],
+    attention: [{ kind: 'stalled', why: 'nothing on its terminal for 12 min', worker: { id: 'w1', name: 'Mochi' } }],
+    decisions: [{ kind: 'needs_input', why: 'Which one?', worker: { id: 'w2', name: 'Pixel' }, ask: 'answer the question it asked' }],
+  };
+  const text = formatReport(report);
+  assert.match(text, /^app: 1 workers, 3 tasks · up to 2 at a time · free: desk-2 · hiring paused: out of budget$/m);
+  assert.match(text, /^Completed \(2\)$/m);
+  assert.match(text, /t1 {2}done {2}Fix login · on codex gpt-6\.1-sol · PR #4 checks pass .*verified/m);
+  assert.match(text, /t2 {2}done {2}Dark mode · on claude · PR #5 checks fail .*needs-review: read the PR and its checks/m);
+  assert.match(text, /^Ongoing \(1\)$/m);
+  assert.match(text, /t3 {2}running {2}Add tests · on codex · worker Byte · for 25 min · waiting on Fix login/m);
+  assert.match(text, /^Needs you \(1\)$/m);
+  assert.match(text, /Pixel \(needs_input\): Which one\? — answer the question it asked/);
+  assert.match(text, /^Flagged \(1\)$/m);
+  assert.match(text, /Mochi \(stalled\): nothing on its terminal for 12 min/);
+  // Nothing anywhere: the three sections still say so.
+  const empty = formatReport({ floor: { name: 'app' }, queue: { maxWorkers: 1, freeDesk: null }, workers: [], tasks: [], completed: [], ongoing: [], attention: [], decisions: [] });
+  assert.match(empty, /nothing yet/);
+  assert.match(empty, /no desk free/);
+  assert.match(empty, /Needs you \(0\)/);
+  assert.doesNotMatch(empty, /Needs you \(0\)[\s\S]*needs-review/);
 });
 
 test('parses list, hire, home, tell and mcp', () => {
@@ -142,7 +201,13 @@ test('answers MCP: the handshake, its tools, and a call', async () => {
   assert.equal((await handleMcp({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '1999-01-01' } }, io))?.result.protocolVersion, '2025-11-25');
   assert.equal(await handleMcp({ jsonrpc: '2.0', method: 'notifications/initialized' }, io), undefined);
   const tools = await handleMcp({ jsonrpc: '2.0', id: 3, method: 'tools/list' }, io);
-  assert.deepEqual(tools?.result.tools.map((t: { name: string }) => t.name), ['list_workers', 'hire_worker', 'send_home', 'tell_worker']);
+  assert.deepEqual(tools?.result.tools.map((t: { name: string }) => t.name), ['list_workers', 'floor_status', 'report_floor', 'hire_worker', 'send_home', 'tell_worker']);
+  // The floor can be read without being asked: the two read-only tools, and no merge or stop among them.
+  assert.deepEqual(MCP_READ_ONLY, ['list_workers', 'floor_status']);
+  assert.equal(TOOLS.some((t) => /merge|stop|kill/.test(t.name)), false);
+  assert.equal(TOOLS.find((t) => t.name === 'floor_status')?.annotations?.readOnlyHint, true);
+  const status = await handleMcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'floor_status', arguments: {} } }, io);
+  assert.deepEqual(JSON.parse(status?.result.content[0].text), { results: [{ worker: 'Bolt', went: true, note: 'Deleted it' }] });
   const call = await handleMcp({ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'send_home', arguments: { merged: true } } }, io);
   assert.deepEqual(call?.result, { content: [{ type: 'text', text: '✓ Bolt went home — Deleted it' }] });
   // Nobody it named went: the call failed, as far as the model is concerned.
@@ -198,6 +263,7 @@ test("a worker's row says where its pull request stands, and whether it would go
     worktree: { path: '.agent-office/worktrees/bolt', branch: 'office/bolt' },
     pr: { number: 7, state: 'merged', title: 'PR 7', url: 'https://github.com/acme/app/pull/7' },
     merged: true,
+    blockers: [],
   });
   assert.equal(workerRow(worker('zed'), view).merged, false);
   assert.equal(workerRow(worker('zed'), view).pr?.state, 'open');

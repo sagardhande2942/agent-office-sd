@@ -14,6 +14,10 @@ import { fileURLToPath } from 'node:url';
 const USAGE = `Usage:
   office-workers list [--json]                  everyone at a desk on this floor: status, task,
                                                 branch and pull request (merged = free to go home)
+  office-workers status [--json]                the floor as a manager sees it: every worker with
+                                                its task, blockers and pull request, every task with
+                                                the agent it runs on and its verdict, what needs a
+                                                person
   office-workers hire [options] <<'EOF'         hire a worker at a free desk; its task on stdin
   …the task…                                    (or --prompt "…"). Options: --provider <name>
   EOF                                           --model <m> --effort <e> --desk <id> --issue <n>
@@ -24,6 +28,11 @@ const USAGE = `Usage:
                                                 that isn't on GitHub, and says what it kept
   office-workers home --merged                  send home everyone whose pull request merged
   office-workers tell <name|id> <<'EOF'         type a prompt to a worker (or --prompt "…")
+  office-workers report --kind standup <<'EOF'  tell the floor what's completed, ongoing and what
+  office-workers report --kind standup <<'EOF'  needs a decision (or --kind question to ask everyone);
+  office-workers report --kind question <<'EOF'  it's shown to everyone in the office and kept in the
+  …the report…                                  floor's manager.jsonl
+  EOF
   office-workers mcp                            serve these as MCP tools on stdio`;
 
 /** A mistake in how the command was called: the usage is shown with it. */
@@ -80,10 +89,17 @@ export function parseArgs(argv) {
     if (rest.length) throw new UsageError(`mcp takes no arguments (got ${rest.join(' ')})`);
     return { cmd: 'mcp' };
   }
-  if (cmd === 'list' || cmd === 'ls') {
+  if (cmd === 'list' || cmd === 'ls' || cmd === 'status') {
     const { opts, words } = options(rest, [], ['--json']);
-    if (words.length) throw new UsageError(`list takes no arguments (got ${words.join(' ')})`);
-    return { cmd: 'list', json: opts['--json'] === true };
+    if (words.length) throw new UsageError(`${cmd === 'status' ? 'status' : 'list'} takes no arguments (got ${words.join(' ')})`);
+    return { cmd: cmd === 'status' ? 'status' : 'list', json: opts['--json'] === true };
+  }
+  if (cmd === 'report') {
+    const { opts, words } = options(rest, ['--kind', '--text'], ['--json']);
+    if (words.length) throw new UsageError(`report takes no arguments (got ${words.join(' ')})`);
+    const kind = String(opts['--kind'] ?? 'standup');
+    if (kind !== 'standup' && kind !== 'question') throw new UsageError('--kind is standup or question');
+    return { cmd: 'report', kind, ...(opts['--text'] !== undefined ? { text: String(opts['--text']) } : {}), json: opts['--json'] === true };
   }
   // send-home, after the MCP tool, which is what an agent reaches for.
   if (cmd === 'home' || cmd === 'send-home') {
@@ -141,16 +157,17 @@ export function officeEnv(env) {
 
 /**
  * The HTTP request for one of the office's worker calls.
- * @param {'list' | 'hire' | 'home' | 'tell'} what
+ * @param {'list' | 'status' | 'hire' | 'home' | 'tell' | 'report'} what
  * @param {{ url: string, worker: string, token: string }} office
  * @param {Record<string, unknown>} [body]
  * @returns {{ method: string, url: string, headers: Record<string, string>, body?: string, timeout: number }}
  */
 export function buildRequest(what, office, body) {
-  const url = new URL(`${office.url}/office/workers${what === 'home' ? '/home' : what === 'tell' ? '/tell' : ''}`);
+  const path = what === 'home' ? '/home' : what === 'tell' ? '/tell' : what === 'report' ? '/report' : '';
+  const url = new URL(`${office.url}${what === 'status' ? '/office/report' : `/office/workers${path}`}`);
   url.searchParams.set('worker', office.worker);
   const headers = { authorization: `Bearer ${office.token}` };
-  if (what === 'list') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS.list };
+  if (what === 'list' || what === 'status') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS.list };
   return { method: 'POST', url: url.href, headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}), timeout: TIMEOUT_MS[what] };
 }
 
@@ -189,7 +206,7 @@ async function send(req, fetchImpl) {
 
 /**
  * Makes one call to the office; resolves to what it answered, or throws with why it said no.
- * @param {'list' | 'hire' | 'home' | 'tell'} what
+ * @param {'list' | 'status' | 'hire' | 'home' | 'tell' | 'report'} what
  * @param {Record<string, unknown> | undefined} body
  * @param {{ env: Record<string, string | undefined>, fetch: typeof fetch }} io
  */
@@ -209,6 +226,7 @@ export function formatWorker(w) {
   if (w.merged) parts.push(w.staying ? `landed, staying: ${w.staying}` : 'landed: free to go home');
   else if (w.viewers?.length) parts.push(`watched by ${w.viewers.join(', ')}`);
   if (w.task) parts.push(w.task);
+  if (w.blockers?.length) parts.push(blockersOf(w));
   return `${w.id}  ${parts.join(' · ')}`;
 }
 
@@ -220,6 +238,53 @@ export function formatWorkers(view) {
     `${view?.freeDesk ? '' : ' · no desk free'}${view?.hiringPaused ? ` · hiring paused: ${view.hiringPaused}` : ''}` +
     ` · go home once merged is ${view?.leaveOnMerge ? 'on' : 'off'}`;
   return [head, ...workers.map(formatWorker)].join('\n');
+}
+
+/** The blockers of one worker or task, as a person reads them. */
+function blockersOf(what) {
+  const list = what.blockers ?? [];
+  return list.length ? ` — ${list.map((b) => `${b.kind.replace(/_/g, ' ')}: ${b.why}`).join('; ')}` : '';
+}
+
+/** How long ago, as a person reads it. */
+const mins = (ms) => `${Math.max(0, Math.floor(ms / 60_000))} min`;
+
+/** One queue task, in a line: what it runs on, who is on it, for how long, and whether it verified. */
+function formatTask(t, at) {
+  const parts = [`${t.title ?? ''}${t.issue ? ` (issue #${t.issue})` : ''}`];
+  const agent = [t.agent?.provider, t.agent?.model, t.agent?.effort].filter(Boolean).join(' ');
+  if (agent) parts.push(`on ${agent}`);
+  if (t.workerName) parts.push(`worker ${t.workerName}`);
+  if (t.startedAt !== undefined && t.status === 'running' && at) parts.push(`for ${mins(at - t.startedAt)}`);
+  if (t.blockedBy?.length) parts.push(`waiting on ${t.blockedBy.join(', ')}`);
+  if (t.pr) parts.push(`PR #${t.pr.number}${t.pr.checks ? ` checks ${t.pr.checks}` : ''} ${t.pr.url}`);
+  if (t.verification) parts.push(t.verification === 'verified' ? 'verified' : `${t.verification}: ${VERDICT_ASK[t.verification]}`);
+  return `${t.id}  ${String(t.status ?? '?')}${t.outcome && t.outcome !== t.status ? ` (${t.outcome})` : ''}  ${parts.join(' · ')}${blockersOf(t)}`;
+}
+
+/** What the office would ask a person to do about a verdict that isn't `verified`. */
+const VERDICT_ASK = { 'needs-review': 'read the PR and its checks', unverified: 'read the work, or office-queue retry' };
+
+/**
+ * The floor as a manager sees it, in three parts: what is finished and whether it's verified, what is
+ * ongoing, and what needs a person. One line a row, the same facts `status --json` gives.
+ */
+export function formatReport(report) {
+  if (!report) return 'The office sent no report.';
+  const q = report.queue ?? {};
+  const head = `${report.floor?.name ?? 'This floor'}: ${report.workers?.length ?? 0} workers, ${report.tasks?.length ?? 0} tasks · up to ${q.maxWorkers ?? 0} at a time` +
+    `${q.freeDesk ? ` · free: ${q.freeDesk}` : ' · no desk free'}${q.hiringPaused ? ` · hiring paused: ${q.hiringPaused}` : ''}`;
+  const at = report.at;
+  const lines = [head];
+  const completed = report.completed ?? [];
+  lines.push('', `Completed (${completed.length})`, ...(completed.length ? completed.map((t) => formatTask(t, at)) : ['  nothing yet']));
+  const ongoing = report.ongoing ?? [];
+  lines.push('', `Ongoing (${ongoing.length})`, ...(ongoing.length ? ongoing.map((t) => formatTask(t, at)) : ['  nothing']));
+  const decisions = report.decisions ?? [];
+  lines.push('', `Needs you (${decisions.length})`, ...(decisions.length ? decisions.map((d) => `  ${d.worker ? d.worker.name : `task ${d.task?.id ?? '?'}`} (${d.kind}): ${d.why} — ${d.ask}`) : ['  nothing']));
+  const attention = report.attention ?? [];
+  if (attention.length) lines.push('', `Flagged (${attention.length})`, ...attention.map((a) => `  ${a.worker ? a.worker.name : `task ${a.task?.id ?? '?'}`} (${a.kind}): ${a.why}`));
+  return lines.join('\n');
 }
 
 /** How sending home went, a line per worker. */
@@ -252,6 +317,36 @@ export const TOOLS = [
       '(still working, someone has its terminal open, a board agent...). worktree.deleted: true means its folder was deleted outside the office, so it cannot start until a person rebuilds it at its desk. you: true is you.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'floor_status',
+    title: 'Floor status',
+    description:
+      "The floor as a manager sees it, as one object: every worker with its desk, provider/model, status, task, pull request and typed blockers " +
+      "(needs_input, failed, stalled, worktree_deleted, no_desk, over_limit, hiring_paused); every queue task with the agent and model it runs on, " +
+      'what it waits on, and its verification (verified with a pull request whose checks passed or none to run, needs-review, or unverified with no pull request); ' +
+      "plus completed, ongoing, attention (worst first) and decisions (what needs a person). Read it before you say what has become of anything, and never call a task " +
+      'done when its verdict is not verified.',
+    inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, openWorldHint: false },
+  },
+  {
+    name: 'report_floor',
+    title: 'Report on the floor',
+    description:
+      "Posts the manager's report to everyone in the office (a toast, its first line) and keeps it in the floor's manager.jsonl: kind standup for what's completed, " +
+      "what's ongoing and what needs a decision, kind question to ask everyone something. Three things stay the person's decision and are not yours to do: merging a pull request, " +
+      'deleting unfinished work, and stopping anything in flight.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string', enum: ['standup', 'question'], description: 'A standup, or a question for everyone.' },
+        text: { type: 'string', description: 'The report, in plain text (its first line is the toast).' },
+      },
+      required: ['text'],
+      additionalProperties: false,
+    },
+    annotations: { destructiveHint: false, openWorldHint: false },
   },
   {
     name: 'hire_worker',
@@ -314,10 +409,14 @@ export const TOOLS = [
   },
 ];
 
+/** The tools that only read the floor, so a client can ask for them without the office's say-so. */
+export const MCP_READ_ONLY = ['list_workers', 'floor_status'];
+
 const INSTRUCTIONS =
   "You work in Agent Office, where coding agents (the office's workers) sit at desks, each usually in its own git worktree and branch. These tools are the way to see and manage " +
   'the other agents: whenever you are asked about the agents or workers (who is working on what, whose pull request merged, hiring one, sending them home), use them, ' +
-  "rather than looking for the agents with git, ps or HTTP calls. list_workers says where each one's pull request stands (merged: true means it merged), hire_worker " +
+  'rather than looking for the agents with git, ps or HTTP calls. list_workers says where each one\'s pull request stands (merged: true means it merged), floor_status ' +
+  'is the whole floor as a manager sees it (workers, tasks, blockers, verdicts, what needs a person), hire_worker ' +
   'puts a new agent to work, send_home sends agents home and deletes their worktrees and branches, and tell_worker gives one a prompt. Everyone in the office sees who did what. ' +
   'The office-workers command on your PATH does the same from a shell.';
 
@@ -325,6 +424,11 @@ const INSTRUCTIONS =
 async function runTool(name, args, io) {
   const a = args && typeof args === 'object' ? args : {};
   if (name === 'list_workers') return { text: JSON.stringify(await call('list', undefined, io), null, 1) };
+  if (name === 'floor_status') return { text: JSON.stringify(await call('status', undefined, io), null, 1) };
+  if (name === 'report_floor') {
+    const answer = await call('report', { kind: a.kind === 'question' ? 'question' : 'standup', text: a.text }, io);
+    return { text: `Reported to the floor as a ${answer.kind}.` };
+  }
   if (name === 'hire_worker') {
     const answer = await call('hire', a, io);
     const w = answer.worker ?? {};
@@ -450,6 +554,19 @@ export async function main(argv, io = {}) {
     if (cmd.cmd === 'list') {
       const view = await call('list', undefined, ctx);
       out(cmd.json ? JSON.stringify(view, null, 2) : formatWorkers(view));
+      return 0;
+    }
+    if (cmd.cmd === 'status') {
+      const report = await call('status', undefined, ctx);
+      out(cmd.json ? JSON.stringify(report, null, 2) : formatReport(report));
+      return 0;
+    }
+    if (cmd.cmd === 'report') {
+      const text = (await prompt()).trim();
+      if (!text) throw new UsageError('The report is empty');
+      const answer = await call('report', { kind: cmd.kind, text }, ctx);
+      if (cmd.json) out(JSON.stringify(answer, null, 2));
+      else err(`Reported to the floor as a ${answer.kind}.`);
       return 0;
     }
     if (cmd.cmd === 'home') {
