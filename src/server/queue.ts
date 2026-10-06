@@ -87,7 +87,7 @@ export class TaskQueue {
 
   /** Queues a task. With no `provider`, it runs on the office's default worker, model and effort included. */
   /** Queues a task; `owner` is the account adding it, whose sign-ins its worker will run on. */
-  add(prompt: string, by: string, title?: string, issue?: number, provider?: AgentProvider, model?: string, effort?: AgentEffort, owner?: string): string | undefined {
+  add(prompt: string, by: string, title?: string, issue?: number, provider?: AgentProvider, model?: string, effort?: AgentEffort, owner?: string, dependsOn?: string[]): string | undefined {
     if (provider === undefined) ({ provider, model, effort } = this.workers.officeDefault ?? { provider: this.workers.defaultProvider });
     if (!isAgentProvider(provider) || (provider === 'custom' && this.workers.defaultProvider !== 'custom')) return 'Unknown agent provider';
     const modelError = validateWorkerModel('agent', provider, model);
@@ -97,6 +97,11 @@ export class TaskQueue {
     const clean = prompt.replace(/\r\n?/g, '\n').trim();
     if (!clean) return 'Empty task';
     if (issue !== undefined && this.tasks.some((t) => t.issue === issue && t.status !== 'done')) return `Issue #${issue} is already on the queue`;
+    // A task it waits on has to be on the queue already, so waiting work can't wait on nothing.
+    const waits = [...new Set(dependsOn ?? [])];
+    for (const id of waits) {
+      if (!this.tasks.some((t) => t.id === id)) return `No task ${id} on the queue to wait for`;
+    }
     if (this.tasks.filter((t) => t.status !== 'done').length >= MAX_TASKS) return `The queue is full (${MAX_TASKS} tasks)`;
     const task: QueueTask = {
       id: randomBytes(6).toString('hex'),
@@ -104,6 +109,7 @@ export class TaskQueue {
       model: takesModel(provider) ? model : undefined,
       effort: takesEffort(provider) ? effort : undefined,
       issue,
+      ...(waits.length ? { dependsOn: waits } : {}),
       title: (title?.trim() || firstLine(clean)).slice(0, 120),
       prompt: clean,
       addedBy: by,
@@ -156,7 +162,7 @@ export class TaskQueue {
     if (t.status !== 'done') return 'That task is still on the queue';
     if (t.issue !== undefined && this.tasks.some((x) => x !== t && x.issue === t.issue && x.status !== 'done')) return `Issue #${t.issue} is already on the queue`;
     this.tasks.splice(this.tasks.indexOf(t), 1);
-    const fresh: QueueTask = { id: t.id, provider: t.provider, model: t.model, effort: t.effort, issue: t.issue, title: t.title, prompt: t.prompt, addedBy: t.addedBy, owner: t.owner, addedAt: Date.now(), status: 'queued' };
+    const fresh: QueueTask = { id: t.id, provider: t.provider, model: t.model, effort: t.effort, issue: t.issue, ...(t.dependsOn?.length ? { dependsOn: t.dependsOn } : {}), title: t.title, prompt: t.prompt, addedBy: t.addedBy, owner: t.owner, addedAt: Date.now(), status: 'queued' };
     this.tasks.push(fresh);
     this.changed();
     this.pump();
@@ -283,6 +289,11 @@ export class TaskQueue {
     return this.tasks.filter((t) => t.status === 'running').length;
   }
 
+  /** Whether everything a task waits on has finished, done. */
+  private settled(t: QueueTask): boolean {
+    return (t.dependsOn ?? []).every((id) => this.tasks.find((x) => x.id === id)?.outcome === 'done');
+  }
+
   /** A free desk (in the back office too, as far as it's built), else a free bean bag. */
   private freeDesk(): string | undefined {
     return nextFreeSeat((id) => this.workers.deskOccupied(id), this.workers.wing?.() ?? 0)?.id;
@@ -319,6 +330,8 @@ export class TaskQueue {
     let changed = false;
     for (const t of this.tasks) {
       if (t.status !== 'queued') continue;
+      // Waiting on another task: the next pump seats it once that one is done (see settled).
+      if (t.dependsOn?.length && !this.settled(t)) continue;
       if (this.busy() >= this.maxWorkers) break;
       // A spent budget holds the queue instead of failing every task; the pump seats them once hiring resumes.
       if (this.events.hiringPaused()) break;
@@ -384,15 +397,19 @@ export class TaskQueue {
     try {
       const saved = JSON.parse(readFileSync(this.statePath, 'utf8')) as { maxWorkers?: number; tasks?: Partial<QueueTask>[] };
       if (typeof saved.maxWorkers === 'number' && Number.isFinite(saved.maxWorkers)) this.maxWorkers = Math.max(0, Math.min(SEATS.length, Math.floor(saved.maxWorkers)));
+      // What a task waits on has to be in the same file: an id that isn't is dropped.
+      const known = new Set((saved.tasks ?? []).map((s) => s.id).filter((id): id is string => typeof id === 'string'));
       for (const s of saved.tasks ?? []) {
         if (typeof s.id !== 'string' || typeof s.prompt !== 'string' || typeof s.title !== 'string') continue;
         const provider = isAgentProvider(s.provider) ? s.provider : this.workers.defaultProvider;
+        const waits = [...new Set((Array.isArray(s.dependsOn) ? s.dependsOn : []).filter((id): id is string => typeof id === 'string' && id !== s.id && known.has(id)))];
         const t: QueueTask = {
           id: s.id,
           provider,
           model: savedModel(provider, s.model),
           effort: savedEffort(provider, s.effort),
           issue: typeof s.issue === 'number' ? s.issue : undefined,
+          ...(waits.length ? { dependsOn: waits } : {}),
           title: s.title,
           prompt: s.prompt,
           addedBy: s.addedBy ?? '?',

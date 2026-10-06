@@ -1,6 +1,7 @@
+import type { CompletionReport } from './completion.js';
 // What a worker's status means, for the checks the server and the browser both make.
 
-import type { GhPull, QueueTask, WorkerInfo, WorkerStatus } from './protocol.js';
+import type { AgentProvider, GhPull, QueueTask, WorkerInfo, WorkerStatus } from './protocol.js';
 
 /**
  * Whether a worker can go on a break round the office (see WorkerInfo.resting), or is on one: an
@@ -53,4 +54,59 @@ export function workerPr(w: WorkerInfo, pulls: GhPull[], tasks: QueueTask[]): Wo
   if (open) return { state: 'open', number: open.number };
   const merged = seen.find((p) => p.state === 'MERGED');
   return merged && { state: 'merged', number: merged.number };
+}
+
+/** One worker as an agent sees it: enough to pick the ones to send home, and say why. */
+export interface WorkerRow {
+  completion?: CompletionReport;
+  id: string;
+  name: string;
+  kind: 'agent' | 'shell';
+  provider?: AgentProvider;
+  model?: string;
+  desk: string;
+  status: WorkerStatus;
+  /** The board it stands by, for a board agent ("PR agent"). */
+  board?: string;
+  /** At the meeting room's table, called to a meeting. */
+  meeting?: true;
+  /** The worker asking. */
+  you?: true;
+  /** What it's on, as the office summed it up, else its first prompt. */
+  task?: string;
+  /** Its latest prompt or tool call. */
+  activity?: string;
+  hiredBy: string;
+  hiredAt: string;
+  /** People with its terminal open. */
+  viewers?: string[];
+  /** `deleted`: its folder was deleted outside the office, so it can't start until someone rebuilds it at its desk. */
+  worktree?: { path: string; branch: string; deleted?: true };
+  /** Other floors' projects it works in too, each on its own worktree. */
+  repos?: { name: string; branch: string; pr?: number }[];
+  /** Its pull request: one still open wins, else one that merged (see workerPr). */
+  pr?: { number: number; state: 'open' | 'merged'; title?: string; url?: string };
+  /** A pull request of its merged and none is open: its work landed, and it can go home. */
+  merged: boolean;
+  /** Its work landed, but it doesn't go home by itself yet, and why (see notLeaving). */
+  staying?: string;
+  /** When its terminal last wrote something: what "stalled" is worked out from (see blockersOf). */
+  lastOutputAt?: number;
+  /** What's stopping it, worst first; empty when nothing is (see blockersOf). */
+  blockers: Blocker[];
+}
+
+/** What a floor knows about its workers' pull requests. */
+export interface PullsView {
+  pulls: GhPull[];
+  tasks: QueueTask[];
+  /** Another floor's pull requests, for a worker across repositories. */
+  pullsOf?: (floor: string) => GhPull[] | undefined;
+}
+
+/** Why a worker or a task isn't getting on: what kind of stop it is, in words, and since when. */
+export interface Blocker {
+  kind: 'needs_input' | 'failed' | 'stalled' | 'worktree_deleted' | 'no_desk' | 'over_limit' | 'hiring_paused';
+  why: string;
+  since?: number;
 }
