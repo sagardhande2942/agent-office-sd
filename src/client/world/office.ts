@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ASHTRAY, BALCONY, BALCONY_DOOR, BEANBAGS, BOARDS, BOOKSHELF, CABINET, DESKS, DESK_SIZE, ELEVATOR, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, GREEN_PLANTS, HANGING_PLANTS, KIOSK, LADDER, LOFT, MACHINE_MONITOR, MEETING_BOARD, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PLANTS, SEATING_BY_ID, SILL_PLANTS, SLAB, STAIRS, STATIONS, STATION_AGENT, STOREY, STREET_Y, THEATRE_SWITCH, TV, WALL_HEIGHT, WALL_T, WINDOWS, WING, WING_DESKS, deskSeat, greenPlantKind, plantByWing, streetBelow, wingMinZ, wingRowZ, type DeskDef, type Opening, type Side, type StationKind } from '../../shared/layout';
+import { ASHTRAY, BALCONY, BALCONY_DOOR, BEANBAGS, BOARDS, BOOKSHELF, CABINET, DESKS, DESK_SIZE, ELEVATOR, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, GREEN_PLANTS, HANGING_PLANTS, KIOSK, LADDER, LOFT, MACHINE_MONITOR, MEETING_BOARD, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PLAN_REVIEW_TABLE, PLAN_REVIEW_SEATS, PLANTS, SEATING_BY_ID, SILL_PLANTS, SLAB, STAIRS, STATIONS, STATION_AGENT, STOREY, STREET_Y, THEATRE_SWITCH, TV, WALL_HEIGHT, WALL_T, WINDOWS, WING, WING_DESKS, deskSeat, greenPlantKind, plantByWing, streetBelow, wingMinZ, wingRowZ, type DeskDef, type Opening, type Side, type StationKind } from '../../shared/layout';
 import { wallFacing, type WallId, type WallRect } from '../../shared/decor';
 import { deskPoint } from '../../shared/nav';
 import { FLOOR_PALETTES, type FloorPalette } from '../../shared/floors';
@@ -41,7 +41,7 @@ export interface Collider {
   glass?: boolean;
 }
 
-export type InteractKind = 'desk' | 'station' | 'issues' | 'pulls' | 'services' | 'queue' | 'tv' | 'theatre' | 'coffee' | 'fridge' | 'decor' | 'smoke' | 'elevator' | 'gong' | 'dog' | 'jukebox' | 'seat' | 'whiteboard' | 'cabinet' | 'ladder' | 'pole' | 'meeting' | 'bar' | 'dj' | 'golf' | 'ball' | 'bookshelf' | 'darts' | 'axe' | 'telescope' | 'car' | 'expand' | 'herald';
+export type InteractKind = 'desk' | 'station' | 'issues' | 'pulls' | 'services' | 'queue' | 'tv' | 'theatre' | 'coffee' | 'fridge' | 'decor' | 'smoke' | 'elevator' | 'gong' | 'dog' | 'jukebox' | 'seat' | 'whiteboard' | 'cabinet' | 'ladder' | 'pole' | 'meeting' | 'plan-review' | 'bar' | 'dj' | 'golf' | 'ball' | 'bookshelf' | 'darts' | 'axe' | 'telescope' | 'car' | 'expand' | 'herald';
 
 /** Something you can use. Its scene object carries it as `userData.interact`, for clicking. */
 export interface Interactable {
@@ -1780,6 +1780,16 @@ export function buildOffice(): Office {
   const bossScreen = buildLoft(group, colliders, interactables, looks);
   // Under the loft: the meeting room.
   const meeting = buildMeetingRoom(group, colliders, interactables, desks, doors, night);
+  const pt=PLAN_REVIEW_TABLE;
+  const planTable=mesh(roundedBox(pt.width,0.12,pt.depth,0.08),toon('#93b6ac'),pt.x,pt.height-0.06,pt.z);
+  group.add(planTable);
+  for (const x of [-pt.width/2+0.3,pt.width/2-0.3]) group.add(mesh(box(0.12,pt.height,0.12),toon('#2b2d42'),pt.x+x,pt.height/2,pt.z));
+  const planInteraction:Interactable={kind:'plan-review',x:pt.x,z:pt.z,radius:2.8};
+  planTable.userData.interact=planInteraction;interactables.push(planInteraction);
+  colliders.push({minX:pt.x-pt.width/2,maxX:pt.x+pt.width/2,minZ:pt.z-pt.depth/2,maxZ:pt.z+pt.depth/2,top:pt.height});
+  for(const [i,def] of PLAN_REVIEW_SEATS.entries()) {const seat=buildMeetingSeat(def,i);group.add(seat.group);desks.set(def.id,seat);const it:Interactable={kind:'desk',deskId:def.id,x:def.x,z:def.z,radius:1};seat.group.userData.interact=it;interactables.push(it);const [x,z]=deskPoint(def,0,0.85);colliders.push({minX:x-0.3,maxX:x+0.3,minZ:z-0.3,maxZ:z+0.3,top:0.5});}
+  const planSign=textPlane('PLAN COMPARISON',{size:26});planSign.position.set(pt.x,1.5,pt.z);planSign.userData.interact=planInteraction;group.add(planSign);
+
   fixture('south', MEETING_BOARD.x, MEETING_BOARD.y, MEETING_BOARD.width + 0.4, MEETING_BOARD.height + 0.4);
 
   // The elevator to the other floors, against the north wall between the PR board and the gong.

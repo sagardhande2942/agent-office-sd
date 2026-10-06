@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import readline from 'node:readline';
 import { WebSocket } from 'ws';
 import { PANELS, communicationLines, gridColumns, plain, renderDashboard, seats, type Dashboard, type Panel } from './tui-dashboard.js';
@@ -145,7 +146,8 @@ function session(ws: WebSocket): Promise<number> {
           print('Welcome. Select a desk with arrows; Enter opens its terminal.');
         }
         dashboard.selected = 0; dashboard.offset = 0; draw();
-      } else if (msg.t === 'floors') floors = msg.floors;
+      } else if (msg.t === 'plan-review' && view) view.planReview=msg.state;
+      else if (msg.t === 'floors') floors = msg.floors;
       else if (msg.t === 'worker.update' && view) {
         view.workers = [...view.workers.filter((w) => w.id !== msg.worker.id), msg.worker];
         print(`${msg.worker.name}: ${msg.worker.status}`);
@@ -242,6 +244,10 @@ function session(ws: WebSocket): Promise<number> {
       if (cmd === 'quit' || cmd === 'exit') return done(0);
       if (cmd === 'help') return panel('help');
       if (cmd === 'messages') { panel('messages'); dashboard.thread = key || undefined; return draw(); }
+      if (cmd === 'plans') return panel('plans');
+      if (cmd === 'plan-start') {if(!key)throw new Error('Usage: plan-start <JSON-file>');return send({t:'plan-review.start',request:JSON.parse(readFileSync(line.slice(cmd.length).trim(),'utf8'))});}
+      if (cmd === 'plan-stop') return send({t:'plan-review.stop'});
+      if (cmd === 'plan-retry') return send({t:'plan-review.retry'});
       if (cmd === 'workers') return workers();
       if (cmd === 'floors') return panel('floors');
       if (cmd === 'go') {

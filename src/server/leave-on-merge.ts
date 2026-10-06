@@ -88,6 +88,7 @@ export function landedWorkers(workers: WorkerInfo[], pulls: GhPull[], tasks: Que
  */
 export function notLeaving(w: WorkerInfo): string | undefined {
   if (w.kind !== 'agent') return 'a shell';
+  if (w.planReview?.locked) return 'in a plan comparison';
   if (w.meeting) return 'at the meeting table';
   if (DESK_BY_ID.get(w.deskId)?.station) return 'a board agent';
   if (isBusy(w.status)) return w.status === 'needs_input' ? 'waiting on someone' : 'still working';

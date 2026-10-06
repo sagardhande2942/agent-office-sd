@@ -1,3 +1,4 @@
+import { openPlanReview } from './ui/plan-review';
 import { completionLabel } from '../shared/completion';
 import { openCommunications } from './ui/communications';
 // The 2D view (/lite): the office without the 3D, for a phone or a computer the 3D office is too
@@ -324,6 +325,7 @@ function showMeeting(preset?: MeetingPreset) {
 
 $('btn-issues').addEventListener('click', () => openBoard('issues', net, boardActions()));
 $('btn-pulls').addEventListener('click', () => openBoard('pulls', net, boardActions()));
+$('btn-plans').addEventListener('click',()=>openPlanReview(net,openWorker));
 $('btn-meeting').addEventListener('click', () => showMeeting());
 $('btn-messages').addEventListener('click', () => openCommunications(openWorker));
 $('btn-queue').addEventListener('click', () => openQueue(net, { openTerminal: openWorker }));

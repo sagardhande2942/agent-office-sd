@@ -1,3 +1,4 @@
+import type { PlanReviewState, PlanReviewRequest, PlanReviewWorker } from './plan-review.js';
 import type { CompletionReport } from './completion.js';
 import type { CommunicationsState } from './communications.js';
 // Wire protocol between browser and server. Every WebSocket frame is one JSON object.
@@ -151,6 +152,7 @@ export interface WorkerInfo {
   lastInput?: { by: string; at: number };
   /** The meeting it was called to, for a worker at the meeting room's table (see Meeting). */
   meeting?: string;
+  planReview?: PlanReviewWorker;
   /**
    * How long it has spent working (ms), over the stretches that have ended, and when the one it's in
    * now started (while it's working): on the castle map, the longer it has worked, the more worn out it looks.
@@ -843,6 +845,7 @@ export interface FloorView {
   whiteboard: WhiteboardView;
   /** The meeting room: who's meeting about what, and the meetings before. */
   meeting: MeetingState;
+  planReview?: PlanReviewState;
   /** The basketball by the hoop: who has it, or how it was last thrown. */
   ball: BallState;
   /** The cars in the garage (see CARS in shared/garage.ts): where each one is, and who's in it. */
@@ -1274,6 +1277,9 @@ export type ClientMsg =
   /** Call a meeting: workers sit down round the meeting room's table and work through it in rounds. */
   | ({ t: 'meeting.start' } & MeetingRequest)
   /** Stop the meeting that's running; its workers stay at the table. */
+  | { t: 'plan-review.start'; request: PlanReviewRequest }
+  | { t: 'plan-review.stop' }
+  | { t: 'plan-review.retry' }
   | { t: 'meeting.stop' }
   | { t: 'meeting.finish'; id: string; allowUnresolved: true }
   /** Send the last meeting's workers home and clear the table. */
@@ -1536,6 +1542,7 @@ export type ServerMsg =
   | { t: 'usage'; state: UsageState }
   | { t: 'limits'; state: PlanLimits }
   | { t: 'queue'; state: QueueState }
+  | { t: 'plan-review'; state: PlanReviewState }
   | { t: 'meeting'; state: MeetingState }
   | { t: 'notify'; state: NotifyState }
   | { t: 'machine'; state: MachineState }

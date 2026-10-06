@@ -60,3 +60,7 @@ Terminal input, including Ctrl+C, goes to the attached worker. Ctrl+] detaches. 
 This first CLI view requires an interactive terminal and an existing project floor. Add floors using the browser office. Voice, whiteboards, spatial activities and account administration remain in the existing interfaces.
 
 Tracked worker message commands and receipts are described in [communications.md](communications.md).
+
+## Plan comparison
+
+Press `:` in the dashboard. `plans` opens plan comparison status, detailed plans and reviewer reasons. `plan-start /absolute/path/task.json` starts 1–5 distinct planning models and one reviewer; `plan-stop` closes it with participant cleanup (preserving the winner’s checkout after implementation starts), and `plan-retry` retries blocked cleanup. These commands have no additional flags. Use `attach <worker-id>` for a participant terminal and Ctrl+] to return. See [plan comparison](plan-comparison.md) for JSON configuration and provider limits.

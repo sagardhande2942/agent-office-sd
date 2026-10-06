@@ -193,11 +193,11 @@ export function officeEnv(env) {
  * @returns {{ method: string, url: string, headers: Record<string, string>, body?: string, timeout: number }}
  */
 export function buildRequest(what, office, body) {
-  const url = new URL(`${office.url}/office/workers${what === 'home' ? '/home' : what === 'tell' ? '/tell' : ['helper', 'inbox', 'request', 'reply', 'ack', 'completion', 'complete'].includes(what) ? '/' + what : ''}`);
+  const url = new URL(`${office.url}/office/workers${what.startsWith('plan') ? '/' + what : what === 'home' ? '/home' : what === 'tell' ? '/tell' : ['helper', 'inbox', 'request', 'reply', 'ack', 'completion', 'complete'].includes(what) ? '/' + what : ''}`);
   url.searchParams.set('worker', office.worker);
   const headers = { authorization: `Bearer ${office.token}` };
-  if (what === 'list' || what === 'inbox' || what === 'completion') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] };
-  return { method: 'POST', url: url.href, headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}), timeout: TIMEOUT_MS[what] };
+  if (what === 'list' || what === 'inbox' || what === 'completion' || what === 'plan-review') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] ?? 15_000 };
+  return { method: 'POST', url: url.href, headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}), timeout: TIMEOUT_MS[what] ?? 15_000 };
 }
 
 /** Why the office turned a request down, in words. */
@@ -396,6 +396,27 @@ TOOLS.push(
   { name: 'ack_worker_message', title: 'Acknowledge a worker message', description: 'Acknowledge a message addressed to you. Acknowledging a request confirms receipt; acknowledging a reply completes the original request. Acknowledgment is not proof that code was integrated or tested; say that separately.', inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'], additionalProperties: false }, annotations: { destructiveHint: false, idempotentHint: true, openWorldHint: false } },
 );
 
+// Role-specific tools are also enforced by the authenticated HTTP endpoint.
+const object = (properties,required=Object.keys(properties))=>({type:'object',properties,required,additionalProperties:false});
+const string={type:'string'};
+const array=items=>({type:'array',items});
+const planSchema=object({requirements:array(object({id:string,approach:string,acceptance:string})),findings:array(object({file:string,evidence:string})),design:string,steps:array(object({title:string,files:array(string),details:string})),verification:array(object({requirement:string,check:string,expected:string})),risks:array(object({risk:string,mitigation:string})),assumptions:array(object({assumption:string,verify:string})),scope:object({included:string,excluded:string})});
+const criteria=['coverage','feasibility','detail','verification','simplicity'];
+const scores=object(Object.fromEntries(criteria.map(k=>[k,{type:'number',minimum:0,maximum:10}])));
+const reasons=object(Object.fromEntries(criteria.map(k=>[k,string])));
+const gates=object(Object.fromEntries(criteria.slice(0,3).map(k=>[k,object({pass:{type:'boolean'},reason:string})])));
+TOOLS.push(
+  {name:'plan_review_state',description:'Read your plan comparison activity, frozen requirements, rubric, revision and own plan (reviewer sees anonymous candidate plans).',inputSchema:object({})},
+  {name:'submit_candidate_plan',description:'Freeze your detailed plan. Every requirement needs an approach, acceptance check and verification. At least two detailed steps and concrete repository findings required. No implementation.',inputSchema:object({id:string,planRevision:{type:'integer',minimum:0,maximum:1},plan:planSchema})},
+  {name:'request_plan_clarification',description:'Reviewer only: request one clarification round before scoring. Do not change requirements. Candidates submit complete revised plans.',inputSchema:object({id:string,revision:{type:'integer'},requests:array(object({candidate:string,question:string}))})},
+  {name:'submit_plan_review',description:'Reviewer only: rate every plan, with evidence and eligibility gates. Highest weighted eligible score wins; tie breakers coverage, feasibility, alphabetical label. Summary explains accepted and rejected plans. Server saves decisions, cleans losers and starts the winner.',inputSchema:object({id:string,revision:{type:'integer'},winner:{type:['string','null']},summary:string,ratings:array(object({candidate:string,scores,scoreReasons:reasons,gates,strengths:array(string),weaknesses:array(string),decision:{type:'string',enum:['accept','reject']},reason:string}))})},
+);
+export function toolsForRole(role) {
+  if (!role) return TOOLS;
+  const names=role==='candidate'?['plan_review_state','submit_candidate_plan']:role==='reviewer'?['plan_review_state','request_plan_clarification','submit_plan_review']:[];
+  return TOOLS.filter(t=>names.includes(t.name));
+}
+
 const INSTRUCTIONS =
   "You work in Agent Office, where coding agents (the office's workers) sit at desks, each usually in its own git worktree and branch. These tools are the way to see and manage " +
   'the other agents: whenever you are asked about the agents or workers (who is working on what, whose pull request merged, hiring one, sending them home), use them, ' +
@@ -408,6 +429,8 @@ const INSTRUCTIONS =
 /** Runs a tool; resolves to its text, and whether nothing it was asked came off, or throws with why it failed. */
 async function runTool(name, args, io) {
   const a = args && typeof args === 'object' ? args : {};
+  const planTools={plan_review_state:'plan-review',submit_candidate_plan:'plan',request_plan_clarification:'plan-review/clarify',submit_plan_review:'plan-review/verdict'};
+  if (planTools[name]) return {text:JSON.stringify(await call(planTools[name],a,io),null,2)};
   const communicationTools = { worker_inbox: 'inbox', request_worker: 'request', reply_worker: 'reply', ack_worker_message: 'ack' };
   if (communicationTools[name]) return { text: JSON.stringify(await call(communicationTools[name], a, io), null, 2) };
   if (name === 'worker_completion') return {text:JSON.stringify(await call('completion', undefined, io),null,2)};
@@ -453,16 +476,16 @@ export async function handleMcp(msg, io) {
         protocolVersion: MCP_VERSIONS.includes(asked) ? asked : MCP_VERSIONS[0],
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: 'agent-office', title: 'Agent Office', version: '1.0.0' },
-        instructions: INSTRUCTIONS,
+        instructions: io.env.AGENT_OFFICE_PLAN_ROLE ? 'Plan-only activity. Use only your role’s plan tools; the office controls review, cleanup and implementation.' : INSTRUCTIONS,
       });
     }
     case 'ping':
       return ok({});
     case 'tools/list':
-      return ok({ tools: TOOLS });
+      return ok({ tools: toolsForRole(io.env.AGENT_OFFICE_PLAN_ROLE) });
     case 'tools/call': {
       const name = msg.params?.name;
-      if (!TOOLS.some((t) => t.name === name)) return { jsonrpc: '2.0', id: msg.id, error: { code: -32602, message: `Unknown tool: ${name}` } };
+      if (!toolsForRole(io.env.AGENT_OFFICE_PLAN_ROLE).some((t) => t.name === name)) return { jsonrpc: '2.0', id: msg.id, error: { code: -32602, message: `Unknown tool: ${name}` } };
       try {
         const { text, isError } = await runTool(name, msg.params?.arguments, io);
         return ok({ content: [{ type: 'text', text }], ...(isError ? { isError: true } : {}) });

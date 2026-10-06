@@ -9,10 +9,10 @@ import { BUILTIN_MAPS, DEFAULT_DAIS, OFFICE_PLAN, checkCustomMaps, mapChoices, p
 import { clockWork, workedMs } from '../src/server/workers.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
 
-test('every built-in map places every seat the office has, by the same ids', () => {
+test('every built-in map places ordinary and meeting seats by the same ids; plan table belongs to office', () => {
   for (const config of BUILTIN_MAPS) {
     const plan = planMap(config);
-    assert.deepEqual(new Set(plan.byId.keys()), new Set(DESK_BY_ID.keys()), `${config.id} has the office's seats`);
+    assert.deepEqual(new Set(plan.byId.keys()), new Set([...DESK_BY_ID].filter(([,d])=>!d.review).map(([id])=>id)), `${config.id} has the office's seats`);
     for (const [id, d] of plan.byId) {
       const office = DESK_BY_ID.get(id)!;
       assert.equal(!!d.station, !!office.station, `${id} is a kiosk on both`);

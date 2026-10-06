@@ -1,3 +1,4 @@
+import type { PlanReviewState } from '../shared/plan-review';
 import type { CommunicationsState } from '../shared/communications';
 import type { AccountsState, ChatLine, FloorInfo, FloorView, GhIssue, GhPull, GhState, JailState, LeaveOnMergeState, MachineState, MapState, MeetingState, NotifyState, PeerInfo, PlanLimits, Me, ProjectInfo, ProjectsDirState, PromptsState, QueueState, QueueTask, RepoChoice, ServerMsg, ServicesState, SignInsState, SkyState, TeamState, ThemeState, UpgradeState, Usage, UsageState, WorkerInfo } from '../shared/protocol';
 import type { ScreenState } from './world/laptop';
@@ -14,7 +15,7 @@ import type { BallState } from '../shared/hoop';
 import { parked, type CarSeat, type CarState } from '../shared/garage';
 import { OFFICE_MAP, planOf, type MapPlan } from '../shared/maps';
 
-export type Topic = 'communications' | 'peers' | 'workers' | 'issues' | 'pulls' | 'chat' | 'project' | 'screens' | 'team' | 'upgrade' | 'services' | 'decor' | 'floorPlan' | 'usage' | 'limits' | 'queue' | 'me' | 'accounts' | 'signins' | 'notify' | 'machine' | 'floors' | 'floor' | 'projectsDir' | 'repos' | 'dog' | 'jukebox' | 'tv' | 'sky' | 'theme' | 'map' | 'leaveOnMerge' | 'whiteboard' | 'drawing' | 'cabinet' | 'cabinetFrame' | 'meeting' | 'prompts' | 'ball' | 'cars' | 'jail' | 'helper';
+export type Topic = 'plan-review' | 'communications' | 'peers' | 'workers' | 'issues' | 'pulls' | 'chat' | 'project' | 'screens' | 'team' | 'upgrade' | 'services' | 'decor' | 'floorPlan' | 'usage' | 'limits' | 'queue' | 'me' | 'accounts' | 'signins' | 'notify' | 'machine' | 'floors' | 'floor' | 'projectsDir' | 'repos' | 'dog' | 'jukebox' | 'tv' | 'sky' | 'theme' | 'map' | 'leaveOnMerge' | 'whiteboard' | 'drawing' | 'cabinet' | 'cabinetFrame' | 'meeting' | 'prompts' | 'ball' | 'cars' | 'jail' | 'helper';
 
 const zeroUsage = (): Usage => ({ input: 0, output: 0, cacheWrite: 0, cacheRead: 0, cost: 0, calls: 0 });
 
@@ -224,6 +225,7 @@ jukebox: JukeboxState & { since: number } = { on: false, track: JUKEBOX_TUNES[0]
   communications: CommunicationsState = { messages: [] };
   queue: QueueState = { tasks: [], maxWorkers: 0 };
   /** The meeting room: the meeting at the table, and the ones before. */
+  planReview: PlanReviewState = {current:null,past:[]};
   meeting: MeetingState = { current: null, past: [] };
   /** Who you're signed in as (see /api/whoami). */
   me: Me = { admin: false };
@@ -330,6 +332,7 @@ jukebox: JukeboxState & { since: number } = { on: false, track: JUKEBOX_TUNES[0]
     this.pulls = v.pulls;
     this.queue = v.queue;
     this.communications = v.communications ?? { messages: [] };
+    this.planReview = v.planReview ?? {current:null,past:[]};
     this.meeting = v.meeting;
     this.decor = v.decor;
     this.floorPlan = v.plan ?? EMPTY_PLAN;
@@ -346,7 +349,7 @@ jukebox: JukeboxState & { since: number } = { on: false, track: JUKEBOX_TUNES[0]
     this.ball = v.ball ?? {};
     this.setCars(v.cars ?? parked());
     this.jail = v.jail ?? { prisoners: [], bones: 0 };
-    for (const t of ['communications', 'floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'helper', 'jukebox', 'tv', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'jail'] as Topic[]) this.emit(t);
+    for (const t of ['plan-review', 'communications', 'floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'helper', 'jukebox', 'tv', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'jail'] as Topic[]) this.emit(t);
   }
 
   private setCars(cars: CarState[]) {
@@ -545,6 +548,8 @@ jukebox: JukeboxState & { since: number } = { on: false, track: JUKEBOX_TUNES[0]
         this.queue = msg.state;
         this.emit('queue');
         break;
+      case 'plan-review':
+        this.planReview = msg.state; this.emit('plan-review'); break;
       case 'meeting':
         this.meeting = msg.state;
         this.emit('meeting');

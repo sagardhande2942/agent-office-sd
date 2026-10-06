@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Hosts, PAIRING_TTL_MS } from '../src/server/hosts.js';
@@ -231,6 +231,8 @@ test('an expired pairing code is refused and cleaned up', () => {
     const saved = JSON.parse(readFileSync(file, 'utf8'));
     saved.codes[0].expiresAt = Date.now() - 1;
     writeFileSync(file, JSON.stringify(saved, null, 2));
+    // Hosts reloads on mtime+size; equal-size writes can share a coarse filesystem timestamp.
+    const changed=new Date(statSync(file).mtimeMs+1000);utimesSync(file,changed,changed);
 
     // An expired code is swept before it is matched, so it reads as unknown rather than as a
     // separate failure. Either message refuses it; what matters is that it cannot be claimed.

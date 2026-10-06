@@ -1,3 +1,4 @@
+import type { PlanReviewWorker } from '../shared/plan-review.js';
 import { readCompletion, restoreCompletion } from './completion.js';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, accessSync, chmodSync, mkdirSync, readdirSync, rmdirSync, unlinkSync, constants } from 'node:fs';
@@ -424,6 +425,7 @@ export class WorkerManager {
    */
   sendHelper(hostId: string, by: string, provider?: AgentProvider, model?: string, effort?: AgentEffort, owner?: string): WorkerInfo | string {
     const host = this.get(hostId);
+    if(host?.planReview?.locked)return 'Planning participants cannot request helpers';
     if (!host) return 'No such worker';
     // A helper helps a worker, not another helper: that would make a chain nobody asked for.
     if (isHelperId(host.deskId)) return `${host.name} is itself a helper`;
@@ -452,7 +454,7 @@ export class WorkerManager {
    * (see meetings.ts), in the meeting's own worktree, which everyone at the table shares. `repos` are
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
-  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', helper?: { hostId: string; hostName: string; worktree?: WorkerInfo['worktree'] }): WorkerInfo | string {
+  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', helper?: { hostId: string; hostName: string; worktree?: WorkerInfo['worktree'] }, planReview?: PlanReviewWorker): WorkerInfo | string {
     // Nobody picked (a board agent, say): the office's default worker, model and effort included.
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
@@ -469,6 +471,11 @@ export class WorkerManager {
     if (this.deskOccupied(deskId) && !(helper && isHelperId(deskId))) return seat.station ? `The ${STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
     if (kind === 'shell' && seat.station) return 'A board agent is always an agent, not a shell';
     if (seat.station && !prompt?.trim()) return 'Tell the board agent what to do';
+    if (!!seat.review !== !!planReview) return 'Only a plan comparison seats workers at its table';
+    if (planReview && (kind !== 'agent' || !worktree || !planReview.locked || !['claude','opencode'].includes(selectedProvider ?? '') || !model || !this.mcpScript)) return 'Planning requires an explicit Claude/OpenCode model, an independent worktree and office MCP tools';
+    if (planReview && selectedProvider === 'opencode') {
+      try { if (!/^1\./.test(execFileSync((selectedProvider===this.defaultProvider?this.agentPath:resolveCommand('opencode')) ?? 'opencode',['--version'],{encoding:'utf8',timeout:5000}).trim())) return 'Read-only planning currently requires OpenCode 1.x'; } catch { return 'OpenCode 1.x must be installed for this candidate'; }
+    }
     if (!seat.room !== !meeting) return seat.room ? 'Only a meeting seats workers at the meeting table: call one in the meeting room' : 'A meeting seats its workers at the meeting table';
     if (meeting && (kind !== 'agent' || worktree)) return 'A meeting seats agents, in its own worktree';
     if (repos.length && (kind !== 'agent' || !worktree || seat.station || meeting)) return 'Only a worker in its own worktree can work in other repositories too';
@@ -531,6 +538,7 @@ export class WorkerManager {
       viewerIds: [],
       activity: prompt ? truncate(prompt, 80) : undefined,
       meeting: meeting?.id,
+      planReview,
       ...(helper ? { helper: { hostId: helper.hostId, hostName: helper.hostName } } : {}),
     };
     const w = newWorker(info, newTracker());
@@ -608,6 +616,20 @@ export class WorkerManager {
       repos: [line(path.basename(primary.path), home, primary.from, " (this floor's project)"), ...others.map((o) => line(o.name, o.project, o.from))].join('\n'),
     });
     for (const file of WORKSPACE_FILES) writeFileSync(path.join(this.dir, path.dirname(primary.path), file), `${brief.trim()}\n`);
+  }
+
+  /** Start a fresh implementation conversation, retaining only the winner's model and checkout. */
+  promotePlanWorker(id:string, activityId:string, prompt:string):string|undefined {
+    const w=this.workers.get(id);
+    if (!w || w.info.planReview?.id!==activityId || w.info.planReview.role!=='candidate') return 'Selected worker is not this activity’s candidate';
+    // Replaying a persisted decision cannot restart implementation. A failed launch needs explicit resume.
+    if (!w.info.planReview.locked) return ['offline','exited'].includes(w.info.status)?'Selected worker is not running; resume its terminal to implement the accepted plan':undefined;
+    const old=w.pty; w.pty=undefined; old?.kill();
+    w.info.planReview.locked=false; w.info.sessionId=undefined; w.info.prompt=prompt;
+    w.hookToken=randomBytes(16).toString('hex'); // Late hooks from the discarded plan conversation are no longer accepted.
+    clockWork(w.info,'starting');w.info.status='starting';w.info.exitCode=undefined;w.interrupted=false;
+    this.notePrompt(w,prompt); this.persist(); this.launch(w,prompt,undefined);
+    return this.get(id)?.status==='exited' ? 'Winner could not start; resume its terminal to implement the accepted plan' : undefined;
   }
 
   /** Starts a worker that isn't running again, carrying on its session, with `prompt` as its next message. */
@@ -1149,6 +1171,7 @@ export class WorkerManager {
    * repository it committed to (see openPrs).
    */
   async openPr(id: string, by: string, as?: ForgeAs): Promise<{ prs: OpenedPr[]; failed: string[] } | string> {
+    if(this.workers.get(id)?.info.planReview?.locked) return 'Plan-only participants cannot open pull requests';
     const w = this.workers.get(id);
     if (!w) return 'No such worker';
     const { info } = w;
@@ -1774,7 +1797,7 @@ export class WorkerManager {
 
     const shell = defaultShell();
     const isShell = info.kind === 'shell';
-    if (!isShell && prompt) prompt = `${prompt}\n\n${WORKER_COORDINATION}`;
+    if (!isShell && prompt && !info.planReview?.locked) prompt = `${prompt}\n\n${WORKER_COORDINATION}`;
     const provider = info.provider;
     const isClaude = !isShell && provider === 'claude';
     const isOpenCode = !isShell && provider === 'opencode';
@@ -1787,7 +1810,12 @@ export class WorkerManager {
     const command = this.command(info);
     const commandPath = isShell ? undefined : configured ? this.agentPath : resolveCommand(command);
     let args = isShell ? (WIN && !process.env.SHELL ? [] : ['-l']) : configured ? [...this.agentArgs] : [];
+    const planning = info.planReview?.locked;
+    // Planning never inherits command-line permission/tool overrides from office defaults.
+    if (planning) args = [];
+    if(planning && isOpenCode) {try {if(!/^1\./.test(execFileSync(commandPath ?? command,['--version'],{encoding:'utf8',timeout:5000}).trim()))throw Error('Read-only planning requires OpenCode 1.x');}catch(err){this.startFailed(w,(err as Error).message);return;}}
     if (isClaude) {
+      if (planning) args.push('--tools','Read,Glob,Grep','--strict-mcp-config','--allowedTools',...['plan_review_state',...(info.planReview?.role==='candidate'?['submit_candidate_plan']:['request_plan_clarification','submit_plan_review'])].map(t=>'mcp__agent-office__'+t));
       args.unshift('--settings', this.settingsPath);
       // The office's MCP server: its workers, to list, hire, send home and tell (see office-workers.ts).
       // Ahead of --settings, which ends the list --mcp-config takes.
@@ -1801,6 +1829,7 @@ export class WorkerManager {
       // `--` so a prompt like "- fix login" is never parsed as a CLI option.
       if (prompt) args.push('--', prompt);
     } else if (isOpenCode) {
+      if (planning) args.push('--agent','office_plan');
       if (resumeSessionId || info.model) args = withoutOpenCodeModel(args);
       if (!resumeSessionId && info.model) args.push('--model', info.model);
       if (resumeSessionId) args.push('--session', resumeSessionId);
@@ -1850,6 +1879,8 @@ export class WorkerManager {
       AGENT_OFFICE_HOOK_URL: this.hook.url,
       AGENT_OFFICE_HOOK_TOKEN: w.hookToken,
     });
+    if (planning) env.AGENT_OFFICE_PLAN_ROLE = info.planReview!.role;
+    else delete env.AGENT_OFFICE_PLAN_ROLE;
     // A board agent files, labels and merges with gh of its own, so it's told which repository the
     // boards are about: left to itself, gh works on a fork's `upstream` remote, not this floor's.
     if (station && this.forge === 'github') {
@@ -1907,6 +1938,13 @@ export class WorkerManager {
       if (isOpenCode) {
         env.AGENT_OFFICE_SESSION_ID = resumeSessionId ?? '';
         env.OPENCODE_CONFIG_CONTENT = mergeOpenCodeConfigContent(env.OPENCODE_CONFIG_CONTENT, openCodePluginSpecifier(this.openCodePlugin), this.mcpScript ? openCodeMcp(this.mcpScript) : undefined);
+        if (planning) {
+          const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
+          const permission: Record<string,string> = {'*':'deny',read:'allow',glob:'allow',grep:'allow',list:'allow'};
+          for (const t of ['plan_review_state',...(info.planReview!.role==='candidate'?['submit_candidate_plan']:['request_plan_clarification','submit_plan_review'])]) permission['agent-office_'+t]='allow';
+          config.permission = permission; config.agent = {office_plan:{mode:'primary',permission}};
+          env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
+        }
       }
       if (isShell) {
         proc = this.host.spawn({ file: shell, args, ...where });
@@ -2417,6 +2455,7 @@ process.stdin.on('end', () => {
       task: info.task,
       pr: info.pr,
       meeting: info.meeting,
+      planReview: info.planReview,
       helperReport: info.helperReport,
       completionRevision: info.completionRevision,
       completion: info.completion,
@@ -2480,6 +2519,7 @@ process.stdin.on('end', () => {
           rows: 30,
           viewers: [],
           viewerIds: [],
+          planReview: DESK_BY_ID.get(s.deskId)?.review && s.planReview && typeof s.planReview.id === 'string' && ['candidate','reviewer'].includes(s.planReview.role) && typeof s.planReview.locked === 'boolean' ? s.planReview : undefined,
           meeting: typeof s.meeting === 'string' && DESK_BY_ID.get(s.deskId)?.room ? s.meeting : undefined,
           workedMs: typeof s.workedMs === 'number' && Number.isFinite(s.workedMs) && s.workedMs > 0 ? s.workedMs : undefined,
         };

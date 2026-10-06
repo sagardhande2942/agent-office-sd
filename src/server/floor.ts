@@ -1,3 +1,4 @@
+import { PlanReviewTable } from './plan-review.js';
 import type { CommunicationsState } from '../shared/communications.js';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -79,6 +80,7 @@ export interface FloorContext {
   lent(floor: Floor): boolean;
   /** Whether the building's map locks up workers sent home (see MapPlan.sendHome), instead of letting them go. */
   locksUp(): boolean;
+  planTableAvailable?(): boolean;
 }
 
 /** The open pull request on a floor's board whose head is `branch`. */
@@ -136,6 +138,7 @@ export class Floor {
   readonly whiteboard: Whiteboard;
   /** The meeting room, where workers work through a question together (see meetings.ts). */
   readonly meetings: MeetingRoom;
+  readonly planReviews: PlanReviewTable;
   /** The helpers standing at workers' desks, and which way each is walking (see helpers.ts). */
   readonly helpers: Helpers;
   /** The bookshelf: the project's Markdown files (see docs.ts). */
@@ -200,6 +203,7 @@ export class Floor {
           // Still being built: the first updates come from waking the workers already at their desks.
           this.queue?.onWorker(worker);
           this.meetings?.onWorker(worker);
+          this.planReviews?.onWorker(worker);
           this.dog.onWorker(worker);
           this.onHelperUpdate(worker);
           ctx.workerChanged(this, worker);
@@ -210,10 +214,11 @@ export class Floor {
           this.changes?.forget(workerId);
           // Sent home on a map that locks workers up: into the dungeon with it, for good (a meeting's
           // workers aren't sent home when it's over, just let go).
-          const jail = info && !info.meeting && !info.helper && ctx.locksUp() ? this.jail.add({ ...info, workedMs: workedMs(info) }) : undefined;
+          const jail = info && !info.meeting && !info.helper && !info.planReview && ctx.locksUp() ? this.jail.add({ ...info, workedMs: workedMs(info) }) : undefined;
           ctx.emit(this, { t: 'worker.remove', workerId, ...(jail ? { jail } : {}) });
           this.queue?.onWorkerGone(workerId);
           this.meetings?.onWorkerGone(workerId);
+          this.planReviews?.onWorker(workerId);
           this.dog.onWorkerGone(workerId);
           this.helpers?.forget(workerId);
           ctx.workerChanged(this, workerId);
@@ -304,6 +309,16 @@ export class Floor {
         prompt: (id) => ctx.prompts.text(id),
       },
     );
+
+    this.planReviews = new PlanReviewTable(dataDir, {
+      list:()=>workers.list(),
+      seat:(desk,choice,prompt,role,owner)=>workers.spawn(desk,'Plan comparison',prompt,true,'agent',choice.provider,choice.model,choice.effort,undefined,owner,[],undefined,undefined,role),
+      prompt:(id,prompt)=>workers.prompt(id,prompt,'Plan reviewer'),
+      resume:(id,prompt)=>workers.resume(id,prompt),
+      promote:(id,activity,prompt)=>workers.promotePlanWorker(id,activity,prompt),
+      remove:(id,cleanup)=>this.sendHome(id,cleanup),
+      cleanup:async ref=>{const trees=new Worktrees(def.dir);return (await trees.hasBranch(ref.branch))?trees.remove(ref,'all'):trees.remove(ref,'worktree');},
+    }, {update:state=>ctx.emit(this,{t:'plan-review',state}),room:()=>ctx.capacity.room(),paused:()=>ctx.planTableAvailable?.()===false?'Switch to the Office map to use its separate plan table':ctx.ledger.hiringPaused,git:()=>!!this.project.branch,toast:text=>ctx.toast(this,text,'info')});
 
     // What each worker changed, for the Changes window at its desk (see changes.ts).
     this.changes = new Changes(
@@ -519,6 +534,7 @@ export class Floor {
     this.dog.stop();
     this.queue.shutdown();
     this.meetings.shutdown();
+    this.planReviews.shutdown();
     this.changes.stop();
     this.whiteboard.flush();
     this.workers.shutdown(keep);

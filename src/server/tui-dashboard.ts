@@ -3,7 +3,7 @@ import { contextLabel } from '../shared/communications.js';
 import { builtDesks } from '../shared/layout.js';
 import type { FloorInfo, FloorView, WorkerInfo, WorktreeCleanup } from '../shared/protocol.js';
 
-export const PANELS = ['office', 'issues', 'pulls', 'queue', 'messages', 'floors', 'help'] as const;
+export const PANELS = ['office', 'issues', 'pulls', 'queue', 'messages', 'plans', 'floors', 'help'] as const;
 export type Panel = typeof PANELS[number];
 export interface Seat { id: string; label: string; worker?: WorkerInfo }
 export interface Dashboard {
@@ -116,8 +116,13 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     body = board?.items.map((item) => `#${item.number}  ${item.title}`) ?? [];
     if (!body.length) body = [board?.error ?? 'No items on this board.'];
   } else if (state.panel === 'queue') body = view?.queue.tasks.map((t) => `${t.status.padEnd(8)} ${t.title} ${t.workerName ? '(' + t.workerName + ')' : ''}`) ?? [];
+  else if (state.panel === 'plans') {
+    const m=view?.planReview?.current;
+    const wrap=(line:string)=>{const safe=plain(line);return Array.from({length:Math.max(1,Math.ceil(safe.length/width))},(_,i)=>safe.slice(i*width,(i+1)*width));};
+    body=(m?[`PLAN COMPARISON: ${m.phase}`,m.brief,...m.requirements.map((r,i)=>`R${i+1}: ${r}`),m.error??'',`Accepted: ${m.review?.winner??'not selected'}`,m.review?.summary??'',...m.candidates.flatMap(c=>{const r=m.review?.ratings.find(r=>r.candidate===c.id);return [`Candidate ${c.id}: ${c.choice.provider}/${c.choice.model}`,`Worker: ${c.workerId} (${c.cleanup?.done?'sent home':c.plan?'plan submitted':'planning'})`,r?`${r.decision} ${r.score}/100: ${r.reason}`:'',...(r?Object.entries(r.scoreReasons).map(([k,v])=>`${k}: ${r.scores[k as keyof typeof r.scores]}/10 - ${v}`):[]),...(c.plan?['PLAN: '+JSON.stringify(c.plan)]:[])]}),`Reviewer: ${m.reviewer.workerId}`,'','Commands: plan-stop | plan-retry | attach <worker>']:['No plan comparison yet.','plan-start <JSON-file> starts candidates and a reviewer.']).flatMap(wrap);
+  }
   else if (state.panel === 'messages') body = communicationLines(state, width);
-  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt    r: resume    x: send home (choose cleanup)', 'i: issues    b: pull requests    t: task queue    m: messages', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'home <worker> [--cleanup auto|keep|worktree|all],', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, messages [request-id], issues, pulls, queue, floors, quit'];
+  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt    r: resume    x: send home (choose cleanup)', 'i: issues    b: pull requests    t: task queue    m: messages', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'home <worker> [--cleanup auto|keep|worktree|all],', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, messages [request-id], issues, pulls, queue, floors, quit','plans, plan-start <JSON-file>, plan-stop, plan-retry'];
   if (state.panel !== 'office') {
     const start = state.panel === 'floors' || (state.panel === 'messages' && !state.thread) ? Math.floor(state.offset / bodyHeight) * bodyHeight : state.offset;
     body = body.slice(start, start + bodyHeight).map((line) => fit(line, width));

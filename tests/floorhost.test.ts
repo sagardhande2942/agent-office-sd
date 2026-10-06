@@ -36,6 +36,9 @@ const LOOKUP_ONLY = [
   'floor.remove',
   'leaveOnMerge.set',
   'meeting.clear',
+  // These read office-owned activity state and explicitly refuse remote floors.
+  'plan-review.start', 'plan-review.stop', 'plan-review.retry',
+  'map.set',
   'wb.update',
 ];
 

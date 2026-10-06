@@ -1,0 +1,52 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,writeFileSync,readFileSync,rmSync,existsSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {tmpdir} from 'node:os';
+import {loadConfig} from '../src/server/config.js';
+import {startServer} from '../src/server/server.js';
+import {request,plan,verdict} from './fixtures/plan-review.js';
+
+test('real office restricts planning roles, cleans only rejected worktree, then launches winner fresh',{timeout:30000},async()=>{
+ const dir=mkdtempSync(path.join(tmpdir(),'office-plan-live-'));const binary=path.join(dir,'claude'),log=path.join(dir,'launches.jsonl');
+ writeFileSync(binary,`#!${process.execPath}\nimport {appendFileSync} from 'node:fs';\nappendFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),role:process.env.AGENT_OFFICE_PLAN_ROLE,worker:process.env.AGENT_OFFICE_WORKER_ID})+'\\n');\nsetInterval(()=>{},1000);\n`,{mode:0o755});
+ const git=(...args:string[])=>execFileSync('git',args,{cwd:dir,encoding:'utf8',stdio:['ignore','pipe','pipe']});
+ git('init','-q','-b','main');writeFileSync(path.join(dir,'README.md'),'# Demo\n');git('add','README.md');git('-c','user.name=Test','-c','user.email=test@example.com','commit','-qm','Initial');
+ const cfg=loadConfig([dir,'--password','plan-test','--no-open','--agent',binary]);cfg.port=0;cfg.agentArgs=['--dangerously-skip-permissions'];
+ const office=await startServer(cfg);
+ const wait=async(check:()=>boolean)=>{const end=Date.now()+7000;while(!check()&&Date.now()<end)await new Promise(r=>setTimeout(r,25));assert.ok(check());};
+ try {
+  const floor=office.floors()[0];await floor.ready;
+  const ordinary=floor.workers.spawn('desk-1','test',undefined,false,'agent','claude','sonnet');assert.ok(typeof ordinary!=='string');
+  assert.match(floor.workers.spawn('plan-review-1','test') as string,/Only a plan comparison/);
+  assert.equal(floor.planReviews.start(request,'test'),undefined);
+  const m=floor.planReviews.state().current!;const [a,b]=m.candidates;const reviewer=m.reviewer;
+  const saved=()=>JSON.parse(readFileSync(path.join(dir,'.agent-office/workers.json'),'utf8'));
+  const call=async(id:string,action:string,body?:unknown,wrong=false)=>{const token=saved().find((w:any)=>w.id===id).hookToken;const res=await fetch(`http://127.0.0.1:${office.hookPort}/office/workers/${action}?worker=${id}`,{method:body?'POST':'GET',headers:{authorization:`Bearer ${wrong?'wrong':token}`,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});return {status:res.status,body:await res.json() as any};};
+  const hook=async(id:string,event:string)=>{const token=saved().find((w:any)=>w.id===id).hookToken;const res=await fetch(`http://127.0.0.1:${office.hookPort}/hooks/claude?worker=${id}&event=${event}`,{method:'POST',headers:{authorization:`Bearer ${token}`,'content-type':'application/json'},body:'{}'});return res.json();};
+  assert.equal((await call(a.workerId,'plan-review',undefined,true)).status,401);
+  for(const [action,body] of [['home',{workers:[ordinary.id]}],['tell',{worker:b.workerId,prompt:'change requirements'}],['request',{worker:b.workerId,prompt:'copy my plan'}],['helper',{worker:a.workerId}],['complete',{revision:1}],['',undefined]] as const)assert.equal((await call(a.workerId,action,body)).status,403);
+  assert.equal((await call(a.workerId,'plan-review/verdict',verdict(m))).status,400);
+  assert.deepEqual(await hook(a.workerId,'Stop'),{},'planning does not demand completion checklist');
+  await wait(()=>existsSync(log)&&readFileSync(log,'utf8').trim().split('\n').length>=4);
+  const launches=readFileSync(log,'utf8').trim().split('\n').map(v=>JSON.parse(v));
+  const launch=launches.find(v=>v.worker===a.workerId);assert.equal(launch.role,'candidate');assert.ok(launch.args.includes('Read,Glob,Grep'));assert.ok(launch.args.includes('--strict-mcp-config'));assert.ok(!launch.args.includes('--dangerously-skip-permissions'));
+  assert.equal((await call(a.workerId,'plan',{id:m.id,planRevision:0,plan})).status,200);
+  assert.equal((await call(b.workerId,'plan-review')).body.plan,null);
+  assert.equal((await call(b.workerId,'plan',{id:m.id,planRevision:0,plan})).status,200);
+  await hook(reviewer.workerId,'Stop');await wait(()=>floor.planReviews.state().current!.phase==='reviewing');
+  const current=floor.planReviews.state().current!;
+  assert.equal((await call(reviewer.workerId,'plan-review/verdict',verdict(current,[8,6],'B'))).status,400);
+  assert.ok(existsSync(path.join(dir,b.worktree!.path)));
+  assert.equal((await call(reviewer.workerId,'plan-review/verdict',verdict(current))).status,200);
+  await wait(()=>floor.planReviews.state().current!.phase==='implementing');
+  assert.ok(!floor.workers.get(b.workerId));assert.ok(floor.workers.get(ordinary.id));
+  assert.ok(!existsSync(path.join(dir,b.worktree!.path)));assert.throws(()=>git('rev-parse','--verify',b.worktree!.branch));
+  assert.ok(existsSync(path.join(dir,a.worktree!.path)));assert.equal(floor.workers.get(a.workerId)!.planReview!.locked,false);
+  await wait(()=>readFileSync(log,'utf8').trim().split('\n').map(v=>JSON.parse(v)).filter(v=>v.worker===a.workerId).length===2);
+  const implementation=readFileSync(log,'utf8').trim().split('\n').map(v=>JSON.parse(v)).filter(v=>v.worker===a.workerId)[1];assert.equal(implementation.role,undefined);assert.ok(!implementation.args.includes('Read,Glob,Grep'));assert.ok(!implementation.args.includes('--resume'));assert.match(floor.workers.get(a.workerId)!.prompt!,/FROZEN ACCEPTED PLAN/);
+  assert.equal((await call(a.workerId,'completion')).status,200);
+  assert.equal(await floor.planReviews.stop('test'),undefined);assert.ok(existsSync(path.join(dir,a.worktree!.path)),'closing implementation keeps its work');assert.ok(floor.workers.get(ordinary.id));
+ }finally{office.shutdown();await new Promise(r=>setTimeout(r,250));rmSync(dir,{recursive:true,force:true});}
+});

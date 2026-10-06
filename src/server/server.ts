@@ -386,8 +386,8 @@ export async function startServer(cfg: Config) {
     const root = !data.agent_id && !data.agent_type && (!data.session_id || !actor?.sessionId || data.session_id === actor.sessionId || event === 'SessionStart');
     const native = ['/hooks/claude', '/hooks/codex'].includes(url.pathname);
     const nativeActor = actor?.kind === 'agent' && (url.pathname === '/hooks/claude' ? actor.provider === 'claude' || actor.provider === 'custom' : url.pathname === '/hooks/codex' && actor.provider === 'codex' && !!normalizeCodexHook(event, payload));
-    let output = actor && root && nativeActor && actor.helperReport?.state !== 'interrupting' ? checkpoints.output(workerId, event, communicationView(floor), data.stop_hook_active === true) : {};
-    if (actor && root && nativeActor && event === 'Stop' && !data.stop_hook_active && output.decision !== 'block' && !actor.helper && !actor.meeting && !DESK_BY_ID.get(actor.deskId)?.station && (actor.prompt || actor.task) && actor.helperReport?.state !== 'interrupting') {
+    let output = actor && root && nativeActor && !actor.planReview?.locked && actor.helperReport?.state !== 'interrupting' ? checkpoints.output(workerId, event, communicationView(floor), data.stop_hook_active === true) : {};
+    if (actor && root && nativeActor && event === 'Stop' && !data.stop_hook_active && output.decision !== 'block' && !actor.helper && !actor.meeting && !actor.planReview?.locked && !DESK_BY_ID.get(actor.deskId)?.station && (actor.prompt || actor.task) && actor.helperReport?.state !== 'interrupting') {
       const revision = actor.completionRevision ?? 0;
       if ((!actor.completion || actor.completion.status === 'needs-attention') && completionStops.get(actor.id) !== revision) {
         completionStops.set(actor.id, revision);
@@ -406,7 +406,7 @@ export async function startServer(cfg: Config) {
             : workers.handleHook(workerId, token, event, payload, holdStop);
     if (!ok) return send(res, 401, {});
     if (native) return send(res, 200, output);
-    if (url.pathname === '/hooks/opencode' && data.type === 'checkpoint') return send(res, 200, checkpoints.output(workerId, 'PostToolUse', communicationView(floor)));
+    if (url.pathname === '/hooks/opencode' && data.type === 'checkpoint' && !actor?.planReview?.locked) return send(res, 200, checkpoints.output(workerId, 'PostToolUse', communicationView(floor)));
     send(res, 200, {});
   });
   /**
@@ -499,6 +499,17 @@ export async function startServer(cfg: Config) {
       return w && workerRow(w, view, me.id);
     };
     const action = url.pathname.slice('/office/workers'.length);
+    if (me.planReview?.locked && !['/plan-review','/plan','/plan-review/clarify','/plan-review/verdict'].includes(action)) return send(res,403,{error:'Planning participants can only read their activity and submit plans or reviews for their role'});
+    if (action === '/plan-review' || action === '/plan' || action.startsWith('/plan-review/')) {
+      if (!(floor instanceof Floor)) return send(res,400,{error:'Plan comparison requires a local floor'});
+      try {
+        if(req.method==='GET' && action==='/plan-review') return send(res,200,floor.planReviews.view(me));
+        if(req.method!=='POST') return send(res,405,{error:'POST the plan, clarification or verdict'});
+        const body=JSON.parse((await readBody(req))||'{}');
+        const result=action==='/plan'?floor.planReviews.submitPlan(me,body):action==='/plan-review/clarify'?floor.planReviews.clarify(me,body):action==='/plan-review/verdict'?floor.planReviews.submitReview(me,body):undefined;
+        return result===undefined?send(res,404,{error:'Unknown activity action'}):send(res,200,result);
+      } catch(err) {return send(res,400,{error:(err as Error).message});}
+    }
     if (req.method === 'GET' && !action) {
       const list = floor.workers.list();
       const free = nextFreeSeat((id) => floor.workers.deskOccupied(id), floor.plan.wing);
@@ -543,6 +554,7 @@ export async function startServer(cfg: Config) {
         const target = findWorker(floor.workers.list(), action === '/reply' ? request?.from.id ?? '' : str(b.worker, 64));
         if (typeof target === 'string') throw new Error(target);
         if (target.kind !== 'agent') throw new Error('Tracked messages are for agents, not shells');
+        if(target.planReview?.locked)throw new Error('Planning participants do not receive inbox messages');
         const context = b.context === undefined ? { branch: me.worktree?.branch ?? floor.project.branch } : b.context;
         const meeting = floor.meetings.state().current;
         const participant = (id: string) => meeting?.seats.some((s) => s.workerId === id);
@@ -571,6 +583,7 @@ export async function startServer(cfg: Config) {
         for (const key of ask.workers) {
           const w = findWorker(floor.workers.list(), key);
           if (typeof w === 'string') results.push({ worker: key, error: w });
+          else if(w.planReview?.locked) results.push({worker:w.name,id:w.id,error:'Planning participants are managed by their activity'});
           else if (w.id === me.id) results.push({ worker: w.name, id: w.id, error: "That's you: someone else has to send you home" });
           else if (!going.some((g) => g.w === w)) going.push({ w });
         }
@@ -594,6 +607,7 @@ export async function startServer(cfg: Config) {
       const b = (body ?? {}) as { worker?: unknown; prompt?: unknown };
       const w = findWorker(floor.workers.list(), str(b.worker, 64));
       if (typeof w === 'string') return send(res, 404, { error: w });
+      if(w.planReview?.locked)return send(res,403,{error:'Planning participants only receive prompts from their activity or a human'});
       if (w.id === me.id) return send(res, 400, { error: "That's you" });
       // A shell would run it as a command, in someone's terminal.
       if (w.kind !== 'agent') return send(res, 400, { error: `${w.name} is a shell, not an agent` });
@@ -847,6 +861,7 @@ export async function startServer(cfg: Config) {
     },
     lent: (floor) => [...floors.values()].some((f) => f !== floor && worksIn(f, floor)),
     locksUp: () => !!maps.plan().sendHome?.keeps,
+    planTableAvailable: ()=>maps.plan().id===OFFICE_MAP,
     runAs: signins,
     forgeAs: (owner, kind) => (owner ? signins.forgeAs(owner, kind) : undefined),
   };
@@ -1000,6 +1015,7 @@ export async function startServer(cfg: Config) {
     jukebox: floor?.jukebox.state() ?? { on: false, track: JUKEBOX_TUNES[0].id, startedAt: Date.now(), elapsed: 0 },
     tv: floor?.tv.state() ?? TV_OFF,
     whiteboard: { elements: local?.whiteboard.scene() ?? [], people: local ? drawing(local) : [] },
+    planReview: local?.planReviews.state(),
     meeting: floor?.meetings.state() ?? { current: null, past: [] },
     cabinet: { ...cabinetState(floor), frame: (floor && cabinetPlayer(floor)?.frame) ?? null },
     };
@@ -2341,6 +2357,17 @@ const handleMessage = async (c: Client, msg: ClientMsg) => {
       case 'queue.limit':
         floorOf(c)?.queue.setLimit(num(msg.maxWorkers));
         break;
+      case 'plan-review.start': {
+        const floor=asLocal(here());
+        if(!floor) {warn(c,'Plan comparison requires a local floor'); break;}
+        const request=msg.request;
+        if (!request || !Array.isArray(request.candidates)) {warn(c,'List planning candidates');break;}
+        if([...request.candidates,request.reviewer].some(a=>!a || !floor.project.agentProviders.includes(a.provider))) {warn(c,'Select installed agent providers');break;}
+        withSignIn(c,claudeFor([...request.candidates,request.reviewer].some(a=>a.provider==='claude')?'claude':'opencode'),()=>withFreshBase(c,floor,()=>warn(c,floor.planReviews.start(request,who,c.accountId))));
+        break;
+      }
+      case 'plan-review.stop': {const floor=asLocal(here());if(floor) warn(c,await floor.planReviews.stop(who));break;}
+      case 'plan-review.retry': {const floor=asLocal(here());if(floor) warn(c,await floor.planReviews.retryCleanup());break;}
       case 'meeting.start': {
         const floor = here();
         if (!floor) break;
@@ -2411,6 +2438,7 @@ const handleMessage = async (c: Client, msg: ClientMsg) => {
         break;
       }
       case 'map.set': {
+        if(msg.map!==undefined && msg.map!==OFFICE_MAP && [...floors.values()].some(f=>f.workers.list().some(w=>!!w.planReview))) {warn(c,'Close plan comparison activities before switching away from the Office map');break;}
         // Someone opened the list, or picked a map: either way the folder of maps of your own is read again first.
         const was = maps.pick();
         const reloaded = maps.reload();

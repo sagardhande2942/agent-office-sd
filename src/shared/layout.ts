@@ -19,6 +19,7 @@ export interface DeskDef {
   station?: StationKind;
   /** A chair at the meeting room's table (see MEETING_SEATS): only a meeting seats a worker here. */
   room?: boolean;
+  review?: boolean;
   /** A desk in the back office (see WING): there once the floor is built out this many rows. */
   wing?: number;
 }
@@ -190,8 +191,14 @@ export const MEETING_SEATS: DeskDef[] = (
 /** The board on the meeting room's back (south) wall that shows the meeting's output file as it's written. */
 export const MEETING_BOARD = { x: MEETING_TABLE.x, y: 1.95, z: FLOOR.maxZ - 0.08, width: 3.6, height: 1.2 } as const;
 
+/** Independent plan comparison: five candidates and one reviewer, separate from meetings. */
+export const PLAN_REVIEW_TABLE = {x:6,z:5.2,width:4.2,depth:1.2,height:0.76} as const;
+export const PLAN_REVIEW_SEATS: DeskDef[] = [
+  [-1.4,-0.25,Math.PI],[-1.4,0.25,0],[0,-0.25,Math.PI],[0,0.25,0],[1.4,-0.25,Math.PI],[1.4,0.25,0],
+].map(([x,z,rotY],i)=>({id:`plan-review-${i+1}`,x:PLAN_REVIEW_TABLE.x+x,z:PLAN_REVIEW_TABLE.z+z,rotY,label:i===5?'Plan reviewer':`Candidate ${String.fromCharCode(65+i)}`,review:true}));
+
 /** Any place a worker can be by id: the seats (the back office's included), the board agents' kiosks and the meeting room's chairs. */
-export const DESK_BY_ID = new Map([...SEATS, ...STATIONS, ...MEETING_SEATS].map((d) => [d.id, d]));
+export const DESK_BY_ID = new Map([...SEATS, ...STATIONS, ...MEETING_SEATS, ...PLAN_REVIEW_SEATS].map((d) => [d.id, d]));
 
 /**
  * The seat a new worker takes when nobody picks one: the first free desk (in the back office too, as

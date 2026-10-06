@@ -1,3 +1,4 @@
+import { openPlanReview } from './ui/plan-review';
 import { openCommunications } from './ui/communications';
 import './style.css';
 import * as THREE from 'three';
@@ -3000,6 +3001,7 @@ function paletteEntries(): PaletteEntry[] {
   out.push(at('pulls', 'the PR board', { icon: '🔀', kind: 'Board', title: 'PR board', keywords: ['pull requests'], open: () => openBoard('pulls', net, boardActions()) }));
   out.push(at('services', 'the Services board', { icon: '🌐', kind: 'Board', title: 'Services board', detail: 'Web servers the workers are running', open: () => openServices() }));
   out.push(at('whiteboard', 'the whiteboard', { icon: '📝', kind: 'Board', title: 'Whiteboard', open: () => openWhiteboard(net) }));
+  out.push({icon:'📐',kind:'Action',title:'Plan comparison',keywords:['compare plans','review plans'],open:showPlanReview});
   out.push(at('meeting', 'the meeting room', { icon: '🤝', kind: 'Board', title: 'Meeting room', keywords: ['call a meeting'], open: () => showMeeting() }));
 
   for (const pr of store.pulls.items) {
@@ -3057,6 +3059,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 /** The meeting room's window: how the meeting's going, or the form to call one (prefilled from an issue or a PR). */
+function showPlanReview() {openPlanReview(net,openWorkerTerminal);}
+
 function showMeeting(preset?: MeetingPreset) {
   openMeeting(
     net,
@@ -3166,6 +3170,7 @@ function interact(target: Interactable | null, key: DeskKey, note = aimedNote) {
     if (key === 'L') return openDeskLabel(net, target.deskId);
     const w = store.workerAtDesk(target.deskId);
     // Nobody is hired at the meeting table: a meeting seats its own workers there.
+    if (!w && plan().byId.get(target.deskId)?.review) return key === 'E' ? showPlanReview() : undefined;
     if (!w && plan().byId.get(target.deskId)?.room) return key === 'E' ? showMeeting() : undefined;
     if (key === 'B' && !w) return openShell(target.deskId);
     if (key === 'P') return promptAtDesk(target.deskId);
@@ -4238,6 +4243,7 @@ function hintFor(it: Interactable): Hint {
       const names = store.drawing.flatMap((id) => (id === store.you ? [] : (store.peers.get(id)?.name ?? []))).join(', ');
       return { k: names, parts: [title('📝 Whiteboard'), aside(names ? `✏️ ${clip(names, 40)} drawing` : 'draw together, live'), key('E', names ? 'Join in' : 'Draw')] };
     }
+    case 'plan-review': return {k:store.planReview.current?.phase??'free',parts:[title('Plan comparison table'),aside(store.planReview.current?.phase??'free'),key('E','Compare plans')]};
     case 'meeting': {
       const m = store.meeting.current;
       const p = m && MEETING_PATTERNS[m.pattern];
@@ -4364,6 +4370,7 @@ function deskHint(deskId: string): Hint {
       key('X', 'Send home'),
     ],
   };
+  if (!w && plan().byId.get(deskId)?.review) return {k:'plan-review',parts:[h('span.title',{},'Plan comparison seat · free'),key('E','Compare plans')]};
   if (!w && plan().byId.get(deskId)?.room) return { k: 'room', parts: [h('span.title', {}, `🤝 ${plan().byId.get(deskId)!.label} · free`), key('E', 'Call a meeting')] };
   // The sign over it, if it has one, and L to hang one (or change it).
   const sign = store.floorPlan.labels[deskId]?.text;
@@ -4870,7 +4877,7 @@ document.addEventListener('pointerlockchange', () => {
 const raycaster = new THREE.Raycaster();
 const CROSSHAIR = new THREE.Vector2(0, 0);
 /** How close (meters from your eyes) you must be to use each kind of thing. */
-const REACH: Record<InteractKind, number> = { desk: 4.5, station: 4.5, coffee: 3, fridge: 3, issues: 9, pulls: 9, services: 9, queue: 9, tv: 10, theatre: 3, decor: 9, smoke: 3, elevator: 4.5, gong: 3.5, dog: 3.2, jukebox: 4, seat: 3, whiteboard: 7, cabinet: 4, ladder: 3, pole: 4, meeting: 7, bar: 3.5, dj: 6, golf: 3.5, ball: 3.2, bookshelf: 4, darts: 4, axe: 5.5, telescope: 3.5, car: 4, expand: 8, herald: 5 };
+const REACH: Record<InteractKind, number> = { desk: 4.5, station: 4.5, coffee: 3, fridge: 3, issues: 9, pulls: 9, services: 9, queue: 9, tv: 10, theatre: 3, decor: 9, smoke: 3, elevator: 4.5, gong: 3.5, dog: 3.2, jukebox: 4, seat: 3, whiteboard: 7, cabinet: 4, ladder: 3, pole: 4, meeting: 7, 'plan-review': 7, bar: 3.5, dj: 6, golf: 3.5, ball: 3.2, bookshelf: 4, darts: 4, axe: 5.5, telescope: 3.5, car: 4, expand: 8, herald: 5 };
 const eye = new THREE.Vector3();
 
 /** What the ray through `ndc` lands on first, whether it is within reach (plus `slack` meters), and where it hit. */
@@ -5094,6 +5101,7 @@ const hud = mountHud(
       title: () => 'Call a meeting: workers work through a question or a task together',
       run: () => showMeeting(),
     },
+    {id:'plan-review',icon:'📐',label:'Compare plans',section:'Open',title:()=> 'Independent plans, scored by a reviewer',run:showPlanReview},
     { id: 'search', icon: '🔎', label: 'Search', section: 'Open', key: '/', title: () => 'Search the chat and every terminal', run: showSearch },
     // The office has its bookshelf for them; a map of its own may not.
     { id: 'docs', icon: '📚', label: 'Docs', section: 'Open', shown: () => !inOffice(), title: () => 'Read the project’s docs', run: showBookshelf },
