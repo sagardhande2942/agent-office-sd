@@ -38,3 +38,8 @@
 .meeting-past summary { font-weight: 800; cursor: pointer; }
 .meeting-past ul { padding-left: 18px; margin: 6px 0 0; }
 .meeting-past li { margin: 6px 0; }
+@media (max-width: 640px) {
+  .meeting-window footer { flex-wrap: wrap; }
+  .meeting-window footer .grow { flex: 1 0 100%; }
+  .meeting-window footer .btn { flex: 1; }
+}

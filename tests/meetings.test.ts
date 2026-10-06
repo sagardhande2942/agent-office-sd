@@ -1,3 +1,5 @@
+import { Communications } from '../src/server/communications.js';
+import type { CommunicationsState } from '../src/shared/communications.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -10,7 +12,7 @@ import type { AgentChoice, MeetingRequest, WorkerInfo } from '../src/shared/prot
 import { MEETING_PATTERNS, MEETING_PATTERN_IDS, fixedRounds, isMeetingPattern } from '../src/shared/meetings.js';
 import { PROMPTS, type PromptId } from '../src/shared/prompts.js';
 
-function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, string>>; officeDefault?: AgentChoice } = {}) {
+function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, string>>; officeDefault?: AgentChoice; communications?: () => CommunicationsState } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'office-meeting-'));
   const dataDir = path.join(dir, '.agent-office');
   mkdirSync(dataDir, { recursive: true });
@@ -62,7 +64,9 @@ function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, str
       return {};
     },
   };
-  const room: MeetingRoom = new MeetingRoom(dir, dataDir, manager, opts.git ? new Worktrees(dir) : undefined, {
+  let room: MeetingRoom;
+  const createRoom = () => new MeetingRoom(dir, dataDir, manager, opts.git ? new Worktrees(dir) : undefined, {
+    communications: opts.communications,
     update() {},
     toast: (text) => toasts.push(text),
     hiringPaused: () => undefined,
@@ -70,8 +74,9 @@ function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, str
       reviews.push({ pr, file });
       return `https://github.com/o/r/pull/${pr}#pullrequestreview-1`;
     },
-    prompt: (id) => opts.rewritten?.[id] ?? PROMPTS[id].text,
+    prompt: (id: PromptId) => opts.rewritten?.[id] ?? PROMPTS[id].text,
   });
+  room = createRoom();
   const cwd = () => {
     const wt = room.state().current?.worktree;
     return wt ? path.join(dir, wt.path) : dir;
@@ -103,7 +108,7 @@ function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, str
   const start = (req: Partial<MeetingRequest>) => room.start({ pattern: 'debate', prompt: 'Which cache should we use?', roles: [], ...req } as MeetingRequest, 'Ada');
   /** A worker writes to its terminal: the sign of work the meeting can see without a status hook. */
   const output = (id: string, at = Date.now()) => outputAt.set(id, at);
-  return { dir, room, workers, prompts, typed, toasts, reviews, take, settle, start, output, cwd, kill: (id: string) => manager.kill(id), close() { room.shutdown(); rmSync(dir, { recursive: true, force: true }); } };
+  return { dir, get room() { return room; }, restart() { room.shutdown(); room = createRoom(); }, workers, prompts, typed, toasts, reviews, take, settle, start, output, cwd, kill: (id: string) => manager.kill(id), close() { room.shutdown(); rmSync(dir, { recursive: true, force: true }); } };
 }
 
 test('a debate runs its rounds and ends when the chair writes the decision', (t) => {
@@ -399,7 +404,7 @@ test('a meeting says what the office’s rewritten prompts say, and seats the de
   });
   t.after(() => f.close());
   assert.equal(f.start({ rounds: 3, provider: undefined }), undefined);
-  assert.equal(f.prompts[0].text, `You are the Chair. Topic: Which cache should we use?{{nothing}}\n\nRound 1 of 3, proposing. Pitch it as the Chair, into ${path.join(f.cwd(), '.agent-office', 'meetings', f.room.state().current!.id, 'r1-1-chair.md')}.`);
+  assert.ok(f.prompts[0].text.startsWith(`You are the Chair. Topic: Which cache should we use?{{nothing}}\n\nRound 1 of 3, proposing. Pitch it as the Chair, into ${path.join(f.cwd(), '.agent-office', 'meetings', f.room.state().current!.id, 'r1-1-chair.md')}.`));
   assert.deepEqual(f.workers.map((w) => [w.provider, w.model, w.effort]), Array(3).fill(['claude', 'sonnet', 'medium']));
   // A worker that ends its turn without its part is nudged in the office's words.
   const w = f.workers[0];
@@ -413,6 +418,114 @@ test('a meeting says what the office’s rewritten prompts say, and seats the de
   t.after(() => g.close());
   assert.equal(g.start({ provider: 'claude', model: 'haiku' }), undefined);
   assert.deepEqual(g.workers.map((x) => x.model), ['haiku', 'haiku', 'haiku']);
+});
+
+function coordinatedFixture() {
+  let now = Date.now();
+  let error: string | undefined;
+  let ledger: Communications;
+  const f = fixture({ communications: () => ({ ...ledger.state(), ...(error ? { error } : {}) }) });
+  ledger = new Communications(path.join(f.dir, 'coordination'), () => {}, () => now);
+  assert.equal(f.start({ rounds: 2, output: 'docs/decision.md' }), undefined);
+  const m = f.room.state().current!;
+  const [a, b] = f.workers;
+  const request = () => ledger.request(a, b, { prompt: 'Confirm /users contract', context: { branch: 'api/users', commit: 'abcdef1' } }, { id: m.id, round: 1 });
+  const writeOutput = () => { for (const i of [0, 1, 2]) f.take(i, 'Initial proposal'); f.take(0, '# Use id and name'); };
+  return { ...f, ledger, request, writeOutput, a, b, id: m.id, expire: () => { now += 2 * 86400_000; }, corrupt: () => { error = 'Communications unavailable'; } };
+}
+
+test('meeting waits for a linked answer acknowledgment and archives context without interrupting workers', (t) => {
+  const f = coordinatedFixture(); t.after(() => f.close());
+  const r = f.request();
+  f.writeOutput();
+  assert.equal(f.room.state().current!.waitingForCommunications, true);
+  assert.equal(f.room.state().current!.status, 'running');
+  assert.equal(f.room.finishAnyway('stale-meeting', 'Observer'), 'This meeting is not waiting for communication');
+  const prompts = f.prompts.length;
+  const reply = f.ledger.reply(f.b, r.id, { prompt: '{ id, name }', context: { files: ['users.ts'] } });
+  assert.deepEqual(reply.meeting, r.meeting);
+  f.room.pump();
+  assert.equal(f.room.state().current!.status, 'running', 'an answer alone does not complete the request');
+  f.ledger.acknowledge(f.a, reply.id);
+  f.room.pump();
+  assert.equal(f.room.state().current!.status, 'done');
+  assert.equal(f.prompts.length, prompts);
+  assert.equal(f.typed.length, 0);
+  const archive = path.join(f.dir, '.agent-office/meetings', f.id);
+  const snapshot = JSON.parse(readFileSync(path.join(archive, 'communications.json'), 'utf8'));
+  assert.deepEqual(snapshot.unresolved, []);
+  assert.equal(snapshot.messages.length, 2);
+  const notes = readFileSync(path.join(archive, 'communications.md'), 'utf8');
+  assert.match(notes, /api\/users/); assert.match(notes, /users.ts/); assert.match(notes, /round 1/);
+  assert.equal(readFileSync(path.join(archive, 'output-decision.md'), 'utf8'), '# Use id and name');
+});
+
+test('meeting finish override records the observer and unresolved IDs; early and duplicate overrides refuse', (t) => {
+  const f = coordinatedFixture(); t.after(() => f.close());
+  assert.ok(f.room.finishAnyway(f.id, 'Observer'));
+  const r = f.request(); f.writeOutput();
+  assert.equal(f.room.finishAnyway(f.id, 'Observer'), undefined);
+  assert.equal(f.room.state().current!.status, 'done');
+  assert.ok(f.room.finishAnyway(f.id, 'Observer'));
+  const snapshot = JSON.parse(readFileSync(path.join(f.dir, '.agent-office/meetings', f.id, 'communications.json'), 'utf8'));
+  assert.equal(snapshot.override.by, 'Observer');
+  assert.deepEqual(snapshot.unresolved, [r.id]);
+  assert.equal(f.ledger.get(r.id)!.status, 'pending', 'override is not an agent receipt');
+});
+
+test('expired requests release meetings; unrelated requests do not hold completion', (t) => {
+  const f = coordinatedFixture(); t.after(() => f.close());
+  f.request(); f.writeOutput(); f.expire(); f.room.pump();
+  assert.equal(f.room.state().current!.status, 'done');
+  const other = coordinatedFixture(); t.after(() => other.close());
+  other.ledger.request(other.a, other.b, { prompt: 'Another task' }, { id: 'another-meeting', round: 1 });
+  other.writeOutput();
+  assert.equal(other.room.state().current!.status, 'done');
+});
+
+test('ledger errors hold meeting completion and are recorded on explicit override', (t) => {
+  const f = coordinatedFixture(); t.after(() => f.close());
+  f.corrupt(); f.writeOutput();
+  assert.equal(f.room.state().current!.coordinationError, 'Communications unavailable');
+  assert.equal(f.room.finishAnyway(f.id, 'Observer'), undefined);
+  const snapshot = JSON.parse(readFileSync(path.join(f.dir, '.agent-office/meetings', f.id, 'communications.json'), 'utf8'));
+  assert.equal(snapshot.error, 'Communications unavailable');
+});
+
+test('a meeting waiting on communication restores after restart and completes from persisted receipts', (t) => {
+  let ledger: Communications;
+  const f = fixture({ communications: () => ledger.state() }); t.after(() => f.close());
+  const ledgerDir = path.join(f.dir, 'coordination');
+  ledger = new Communications(ledgerDir);
+  assert.equal(f.start({ rounds: 2 }), undefined);
+  const m = f.room.state().current!;
+  const [a, b] = f.workers;
+  const request = ledger.request(a, b, { prompt: 'Fields?' }, { id: m.id, round: 1 });
+  for (const i of [0, 1, 2]) f.take(i);
+  f.take(0, '# Use id and name');
+  assert.equal(f.room.state().current!.waitingForCommunications, true);
+  f.restart(); ledger = new Communications(ledgerDir);
+  f.room.pump();
+  assert.equal(f.room.state().current!.status, 'running');
+  const reply = ledger.reply(b, request.id, { prompt: 'id, name' });
+  ledger.acknowledge(a, reply.id); f.room.pump();
+  assert.equal(f.room.state().current!.status, 'done');
+});
+
+test('a review is not posted while linked requests remain unresolved', async (t) => {
+  let ledger: Communications;
+  const f = fixture({ communications: () => ledger.state() }); t.after(() => f.close());
+  ledger = new Communications(path.join(f.dir, 'coordination'));
+  assert.equal(f.start({ pattern: 'review', pr: 42, roles: ['Chair', 'Security'] }), undefined);
+  const m = f.room.state().current!;
+  ledger.request(f.workers[0], f.workers[1], { prompt: 'Confirm the security finding' }, { id: m.id, round: 1 });
+  f.take(0); f.take(1); f.take(0, '# Review decision');
+  assert.equal(f.room.state().current!.waitingForCommunications, true);
+  assert.equal(f.reviews.length, 0);
+  assert.equal(f.room.finishAnyway(m.id, 'Reviewer'), undefined);
+  await Promise.resolve();
+  assert.equal(f.reviews.length, 1);
+  assert.equal(f.room.state().current!.review?.url, 'https://github.com/o/r/pull/42#pullrequestreview-1');
 });
 
 test('a pattern with a set number of rounds says so, and names them; a range is left to pick from', (t) => {

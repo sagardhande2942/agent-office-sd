@@ -472,6 +472,7 @@ export class RemoteFloor implements FloorActions {
     return {
       start: async (req: MeetingRequest, by, owner) => String((await remote.call('meeting.start', { req, by, owner })) ?? ''),
       stop: async (by) => String((await remote.call('meeting.stop', { by })) ?? ''),
+      finishAnyway: async (id, by) => String((await remote.call('meeting.finish', { id, by, allowUnresolved: true })) ?? ''),
       // A meeting is refused by kind on a hosted floor — the room's people are in the office, not here
       // — so this asks the host only so the refusal is the host's own words rather than a guess.
       clear: async (by) => String((await remote.call('meeting.clear', { by })) ?? ''),

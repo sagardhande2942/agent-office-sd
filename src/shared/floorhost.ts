@@ -112,6 +112,7 @@ export const FLOOR_CASES = [
   'jukebox.skip',
   'jukebox.stop',
   'meeting.clear',
+  'meeting.finish',
   'meeting.start',
   'meeting.stop',
   'queue.add',

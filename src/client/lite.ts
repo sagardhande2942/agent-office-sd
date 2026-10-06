@@ -320,6 +320,7 @@ function showMeeting(preset?: MeetingPreset) {
 
 $('btn-issues').addEventListener('click', () => openBoard('issues', net, boardActions()));
 $('btn-pulls').addEventListener('click', () => openBoard('pulls', net, boardActions()));
+$('btn-meeting').addEventListener('click', () => showMeeting());
 $('btn-messages').addEventListener('click', () => openCommunications(openWorker));
 $('btn-queue').addEventListener('click', () => openQueue(net, { openTerminal: openWorker }));
 $('btn-new').addEventListener('click', () => sendToWorker('✨ New task'));

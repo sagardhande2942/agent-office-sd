@@ -5,6 +5,7 @@ import { messageStatus, type CommunicationsState, type MessageContext, type Work
 
 type Stored = Omit<WorkerMessage, 'status'> & { key?: string };
 type Actor = WorkerMessage['from'];
+type MeetingLink = WorkerMessage['meeting'];
 export const MESSAGE_KEEP = 500;
 export const MESSAGE_PENDING = 50;
 
@@ -36,6 +37,7 @@ export class Communications {
       if (!Array.isArray(stored) || stored.length > MESSAGE_KEEP || stored.some((m) => !m || typeof m.id !== 'string' || typeof m.threadId !== 'string' || !['request', 'reply'].includes(m.kind) || typeof m.text !== 'string' || typeof m.from?.id !== 'string' || typeof m.from?.name !== 'string' || typeof m.to?.id !== 'string' || typeof m.to?.name !== 'string' || !Number.isFinite(m.at) || !Number.isFinite(m.expiresAt))) throw new Error('Invalid communications ledger');
       for (const m of stored) {
         m.context = messageContext(m.context);
+        if (m.meeting !== undefined && (!m.meeting || typeof m.meeting.id !== 'string' || !m.meeting.id || !Number.isInteger(m.meeting.round) || m.meeting.round < 1)) throw new Error('Invalid meeting link');
         for (const field of ['deliveredAt', 'acknowledgedAt', 'answeredAt', 'completedAt']) if (m[field] !== undefined && !Number.isFinite(m[field])) throw new Error('Invalid communication receipt');
       }
       if (new Set(stored.map((m) => m.id)).size !== stored.length || stored.some((m) => !stored.some((root) => root.id === m.threadId && root.kind === 'request'))) throw new Error('Invalid communication thread');
@@ -53,9 +55,9 @@ export class Communications {
     if (changed) this.save(next);
     return { messages: this.state().messages.filter((m) => m.to.id === actor.id || m.from.id === actor.id) };
   }
-  request(from: Actor, to: Actor, body: Record<string, unknown>): WorkerMessage {
+  request(from: Actor, to: Actor, body: Record<string, unknown>, meeting?: MeetingLink): WorkerMessage {
     if (from.id === to.id) throw new Error('Send a request to another worker');
-    return this.create(from, to, body);
+    return this.create(from, to, body, undefined, meeting);
   }
   reply(from: Actor, id: string, body: Record<string, unknown>): WorkerMessage {
     const target = this.get(id);
@@ -78,7 +80,7 @@ export class Communications {
     }
     return this.get(id)!;
   }
-  private create(from: Actor, to: Actor, body: Record<string, unknown>, target?: WorkerMessage): WorkerMessage {
+  private create(from: Actor, to: Actor, body: Record<string, unknown>, target?: WorkerMessage, meeting = target?.meeting): WorkerMessage {
     const content = text(body.prompt, 4000, 'prompt', true)!;
     const context = messageContext(body.context);
     const key = text(body.key, 80, 'key');
@@ -99,7 +101,7 @@ export class Communications {
       for (let i = next.length - 1; i >= 0; i--) if (next[i].threadId === root.id) next.splice(i, 1);
     }
     const id = randomUUID(), at = this.now();
-    const m: Stored = { id, threadId: target?.threadId ?? id, ...(target ? { replyTo: target.id } : {}), kind: target ? 'reply' : 'request', from: { ...from }, to: { ...to }, text: content, context, at, expiresAt: at + (minutes as number) * 60_000, ...(key ? { key } : {}) };
+    const m: Stored = { id, threadId: target?.threadId ?? id, ...(target ? { replyTo: target.id } : {}), kind: target ? 'reply' : 'request', from: { ...from }, to: { ...to }, text: content, context, ...(meeting ? { meeting: { ...meeting } } : {}), at, expiresAt: at + (minutes as number) * 60_000, ...(key ? { key } : {}) };
     if (target) {
       const root = next.find((item) => item.id === target.threadId)!;
       root.deliveredAt ??= at; root.answeredAt ??= at;

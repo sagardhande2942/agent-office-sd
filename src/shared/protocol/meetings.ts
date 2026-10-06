@@ -74,6 +74,10 @@ export interface Meeting {
   /** False when a worker's provider reports no cost, so `cost` leaves it out. */
   costKnown: boolean;
   status: MeetingStatus;
+  /** Finished output is held until linked requests resolve or a viewer explicitly overrides. */
+  waitingForCommunications?: boolean;
+  coordinationError?: string;
+  communicationOverride?: { by: string; at: number };
   /** Why it stopped short. */
   reason?: string;
   calledBy: string;
@@ -139,6 +143,7 @@ export type MeetingClientMsg =
   | ({ t: 'meeting.start' } & MeetingRequest)
   /** Stop the meeting that's running; its workers stay at the table. */
   | { t: 'meeting.stop' }
+  | { t: 'meeting.finish'; id: string; allowUnresolved: true }
   /** Send the last meeting's workers home and clear the table. */
   | { t: 'meeting.clear' };
 

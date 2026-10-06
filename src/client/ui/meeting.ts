@@ -1,3 +1,5 @@
+import { meetingMessages, unresolvedRequests } from '../../shared/communications';
+import { renderCommunicationList } from './communications';
 import './meeting.css';
 import { MEETING_PATTERNS, MEETING_PATTERN_IDS, fixedRounds, meetingSpend, meetingStage, outputProblem, slugify } from '../../shared/meetings';
 import { fmtTokens, type Meeting, type MeetingPattern, type MeetingTurn } from '../../shared/protocol';
@@ -44,6 +46,9 @@ export function openMeeting(net: Net, actions: MeetingActions, preset?: MeetingP
   const foot = h('footer');
   const el = h('div.modal.meeting-window', { role: 'dialog', 'aria-label': 'Meeting room' }, h('header', {}, title, close), body, foot);
   let view: 'status' | 'form' = preset || !store.meeting.current ? 'form' : 'status';
+  let tab: 'status' | 'messages' = 'status';
+  let unresolvedOnly = false;
+  const openThreads = new Set<string>();
   let form: ReturnType<typeof meetingForm> | null = null;
   const render = () => {
     if (view === 'status' && store.meeting.current) {
@@ -53,6 +58,26 @@ export function openMeeting(net: Net, actions: MeetingActions, preset?: MeetingP
         view = 'form';
         render();
       });
+      const messages = meetingMessages(store.communications.messages, store.meeting.current.id);
+      const pending = unresolvedRequests(messages).length;
+      const tabs = h('div.communication-actions', { role: 'tablist', 'aria-label': 'Meeting views', onkeydown: (event: Event) => {
+        const e = event as KeyboardEvent;
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+        e.preventDefault();
+        tab = e.key === 'Home' ? 'status' : e.key === 'End' ? 'messages' : tab === 'status' ? 'messages' : 'status';
+        render();
+        (body.querySelector('[role=tab][aria-selected=true]') as HTMLElement)?.focus();
+      } },
+        h('button.btn', { role: 'tab', 'aria-selected': String(tab === 'status'), tabindex: tab === 'status' ? 0 : -1, class: tab === 'status' ? 'primary' : undefined, onclick: () => { tab = 'status'; render(); } }, 'Overview'),
+        h('button.btn', { role: 'tab', 'aria-selected': String(tab === 'messages'), tabindex: tab === 'messages' ? 0 : -1, class: tab === 'messages' ? 'primary' : undefined, onclick: () => { tab = 'messages'; render(); } }, `Messages (${pending} unresolved)`));
+      if (tab === 'messages') {
+        const filter = h('select', { 'aria-label': 'Filter meeting messages' }, h('option', { value: 'all' }, 'All requests'), h('option', { value: 'open' }, 'Unresolved requests')) as HTMLSelectElement;
+        filter.value = unresolvedOnly ? 'open' : 'all';
+        filter.addEventListener('change', () => { unresolvedOnly = filter.value === 'open'; render(); });
+        const list = h('div.communication-list');
+        renderCommunicationList(list, messages, (id) => { modal.close(); actions.openTerminal(id); }, { unresolved: unresolvedOnly, open: openThreads, error: store.communications.error });
+        body.replaceChildren(tabs, h('p.muted', {}, 'Requests involving meeting participants are linked to the round in which they were sent. Viewing does not acknowledge them.'), filter, list);
+      } else body.prepend(tabs);
       return;
     }
     if (!form) {
@@ -66,7 +91,7 @@ export function openMeeting(net: Net, actions: MeetingActions, preset?: MeetingP
     }
     form.refresh();
   };
-  const offs = [store.on('meeting', render), store.on('workers', () => view === 'status' && render()), store.on('pulls', () => form?.refresh())];
+  const offs = [store.on('communications', () => view === 'status' && render()), store.on('meeting', render), store.on('workers', () => view === 'status' && render()), store.on('pulls', () => form?.refresh())];
   const modal: Modal = openModal(el, { doing: '🤝 at the meeting room', onClose: () => offs.forEach((off) => off()) });
   close.addEventListener('click', () => modal.close());
   render();
@@ -101,9 +126,10 @@ function renderStatus(m: Meeting, body: HTMLElement, foot: HTMLElement, net: Net
   body.replaceChildren(
     ...present(
     h('div.meeting-head', {}, pill, h('b', {}, `${p.icon} ${p.label}`), h('span.meeting-title', { title: m.prompt }, m.title)),
-    h('p.meeting-line', {}, running ? `${meetingStage(m)} · called by ${m.calledBy} ${timeAgo(new Date(m.startedAt).toISOString())}` : m.status === 'done' ? `✅ Wrote ${m.output} in ${m.round} round${m.round === 1 ? '' : 's'}` : `⛔ Stopped in round ${m.round}: ${m.reason ?? 'stopped'}`),
+    h('p.meeting-line', {}, running ? `${m.waitingForCommunications ? 'Output ready · waiting for communication' : meetingStage(m)} · called by ${m.calledBy} ${timeAgo(new Date(m.startedAt).toISOString())}` : m.status === 'done' ? `✅ Wrote ${m.output} in ${m.round} round${m.round === 1 ? '' : 's'}` : `⛔ Stopped in round ${m.round}: ${m.reason ?? 'stopped'}`),
     m.tokens ? h('p.meeting-spend', { title: `${m.tokens.toLocaleString()} tokens, cache reads included` }, `💸 ${meetingSpend(m)}${running ? ' so far' : ''}`) : null,
     seats,
+    m.waitingForCommunications ? h('p.meeting-line', {}, m.coordinationError ?? `${unresolvedRequests(meetingMessages(store.communications.messages, m.id)).length} unresolved requests. Read Messages to review them, or finish anyway.`) : null,
     h('div.meeting-out', {}, h('div.meeting-out-head', {}, h('b', {}, '📄 '), h('code', {}, m.output), where, review), h('pre.meeting-preview', {}, m.preview?.trim() ? m.preview : running ? 'Nothing written yet.' : 'Nothing was written.')),
     store.meeting.past.length
       ? h('details.meeting-past', {}, h('summary', {}, `Earlier meetings (${store.meeting.past.length})`), h('ul', {}, ...store.meeting.past.map((r) => h('li', { title: `Called by ${r.calledBy}` }, h('b', {}, r.title), h('div.muted', {}, r.summary)))))
@@ -114,6 +140,7 @@ function renderStatus(m: Meeting, body: HTMLElement, foot: HTMLElement, net: Net
   foot.replaceChildren(
     ...present(
     h('span.grow', {}, running ? 'The workers stay at the table after it ends, so you can read their terminals.' : 'Clearing the room sends the workers home. A committed output stays on its branch.'),
+    running && m.waitingForCommunications ? h('button.btn.primary', { type: 'button', onclick: () => confirmDialog('Finish with unresolved requests?', 'The output will be committed or the review posted. Outstanding requests and your choice will be recorded in the saved meeting notes.', 'Finish anyway', () => net.send({ t: 'meeting.finish', id: m.id, allowUnresolved: true })) }, 'Finish anyway') : null,
     running ? h('button.btn', { type: 'button', onclick: () => confirmDialog('Stop the meeting?', `The workers stop where they are and stay at the table. ${m.output} is only there if it was written.`, 'Stop it', () => net.send({ t: 'meeting.stop' })) }, '⛔ Stop meeting') : null,
     !running && m.commit && head?.worktree ? h('button.btn', { type: 'button', title: `Push ${m.worktree?.branch} and open a pull request`, onclick: () => actions.openPr(head.id) }, head.pr ? `🔀 PR #${head.pr.number}` : '🔀 Open PR') : null,
     !running ? h('button.btn', { type: 'button', onclick: () => net.send({ t: 'meeting.clear' }) }, '🧹 Clear the room') : null,

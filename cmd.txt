@@ -267,3 +267,14 @@ Expired requests reject new replies. History survives restarts and is independen
 of terminal scrollback. This release supports the same local floor only.
 
 See docs/communications.md for MCP tools, limits, persistence and all office views.
+
+MEETING COMMUNICATION
+---------------------
+No extra CLI flags are needed: request/reply/ack commands automatically track
+requests involving active meeting participants with the meeting and round.
+In lite or 3D: open Meeting room -> Messages to review those threads.
+Once output is ready, unresolved requests hold completion until acknowledged
+or expired. Use Finish anyway and confirm to record an explicit override;
+Stop meeting ends the meeting without completing it.
+Saved records: .agent-office/meetings/<meeting-id>/communications.md and
+communications.json, alongside the meeting output. See docs/communications.md.

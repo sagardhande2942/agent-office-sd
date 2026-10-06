@@ -25,7 +25,10 @@ export async function workerCommunications(ctx: Ctx, req: http.IncomingMessage, 
     if (typeof target === 'string') throw new Error(target);
     if (target.kind !== 'agent') throw new Error('Tracked messages are for agents, not shells');
     const context = b.context === undefined ? { branch: me.worktree?.branch ?? floor.project.branch } : b.context;
-    const message = action === '/request' ? ledger.request(actor, { id: target.id, name: target.name }, { ...b, context }) : ledger.reply(actor, str(b.id, 80), { ...b, context });
+    const meeting = floor.meetings.state().current;
+    const participant = (id: string) => meeting?.seats.some(s => s.workerId === id);
+    const link = meeting?.status === 'running' && (participant(me.id) || participant(target.id)) ? { id: meeting.id, round: meeting.round } : undefined;
+    const message = action === '/request' ? ledger.request(actor, { id: target.id, name: target.name }, { ...b, context }, link) : ledger.reply(actor, str(b.id, 80), { ...b, context });
     return send(res, 200, { message });
   } catch (err) { return send(res, 400, { error: (err as Error).message }); }
 }

@@ -43,4 +43,8 @@ export const meetingHandlers = {
     const floor = here(ctx, c);
     if (floor) ctx.warn(c, await floor.meetings.clear(who));
   },
+  async 'meeting.finish'(ctx, c, msg) {
+    const floor = here(ctx, c);
+    if (floor && msg.allowUnresolved === true) ctx.warn(c, await floor.meetings.finishAnyway(str(msg.id, 80), c.peer.name));
+  },
 } satisfies HandlerMap<MeetingClientMsg>;

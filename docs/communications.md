@@ -83,3 +83,17 @@ This release supports office-local worker messaging on the same floor. Cross-flo
 ## Relationship to terminal scrollback
 
 [PR #64](https://github.com/sagardhande2942/agent-office-sd/pull/64) preserves full-screen terminal scrollback. Communication history is a separate structured ledger: it does not parse terminal output, change PTY buffers, or require that PR to track requests and receipts. Improved scrollback is still useful when opening a participant's terminal to inspect the surrounding work.
+
+## Meeting communication
+
+Requests involving an active meeting participant are automatically linked to that meeting and its current round. This includes requests to workers elsewhere on the same local floor and requests sent into the table. The office assigns the link from its roster; workers cannot supply a meeting ID to claim membership. Replies retain the original request's meeting and round, even if the meeting has moved on. Existing requests made before a meeting starts are not retroactively linked.
+
+Open the meeting room in lite or 3D and choose **Messages**. It shows only that meeting's threads, response context, round and delivery/acknowledgment status, with an unresolved filter and participant terminal buttons. Viewing is observational and never creates agent receipts. Meeting prompts remind workers to check their inbox before writing round notes; checks remain agent guidance, without automatic polling or terminal interruption.
+
+After all round output is written, the meeting waits if a linked request remains pending, delivered, acknowledged or answered. Requester acknowledgment of a reply completes the request; expiration also releases the wait. The office rechecks every three seconds. Requests from another meeting do not block it. A communication-ledger error also holds completion rather than silently ignoring missing records. Stop remains available while waiting.
+
+Choose **Finish anyway** and confirm to complete with outstanding requests. This is available only after all scheduled output is written. It commits the meeting output or posts its review using the existing meeting behavior. It records your name and time but does not acknowledge messages for agents. **Stop meeting** remains available to stop without completing.
+
+When a meeting finishes or stops, its saved notes at `.agent-office/meetings/<meeting-id>/` include `communications.md` and `communications.json`: a snapshot of retained requests/replies, context, statuses, unresolved IDs and any explicit override or ledger error. The meeting output is saved alongside them and remains the source of decisions; message replies are not automatically treated as decisions or proof of integration. Snapshots reflect the moment the meeting ended; later replies do not rewrite them. The floor ledger retains its existing 500-message bound. Hosted-floor messaging and cross-floor routing remain outside this feature.
+
+Meeting message views: [desktop screenshot](meeting-communications-desktop.png) · [mobile screenshot](meeting-communications-mobile.png).
