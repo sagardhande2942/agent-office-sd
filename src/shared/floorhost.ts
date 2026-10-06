@@ -49,6 +49,9 @@ export interface FloorReady {
   gitIdentity?: string;
   /** The models this host can actually run, so the office never offers one it would refuse. */
   models?: string[];
+  /** Host checks Boss prompt snapshots immediately before terminal input. */
+  bossGuard?: boolean;
+  workerBreaks?: boolean;
   /**
    * The branch this host's checkout is on, and the agent CLIs it has installed.
    *
@@ -133,6 +136,7 @@ export const FLOOR_CASES = [
   'worker.pr',
   'worker.rebuild',
   'worker.resume',
+  'worker.rest',
   'worker.spawn',
   'worker.worktree',
 ] as const;

@@ -3,6 +3,27 @@ import assert from 'node:assert/strict';
 import headless from '@xterm/headless';
 import serialize from '@xterm/addon-serialize';
 import { screenSnapshot, withoutFullScreen } from '../src/server/screen.js';
+import { newTerm, observed } from '../src/server/workers/terminal.js';
+import type { Worker } from '../src/server/workers/types.js';
+
+test('worker observer preserves history and resets full-screen detection for each run', async (t) => {
+  const w = { info: { cols: 80, rows: 10 }, fullScreen: true } as Worker;
+  const on = { title() {} };
+  let term = newTerm(w, on);
+  t.after(() => w.term?.dispose());
+  assert.equal(w.fullScreen, undefined);
+  const raw = tui(Array.from({ length: 25 }, (_, i) => `worker line ${i + 1}`));
+  const seen = observed(raw, w);
+  assert.equal(w.fullScreen, true);
+  assert.ok(raw.includes('\x1b[?1049h'), 'viewer bytes retain the full-screen mode');
+  await new Promise<void>(resolve => term.write(seen, resolve));
+  assert.ok(transcript(term).includes('worker line 1'));
+  assert.ok(transcript(term).includes('worker line 25'));
+  term = newTerm(w, on);
+  assert.equal(w.fullScreen, undefined);
+  await new Promise<void>(resolve => term.write('\x1b[?1049hlegacy prelude', resolve));
+  assert.equal(w.fullScreen, true, 'legacy snapshots notify the new worker observer');
+});
 
 function terminal() {
   const term = new headless.Terminal({ cols: 80, rows: 10, scrollback: 100, allowProposedApi: true });

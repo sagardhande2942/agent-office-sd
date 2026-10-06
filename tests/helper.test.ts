@@ -203,7 +203,7 @@ function removalHarness() {
   const stopped: string[] = [];
   const workers = new Map<string, any>();
   const manager: any = {
-    workers, namer: { forget() {} }, scrollback: { remove() {} }, drops: { remove() {} },
+    workers, tasks: { forget() {} }, worktrees: { sendHome: async () => { stopped.push('worktree'); return {}; } }, namer: { forget() {} }, scrollback: { remove() {} }, drops: { remove() {} },
     events: { remove(id: string) { removed.push(id); } }, persist() {},
     current: async (wt: unknown) => wt,
     trees: { remove: async () => { stopped.push('worktree'); } },

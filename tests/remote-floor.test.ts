@@ -352,3 +352,48 @@ test('hosted report delivery forwards a report request without an arbitrary prom
   floor.deliver({ t: 'result', floorId: 'f1', seq: host.sent[0].seq as number, value: '' });
   assert.equal(await delivered, '');
 });
+
+
+test('hosted helper paths survive an arriving floor view and clear on removal', () => {
+  const floor = make(fakeHost());
+  const helpers = [{hostId:'worker',workerId:'helper',path:[[0,0],[1,1]],speed:2,face:0,phase:'reading'}];
+  floor.deliver({t:'event',floorId:'f1',seq:0,msg:{t:'helper',helpers}});
+  assert.deepEqual(floor.helpers.states(),helpers);
+  floor.deliver({t:'event',floorId:'f1',seq:0,msg:{t:'helper',helpers:[]}});
+  assert.deepEqual(floor.helpers.states(),[]);
+});
+
+
+test('Boss prompts refuse legacy hosts and carry snapshot guards to capable hosts', async () => {
+  const host=fakeHost(), floor=make(host), guard={floor:'f1',createdAt:1,status:'idle' as const};
+  assert.match((await floor.workers.prompt('a','hello','QA',guard))!,/Update the floor host/);
+  assert.equal(host.sent.length,0);
+  floor.deliver({t:'ready',floor:{floorId:'f1',name:'API',seats:2,accepting:false,workers:[],forge:'github',bossGuard:true}});
+  const pending=floor.workers.prompt('a','hello','QA',guard);
+  assert.deepEqual(host.sent[0].guard,guard);
+  floor.deliver({t:'result',floorId:'f1',seq:host.sent[0].seq as number,value:''});
+  assert.equal(await pending,'');
+  floor.deliver({t:'ready',floor:{floorId:'f1',name:'API',seats:2,accepting:false,workers:[],forge:'github'}});
+  assert.match((await floor.workers.prompt('a','hello','QA',guard))!,/Update the floor host/);
+  assert.equal(host.sent.length,1);
+});
+
+
+test('breaks refuse legacy hosts, travel to capable hosts and reset on reconnect', async () => {
+  const host = fakeHost();
+  const floor = make(host);
+  const ready = { floorId: 'f1', name: 'API', seats: 2, accepting: false, workers: [], forge: 'github' as const };
+  floor.deliver({ t: 'ready', floor: ready });
+  assert.match((await floor.workers.rest('worker', true))!, /Update the floor host/);
+  assert.equal(host.sent.length, 0);
+  floor.deliver({ t: 'ready', floor: { ...ready, workerBreaks: true } });
+  const pending = floor.workers.rest('worker', true);
+  assert.equal(host.sent[0].t, 'worker.rest');
+  assert.equal(host.sent[0].workerId, 'worker');
+  assert.equal(host.sent[0].on, true);
+  floor.deliver({ t: 'result', floorId: 'f1', seq: host.sent[0].seq as number, value: undefined });
+  assert.equal(await pending, undefined);
+  floor.deliver({ t: 'ready', floor: ready });
+  assert.match((await floor.workers.rest('worker', false))!, /Update the floor host/);
+  assert.equal(host.sent.length, 1);
+});

@@ -193,3 +193,33 @@ test('a tv.json nobody would have allowed leaves the screen dark', (t) => {
   writeFileSync(path.join(dir, 'tv.json'), JSON.stringify({ on: false, playing: false, position: 0, at: 0, theatre: 'yes' }));
   assert.equal(new Tv(dir).state().theatre, false);
 });
+
+
+test('TV mutations notify floor subscribers, including theatre without moving playback time', () => {
+  const dir=mkdtempSync(path.join(tmpdir(),'office-tv-sync-'));
+  try {
+    const states: ReturnType<Tv['state']>[]=[];
+    const tv=new Tv(dir,state=>states.push(state));
+    assert.ok('error' in tv.play({url:'javascript:alert(1)'},'QA'));assert.equal(states.length,0);
+    tv.play({url:YT,position:10},'QA');assert.equal(states.length,1);assert.equal(states[0].playing,true);
+    const at=tv.state().at;tv.theatre(true,'QA');assert.equal(states.length,2);assert.equal(states[1].theatre,true);assert.equal(states[1].at,at);
+    tv.theatre(true,'QA');assert.equal(states.length,2);
+    tv.pause(12,'QA');assert.equal(states.at(-1)!.playing,false);
+    tv.seek(25,'QA');assert.equal(states.at(-1)!.position,25);
+    tv.play({},'QA');assert.equal(states.at(-1)!.playing,true);
+    tv.stop('QA');assert.equal(states.at(-1)!.on,false);
+    assert.equal(states.length,6);
+  } finally { rmSync(dir,{recursive:true,force:true}); }
+});
+
+
+test('TV masking sees past the whiteboard walking envelope but still hides its solid panel', async () => {
+  const {whiteboardOcclusion}=await import('../src/client/features/whiteboard/occlusion.js');
+  const {blocks}=await import('../src/client/tv-projection.js');
+  const {Vector3}=await import('three');
+  const eye=new Vector3(2,1.6,-8),clear=new Vector3(18,1.6,-1),covered=new Vector3(18,1.6,1);
+  const walking={minX:3.2,maxX:7.6,minZ:-5.88,maxZ:-4.92,top:3.05};
+  assert.equal(blocks(eye,clear,walking),true);
+  assert.equal(whiteboardOcclusion().some(c=>blocks(eye,clear,c)),false);
+  assert.equal(whiteboardOcclusion().some(c=>blocks(eye,covered,c)),true);
+});

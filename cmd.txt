@@ -1,0 +1,229 @@
+AGENT OFFICE COMMAND REFERENCE
+==============================
+Commands from the CLI office setup and troubleshooting conversation.
+Shell commands run in Bash; dashboard commands run inside the TUI after pressing :.
+
+1. USE THE CLI WORKTREE
+----------------------
+The feature branch is checked out in a separate worktree, not in the main checkout:
+
+  cd /tmp/agent-office-cli
+
+You do not need to run git checkout feat/terminal-office in ~/agent-office-sd.
+Git refuses that checkout while the branch is already used by this worktree.
+The /tmp path is specific to this development session, not a permanent installation.
+
+Inspect your checkout and worktrees:
+
+  git branch
+  git worktree list
+  git status --short
+
+If dependencies or compiled files are missing in your feature checkout:
+
+  npm install
+  npm run build
+
+Run through Node without installing a global command:
+
+  node bin/agent-office.js tui
+
+Optional: install the command on your PATH from the feature checkout:
+
+  npm install -g .
+  agent-office tui
+
+If Bash says "agent-office: command not found", use the Node command above.
+
+2. START THE OFFICE SERVER
+-------------------------
+The TUI joins an existing server. Keep the server running in one terminal and
+open the TUI in another. Start the server only if port 4600 is free.
+
+Start locally; do not open a browser automatically:
+
+  cd /tmp/agent-office-cli
+  node bin/agent-office.js --no-open
+
+Choose a password explicitly:
+
+  node bin/agent-office.js --no-open --password 'my-office-password'
+
+The generated password is printed at server startup when it is still available.
+It is normally saved in ~/agent-office/.agent-office/config.json, or in the
+project's .agent-office/config.json when using a project checkout. A claimed
+password is not recoverable from plaintext. With an individual account, the TUI
+needs your account password instead of the shared office password.
+
+Start behind the Cloud Shell web preview proxy:
+
+  node bin/agent-office.js --no-open --host 0.0.0.0 --port 4600 \
+    --trust-proxy --password 'my-office-password'
+
+The conversation used --password 123 in the development server. That value is
+an example, not a required password. Server and TUI must use the same password.
+
+Server flags relevant to these commands:
+
+  --no-open             Do not automatically open a browser.
+  --host <address>      Bind address. Default 127.0.0.1; 0.0.0.0 binds all IPv4 interfaces.
+  --port <number>       Listening port. Default 4600; -p is an alias. PORT is the env equivalent.
+  --password <text>     Shared office password; AGENT_OFFICE_PASSWORD is the env equivalent.
+  --trust-proxy         Trust X-Forwarded-* headers from the proxy in front of the office.
+                        Use for the Cloud Shell web preview deployment above.
+  --home <directory>    Office data location when no project path is supplied.
+  --projects <dir>      Parent directory for cloned project floors.
+  --agent <command>     Default worker agent command; default claude.
+  --help                Print all server options.
+
+Use an existing project as the initial floor:
+
+  node bin/agent-office.js /path/to/project --no-open
+
+Read the complete server flag reference:
+
+  node bin/agent-office.js --help
+
+3. JOIN FROM THE CLI
+--------------------
+Default connection is http://localhost:4600. A hidden password prompt appears:
+
+  cd /tmp/agent-office-cli
+  node bin/agent-office.js tui
+
+Sign in with your own account:
+
+  node bin/agent-office.js tui --name ada
+
+Use another office address or local port:
+
+  node bin/agent-office.js tui --office http://localhost:4700
+  node bin/agent-office.js tui --office https://office.example.com --name ada
+
+Choose the initial project floor by its ID:
+
+  node bin/agent-office.js tui --floor <floor-id>
+
+Read TUI help without needing a running server:
+
+  node bin/agent-office.js tui --help
+
+TUI flags:
+
+  --office <origin>     http(s) origin, default http://localhost:4600.
+                       Use the origin only, without paths, query strings or embedded credentials.
+  --name <name>         Account login name; omit for shared-password login.
+  --floor <id>          Initial floor ID.
+  -h, --help            Show usage and dashboard commands.
+
+Environment:
+
+  AGENT_OFFICE_PASSWORD supplies the TUI password instead of prompting.
+  NODE_EXTRA_CA_CERTS can supply a trusted CA file for an office using a private certificate.
+  An interactive terminal is required. The client does not save passwords or session cookies.
+
+4. VISUAL DASHBOARD KEYS
+-----------------------
+  Arrow keys           Select a desk, scroll a board, or select a floor.
+  Enter                Open selected worker's terminal; at an empty desk, enter hiring.
+                       On the floors panel, go to the selected floor.
+  Tab / Shift+Tab      Cycle office, issues, pulls, queue, floors and help panels.
+  f                    Floor picker.
+  i                    Issues board.
+  b                    Pull requests board.
+  t                    Task queue.
+  n                    Next worker needing input or finished.
+  h                    Open hiring command prompt.
+  p                    Prompt selected worker.
+  r                    Resume selected worker.
+  c                    Write a chat message.
+  :                    Open command prompt.
+  ?                    Help panel.
+  Esc                  Cancel command entry or return to the desk grid.
+  Ctrl+U               Clear text in the command prompt.
+  q / Ctrl+C           Leave the dashboard; the server and workers keep running.
+
+Status colors: yellow = needs input, green = done, cyan = working.
+Selected desks are highlighted. Wide terminals show worker details on the right.
+Smaller terminals page through desks as you move. Expanded desks and workers at
+special seats are included. See docs/cli-dashboard.png for a sample view.
+
+5. DASHBOARD COMMANDS (PRESS : FIRST)
+------------------------------------
+  workers                         Show office desk grid.
+  floors                          Show floor picker and IDs.
+  go <floor-id or exact name>      Switch floor.
+  hire codex Write tests          Hire Codex with an initial prompt.
+  hire claude                     Hire Claude without an initial prompt.
+  attach <worker-id>              Open worker's shared terminal.
+  prompt <worker-id> Fix login     Send a prompt to that worker.
+  resume <worker-id>               Resume stopped worker.
+  pr <worker-id>                   Request push and pull request creation.
+  issues                          Show issue board.
+  pulls                           Show pull request board.
+  queue                           Show task queue.
+  enqueue Update documentation    Add task to the existing queue.
+  chat Hello team                 Send chat to teammates.
+  help                            Show keyboard and command help.
+  quit / exit                     Leave client, keeping server and workers running.
+
+Replace placeholders such as <worker-id> with actual IDs; omit the angle brackets.
+Worker commands accept exact IDs or unique single-word names. Use IDs for names
+with spaces or duplicates. The worker ID appears in the detail panel on wide terminals.
+Hire providers: claude, codex, opencode, grok, muse, dsh, custom.
+Hiring uses the selected empty desk, or the first available desk if the selection
+is occupied. Queue tasks follow the server's existing queue settings.
+
+6. LEAVE A WORKER TERMINAL SAFELY
+--------------------------------
+  Ctrl + ]
+
+This detaches and returns to the office dashboard. The worker keeps running.
+Do not press Ctrl+C to detach: while attached, Ctrl+C goes to the worker and may
+interrupt its task. Esc also goes to the worker while attached.
+After detaching, q leaves the CLI without stopping the office.
+
+7. GUI SAYS "RECONNECTING" BUT CLI WORKS
+----------------------------------------
+The local CLI connects directly to localhost. The Cloud Shell browser preview
+uses an HTTPS proxy. A server without --trust-proxy may reject the browser's
+WebSocket origin even though the local CLI works.
+
+The preview URL used in this session was:
+  https://4600-cs-563764481812-default.cs-asia-southeast1-palm.cloudshell.dev/
+
+That URL belongs to this Cloud Shell session and may change. After restarting
+with --trust-proxy, refresh the GUI and sign in again. If reconnecting continues,
+inspect the browser's Network -> WS request to /ws for its failure status.
+
+Check which process owns port 4600:
+
+  ss -ltnp 'sport = :4600'
+
+For a directly started server, restart while preserving workers:
+
+  kill -TERM <server-pid>
+
+Wait for the old server to release port 4600, then run the Cloud Shell server
+command from section 2. SIGTERM tells the office to keep its workers for the next
+server instance. Ctrl+C on the SERVER intentionally shuts down its workers.
+
+Use the PID of the office server, not the TUI client or terminal host.
+If npm run dev, tsx watch, systemd or another supervisor owns the server, update
+that launch configuration to include --trust-proxy and use its restart procedure;
+a child-process kill alone does not update the supervisor's launch flags.
+
+8. DEVELOPMENT CHECKS AND DOCUMENTATION
+---------------------------------------
+  npm run typecheck      Check server/client TypeScript.
+  npm test               Run repository test suite.
+  npm run build          Build browser client and server.
+  npm run build:server   Rebuild only the server (including the TUI).
+
+Further reference:
+  docs/cli.md             Visual CLI setup, keys, commands and limitations.
+  docs/configuration.md   Office server configuration.
+  README.md               Installation and running the office.
+
+Pull request:
+  https://github.com/sagardhande2942/agent-office-sd/pull/62

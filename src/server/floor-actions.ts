@@ -49,6 +49,7 @@ import type {
 } from '../shared/protocol.js';
 import type { BallState } from '../shared/hoop.js';
 import type { CarPose, CarSeat, CarState } from '../shared/garage.js';
+import type { BossGuard } from '../shared/boss.js';
 import type { Decoration } from '../shared/decor.js';
 import type { JukeboxSpot, JukeboxState } from '../shared/jukebox.js';
 import type { TvState } from '../shared/tv.js';
@@ -102,6 +103,7 @@ export interface FloorForge {
 export interface FloorWorkers {
   // Reads: answered from the roster and worker updates the floor streams upward, so a hosted floor
   // costs no round trip for any of them.
+  rest(id: string, on: boolean): Awaitable<string | undefined>;
   list(): WorkerInfo[];
   get(id: string): WorkerInfo | undefined;
   ownerOf(id: string): string | undefined;
@@ -137,7 +139,7 @@ export interface FloorWorkers {
   /** A board agent on a station desk: told what it is there for before its first request. */
   station(deskId: string, by: string, text: string, owner?: string): Awaitable<{ info: WorkerInfo; hired: boolean } | string>;
   resume(id: string, prompt?: string): Awaitable<string | undefined>;
-  prompt(id: string, text: string, by?: string): Awaitable<string | undefined>;
+  prompt(id: string, text: string, by?: string, guard?: BossGuard): Awaitable<string | undefined>;
   deliverHelperReport(id: string, by?: string): Awaitable<string | undefined>;
   kill(id: string, cleanup?: WorktreeCleanup): Promise<{ note?: string; error?: string }>;
 
@@ -264,6 +266,7 @@ export interface FloorMeetings {
  * checks that claim at the assignment in floor.ts.
  */
 export interface FloorActions {
+  helpers?: { states(): import('../shared/helper.js').HelperState[] };
   readonly id: string;
   readonly def: { id: string; name: string; dir: string; repo?: string };
   /** Where the checkout is. Empty for a hosted floor, which the office must never touch. */

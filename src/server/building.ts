@@ -1,29 +1,26 @@
-import { execFile } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { FLOOR_PALETTES, MAX_FLOORS, normalizeRepo, sameRepo } from '../shared/floors.js';
-import type { ForgeKind, ProjectsDirState, RepoChoice } from '../shared/protocol.js';
-import { bb, gh, originRepo } from './forge.js';
+import type { ForgeKind, CloneProgress, ProjectsDirState, RepoChoice } from '../shared/protocol.js';
+import { CloneRun, dropLog, whyCloneFailed, type CloneEnd, type CloneRunOptions } from './clone.js';
+import { gh, bb } from './forge.js';
+import { askBb, listRepos } from './building-forges.js';
 
 /** A floor as floors.json keeps it. */
 export interface FloorDef {
   id: string;
   name: string;
-  /** owner/name on the forge (GitHub or Bitbucket) it came from. */
+  /** owner/name on GitHub. */
   repo?: string;
   dir: string;
   palette: number;
   addedBy: string;
   addedAt: number;
-  /**
-   * The machine this floor runs on, when that is not the office. Absent — the ordinary case, and the
-   * only one an office-side floor has ever had — means it runs here.
-   *
-   * `dir` stays a real path even for a hosted floor: it is the path on *that* machine, so the office
-   * must never read it. `RemoteFloor` is what the office holds instead (see floor-actions.ts).
-   */
   host?: string;
+  forge?: ForgeKind;
+  asked?: string;
 }
 
 /** A projects folder picked in ⚙️ Settings (or with --projects), as projects-folder.json keeps it. */
@@ -33,14 +30,6 @@ interface PickedDir {
   at: number;
 }
 
-/** What a forge said about a name someone typed: the repository's real name, and its CLI. */
-interface Found {
-  repo: string;
-  forge: ForgeKind;
-  /** The name the forge's own CLI answered to, which is the one it can clone from. */
-  asked?: string;
-}
-
 /** The checkout the office was started in, once it's been taken off the building (local-floor.json). */
 interface LocalOff {
   dir: string;
@@ -48,16 +37,42 @@ interface LocalOff {
   at: number;
 }
 
-/** How long the list of repositories the office's forge sign-ins can see is reused before it's asked again. */
+/** A floor on its way: its clone, and who can stop it besides admins. */
+interface Pending {
+  def: FloorDef;
+  run?: CloneRun;
+  /** The account that added it. */
+  owner?: string;
+  /** GitHub says the repository has no commits yet, so there's nothing to check out. */
+  empty: boolean;
+}
+
+/** A clone under way, as cloning.json keeps it for the next office to pick up (see resumeClones). */
+interface SavedClone extends FloorDef {
+  pid: number;
+  log: string;
+  owner?: string;
+  empty?: boolean;
+}
+
+export interface BuildingOptions {
+  /**
+   * Clones run in this terminal (`agent-office setup`), showing git's own progress and asking
+   * there if ssh or git has a question, rather than watched by the office.
+   */
+  terminal?: boolean;
+  /** How clones are watched (tests shorten these). */
+  clone?: Pick<CloneRunOptions, 'stallMs' | 'tickMs'>;
+}
+
+/** How long the list of repositories `gh` can see is reused before it's asked again. */
 const REPOS_TTL_MS = 5 * 60_000;
 const MAX_REPOS = 1000;
-const CLONE_TIMEOUT_MS = 30 * 60_000;
 
 /**
  * The floors of the building, saved in <office>/.agent-office/floors.json: which projects there are,
  * where their checkouts live, and how each floor is painted. New floors are cloned with the office
- * machine's own forge sign-ins into <projects>/<owner>/<repo> — `gh repo clone` for a GitHub
- * repository, `bb repo clone` for a Bitbucket one; the projects folder can be picked in ⚙️ Settings
+ * machine's `gh` login into <projects>/<owner>/<repo>; the projects folder can be picked in ⚙️ Settings
  * (kept in projects-folder.json).
  */
 export class Building {
@@ -65,8 +80,13 @@ export class Building {
   private file: string;
   private pickedFile: string;
   private picked?: PickedDir;
-  /** Floors being cloned, by lower-cased repo. Not saved until the clone is there. */
-  private cloning = new Map<string, FloorDef>();
+  /** Floors being cloned, by lower-cased repo. Not in floors.json until the clone is there, but in cloning.json. */
+  private cloning = new Map<string, Pending>();
+  private clonesFile: string;
+  /** Where clones write their progress. */
+  private logsDir: string;
+  /** Hears when a clone gets further along. */
+  private cloneChanged?: () => void;
   private repoCache?: { at: number; repos: Promise<RepoChoice[]> };
   /** The checkout the office was started in (see ensureLocal), and the repository it's a checkout of. */
   private local?: { dir: string; repo?: string };
@@ -81,8 +101,11 @@ export class Building {
     private dataDir: string,
     /** Where new floors are cloned unless another folder was picked. */
     private defaultProjectsDir: string,
+    private opts: BuildingOptions = {},
   ) {
     this.file = path.join(dataDir, 'floors.json');
+    this.clonesFile = path.join(dataDir, 'cloning.json');
+    this.logsDir = path.join(dataDir, 'clones');
     this.pickedFile = path.join(dataDir, 'projects-folder.json');
     this.localFile = path.join(dataDir, 'local-floor.json');
     this.load();
@@ -130,7 +153,83 @@ export class Building {
 
   /** Floors on their way: shown in the elevator, but nobody can ride there yet. */
   pending(): FloorDef[] {
-    return [...this.cloning.values()];
+    return [...this.cloning.values()].map((p) => p.def);
+  }
+
+  /** How a floor on its way is getting on, once git says. */
+  cloneProgress(id: string): CloneProgress | undefined {
+    return this.pendingFloor(id)?.run?.progress;
+  }
+
+  /** `fn` hears whenever a clone gets further along (at most once a second each). */
+  watchClones(fn: () => void) {
+    this.cloneChanged = fn;
+  }
+
+  /**
+   * Stops a floor's clone before it's there, if `may` lets whoever's asking stop one `owner` added.
+   * git tidies away what it had cloned, and add() resolves to `why`. Returns why it can't, if it can't.
+   */
+  cancel(id: string, why: string, may: (owner: string | undefined) => boolean): string | undefined {
+    const p = this.pendingFloor(id);
+    if (!p) return this.defs.some((d) => d.id === id) ? 'That floor is already there' : 'No such floor';
+    if (!may(p.owner)) return 'Only admins, or whoever added it, can stop a floor on its way';
+    if (!p.run) return "There's no clone to stop yet — try again in a moment";
+    p.run.stop(why);
+    return undefined;
+  }
+
+  /**
+   * Picks up the clones an office before this one left running (it restarted mid-clone): each goes
+   * on as a floor on its way, and `done` hears how it ended. One that finished with no office
+   * watching becomes its floor now.
+   */
+  resumeClones(done: (r: FloorDef | string) => void) {
+    for (const s of this.loadClones()) {
+      const repo = normalizeRepo(s.repo);
+      if (!repo || this.defs.some((d) => sameRepo(d.repo, repo)) || this.cloning.has(repo.toLowerCase())) {
+        dropLog(s.log);
+        continue;
+      }
+      const def = { ...this.newDef(s.name, repo, s.dir, s.addedBy), forge:s.forge, asked:s.asked };
+      const pending: Pending = { def, owner: s.owner, empty: !!s.empty };
+      const run = CloneRun.adopt(s.pid, s.log, { ...this.opts.clone, changed: () => this.cloneChanged?.() });
+      if (!run) {
+        dropLog(s.log);
+        if (checkoutAt(def.dir, repo, pending.empty) !== 'ok') {
+          done(`Cloning ${repo} stopped when the office restarted — add it again`);
+          continue;
+        }
+        this.defs.push(def);
+        this.save();
+        done(def);
+        continue;
+      }
+      pending.run = run;
+      this.cloning.set(repo.toLowerCase(), pending);
+      void run.done.then((end) => {
+        const err = this.settle(pending, end);
+        this.cloning.delete(repo.toLowerCase());
+        this.saveClones();
+        if (!err) {
+          this.defs.push(def);
+          this.save();
+        }
+        done(err ?? def);
+      });
+    }
+    this.saveClones();
+  }
+
+  /** The office is closing: its clones stop, or with `keep` (a restart) carry on for the next office to pick up. */
+  shutdown(keep: boolean) {
+    for (const p of this.cloning.values()) {
+      if (keep) p.run?.release();
+      else p.run?.stop('The office closed before the clone finished');
+    }
+    if (keep) return;
+    this.cloning.clear();
+    this.saveClones();
   }
 
   /**
@@ -140,7 +239,7 @@ export class Building {
    */
   ensureLocal(dir: string, by: string): FloorDef | undefined {
     const abs = path.resolve(dir);
-    const known = this.defs.find((d) => !d.host && path.resolve(d.dir) === abs);
+    const known = this.defs.find((d) => path.resolve(d.dir) === abs);
     this.local = { dir: abs, repo: known?.repo ?? originRepo(abs) };
     if (known) {
       this.localId = known.id;
@@ -169,7 +268,7 @@ export class Building {
    */
   remove(id: string, by = '?'): FloorDef | string {
     const def = this.defs.find((d) => d.id === id);
-    if (!def) return [...this.cloning.values()].some((d) => d.id === id) ? "That floor is still being cloned — take it off once it's there" : 'No such floor';
+    if (!def) return this.pendingFloor(id) ? "That floor is still being cloned — stop it, or take it off once it's there" : 'No such floor';
     this.defs = this.defs.filter((d) => d !== def);
     if (this.isLocal(id)) {
       this.localId = undefined;
@@ -182,20 +281,8 @@ export class Building {
   /**
    * Clones a repository into the projects folder and adds it as a floor. `started` hears about the
    * floor as soon as the clone begins; resolves to the finished floor, or to why there's none. A
-   * checkout that's already where the clone would go is used as it is. `kind` says which forge the
-   * repository is on; without it, GitHub is asked first and Bitbucket second.
-   */
-  /**
-   * Puts a floor on a **paired machine** onto the building, without cloning anything.
-   *
-   * This is the one way to add a floor whose checkout the office cannot see. It deliberately does not
-   * ask the forge, does not clone, and does not check that `dir` exists: all three would be the office
-   * reaching for a disk that belongs to somebody else. The path is that machine's, kept to say which
-   * checkout the floor is; the host is the one that finds out whether it is really there, when the
-   * office asks it to serve the floor and it answers `leave` if it cannot.
-   *
-   * `dir` is required because it is what identifies the floor across restarts — two floors of the same
-   * repository on one machine would otherwise be the same floor.
+   * checkout that's already where the clone would go is used as it is. `account` (whoever's adding it)
+   * can stop the clone, as admins can.
    */
   addHosted(input: { repo: string; dir: string; host: string; name?: string }, by: string): FloorDef | string {
     const wanted = normalizeRepo(input.repo);
@@ -212,7 +299,7 @@ export class Building {
     return def;
   }
 
-  async add(input: string, by: string, started: (def: FloorDef) => void, kind?: ForgeKind): Promise<FloorDef | string> {
+  async add(input: string, by: string, started: (def: FloorDef) => void, kindOrAccount?: string, account?: string): Promise<FloorDef | string> {
     const wanted = normalizeRepo(input);
     if (!wanted) return 'Pick a repository, or type it as owner/name';
     if (this.defs.some((d) => sameRepo(d.repo, wanted))) return `${wanted} already has a floor`;
@@ -229,39 +316,85 @@ export class Building {
       this.save();
       return def;
     }
-    // Asking the forge first says whether this login can see it at all, and gets the name's real case.
+    // Asking GitHub first says whether this login can see it at all, and gets the name's real case.
     let repo: string;
-    let forge: ForgeKind;
-    /** The name bb answered to, which is the one it can clone from (see askBb). */
+    const kind = kindOrAccount === 'github' || kindOrAccount === 'bitbucket' ? kindOrAccount : undefined;
+    account ??= kind ? undefined : kindOrAccount;
+    let forge: ForgeKind = kind ?? 'github';
     let asked: string | undefined;
+    let empty = false;
     try {
-      const found = await (kind ? this.ask(kind, wanted, this.dataDir) : this.askAny(wanted, this.dataDir));
-      if (!found) throw new Error(`${wanted} isn't on GitHub or Bitbucket, or this login can't see it`);
-      ({ repo, forge, asked } = found);
+      if (kind === 'bitbucket') throw Error('Ask Bitbucket');
+      const view = JSON.parse(await gh(['repo', 'view', wanted, '--json', 'nameWithOwner,isEmpty'], this.dataDir, 30_000));
+      repo = normalizeRepo(view.nameWithOwner) ?? wanted;
+      empty = view.isEmpty === true;
     } catch (err) {
-      return (err as Error).message;
+      const found = kind === 'github' ? undefined : await askBb(wanted, this.dataDir);
+      if (!found) return `${wanted} isn't on GitHub or Bitbucket, or this login cannot see it: ${(err as Error).message}`;
+      ({ repo, forge, asked } = found);
     }
     const key = repo.toLowerCase();
-    if (this.defs.some((d) => sameRepo(d.repo, repo))) return `${repo} already has a floor`;
-    if (this.cloning.has(key)) return `${repo} is already being cloned`;
     const [owner, name] = repo.split('/');
     const dest = path.join(this.projectsDir, owner, name);
     if (this.defs.some((d) => path.resolve(d.dir) === dest)) return `${dest} is already a floor`;
     const def = this.newDef(name, repo, dest, by);
-    this.cloning.set(key, def);
+    def.forge = forge;
+    def.asked = asked;
+    const pending: Pending = { def, owner: account, empty };
+    this.cloning.set(key, pending);
     started(def);
     try {
-      const err = await cloneInto(repo, dest, forge, asked);
+      const err = await this.clone(pending);
       if (err) return err;
     } finally {
       this.cloning.delete(key);
+      this.saveClones();
     }
     this.defs.push(def);
     this.save();
     return def;
   }
 
-  /** Repositories the office's own forge sign-ins can clone, most recently pushed first. */
+  /** Clones a floor on its way, or checks that what's already there is its repository. Resolves to an error, if any. */
+  private async clone(p: Pending): Promise<string | undefined> {
+    const { dir: dest } = p.def;
+    const repo = p.def.repo!;
+    const there = checkoutAt(dest, repo, p.empty);
+    // Cloned before (a floor that was taken off the list, or by hand): move back in.
+    if (there === 'ok') return undefined;
+    if (there !== 'none') return there;
+    try {
+      mkdirSync(path.dirname(dest), { recursive: true });
+    } catch (err) {
+      return `Couldn't make ${path.dirname(dest)}: ${(err as Error).message}`;
+    }
+    if (this.opts.terminal) return cloneHere(repo, dest, p.def.forge, p.def.asked);
+    try {
+      mkdirSync(this.logsDir, { recursive: true, mode: 0o700 });
+    } catch (err) {
+      return `Couldn't make ${this.logsDir}: ${(err as Error).message}`;
+    }
+    const run = await CloneRun.start(repo, dest, path.join(this.logsDir, `${repo.replace('/', '__')}.log`), { ...this.opts.clone, forge:p.def.forge, asked:p.def.asked, changed: () => this.cloneChanged?.() });
+    if (typeof run === 'string') return run;
+    p.run = run;
+    this.saveClones();
+    return this.settle(p, await run.done);
+  }
+
+  /** Whether a clone that ended left its checkout: an error if it didn't. */
+  private settle(p: Pending, end: CloneEnd): string | undefined {
+    if (p.run) dropLog(p.run.log);
+    if (end.stopped) return end.stopped;
+    // Its exit code isn't the word on it (a clone an office before this one started has none): the checkout is.
+    if (checkoutAt(p.def.dir, p.def.repo!, p.empty) === 'ok') return undefined;
+    return `Couldn't clone ${p.def.repo}: ${whyCloneFailed(end.output)}`;
+  }
+
+  private pendingFloor(id: string): Pending | undefined {
+    return [...this.cloning.values()].find((p) => p.def.id === id);
+  }
+
+  /** Repositories the office's `gh` login can clone, most recently pushed first. */
   async repos(refresh = false): Promise<RepoChoice[]> {
     const cached = this.repoCache;
     if (cached && !refresh && Date.now() - cached.at < REPOS_TTL_MS) return cached.repos;
@@ -274,33 +407,13 @@ export class Building {
     return repos;
   }
 
-  /**
-   * Asks one forge about `repo`: the name's real case, and that this login can see it. Resolves to
-   * nothing when the forge doesn't have it, rather than failing, so the next one can be asked.
-   * `asked` is the name the forge itself answered to, which is the one it can go on to clone from.
-   */
-  private async ask(kind: ForgeKind, repo: string, cwd: string): Promise<Found | undefined> {
-    try {
-      if (kind === 'bitbucket') return await askBb(repo, cwd);
-      const view = JSON.parse(await gh(['repo', 'view', repo, '--json', 'nameWithOwner'], cwd, 30_000)) as { nameWithOwner?: string };
-      return view.nameWithOwner ? { repo: normalizeRepo(view.nameWithOwner) ?? repo, forge: 'github' } : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
-  /** A name with no forge said: GitHub first, then Bitbucket, so `agent-office owner/name` still works. */
-  private async askAny(repo: string, cwd: string): Promise<Found | undefined> {
-    return (await this.ask('github', repo, cwd)) ?? (await this.ask('bitbucket', repo, cwd));
-  }
-
   private newDef(name: string, repo: string | undefined, dir: string, by: string): FloorDef {
-    const taken = new Set([...this.defs, ...this.cloning.values()].map((d) => d.id));
+    const taken = new Set([...this.defs, ...this.pending()].map((d) => d.id));
     const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32) || 'floor';
     let id = base;
     for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
     // The first look nobody has, so floors side by side never match; then round again.
-    const used = new Set([...this.defs, ...this.cloning.values()].map((d) => d.palette));
+    const used = new Set([...this.defs, ...this.pending()].map((d) => d.palette));
     const free = FLOOR_PALETTES.findIndex((_, i) => !used.has(i));
     const palette = free >= 0 ? free : (this.defs.length + this.cloning.size) % FLOOR_PALETTES.length;
     return { id, name, repo, dir, palette, addedBy: by, addedAt: Date.now() };
@@ -333,6 +446,8 @@ export class Building {
           // kept only to identify the floor. Keep the host too: dropping it here would silently turn
           // a hosted floor into an office-side one on the next restart, pointed at a path it cannot read.
           host,
+          forge: s.forge,
+          asked: s.asked,
         });
       }
     } catch (err) {
@@ -379,6 +494,30 @@ export class Building {
       console.error(`agent-office: couldn't save the floors: ${(err as Error).message}`);
     }
   }
+
+  private loadClones(): SavedClone[] {
+    try {
+      const saved = JSON.parse(readFileSync(this.clonesFile, 'utf8')) as Partial<SavedClone>[];
+      return (Array.isArray(saved) ? saved : []).filter(
+        // Its log is one of ours (it gets deleted), in .agent-office/clones.
+        (s): s is SavedClone =>
+          Number.isInteger(s.pid) && (s.pid as number) > 0 && typeof s.log === 'string' && path.dirname(s.log) === this.logsDir && typeof s.dir === 'string' && path.isAbsolute(s.dir) && typeof s.name === 'string',
+      );
+    } catch {
+      return [];
+    }
+  }
+
+  /** Keeps the clones under way in cloning.json, so the next office can pick them up after a restart. */
+  private saveClones() {
+    const saved: SavedClone[] = [...this.cloning.values()].flatMap((p) => (p.run ? [{ ...p.def, pid: p.run.pid, log: p.run.log, owner: p.owner, empty: p.empty }] : []));
+    try {
+      if (saved.length) writeFileSync(this.clonesFile, JSON.stringify(saved, null, 2), { mode: 0o600 });
+      else rmSync(this.clonesFile, { force: true });
+    } catch (err) {
+      console.error(`agent-office: couldn't save ${this.clonesFile}: ${(err as Error).message}`);
+    }
+  }
 }
 
 /** A path under the home folder as ~/…, for showing people. */
@@ -410,161 +549,43 @@ function unwritable(dir: string): string | undefined {
   return undefined;
 }
 
-/**
- * Asks bb about a repository someone typed, and reports the name bb itself answers to.
- *
- * bb works out its workspace from `BB_WORKSPACE` or the default its sign-in recorded, and that is
- * the only way to reach a personal workspace, whose slug is often not the username: asked as
- * `tradai/discovery` it says the repository is not found, while `discovery` alone works. So the name
- * is asked about both ways and whichever bb recognises is the one given back — and the one cloned
- * from later, since `repo clone` takes the same forms and fails the same way.
- */
-async function askBb(repo: string, cwd: string): Promise<Found | undefined> {
-  const slug = repo.split('/').pop() ?? repo;
-  for (const asked of [repo, slug]) {
-    try {
-      const out = await bb(['repo', 'view', asked, '--json', 'full_name'], cwd, 30_000);
-      const full = normalizeRepo((JSON.parse(out || '{}') as { full_name?: string }).full_name);
-      if (full) return { repo: full, forge: 'bitbucket', asked };
-    } catch {
-      // Not that one, or not under that name: try the next way of saying it.
-    }
-  }
-  return undefined;
-}
-
-/** Clones `repo` to `dest`, or checks that what's already there is that repository. `asked` is the
- * name the forge answered to, which for Bitbucket is the form its CLI can clone from. */
-async function cloneInto(repo: string, dest: string, kind: ForgeKind, asked?: string): Promise<string | undefined> {
-  if (existsSync(dest)) {
-    if (!statSync(dest).isDirectory()) return `${dest} is already there and isn't a folder`;
-    if (readdirSync(dest).length) {
-      // Cloned before (a floor that was taken off the list, or by hand): move back in.
-      return sameRepo(originRepo(dest), repo) ? undefined : `${dest} already exists and isn't a checkout of ${repo} — move it out of the way first`;
-    }
-  }
+/** The GitHub repository a checkout's origin points at. */
+export function originRepo(dir: string): string | undefined {
   try {
-    mkdirSync(path.dirname(dest), { recursive: true });
-  } catch (err) {
-    return `Couldn't make ${path.dirname(dest)}: ${(err as Error).message}`;
+    const url = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10_000 }).trim();
+    return /(?:github\.com|bitbucket\.org)[/:]/i.test(url) ? normalizeRepo(url) : undefined;
+  } catch {
+    return undefined;
   }
-  const how = kind === 'bitbucket' ? 'bb' : 'gh';
-  const name = kind === 'bitbucket' ? (asked ?? repo) : repo;
-  const args = kind === 'bitbucket' ? ['repo', 'clone', name, '--directory', dest] : ['repo', 'clone', repo, dest];
+}
+
+/**
+ * What's at `dest`: nothing yet ('none'), a checkout of `repo` ('ok'), or why it's in the way. A
+ * clone that was cut off has its origin but no commit checked out; an `empty` repository has none to.
+ */
+function checkoutAt(dest: string, repo: string, empty: boolean): 'none' | 'ok' | string {
+  if (!existsSync(dest)) return 'none';
+  if (!statSync(dest).isDirectory()) return `${dest} is already there and isn't a folder`;
+  if (!readdirSync(dest).length) return 'none';
+  if (!sameRepo(originRepo(dest), repo)) return `${dest} already exists and isn't a checkout of ${repo} — move it out of the way first`;
+  if (!empty && !hasCommit(dest)) return `${dest} is a clone of ${repo} that didn't finish — delete that folder and add the floor again`;
+  return 'ok';
+}
+
+function hasCommit(dir: string): boolean {
+  try {
+    execFileSync('git', ['rev-parse', '--verify', '--quiet', 'HEAD^{commit}'], { cwd: dir, stdio: 'ignore', timeout: 10_000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Clones `repo` to `dest` in this terminal: git shows its progress, and ssh or git can ask here. Resolves to an error, if any. */
+function cloneHere(repo: string, dest: string, forge?: ForgeKind, asked?: string): Promise<string | undefined> {
   return new Promise((resolve) => {
-    execFile(kind === 'bitbucket' ? 'bb' : 'gh', args, { cwd: path.dirname(dest), timeout: CLONE_TIMEOUT_MS, maxBuffer: 4 * 1024 * 1024 }, (err, _out, stderr) => {
-      if (!err) return resolve(undefined);
-      const why = String(stderr || err.message).trim().split('\n').filter(Boolean).slice(-2).join(' ');
-      resolve(`Couldn't clone ${repo}: ${why || `${how} failed`}`);
-    });
+    const child = spawn(forge === 'bitbucket' ? 'bb' : 'gh', forge === 'bitbucket' ? ['repo', 'clone', asked ?? repo, '--directory', dest] : ['repo', 'clone', repo, dest], { cwd: path.dirname(dest), stdio: 'inherit' });
+    child.once('error', (err: NodeJS.ErrnoException) => resolve(err.code === 'ENOENT' ? "The GitHub CLI (gh) isn't installed on this machine" : `Couldn't run gh: ${err.message}`));
+    child.once('exit', (code, signal) => resolve(code === 0 ? undefined : `Couldn't clone ${repo}: gh ${signal ? `stopped (${signal})` : `failed (exit ${code})`}`));
   });
-}
-
-/**
- * Repositories the office's own sign-ins can clone, most recently pushed first. Both forges are
- * asked, and one that isn't installed or isn't signed in is quietly left out rather than failing
- * the whole list: GitHub-only and Bitbucket-only people get theirs either way.
- */
-async function listRepos(cwd: string): Promise<RepoChoice[]> {
-  const [github, bitbucket] = await Promise.allSettled([githubRepos(cwd), bitbucketRepos(cwd)]);
-  if (github.status === 'rejected' && bitbucket.status === 'rejected') throw github.reason;
-  const repos = [...(github.status === 'fulfilled' ? github.value : []), ...(bitbucket.status === 'fulfilled' ? bitbucket.value : [])];
-  const seen = new Set<string>();
-  return repos
-    .filter((r) => (seen.has(r.name.toLowerCase()) ? false : seen.add(r.name.toLowerCase())))
-    .sort((a, b) => (b.pushedAt ?? '').localeCompare(a.pushedAt ?? ''))
-    .slice(0, MAX_REPOS);
-}
-
-async function githubRepos(cwd: string): Promise<RepoChoice[]> {
-  const out = await gh(
-    [
-      'api',
-      '--paginate',
-      'user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member',
-      '--jq',
-      '.[] | {name: .full_name, description: (.description // ""), private: .private, pushedAt: .pushed_at}',
-    ],
-    cwd,
-    90_000,
-  );
-  const repos: RepoChoice[] = [];
-  for (const line of out.split('\n')) {
-    if (!line.trim()) continue;
-    try {
-      const r = JSON.parse(line) as { name?: unknown; description?: unknown; private?: unknown; pushedAt?: unknown };
-      const name = normalizeRepo(r.name);
-      if (!name) continue;
-      repos.push({
-        name,
-        forge: 'github',
-        description: typeof r.description === 'string' && r.description ? r.description.slice(0, 200) : undefined,
-        private: r.private === true,
-        pushedAt: typeof r.pushedAt === 'string' ? r.pushedAt : undefined,
-      });
-    } catch {
-      // not a line of ours
-    }
-    if (repos.length >= MAX_REPOS) break;
-  }
-  return repos;
-}
-
-/**
- * The repositories in every Bitbucket workspace this login belongs to.
- *
- * bb works out a workspace for itself — `BB_WORKSPACE`, or the default its sign-in recorded — and
- * that is the only way to reach a *personal* workspace, whose slug is often not the username: named
- * outright, bb answers `No workspace with identifier 'tradai'` and `repo view tradi/discovery` says
- * the repository is not found, while `discovery` alone works. So the workspace bb has for itself is
- * listed without one, and every other workspace is asked for by name, with any that won't answer
- * left out rather than failing the whole list.
- */
-async function bitbucketRepos(cwd: string): Promise<RepoChoice[]> {
-  const repos: RepoChoice[] = [];
-  // A workspace list that can't be read is not a reason to show nothing: the default one still can.
-  const slugs = await Promise.allSettled([bbWorkspaceSlugs(cwd)]).then(([s]) => (s.status === 'fulfilled' ? s.value : []));
-  // Asking for exactly the fields the elevator shows, rather than each repository in full, is a
-  // fraction of the JSON: four fields against a links-and-permissions object apiece.
-  const pages = await Promise.allSettled([undefined, ...slugs].map((s) => bbRepoPage(s, cwd)));
-  for (const page of pages) {
-    if (page.status !== 'fulfilled') continue;
-    for (const r of page.value) {
-      repos.push(r);
-      if (repos.length >= MAX_REPOS) break;
-    }
-    if (repos.length >= MAX_REPOS) break;
-  }
-  return repos;
-}
-
-/** The slugs of the workspaces this login belongs to; the default one among them, if bb names it. */
-async function bbWorkspaceSlugs(cwd: string): Promise<string[]> {
-  const listed = await bb(['workspace', 'list', '--json'], cwd, 60_000);
-  // Each entry is a workspace_access wrapper with the workspace itself under `workspace`, so the
-  // slug is one level in — reading it off the entry finds nothing and the list comes back empty.
-  return ((JSON.parse(listed || '{}') as { workspaces?: any[] }).workspaces ?? [])
-    .map((w) => String(w?.workspace?.slug ?? w?.slug ?? '').trim())
-    .filter(Boolean);
-}
-
-/** One page of `bb repo list`: `workspace` is undefined for the workspace bb has for itself. */
-async function bbRepoPage(workspace: string | undefined, cwd: string): Promise<RepoChoice[]> {
-  const out = await bb(['repo', 'list', ...(workspace ? ['--workspace', workspace] : []), '--all', '--json', 'full_name,description,is_private,updated_on'], cwd, 90_000);
-  // Naming the fields drops the envelope and answers with a flat array; a bare `--json` keeps it.
-  const parsed = JSON.parse(out || '[]') as any[] | { repositories?: any[] };
-  const rows = Array.isArray(parsed) ? parsed : (parsed.repositories ?? []);
-  const repos: RepoChoice[] = [];
-  for (const r of rows) {
-    const name = normalizeRepo(r?.full_name);
-    if (!name) continue;
-    repos.push({
-      name,
-      forge: 'bitbucket',
-      description: typeof r?.description === 'string' && r.description ? r.description.slice(0, 200) : undefined,
-      private: r?.is_private === true,
-      pushedAt: typeof r?.updated_on === 'string' ? r.updated_on : undefined,
-    });
-  }
-  return repos;
 }

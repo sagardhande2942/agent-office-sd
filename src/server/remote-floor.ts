@@ -65,6 +65,7 @@ interface Pending {
  */
 export class RemoteFloor implements FloorActions {
   readonly dir: string;
+  readonly helpers = { states: () => (this.mirror.get('helper') ?? []) as import('../shared/helper.js').HelperState[] };
   private seq = 0;
   private pending = new Map<number, Pending>();
   /** The last thing each read returned, kept so a read never has to cross the socket. */
@@ -92,7 +93,7 @@ export class RemoteFloor implements FloorActions {
     /** The floor's identity, as the host announced it. Named so refusals and the elevator can use it. */
     readonly def: { id: string; name: string; dir: string; repo?: string; palette: number; addedBy: string; addedAt: number },
     /** What the host's `ready` frame said, kept here so the office can describe the floor it is in. */
-    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind } = { providers: [], forge: 'github' },
+    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean } = { providers: [], forge: 'github' },
   ) {
     // The office keeps this for identity, and must never use it: it is a path on the host.
     this.dir = '';
@@ -182,7 +183,7 @@ export class RemoteFloor implements FloorActions {
       // The same frame is where the host says which branch it is on and which agents it has, which is
       // what `project` and `officeDefault` answer from. Recorded here rather than in the constructor,
       // because the office registers a hosted floor from the building long before its machine pairs.
-      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge };
+      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true };
       return;
     }
     // An unaddressed refusal (no floor) is about the connection, not a call, so it never settles one.
@@ -208,7 +209,7 @@ export class RemoteFloor implements FloorActions {
     // Whatever the floor would have emitted locally, remembered under the event's own name so the
     // reads can find it. Worker updates are kept apart from the mirror: they describe a worker rather
     // than a floor's furniture, and the office asks for them by id.
-    const payload = msg.msg as { t?: string; worker?: WorkerInfo; workerId?: string; state?: unknown; items?: unknown; plan?: unknown; ball?: unknown; cars?: unknown } | undefined;
+    const payload = msg.msg as { t?: string; worker?: WorkerInfo; workerId?: string; state?: unknown; items?: unknown; plan?: unknown; ball?: unknown; cars?: unknown; helpers?: unknown } | undefined;
     if (!payload?.t) return;
     if (payload.t === 'worker.update' && payload.worker) {
       this.known.set(payload.worker.id, payload.worker);
@@ -219,7 +220,7 @@ export class RemoteFloor implements FloorActions {
     } else {
       // What a read answers with is the payload, not the frame around it: a `queue` event carries
       // `{ t: 'queue', state }`, and `queue.state()` must return the state.
-      this.mirror.set(payload.t, payload.state ?? payload.items ?? payload.plan ?? payload.ball ?? payload.cars ?? payload);
+      this.mirror.set(payload.t, payload.state ?? payload.items ?? payload.plan ?? payload.ball ?? payload.cars ?? payload.helpers ?? payload);
     }
   }
 
@@ -316,7 +317,8 @@ export class RemoteFloor implements FloorActions {
       station: async (deskId, by, text, owner) => (await remote.call('station.prompt', { deskId, by, text, owner })) as { info: WorkerInfo; hired: boolean } | string,
       resume: async (id, prompt) => String((await remote.call('worker.resume', { workerId: id, prompt })) ?? ''),
       deliverHelperReport: async (id, by) => String((await remote.call('worker.prompt', { workerId: id, helperReport: true, by })) ?? ''),
-      prompt: async (id, text, by) => String((await remote.call('worker.prompt', { workerId: id, text, by })) ?? ''),
+      rest: async (id,on) => !remote.announced.workerBreaks ? 'Update the floor host to support worker breaks' : String((await remote.call('worker.rest',{workerId:id,on})) ?? '') || undefined,
+      prompt: async (id, text, by, guard) => guard !== undefined && !remote.announced.bossGuard ? 'Update the floor host before sending Boss prompts; its terminal guard is unavailable' : String((await remote.call('worker.prompt', { workerId: id, text, by, ...(guard !== undefined ? {guard} : {}) })) ?? ''),
       kill: async (id, cleanup) => {
         const result = await remote.call('worker.kill', { workerId: id, cleanup });
         return typeof result === 'string' ? { error: result } : (result ?? {}) as { note?: string; error?: string };
