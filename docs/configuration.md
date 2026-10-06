@@ -57,4 +57,4 @@ agent-office accounts [list | invite [name] [--admin] | revoke <name> | role <na
 
 ## Terminal office client
 
-`agent-office tui` joins a running office without opening a browser. Use `--office <http(s) origin>` for a remote server, `--name <account>` for account login, and `--floor <id>` for the initial floor. See [cli.md](cli.md) for commands and password handling.
+`agent-office tui` joins a running office with a live terminal desk grid, worker details and board panels. Arrow keys select a desk, Enter opens its terminal, and `:` opens a command prompt. Use `--office <http(s) origin>` for a remote server, `--name <account>` for account login, and `--floor <id>` for the initial floor. See [cli.md](cli.md) for commands and password handling.
