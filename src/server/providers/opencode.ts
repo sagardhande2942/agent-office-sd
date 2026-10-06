@@ -115,7 +115,7 @@ export const opencode: ProviderAdapter<StatusState, OpenCodeSetup> = {
   prepare: ({ dataDir, mcpScript }) => ({ plugin: writeOpenCodePlugin(dataDir), mcpScript }),
   launch({ h, args, prompt, resumeSessionId, setup }) {
     const { info } = h;
-    if (info.planReview?.locked) args.push('--agent', 'office_plan');
+    if (info.planReview?.locked) args.push('--agent', 'plan');
     if (resumeSessionId || info.model) args = withoutOpenCodeModel(args);
     if (!resumeSessionId && info.model) args.push('--model', info.model);
     if (resumeSessionId) args.push('--session', resumeSessionId);
@@ -133,9 +133,10 @@ export const opencode: ProviderAdapter<StatusState, OpenCodeSetup> = {
         env.OPENCODE_CONFIG_CONTENT = mergeOpenCodeConfigContent(env.OPENCODE_CONFIG_CONTENT, openCodePluginSpecifier(setup.plugin), setup.mcpScript ? openCodeMcp(setup.mcpScript) : undefined);
         if (info.planReview?.locked) {
           const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
-          const permission: Record<string, string> = { '*': 'deny', read: 'allow', glob: 'allow', grep: 'allow', list: 'allow' };
+          const permission: Record<string, string> = { '*': 'deny', read: 'allow', glob: 'allow', grep: 'allow', list: 'allow', bash: 'ask' };
           for (const t of ['plan_review_state', ...(info.planReview.role === 'candidate' ? ['submit_candidate_plan'] : ['request_plan_clarification', 'submit_plan_review'])]) permission['agent-office_' + t] = 'allow';
-          config.permission = permission; config.agent = { office_plan: { mode: 'primary', permission } };
+          // Retain the native Plan identity and shell schema for Zen compatibility; the plugin still rejects all shell execution.
+          config.permission = permission; config.agent = { plan: { permission } };
           env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
         }
       },
