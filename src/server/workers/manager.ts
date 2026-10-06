@@ -251,7 +251,7 @@ export class WorkerManager {
     if (this.deskOccupied(deskId) && !(helper && isHelperId(deskId))) return seat.station ? `The ${STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
     if (kind === 'shell' && seat.station) return 'A board agent is always an agent, not a shell';
     if (seat.station && !prompt?.trim()) return 'Tell the board agent what to do';
-    const planError = planningSeat(seat, planReview, kind, worktree, selectedProvider, model, this.mcpScript, (selectedProvider === this.defaultProvider ? this.agentPath : resolveCommand('opencode')) ?? 'opencode');
+    const planError = planningSeat(seat, planReview, kind, worktree, selectedProvider, model, binScript('office-workers.js'), (selectedProvider === this.defaultProvider ? this.agentPath : resolveCommand('opencode')) ?? 'opencode');
     if (planError) return planError;
     if (!seat.room !== !meeting) return seat.room ? 'Only a meeting seats workers at the meeting table: call one in the meeting room' : 'A meeting seats its workers at the meeting table';
     if (meeting && (kind !== 'agent' || worktree)) return 'A meeting seats agents, in its own worktree';

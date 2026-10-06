@@ -23,5 +23,5 @@ export function promotePlanWorker(ctx: WorkerContext, id: string, activityId: st
   w.hookToken = randomBytes(16).toString('hex');
   clockWork(w.info, 'starting'); w.info.status = 'starting'; w.info.exitCode = undefined; w.interrupted = false;
   ctx.notePrompt(w, prompt); ctx.persist(); launch(w, prompt);
-  return w.info.status === 'exited' ? 'Winner could not start; resume its terminal to implement the accepted plan' : undefined;
+  return ctx.workers.get(id)?.info.status === 'exited' ? 'Winner could not start; resume its terminal to implement the accepted plan' : undefined;
 }
