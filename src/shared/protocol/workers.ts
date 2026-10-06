@@ -1,3 +1,4 @@
+import type { BossGuard } from '../boss.js';
 import type { HelperState } from '../helper.js';
 // Workers at their desks: what they are, their worktrees and their terminals.
 
@@ -198,7 +199,7 @@ export type WorkerClientMsg =
   | { t: 'worker.attach'; workerId: string }
   | { t: 'worker.detach'; workerId: string }
   /** With `issue`, the prompt hands the worker that GitHub issue, which is taken as for worker.spawn. */
-  | { t: 'worker.prompt'; workerId: string; prompt: string; issue?: number; helperReport?: boolean }
+  | { t: 'worker.prompt'; workerId: string; prompt: string; issue?: number; helperReport?: boolean; guard?: BossGuard }
   /**
    * A prompt for the agent standing by a board (`deskId` is its kiosk, see STATIONS in layout). It's
    * typed into its session, which is woken up first if it's asleep, or hired there when nobody is.

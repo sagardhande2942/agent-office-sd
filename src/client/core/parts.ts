@@ -5,6 +5,7 @@
  * order they register in, and a part can reach one installed after it. Each part names the ones it
  * reaches for (a `Pick` of these). Types only.
  */
+import type { installBoss } from '../features/boss';
 import type { Net } from '../net';
 import type { DesktopNotifier } from '../notify';
 import type { PlayerController } from '../player';
@@ -115,6 +116,7 @@ export interface Parts {
   waiting: Made<typeof installWaiting>;
   needsYou: Made<typeof installNeedsYou>;
   meeting: Made<typeof installMeeting>;
+  boss: Made<typeof installBoss>;
   smartphone: Made<typeof installSmartphone>;
   bookshelf: Made<typeof installBookshelf>;
   bar: Made<typeof installBar>;

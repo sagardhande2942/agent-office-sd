@@ -362,3 +362,18 @@ test('hosted helper paths survive an arriving floor view and clear on removal', 
   floor.deliver({t:'event',floorId:'f1',seq:0,msg:{t:'helper',helpers:[]}});
   assert.deepEqual(floor.helpers.states(),[]);
 });
+
+
+test('Boss prompts refuse legacy hosts and carry snapshot guards to capable hosts', async () => {
+  const host=fakeHost(), floor=make(host), guard={floor:'f1',createdAt:1,status:'idle' as const};
+  assert.match((await floor.workers.prompt('a','hello','QA',guard))!,/Update the floor host/);
+  assert.equal(host.sent.length,0);
+  floor.deliver({t:'ready',floor:{floorId:'f1',name:'API',seats:2,accepting:false,workers:[],forge:'github',bossGuard:true}});
+  const pending=floor.workers.prompt('a','hello','QA',guard);
+  assert.deepEqual(host.sent[0].guard,guard);
+  floor.deliver({t:'result',floorId:'f1',seq:host.sent[0].seq as number,value:''});
+  assert.equal(await pending,'');
+  floor.deliver({t:'ready',floor:{floorId:'f1',name:'API',seats:2,accepting:false,workers:[],forge:'github'}});
+  assert.match((await floor.workers.prompt('a','hello','QA',guard))!,/Update the floor host/);
+  assert.equal(host.sent.length,1);
+});

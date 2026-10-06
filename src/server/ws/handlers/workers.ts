@@ -1,5 +1,6 @@
 // Workers at their desks and the board agents at their kiosks: hiring them, their terminals, their
 // worktrees and pull requests.
+import { validBossGuard } from '../../../shared/boss.js';
 import { MAX_REPOS, type RepoSource } from '../../workers.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
 import { isAgentEffort, isAgentProvider, type WorkerClientMsg } from '../../../shared/protocol.js';
@@ -116,7 +117,8 @@ export const workerHandlers = {
   async 'worker.prompt'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);
-    const err = w ? msg.helperReport ? await w.floor.workers.deliverHelperReport(w.wid, who) : await w.floor.workers.prompt(w.wid, str(msg.prompt, 20000), who) : 'No such worker';
+    if (msg.guard !== undefined && (!w || msg.helperReport || !validBossGuard(w.info, msg.guard) || msg.guard.floor !== w.floor.id || ctx.floorOf(c)?.id !== w.floor.id)) return ctx.warn(c, 'Worker or floor changed; review the boss prompt again');
+    const err = w ? msg.helperReport ? await w.floor.workers.deliverHelperReport(w.wid, who) : await w.floor.workers.prompt(w.wid, str(msg.prompt, 20000), who, msg.guard) : 'No such worker';
     ctx.warn(c, err);
     const issue = w?.info.kind === 'agent' ? issueNumber(msg.issue) : undefined;
     if (w && !err && issue) {
