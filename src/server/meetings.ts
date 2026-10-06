@@ -309,7 +309,6 @@ export class MeetingRoom {
       return;
     }
     if (m.waitingForCommunications) {
-      if (m.tokens > m.budget) return this.halt(m, `over budget: ${fmtTokens(m.tokens)} of ${fmtTokens(m.budget)} tokens`);
       this.finish(m);
       if (this.dirty) this.changed();
       return;
