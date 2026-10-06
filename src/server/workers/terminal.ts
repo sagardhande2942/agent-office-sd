@@ -5,7 +5,7 @@ import serialize from '@xterm/addon-serialize';
 import type { Run, WorkerInfo } from '../../shared/protocol.js';
 import { FLAG_BOLD, FLAG_DIM, FLAG_INVERSE, RGB_FLAG } from '../../shared/protocol.js';
 import { SCROLLBACK } from '../ptys.js';
-import { screenSnapshot } from '../screen.js';
+import { screenSnapshot, withoutFullScreen } from '../screen.js';
 import type { Worker, WorkerEvents } from './types.js';
 
 export type HeadlessTerminal = InstanceType<typeof headless.Terminal>;
@@ -35,11 +35,19 @@ export function newTerm(w: Worker, on: { progress?(busy: boolean): void; title(t
   w.term?.dispose();
   w.term = term;
   w.ser = ser;
-  w.snapshot = screenSnapshot(term, ser);
+  w.snapshot = screenSnapshot(term, ser, () => (w.fullScreen = true));
   w.lastLines = [];
   w.screenDirty = true;
   w.fresh = undefined;
+  w.fullScreen = undefined;
   return term;
+}
+
+/** Preserve scrollback in the office's observer; viewers still receive the original bytes. */
+export function observed(data: string, w: Worker): string {
+  const seen = withoutFullScreen(data, w.info.rows);
+  if (seen !== data) w.fullScreen = true;
+  return seen;
 }
 
 /** Full screens for every running worker — sent to people as they walk in. */

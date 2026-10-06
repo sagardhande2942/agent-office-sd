@@ -35,7 +35,7 @@ import { restoreWorkers, saveWorkers } from './persist.js';
 import { WorkerPrs } from './pr.js';
 import { WIN, binScript, defaultShell, resolveCommand, shellRun, shq, writeOfficeCommands } from './process.js';
 import { CARRY_ON_PROMPT, WorkerTasks } from './tasks.js';
-import { flushScreens, fullScreens, newTerm, offlineBanner, screenText, type HeadlessTerminal } from './terminal.js';
+import { flushScreens, fullScreens, newTerm, observed, offlineBanner, screenText, type HeadlessTerminal } from './terminal.js';
 import type { HookEnv, OpenedPr, RepoSource, RunAs, Worker, WorkerContext, WorkerEvents, WorkerHandle } from './types.js';
 import { clamp, safeEq, truncate } from './util.js';
 import { COLORS, NAMES, newWorker } from './worker.js';
@@ -826,7 +826,7 @@ export class WorkerManager {
     const adapter = info.kind === 'agent' ? providerAdapter(info.provider) : undefined;
     w.pty = proc;
     proc.onData((data) => {
-      term.write(data);
+      term.write(observed(data, w));
       w.screenDirty = true;
       w.unsaved = true;
       if (w.viewers.size) this.events.data(info.id, data, [...w.viewers.keys()]);
@@ -1004,7 +1004,7 @@ export class WorkerManager {
     const s = w.info.status;
     if (s !== 'starting' && s !== 'idle' && !(w.bootBlocked && s === 'needs_input')) return;
     // Only this run's output counts: a "Not logged in" in the scrollback from before is old news.
-    const text = screenText(w.term, w.term.buffer.active.type === 'normal' ? Math.max(0, w.fresh?.line ?? 0) : 0);
+    const text = screenText(w.term, w.fullScreen ? 0 : Math.max(0, w.fresh?.line ?? 0));
     const blocked = blockedBy(text, s === 'starting' || !!w.bootBlocked);
     if (blocked && s !== 'needs_input') {
       w.bootBlocked = true;

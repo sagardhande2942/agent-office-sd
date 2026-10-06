@@ -104,6 +104,8 @@ export interface Worker {
   outputAt?: number;
   /** Where this run's own output starts, below the scrollback carried over from before. */
   fresh?: { readonly line: number };
+  /** This run drew full-screen, including rows above its fresh-output marker. */
+  fullScreen?: boolean;
   /** Its lost worktree is being put back (see rebuild): the folder coming back mustn't wake it before that's done. */
   rebuilding?: boolean;
 }

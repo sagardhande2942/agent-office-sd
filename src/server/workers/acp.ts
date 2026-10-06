@@ -1,7 +1,7 @@
 // A worker that runs over ACP rather than in a terminal (DeepSeek Harness, see ProviderAdapter.transport):
 // the office holds the connection and draws what it says into the worker's terminal itself.
 import { DshSession, terminalSafe } from '../dsh.js';
-import type { HeadlessTerminal } from './terminal.js';
+import { observed, type HeadlessTerminal } from './terminal.js';
 import type { Worker, WorkerContext } from './types.js';
 import { truncate } from './util.js';
 
@@ -26,7 +26,7 @@ export function launchAcp(ctx: WorkerContext, w: Worker, term: HeadlessTerminal,
     {
       output: (data) => {
         if (w.dsh !== session) return;
-        term.write(data);
+        term.write(observed(data, w));
         w.screenDirty = true;
         w.unsaved = true;
         if (w.viewers.size) ctx.events.data(info.id, data, [...w.viewers.keys()]);
