@@ -1,3 +1,4 @@
+import './completion.css';
 import type { WorkerInfo } from '../../shared/protocol';
 import type { CompletionReport } from '../../shared/completion';
 import { completionLabel } from '../../shared/completion';

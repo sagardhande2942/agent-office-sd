@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 // Exercise the actual dialog entry point without booting the WebGL application.
-const source = readFileSync(new URL('../src/client/main.ts', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/client/features/workers/actions.ts', import.meta.url), 'utf8').replace(/^  /gm, '');
 const entry = source.match(/^function helperFor\(w: WorkerInfo\) \{[\s\S]*?^\}/m)![0].replace('w: WorkerInfo', 'w');
 for (const kind of ['agent', 'shell']) {
   test(`helper dialog opens and sends a request for a ${kind} in the shared checkout`, () => {

@@ -5,9 +5,9 @@ import { overlaps, type WallId, type WallRect } from '../shared/decor';
 import type { Net } from './net';
 import type { PlayerController } from './player';
 import { toast } from './ui/dom';
-import { aimAtWall } from './world/gallery';
+import { aimAtWall } from './features/hanging/world';
 import type { Office } from './world/office';
-import { JukeboxGhost, jukeboxRun } from './world/jukebox';
+import { JukeboxGhost, jukeboxRun } from './features/jukebox/world';
 
 // Moving the jukebox, the way you hang a picture: pick it up, aim at a wall and click to stand it
 // there, with Esc to put it back where it was. There's one jukebox a floor and it's the floor's, so
@@ -42,7 +42,7 @@ export function spotFits(office: Office, wall: WallId, u: number): boolean {
     if (c === office.jukebox.collider) continue;
     // The walls are what it stands against, anything you could walk over is no obstacle, and
     // anything up past its head (the ceiling, the loft) it fits under.
-    if (office.wallColliders.has(c) || c.top <= CLEAR || (c.bottom ?? 0) >= JUKEBOX.height) continue;
+    if (c.top === 99 || c.top <= CLEAR || (c.bottom ?? 0) >= JUKEBOX.height) continue;
     if (clear.minX < c.maxX && c.minX < clear.maxX && clear.minZ < c.maxZ && c.minZ < clear.maxZ) return false;
   }
   return true;
@@ -105,7 +105,7 @@ export class Mover {
     const at = this.at;
     if (!at) return toast('Aim at a wall to stand it against it');
     if (!at.ok) return toast("Something's in the way there", 'warn');
-    this.net.send({ t: 'jukebox.place', spot: jukeboxSpot(at.wall, at.u) });
+    this.net.send({ t: 'jukebox.move', spot: jukeboxSpot(at.wall, at.u) });
     this.stop();
   }
 
@@ -139,4 +139,3 @@ export class Mover {
     this.onChange();
   }
 }
-

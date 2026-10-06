@@ -1,3 +1,4 @@
+import './helperreport.css';
 import type { WorkerInfo } from '../../shared/protocol';
 import { isAsleep, isBusy } from '../../shared/status';
 import { h } from './dom';

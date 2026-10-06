@@ -1,0 +1,16 @@
+.modal.boss-center { width: min(980px, 100%); }
+.boss-center header, .boss-summary, .boss-tools, .boss-scope, .boss-composer { padding: 10px 18px; }
+.boss-center h2 { margin: 0; }
+.boss-scope, .boss-hint { color: var(--muted); font-size: 13px; }
+.boss-summary { background: var(--ink); color: var(--paper); font-weight: 800; }
+.boss-tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.boss-workers { margin: 0; padding: 12px 18px; list-style: none; max-height: 38vh; overflow: auto; }
+.boss-worker { display: flex; align-items: center; gap: 10px; border-bottom: 2px solid var(--ink); padding: 10px 0; }
+.boss-dot { width: 20px; height: 20px; border: 2px solid var(--ink); border-radius: 50%; flex: none; }
+.boss-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.boss-info small { color: var(--muted); overflow-wrap: anywhere; max-height: 3em; overflow: hidden; }
+.boss-status { font-size: 12px; font-weight: 800; }
+.boss-status[data-status=needs_input] { color: #c8274b; }
+.boss-composer textarea { width: 100%; box-sizing: border-box; resize: vertical; margin-top: 6px; }
+.boss-composer .boss-tools { padding: 0; }
+@media (max-width: 650px) { .boss-worker { flex-wrap: wrap; } .boss-info { min-width: 55%; } }

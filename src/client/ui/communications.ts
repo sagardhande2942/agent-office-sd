@@ -7,9 +7,11 @@ import './communications.css';
 export function openCommunications(openTerminal: (workerId: string) => void) {
   const filter = h('select', { 'aria-label': 'Filter communications' }, h('option', { value: 'all' }, 'All requests'), h('option', { value: 'open' }, 'Unresolved requests')) as HTMLSelectElement;
   const body = h('div.body.communication-list');
+  const close = h('button.btn.close', { type: 'button', 'aria-label': 'Close' }, '✕');
   const el = h('div.modal.communication-modal', { role: 'dialog', 'aria-label': 'Worker communications', style: 'width:min(850px,100%)' },
-    h('header', {}, h('h2', {}, '📬 Worker communications'), filter), body,
+    h('header', {}, h('h2', {}, '📬 Worker communications'), filter, close), body,
     h('footer', {}, 'Completed = reply acknowledged, or helper report handled through inbox/terminal. This does not confirm a fix or integration.'));
+
   const open = new Set<string>();
   const render = () => {
     const messages = store.communications.messages;
@@ -17,6 +19,7 @@ export function openCommunications(openTerminal: (workerId: string) => void) {
   };
   const unsubs = [store.on('communications', render), store.on('workers', render)];
   const modal = openModal(el, { doing: 'reading worker communications', reading: true, onClose: () => unsubs.forEach((off) => off()) });
+  close.addEventListener('click', () => modal.close());
   filter.addEventListener('change', render);
   render();
 }

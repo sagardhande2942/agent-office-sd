@@ -4,7 +4,7 @@ import { Vector3 } from 'three';
 import { DOG_BREEDS, dogBreed, dogDefaults, type DogBreed } from '../src/shared/dog.js';
 import { openModel } from './glb';
 
-// Each breed's dog-<breed>.glb (exported by blender/scripts/build_dog.py) against what world/dog.ts counts
+// Each breed's dog-<breed>.glb (exported by blender/scripts/build_dog.py) against what features/dog/world.ts counts
 // on: the names it finds the model's parts by, the same for every breed, and roughly the size and shape of
 // dog the office was laid out for.
 
@@ -90,7 +90,8 @@ test('the breeds are built as they should be: a corgi and a dachshund low, a dac
   }
   const length = (b: DogBreed) => size(b).max.z - size(b).min.z;
   for (const b of DOG_BREEDS) if (b !== 'dachshund') assert.ok(length('dachshund') > length(b), `a dachshund is longer than a ${b}`);
-  for (const b of DOG_BREEDS) if (b !== 'pug') assert.ok(length('pug') < length(b), `a pug is shorter than a ${b}`);
+  // A pomeranian is about a pug's length, all fluff.
+  for (const b of DOG_BREEDS) if (b !== 'pug' && b !== 'pomeranian') assert.ok(length('pug') < length(b), `a pug is shorter than a ${b}`);
 });
 
 test("a floor's dog keeps its name and coat, and gets a breed, from its id", () => {
@@ -103,7 +104,8 @@ test("a floor's dog keeps its name and coat, and gets a breed, from its id", () 
     seen.add(d.breed);
     if (d.name === 'Pancake') pancakes.add(d.breed);
   }
-  assert.equal(seen.size, DOG_BREEDS.length, 'every breed turns up');
+  // Every breed there was when floors got breeds; a newer one is only ever picked.
+  assert.deepEqual([...seen].sort(), ['corgi', 'dachshund', 'pug', 'pup', 'shiba'], 'every breed dealt turns up');
   assert.ok(pancakes.size > 1, "a dog's breed doesn't go with its name");
   // What these floors were called and wore before there were breeds.
   assert.deepEqual({ ...dogDefaults('main'), breed: undefined }, { name: 'Pancake', coat: 5, breed: undefined });

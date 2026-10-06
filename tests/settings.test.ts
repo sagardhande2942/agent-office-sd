@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadSettings, saveSettings } from '../src/client/state.js';
+import { loadSettings, saveSettings } from '../src/client/state/persist.js';
 
 /** A localStorage the test can look at, since settings live in the browser's. */
 function fakeStorage(saved: unknown) {
