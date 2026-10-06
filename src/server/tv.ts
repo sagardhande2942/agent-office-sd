@@ -28,7 +28,7 @@ export class Tv {
   private s: Saved = { on: false, playing: false, position: 0, at: Date.now(), theatre: false };
   private file: string;
 
-  constructor(dataDir: string) {
+  constructor(dataDir: string, private readonly changed: (state: TvState) => void = () => {}) {
     this.file = path.join(dataDir, 'tv.json');
     this.load();
   }
@@ -95,12 +95,14 @@ export class Tv {
     if (this.s.theatre === on) return false;
     this.s = { ...this.s, theatre: on, by };
     this.save();
+    this.changed(this.state());
     return true;
   }
 
   private set(s: Omit<Saved, 'at'> & { at?: number }) {
     this.s = { ...s, at: Date.now() };
     this.save();
+    this.changed(this.state());
   }
 
   private load() {

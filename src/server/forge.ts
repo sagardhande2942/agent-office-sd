@@ -1,3 +1,4 @@
+import { Claims } from './claims.js';
 import { execFileSync, spawn } from 'node:child_process';
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
@@ -240,6 +241,9 @@ function friendlyBb(raw: string): string {
  * are written once.
  */
 export class Board<T extends GhIssue | GhPull> {
+  private claims = new Claims();
+  claim(n: number) { const finish=this.claims.take(n); this.showClaims(); return (ok:boolean)=>{finish(ok);this.showClaims();}; }
+  private showClaims() { this.state={...this.state,items:this.claims.mark(this.state.items as GhIssue[]) as T[]}; this.send(this.state); }
   /** The list as the last look left it, and whatever that look said about it. */
   state: GhState<T> = { items: [], fetchedAt: 0, loading: false };
 
@@ -275,7 +279,7 @@ export class Board<T extends GhIssue | GhPull> {
     try {
       // A list asked for before a label change made here still has the old labels (see relabel).
       const items = this.relabel(await this.list(), asked);
-      this.state = { items, fetchedAt: Date.now(), loading: false, forge: this.forge };
+      this.state = { items: this.claims.mark(items as GhIssue[], asked) as T[], fetchedAt: Date.now(), loading: false, forge: this.forge };
     } catch (err) {
       this.state = { ...this.state, loading: false, error: (err as Error).message, fetchedAt: Date.now(), forge: this.forge };
     }

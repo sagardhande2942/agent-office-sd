@@ -1,6 +1,6 @@
 import { contextLabel } from '../shared/communications.js';
 import { builtDesks } from '../shared/layout.js';
-import type { FloorInfo, FloorView, WorkerInfo } from '../shared/protocol.js';
+import type { FloorInfo, FloorView, WorkerInfo, WorktreeCleanup } from '../shared/protocol.js';
 
 export const PANELS = ['office', 'issues', 'pulls', 'queue', 'messages', 'floors', 'help'] as const;
 export type Panel = typeof PANELS[number];
@@ -14,6 +14,7 @@ export interface Dashboard {
   notice: string;
   command?: string;
   thread?: string;
+  home?: { worker: WorkerInfo; cleanup: WorktreeCleanup };
 }
 
 /** Dashboard text is untrusted; only attached PTYs may emit terminal controls. */
@@ -61,7 +62,29 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
   const lines = [fit(`AGENT OFFICE / ${name}    ${view?.workers.length ?? 0} workers | ${attention} need attention | Desk ${all.length ? selected + 1 : 0}/${all.length}`, width),
     fit(PANELS.map((p) => p === state.panel ? `[${p.toUpperCase()}]` : p).join('   '), width), '-'.repeat(width)];
   let body: string[] = [];
-  if (state.panel === 'office' && all.length) {
+  if (state.home) {
+    const { worker, cleanup } = state.home;
+    const many = (worker.repos?.length ?? 0) > 0;
+    const noun = many ? 'worktrees' : 'worktree';
+    body = [`Send ${worker.name} home?`];
+    if (worker.worktree && !worker.meeting) {
+      body.push(
+        `${cleanup === 'all' ? '>' : ' '} 1. Delete ${noun} + branch`,
+        `${cleanup === 'worktree' ? '>' : ' '} 2. Delete ${noun} only`,
+        `${cleanup === 'keep' ? '>' : ' '} 3. ${many ? 'Keep them all' : 'Keep both'}`,
+        'Option 2 keeps the branch.',
+        `Branch: ${worker.worktree.branch}`, `Path: ${worker.worktree.path}`, '',
+        'Deleting removes local work in the selected worktrees.',
+        'Up/Down or 1/2/3: choose | Enter: send home | Esc: cancel');
+    } else body.push(
+      '  1. Delete worktree + branch [unavailable]',
+      '  2. Delete worktree only [unavailable]',
+      '> 3. Keep checkout and branch',
+      worker.meeting ? 'Meeting workers share their checkout; cleanup is managed by the meeting.' : 'This worker uses the shared checkout; it has no private worktree to delete.',
+      'Sending home stops its session and keeps the checkout and branch.',
+      'Enter: send home | Esc: cancel');
+    body = body.map((line) => fit(line, width));
+  } else if (state.panel === 'office' && all.length) {
     const columns = gridColumns(width), cardWidth = Math.min(24, width), side = width >= 100;
     const pageRows = Math.max(1, Math.floor(bodyHeight / 5));
     const start = Math.floor(Math.floor(selected / columns) / pageRows) * pageRows * columns;
@@ -93,12 +116,12 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     if (!body.length) body = [board?.error ?? 'No items on this board.'];
   } else if (state.panel === 'queue') body = view?.queue.tasks.map((t) => `${t.status.padEnd(8)} ${t.title} ${t.workerName ? '(' + t.workerName + ')' : ''}`) ?? [];
   else if (state.panel === 'messages') body = communicationLines(state, width);
-  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt    r: resume    x: send home (Enter confirms)', 'i: issues    b: pull requests    t: task queue    m: messages', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'home <worker> [--cleanup auto|keep|worktree|all],', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, messages [request-id], issues, pulls, queue, floors, quit'];
+  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt    r: resume    x: send home (choose cleanup)', 'i: issues    b: pull requests    t: task queue    m: messages', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'home <worker> [--cleanup auto|keep|worktree|all],', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, messages [request-id], issues, pulls, queue, floors, quit'];
   if (state.panel !== 'office') {
     const start = state.panel === 'floors' || (state.panel === 'messages' && !state.thread) ? Math.floor(state.offset / bodyHeight) * bodyHeight : state.offset;
     body = body.slice(start, start + bodyHeight).map((line) => fit(line, width));
   }
   lines.push(...Array.from({ length: bodyHeight }, (_, i) => body[i] ?? ''));
-  lines.push('-'.repeat(width), fit(state.notice, width), fit(state.command !== undefined ? ':' + state.command.slice(-Math.max(0, width - 2)) + '_' : 'Arrows select | Enter open | Tab panels | f floors | x send home | : command | q quit', width));
+  lines.push('-'.repeat(width), fit(state.notice, width), fit(state.home ? (state.home.worker.worktree && !state.home.worker.meeting ? 'Up/Down choose | Enter send home | Esc cancel' : 'Enter send home (keep checkout) | Esc cancel') : state.command !== undefined ? ':' + state.command.slice(-Math.max(0, width - 2)) + '_' : 'Arrows select | Enter open | Tab panels | f floors | x send home | : command | q quit', width));
   return lines.slice(0, height).join('\r\n');
 }

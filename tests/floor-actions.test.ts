@@ -90,7 +90,7 @@ test('the 56 floor cases map onto the interface, not onto the class', () => {
   // only exists on the class.
   assert.equal(FLOOR_CASES.length, 56);
   const actions = readFileSync(path.join(root, 'src/server/floor-actions.ts'), 'utf8');
-  for (const m of ['spawn', 'station', 'resume', 'prompt', 'kill', 'attach', 'detach', 'write', 'resize', 'openPr', 'rebuild', 'inspectWorktree']) {
+  for (const m of ['spawn', 'station', 'resume', 'prompt', 'rest', 'kill', 'attach', 'detach', 'write', 'resize', 'openPr', 'rebuild', 'inspectWorktree']) {
     assert.match(actions, new RegExp(`\\b${m}\\(`), `workers.${m} must be on the surface`);
   }
   for (const m of ['add', 'remove', 'move', 'retry', 'clear', 'setLimit']) {

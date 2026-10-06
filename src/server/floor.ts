@@ -334,7 +334,7 @@ export class Floor {
 
     this.decor = new Decor(dataDir);
     this.jukebox = new Jukebox(dataDir);
-    this.tv = new Tv(dataDir);
+    this.tv = new Tv(dataDir, (state) => ctx.emit(this, { t: 'tv', state }));
     this.whiteboard = new Whiteboard(dataDir);
     this.ready = this.workers.start();
 

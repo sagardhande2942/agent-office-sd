@@ -8,6 +8,7 @@ import { openCommunications } from './ui/communications';
 import { Net } from './net';
 import { AVATAR_COLORS, loadProfile, loadSettings, saveProfile, store } from './state';
 import { randomLook } from '../shared/avatar';
+import { cloneLabel } from '../shared/floors';
 import { ROOF } from '../shared/rooftop';
 import { DESK_BY_ID, nextFreeSeat } from '../shared/layout';
 import { isAsleep } from '../shared/status';
@@ -16,7 +17,8 @@ import { $, clip, closeAllModals, doingNow, h, onDoingChange, onModalChange, ope
 import { openTerminal, openTerminalFor, routeTerminalMessage } from './ui/terminal';
 import { openChanges, openChangesFor, routeChangesMessage } from './ui/changes';
 import { lostWorktreeDialog, openPrompt, routeWorktreeMessage, sendHomeDialog } from './ui/prompt';
-import { openBoard, type BoardActions } from './ui/boards';
+import { openBoard } from './ui/boards';
+import type { BoardActions } from './ui/github/prompts';
 import { openPull, routePullMessage } from './ui/pull';
 import { openQueue } from './ui/queue';
 import { openAsk } from './ui/ask';
@@ -25,8 +27,11 @@ import { openSignIns } from './ui/signins';
 import { modelBadge, providerLabel } from './ui/provider';
 import { byUrgency, waitingInOrder, waitingLabel } from './nextup';
 import { askNotifyPermission, DesktopNotifier, notifyPermission, waitingOnSomeone } from './notify';
+import { repoChoices } from './shared/hiring';
+// The tab title counts the workers waiting on someone, on every floor, as the 3D office's does.
+import { renderTitle } from './shared/title';
 
-// Sent here because this browser can't draw the 3D office (see main.ts).
+// Sent here because this browser can't draw the 3D office (see noWebGL in core/scene.ts).
 if (new URLSearchParams(location.search).get('why') === 'webgl') {
   history.replaceState(null, '', location.pathname);
   toast("This browser can't draw the 3D office (WebGL is off or missing), so here's the 2D view", 'warn');
@@ -91,7 +96,7 @@ function offTheRoof() {
 
 // ---- The floor you're on ------------------------------------------------------------------------
 const floorSelect = $('floor') as HTMLSelectElement;
-const floorLabel = (f: FloorInfo) => `${f.name}${f.cloning ? ' (cloning…)' : f.waiting ? ` · 🙋 ${f.waiting}` : ''}`;
+const floorLabel = (f: FloorInfo) => `${f.name}${f.cloning ? ` (${cloneLabel(f.clone)})` : f.waiting ? ` · 🙋 ${f.waiting}` : ''}`;
 
 function renderFloors() {
   const options = store.floors.map((f) => h('option', { value: f.id, disabled: !!f.cloning }, floorLabel(f)));
@@ -120,14 +125,6 @@ store.on('floors', renderFloors);
 store.on('floor', renderFloors);
 store.on('project', renderFloors);
 
-/** The tab title counts the workers waiting on someone, on every floor, as the 3D office's does. */
-function renderTitle() {
-  const elsewhere = store.floors.reduce((n, f) => n + (f.id === store.floor ? 0 : f.waiting), 0);
-  const waiting = waitingInOrder(store.workers.values()).length + elsewhere;
-  const name = store.project?.name;
-  document.title = `${waiting ? `(${waiting}) ` : ''}${name ? `${name} · ` : ''}Agent Office`;
-}
-
 // ---- Workers ------------------------------------------------------------------------------------
 /** What each worker was last, to tell when one starts waiting on someone. */
 const lastStatus = new Map<string, string>();
@@ -145,7 +142,7 @@ function workerCard(w: WorkerInfo): HTMLElement {
   const desk = DESK_BY_ID.get(w.deskId);
   const waiting = waitingOnSomeone(w);
   const asleep = isAsleep(w.status);
-  const badge = w.kind === 'agent' ? modelBadge(w.provider, w.model, w.effort) : undefined;
+  const badge = w.kind === 'agent' ? modelBadge(w.provider, w.model, w.effort, w.usage?.model) : undefined;
   const task = w.task?.name ?? w.title ?? (w.prompt ? clip(w.prompt, 90) : undefined);
   // What it's asking, doing or did, in a line.
   const now = w.lost
@@ -260,11 +257,12 @@ function promptWorker(id: string) {
 }
 
 // ---- New work: a prompt for a worker who's here, or a new one at a free desk -------------------
-function hire(deskId: string, prompt: string, worktree: boolean, provider?: AgentProvider, model?: string, effort?: AgentEffort, repos?: string[]) {
-  net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, repos: repos?.length ? repos : undefined });
+function hire(deskId: string, prompt: string, worktree: boolean, provider?: AgentProvider, model?: string, effort?: AgentEffort, repos?: string[], issue?: number) {
+  net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, repos: repos?.length ? repos : undefined });
 }
 
-function sendToWorker(title: string, text: { context?: string; initial?: string } = {}) {
+/** With `issue`, the worker the prompt goes to takes that GitHub issue. */
+function sendToWorker(title: string, text: { context?: string; initial?: string } = {}, issue?: number) {
   if (!store.project) return toast('Pick a floor first', 'warn');
   // The back office's desks too, as far as the floor's built out (see WING).
   const desk = nextFreeSeat((id) => !!store.workerAtDesk(id), store.floorPlan.wing)?.id;
@@ -277,10 +275,10 @@ function sendToWorker(title: string, text: { context?: string; initial?: string 
     workers: awake.map((w) => ({ id: w.id, name: w.name, color: w.color, status: w.status })),
     worktreeOption: !!store.project.branch,
     providerOption: true,
-    repoOptions: store.floors.filter((f) => f.id !== store.floor && f.branch && !f.cloning).map((f) => ({ id: f.id, name: f.name })),
+    repoOptions: repoChoices(),
     onSubmit: (prompt, to, worktree, provider, model, effort, repos) => {
-      if (to) net.send({ t: 'worker.prompt', workerId: to, prompt });
-      else if (desk) hire(desk, prompt, worktree, provider, model, effort, repos);
+      if (to) net.send({ t: 'worker.prompt', workerId: to, prompt, issue });
+      else if (desk) hire(desk, prompt, worktree, provider, model, effort, repos, issue);
     },
   });
 }
@@ -289,7 +287,7 @@ function sendToWorker(title: string, text: { context?: string; initial?: string 
 function boardActions(): BoardActions {
   return {
     queue: (prompt, title, issue, provider, model, effort) => net.send({ t: 'queue.add', prompt, title, issue, provider, model, effort }),
-    assign: (prompt, title) => sendToWorker(`🤖 ${title}`, { initial: prompt }),
+    assign: (prompt, title, issue) => sendToWorker(`🤖 ${title}`, { initial: prompt }, issue),
     ask: (context, title) => sendToWorker(`✍️ ${title}`, { context }),
     // There's no desk to walk to from here: its terminal instead.
     goToDesk: (deskId) => {
