@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { QUEUE_AGENT_DISALLOWED_TOOLS, stationBrief } from '../src/server/stations.js';
+import { QUEUE_AGENT_DISALLOWED_TOOLS, stationBrief, stationProvider } from '../src/server/stations.js';
 import type { StationKind } from '../src/shared/layout.js';
 
 const KINDS: StationKind[] = ['issues', 'pulls', 'queue', 'manager'];
@@ -72,6 +72,13 @@ test('the manager asks the person before anything irreversible', () => {
 
 test('the queue agent is launched without the file-editing tools', () => {
   assert.deepEqual(QUEUE_AGENT_DISALLOWED_TOOLS, ['Edit', 'Write', 'NotebookEdit']);
+});
+
+test('the manager runs on Claude Code, whatever the office is configured with', () => {
+  assert.equal(stationProvider('manager'), 'claude');
+  // The other three are left on the office default, and a desk that is no station at all too.
+  for (const kind of ['issues', 'pulls', 'queue'] as StationKind[]) assert.equal(stationProvider(kind), undefined);
+  assert.equal(stationProvider(undefined), undefined);
 });
 
 test('a board agent on a Bitbucket floor is told to use bb, and that there is no issues board', () => {

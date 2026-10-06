@@ -1144,6 +1144,40 @@ test('the queue agent is launched without file-editing tools, and board agents g
   assert.ok(onPath(deskLaunch), 'office-workers is first on a desk worker\'s PATH');
 });
 
+test('the manager runs on Claude Code on a floor configured for another agent, and the rest keep the default', async (t) => {
+  const f = fixture();
+  const updates: WorkerInfo[] = [];
+  isolateProviderEnvironment(f, t);
+  const previousLog = process.env.FAKE_AGENT_LOG;
+  process.env.FAKE_AGENT_LOG = f.log;
+  t.after(() => {
+    if (previousLog === undefined) delete process.env.FAKE_AGENT_LOG;
+    else process.env.FAKE_AGENT_LOG = previousLog;
+    f.close();
+  });
+  const workers = manager(f, f.opencode, updates);
+  t.after(() => workers.shutdown());
+  assert.equal(workers.defaultProvider, 'opencode');
+  const launches = (id: string) => f.read().filter((r) => r.stdin === undefined && r.env.workerId === id);
+
+  const hired = workers.station('station-manager', 'Ada', 'What needs my attention?');
+  const issues = workers.station('station-issues', 'Ada', 'File an issue about the dog');
+  assert.ok(typeof hired === 'object' && typeof issues === 'object');
+  if (typeof hired !== 'object' || typeof issues !== 'object') return;
+
+  // The Manager starts on Claude Code, without the configured provider's model or effort.
+  assert.deepEqual([hired.info.provider, hired.info.model, hired.info.effort], ['claude', undefined, undefined]);
+  const [managerLaunch] = await waitFor(() => launches(hired.info.id), (l) => l.length === 1);
+  assert.equal(managerLaunch.kind, 'claude');
+  assert.ok(managerLaunch.args.includes('--settings'), 'the Claude CLI runs with the office settings');
+  assert.match(managerLaunch.args.at(-1)!, /Manager agent[\s\S]*What needs my attention\?/);
+
+  // The other board agents, and the office default everyone else starts on, are left alone.
+  assert.equal(issues.info.provider, 'opencode');
+  const [issuesLaunch] = await waitFor(() => launches(issues.info.id), (l) => l.length === 1);
+  assert.equal(issuesLaunch.kind, 'opencode');
+});
+
 test("every Claude worker gets the office's MCP server, and office-workers on its PATH", async (t) => {
   const f = fixture();
   isolateProviderEnvironment(f, t);

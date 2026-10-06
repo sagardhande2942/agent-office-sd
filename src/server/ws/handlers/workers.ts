@@ -2,9 +2,11 @@
 // worktrees and pull requests.
 import { validBossGuard } from '../../../shared/boss.js';
 import { MAX_REPOS, type RepoSource } from '../../workers.js';
+import { DESK_BY_ID } from '../../../shared/layout.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
 import { isAgentEffort, isAgentProvider, type WorkerClientMsg } from '../../../shared/protocol.js';
 import { issueNumber, num, str } from '../../office/input.js';
+import { stationProvider } from '../../stations.js';
 import { here, workerOf } from './common.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
@@ -140,7 +142,9 @@ export const workerHandlers = {
     const deskId = str(msg.deskId, 32);
     // Nobody there yet: whoever asks first hires it, on their own sign-ins.
     const hires = !floor.workers.deskOccupied(deskId);
-    ctx.withSignIn(c, hires ? ctx.claudeFor(floor.workers.officeDefault.provider) : undefined, async () => {
+    // The Manager runs on Claude Code whatever the office default is, so that's the sign-in it needs.
+    const provider = stationProvider(DESK_BY_ID.get(deskId)?.station) ?? floor.workers.officeDefault.provider;
+    ctx.withSignIn(c, hires ? ctx.claudeFor(provider) : undefined, async () => {
       const r = await floor.workers.station(deskId, who, str(msg.prompt, 20000), c.accountId);
       if (typeof r === 'string') ctx.warn(c, r);
       else if (r.hired) ctx.toastFloor(floor, `${who} asked the ${r.info.name} something`);
