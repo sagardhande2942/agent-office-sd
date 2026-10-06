@@ -2,7 +2,7 @@
 
 Workers can coordinate on the same local project floor through persistent inboxes, without typing into another agent's active terminal. Use tracked requests when a frontend worker depends on an API worker, when asking for a review, or when handing off a branch. The existing `office-workers tell` command still sends an immediate terminal prompt.
 
-A worker must check its inbox at a suitable point, such as between tasks or while waiting for a dependency. Messages do not wake stopped workers or interrupt a busy agent. Ask workers to check their inboxes when assigning coordinated work. The MCP server also explains that behavior in its instructions and tools, and `office-workers list` returns a coordination hint.
+A worker must check its inbox at a suitable point, such as between tasks or while waiting for a dependency. Messages do not wake stopped workers or interrupt a busy agent. The office appends standing coordination instructions to agent launch prompts, including inbox checks and handling messages by ID and receipt without repeating completed work. This is agent guidance, not automatic polling. The MCP server also explains that behavior in its instructions and tools, and `office-workers list` returns a coordination hint.
 
 ## Example: Grace asks Ada for the API contract
 

@@ -15,7 +15,7 @@ import { WORKSPACE_FILES, WORKTREES_DIR, Worktrees, describeWork, workspaceOf, t
 import { DESK_BY_ID, STATION_AGENT, deskBuilt, type DeskDef } from '../shared/layout.js';
 import { FINDING_LINES, helperDesk, helperId, isHelperId, plainText } from '../shared/helper.js';
 import { QUEUE_AGENT_DISALLOWED_TOOLS, stationBrief } from './stations.js';
-import { officePrompt, type PromptSource } from './prompts.js';
+import { officePrompt, WORKER_COORDINATION, type PromptSource } from './prompts.js';
 import { isAsleep, isBusy } from '../shared/status.js';
 import { findPull, forgeOfDir, openPull, originRepo, prRef, pullBody, setPullBody, workRepo } from './forge.js';
 import type { ForgeAs } from './signins.js';
@@ -1733,6 +1733,7 @@ export class WorkerManager {
 
     const shell = defaultShell();
     const isShell = info.kind === 'shell';
+    if (!isShell && prompt) prompt = `${prompt}\n\n${WORKER_COORDINATION}`;
     const provider = info.provider;
     const isClaude = !isShell && provider === 'claude';
     const isOpenCode = !isShell && provider === 'opencode';
