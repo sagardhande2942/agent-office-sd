@@ -6,7 +6,6 @@
 import { FORGE_LABEL, type ForgeKind } from '../shared/protocol.js';
 import { forgeNote } from '../shared/forgeweb.js';
 import type { StationKind } from '../shared/layout.js';
-import type { AgentProvider } from '../shared/providers.js';
 import { officePrompt, type PromptSource } from './prompts.js';
 
 /**
@@ -23,15 +22,3 @@ export function stationBrief(kind: StationKind, prompts?: PromptSource, forge: F
 
 /** Claude Code tools the queue agent is launched without, so it can't edit the checkout even by mistake. */
 export const QUEUE_AGENT_DISALLOWED_TOOLS = ['Edit', 'Write', 'NotebookEdit'];
-
-/**
- * The provider a board agent starts on when nobody picked one for it: undefined leaves it on the
- * office's default (see officeDefault in server/workers/manager.ts), the way the Issues, PR and Queue
- * agents run. The Manager is the one exception: it runs on Claude Code only for now, whatever the
- * office is configured with, because its job leans on the office MCP server and Claude Code's own
- * tools rather than on the provider's. A model or effort picked office-wide is the configured
- * provider's, so it isn't carried over either: the Manager starts on Claude Code's own settings.
- */
-export function stationProvider(kind: StationKind | undefined): AgentProvider | undefined {
-  return kind === 'manager' ? 'claude' : undefined;
-}

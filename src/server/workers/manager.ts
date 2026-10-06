@@ -18,7 +18,7 @@ import type { AgentChoice, AgentEffort, AgentProvider, TerminalHit, WorkerInfo, 
 import { AGENT_PROVIDERS, takesEffort, takesModel } from '../../shared/providers.js';
 import { Worktrees, workspaceOf, type WorktreeCleanup, type WorktreeState } from '../worktrees.js';
 import { DESK_BY_ID, STATION_AGENT, deskBuilt } from '../../shared/layout.js';
-import { stationBrief, stationProvider } from '../stations.js';
+import { stationBrief } from '../stations.js';
 import type { PromptSource } from '../prompts.js';
 import type { GhAs } from '../signins.js';
 import type { ServiceOwner } from '../services.js';
@@ -351,8 +351,7 @@ export class WorkerManager {
   /**
    * A request for the agent standing by a board (see STATIONS): typed into its session, which is woken
    * up with it if it's asleep, or it's hired there with it when nobody is. Returns what went wrong, or
-   * the agent and whether it was just hired. Only the Manager picks its own provider; the other
-   * board agents are hired on the office default (see stationProvider).
+   * the agent and whether it was just hired.
    */
   station(deskId: string, by: string, text: string, owner?: string): { info: WorkerInfo; hired: boolean } | string {
     if (!DESK_BY_ID.get(deskId)?.station) return 'There is no agent to ask there';
@@ -360,7 +359,7 @@ export class WorkerManager {
     if (!clean) return 'Empty prompt';
     const w = [...this.workers.values()].find((x) => x.info.deskId === deskId);
     if (!w) {
-      const info = this.spawn(deskId, by, clean, false, 'agent', stationProvider(DESK_BY_ID.get(deskId)?.station), undefined, undefined, undefined, owner);
+      const info = this.spawn(deskId, by, clean, false, 'agent', undefined, undefined, undefined, undefined, owner);
       return typeof info === 'string' ? info : { info, hired: true };
     }
     // Typed into the question it's asking, the prompt would answer it.
