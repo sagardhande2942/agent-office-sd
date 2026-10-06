@@ -3,7 +3,7 @@
 import { validBossGuard } from '../../../shared/boss.js';
 import { MAX_REPOS, type RepoSource } from '../../workers.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
-import { isAgentEffort, isAgentProvider, type WorkerClientMsg } from '../../../shared/protocol.js';
+import { isAgentEffort, isAgentProvider, type AgentChoice, type WorkerClientMsg } from '../../../shared/protocol.js';
 import { issueNumber, num, str } from '../../office/input.js';
 import { here, workerOf } from './common.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
@@ -138,10 +138,21 @@ export const workerHandlers = {
     const floor = here(ctx, c);
     if (!floor) return;
     const deskId = str(msg.deskId, 32);
+    // The agent to hire, when whoever asks picked one: a board agent of its own, so it may be any
+    // the project can start. Asking one that's already there is a prompt to it, not a new hire.
+    const hired = !floor.workers.deskOccupied(deskId);
+    let choice: AgentChoice | undefined;
+    if (msg.provider !== undefined) {
+      if (!hired) return ctx.warn(c, 'That board agent is already there: send it home to run on another agent');
+      if (!isAgentProvider(msg.provider) || !floor.project?.agentProviders.includes(msg.provider)) return ctx.warn(c, 'Unknown agent provider');
+      const model = msg.model === undefined ? undefined : str(msg.model, OPEN_CODE_MODEL_MAX + 1);
+      const effort = isAgentEffort(msg.effort) ? msg.effort : undefined;
+      choice = { provider: msg.provider, ...(model ? { model } : {}), ...(effort ? { effort } : {}) };
+    }
+    const provider = choice?.provider ?? floor.workers.officeDefault.provider;
     // Nobody there yet: whoever asks first hires it, on their own sign-ins.
-    const hires = !floor.workers.deskOccupied(deskId);
-    ctx.withSignIn(c, hires ? ctx.claudeFor(floor.workers.officeDefault.provider) : undefined, async () => {
-      const r = await floor.workers.station(deskId, who, str(msg.prompt, 20000), c.accountId);
+    ctx.withSignIn(c, hired ? ctx.claudeFor(provider) : undefined, async () => {
+      const r = await floor.workers.station(deskId, who, str(msg.prompt, 20000), c.accountId, choice);
       if (typeof r === 'string') ctx.warn(c, r);
       else if (r.hired) ctx.toastFloor(floor, `${who} asked the ${r.info.name} something`);
     });

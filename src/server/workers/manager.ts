@@ -351,15 +351,15 @@ export class WorkerManager {
   /**
    * A request for the agent standing by a board (see STATIONS): typed into its session, which is woken
    * up with it if it's asleep, or it's hired there with it when nobody is. Returns what went wrong, or
-   * the agent and whether it was just hired.
+   * the agent and whether it was just hired. `choice` is the agent to hire it on when nobody picked one.
    */
-  station(deskId: string, by: string, text: string, owner?: string): { info: WorkerInfo; hired: boolean } | string {
+  station(deskId: string, by: string, text: string, owner?: string, choice?: AgentChoice): { info: WorkerInfo; hired: boolean } | string {
     if (!DESK_BY_ID.get(deskId)?.station) return 'There is no agent to ask there';
     const clean = text.replace(/\r\n?/g, '\n').trim();
     if (!clean) return 'Empty prompt';
     const w = [...this.workers.values()].find((x) => x.info.deskId === deskId);
     if (!w) {
-      const info = this.spawn(deskId, by, clean, false, 'agent', undefined, undefined, undefined, undefined, owner);
+      const info = this.spawn(deskId, by, clean, false, 'agent', choice?.provider, choice?.model, choice?.effort, undefined, owner);
       return typeof info === 'string' ? info : { info, hired: true };
     }
     // Typed into the question it's asking, the prompt would answer it.

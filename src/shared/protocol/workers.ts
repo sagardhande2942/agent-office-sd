@@ -214,8 +214,10 @@ export type WorkerClientMsg =
   /**
    * A prompt for the agent standing by a board (`deskId` is its kiosk, see STATIONS in layout). It's
    * typed into its session, which is woken up first if it's asleep, or hired there when nobody is.
+   * `provider`/`model`/`effort` pick the agent it is hired on, and say nothing when it already is:
+   * a prompt goes to the agent that is there, whatever it runs on.
    */
-  | { t: 'station.prompt'; deskId: string; prompt: string }
+  | { t: 'station.prompt'; deskId: string; prompt: string; provider?: AgentProvider; model?: string; effort?: AgentEffort }
   /** Push a worktree worker's branch and open a pull request for it, drafted from its task. */
   | { t: 'worker.pr'; workerId: string }
   | { t: 'term.input'; workerId: string; data: string }

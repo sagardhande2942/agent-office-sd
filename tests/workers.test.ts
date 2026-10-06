@@ -1080,6 +1080,14 @@ test('a worker nobody picked a model for starts on the office default, and a boa
   assert.deepEqual([desk.provider, desk.model, desk.effort], ['claude', undefined, undefined]);
   const [own] = await waitFor(() => launches(desk.id), (l) => l.length === 1);
   assert.equal(own.args.includes('--model'), false);
+
+  // A board agent is hired on the agent picked at its kiosk, not just the office default.
+  const manager = workers.station('station-manager', 'Ada', 'How is the floor?', undefined, { provider: 'opencode', model: 'anthropic/claude-sonnet-4', effort: 'high' });
+  assert.equal(typeof manager, 'object');
+  if (typeof manager !== 'object') return;
+  assert.deepEqual([manager.info.provider, manager.info.model, manager.info.effort], ['opencode', 'anthropic/claude-sonnet-4', 'high']);
+  const [picked] = await waitFor(() => f.read().filter((r) => r.kind === 'opencode' && r.stdin === undefined && r.env.workerId === manager.info.id), (l) => l.length === 1);
+  assert.match(picked.args.at(-1)!, /Manager agent[\s\S]*How is the floor\?/);
 });
 
 test('the queue agent is launched without file-editing tools, and board agents get office-queue on their PATH', async (t) => {
