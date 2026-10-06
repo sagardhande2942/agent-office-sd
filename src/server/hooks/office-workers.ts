@@ -3,7 +3,7 @@ import { notLeaving } from '../leave-on-merge.js';
 import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow, type PullsView } from '../office-workers.js';
 import { gh } from '../github.js';
 import type { Floor } from '../floor.js';
-import { nextFreeSeat } from '../../shared/layout.js';
+import { DESK_BY_ID, nextFreeSeat } from '../../shared/layout.js';
 import type { WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
@@ -77,6 +77,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
   if (action === '/home') {
     const ask = readHomeRequest(body);
     if (typeof ask === 'string') return send(res, 400, { error: ask });
+    if (ask.cleanup === 'all' && DESK_BY_ID.get(me.deskId)?.station) return send(res, 403, { error: 'Ask a person before deleting work that is not on GitHub' });
     type Outcome = { worker: string; id?: string; went?: boolean; note?: string; error?: string; skipped?: string };
     const results: Outcome[] = [];
     const going: { w: WorkerInfo; why?: string }[] = [];

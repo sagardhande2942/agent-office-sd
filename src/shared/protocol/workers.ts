@@ -107,6 +107,8 @@ export interface WorkerInfo {
    */
   workedMs?: number;
   workingSince?: number;
+  /** Most recent terminal output, used by the manager to detect stalls. Not persisted. */
+  lastOutputAt?: number;
   /** Sent out by a map's herald (the castle's Hand of the King), so every browser has it run to its seat from beside them. */
   via?: 'herald';
   /**

@@ -166,6 +166,7 @@ export const CYBERPUNK: MapConfig = {
     issues: { x: -15.3, z: -20, rotY: -Math.PI / 2 },
     queue: { x: -15.3, z: 14, rotY: -Math.PI / 2 },
     pulls: { x: 15.3, z: -20, rotY: Math.PI / 2 },
+    manager: { x: 15.3, z: 14, rotY: Math.PI / 2 },
   },
   council: { x: 9.6, z: -24.4, rotY: 0 },
   boards: {

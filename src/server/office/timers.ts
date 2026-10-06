@@ -1,9 +1,11 @@
+import { startManagerClock } from '../manager.js';
 import type { Ctx } from './context.js';
 import { SLOW_CLIENT_BYTES } from './client.js';
 import { startCommunicationClock } from './communications.js';
 
 /** The office's own clocks: terminals re-sent to viewers who fell behind, and the heartbeat. Returns what stops them. */
 export function startTimers(ctx: Ctx): () => void {
+  const stopManager = startManagerClock(ctx);
   const stopCommunications = startCommunicationClock(ctx);
   const { clients } = ctx;
   const resync = setInterval(() => {
@@ -34,6 +36,7 @@ export function startTimers(ctx: Ctx): () => void {
   }, 20_000);
 
   return () => {
+    stopManager();
     stopCommunications();
     clearInterval(heartbeat);
     clearInterval(resync);

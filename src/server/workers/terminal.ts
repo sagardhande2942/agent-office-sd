@@ -45,6 +45,8 @@ export function newTerm(w: Worker, on: { progress?(busy: boolean): void; title(t
 
 /** Preserve scrollback in the office's observer; viewers still receive the original bytes. */
 export function observed(data: string, w: Worker): string {
+  w.outputAt = Date.now();
+  w.info.lastOutputAt = w.outputAt;
   const seen = withoutFullScreen(data, w.info.rows);
   if (seen !== data) w.fullScreen = true;
   return seen;

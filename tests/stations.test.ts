@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { QUEUE_AGENT_DISALLOWED_TOOLS, stationBrief } from '../src/server/stations.js';
 import type { StationKind } from '../src/shared/layout.js';
 
-const KINDS: StationKind[] = ['issues', 'pulls', 'queue'];
+const KINDS: StationKind[] = ['issues', 'pulls', 'queue', 'manager'];
 
 test('every board agent reaches the queue with office-queue, not its own curl calls', () => {
   for (const kind of KINDS) {
@@ -43,6 +43,31 @@ test('the issues and PR agents keep their jobs, and may still be asked for somet
     assert.match(brief, /say in a few lines what you did, with links/);
     assert.doesNotMatch(brief, /one-line fix/);
   }
+});
+
+test('the manager reads the floor, queues work with a chosen agent, and holds dependent work', () => {
+  const brief = stationBrief('manager');
+  assert.match(brief, /Manager agent/);
+  assert.match(brief, /office-workers status --json/);
+  assert.match(brief, /office-workers tell <name\|id>/);
+  assert.match(brief, /office-workers report --kind standup/);
+  assert.match(brief, /--provider <name> --model <m> --effort <e>/);
+  assert.match(brief, /--after <taskId>/);
+  assert.match(brief, /office-queue retry <id>/);
+  assert.match(brief, /one task per independent piece of work/);
+  // It reads the floor before acting, and never on a worker's say-so alone.
+  assert.match(brief, /Read it before you act on anything/);
+  assert.match(brief, /never call a task done on a worker's say-so alone/);
+  // Work goes on the queue, not onto a desk it hires itself.
+  assert.match(brief, /never onto a desk you hired yourself/);
+});
+
+test('the manager asks the person before anything irreversible', () => {
+  const brief = stationBrief('manager');
+  assert.match(brief, /merging a pull request/);
+  assert.match(brief, /deleting unfinished work/);
+  assert.match(brief, /stopping anything in flight/);
+  assert.match(brief, /Ask the person first and wait/);
 });
 
 test('the queue agent is launched without the file-editing tools', () => {

@@ -25,6 +25,16 @@ test('parses list, add and remove, with their options', () => {
   assert.deepEqual(parseArgs(['add', '--issue=#7', '--title', ' Fix login ', '--prompt', 'Do it']), { cmd: 'add', title: 'Fix login', issue: 7, prompt: 'Do it' });
   // A prompt that looks like an option is still the prompt.
   assert.deepEqual(parseArgs(['add', '--title', 'T', '--prompt', '- fix the list']), { cmd: 'add', title: 'T', prompt: '- fix the list' });
+  assert.deepEqual(parseArgs(['retry', 'abc123']), { cmd: 'retry', id: 'abc123' });
+  assert.deepEqual(parseArgs(['remove', 'abc123']), { cmd: 'remove', id: 'abc123' });
+});
+
+test('parses the agent to run a task on, and what it waits for', () => {
+  assert.deepEqual(parseArgs(['add', '--title', 'T', '--provider', 'codex', '--model', 'gpt-5-codex', '--effort', 'high']), {
+    cmd: 'add', title: 'T', provider: 'codex', model: 'gpt-5-codex', effort: 'high',
+  });
+  assert.deepEqual(parseArgs(['add', '--title=T', '--provider=claude', '--model=opus', '--effort=max']), { cmd: 'add', title: 'T', provider: 'claude', model: 'opus', effort: 'max' });
+  assert.deepEqual(parseArgs(['add', '--title', 'T', '--after', 'abc123', '--after', 'def456']), { cmd: 'add', title: 'T', after: ['abc123', 'def456'] });
 });
 
 test('says what is wrong with a bad command line', () => {
@@ -38,7 +48,11 @@ test('says what is wrong with a bad command line', () => {
     [['add', '--title', '  '], /Give the task a --title/],
     [['add', '--title', 'T', '--issue', 'twelve'], /--issue takes an issue number/],
     [['add', '--title', 'T', '--issue', '0'], /--issue takes an issue number/],
-    [['add', '--title', 'T', '--model', 'x'], /Unknown option for add: --model/],
+    [['add', '--title', 'T', '--effort', 'extreme'], /--effort is one of low, medium, high, xhigh, max/],
+    [['add', '--title', 'T', '--provider'], /--provider needs a value/],
+    [['add', '--title', 'T', '--desk', 'x'], /Unknown option for add: --desk/],
+    [['retry'], /retry takes one finished task id/],
+    [['retry', 'a', 'b'], /retry takes one finished task id/],
     [['add', 'Fix', 'login'], /Unexpected argument: Fix/],
   ];
   for (const [argv, message] of bad) assert.throws(() => parseArgs(argv), (e: Error) => e instanceof UsageError && message.test(e.message), argv.join(' '));
@@ -67,9 +81,16 @@ test('builds the /office/queue requests', () => {
   const flagged = buildRequest({ cmd: 'add', title: 'T', prompt: 'from the flag' }, OFFICE, 'from stdin');
   assert.deepEqual(JSON.parse(flagged.body), { title: 'T', prompt: 'from the flag' });
   assert.throws(() => buildRequest({ cmd: 'add', title: 'T' }, OFFICE, '  \n'), /needs a prompt/);
+  // The agent a task starts on, and what it waits for, go on the body.
+  const chosen = buildRequest({ cmd: 'add', title: 'T', provider: 'codex', model: 'gpt-5-codex', effort: 'high', after: ['abc123'] }, OFFICE, 'Do it');
+  assert.deepEqual(JSON.parse(chosen.body), { title: 'T', prompt: 'Do it', provider: 'codex', model: 'gpt-5-codex', effort: 'high', depends: ['abc123'] });
+  // A finished task goes back on the queue with ?task= and a retry, keeping the agent it was on.
+  assert.deepEqual(buildRequest({ cmd: 'retry', id: 'abc/123' }, OFFICE), {
+    method: 'POST', url: 'http://127.0.0.1:4455/office/queue?worker=w1&task=abc%2F123', headers: { ...auth, 'content-type': 'application/json' }, body: JSON.stringify({ retry: true }),
+  });
 });
 
-test('lists the queue readably: id, status, title, worker and PR', () => {
+test('lists the queue readably: id, status, title, agent, worker, PR and what it waits on', () => {
   assert.equal(formatQueue({ maxWorkers: 2, tasks: [] }), 'The queue is empty · up to 2 at a time.');
   const text = formatQueue({
     maxWorkers: 2,
@@ -78,14 +99,16 @@ test('lists the queue readably: id, status, title, worker and PR', () => {
       { id: 'bbb222', title: 'Dark mode', status: 'queued' },
       { id: 'ccc333', title: 'Rename the dog', status: 'done', outcome: 'done', worker: 'Byte', pr: { number: 9, url: 'https://github.com/o/r/pull/9', state: 'OPEN', title: 'x' } },
       { id: 'ddd444', title: 'Broken', status: 'done', outcome: 'failed', error: 'no desk' },
+      { id: 'eee555', title: 'Follow-up', status: 'queued', agent: { provider: 'claude', model: 'opus', effort: 'high' }, dependsOn: ['ccc333'] },
     ],
   });
   assert.equal(text, [
-    '4 tasks · up to 2 at a time',
+    '5 tasks · up to 2 at a time',
     'aaa111  running        Fix login (issue #12) · worker Pixel on office/pixel-1a2b',
     'bbb222  queued         Dark mode',
     'ccc333  done           Rename the dog · worker Byte · PR #9 open https://github.com/o/r/pull/9',
     'ddd444  done (failed)  Broken · error: no desk',
+    'eee555  queued         Follow-up · agent claude opus high · waiting on ccc333',
   ].join('\n'));
 });
 
@@ -116,6 +139,15 @@ test('add sends the prompt from stdin and prints the new task id', async () => {
   assert.equal(r.sent.length, 1);
   assert.equal(r.sent[0].init.method, 'POST');
   assert.deepEqual(JSON.parse(String(r.sent[0].init.body)), { title: 'Fix login', prompt: 'Fix it.', issue: 12 });
+});
+
+test('retry puts a finished task back on the queue', async () => {
+  const r = await run(['retry', 'abc123'], { body: { ok: true, task: { id: 'abc123', title: 'Fix login', status: 'queued' } } });
+  assert.equal(r.code, 0);
+  assert.equal(r.out, 'Requeued abc123.');
+  assert.equal(r.sent[0].init.method, 'POST');
+  assert.match(String(r.sent[0].url), /task=abc123$/);
+  assert.deepEqual(JSON.parse(String(r.sent[0].init.body)), { retry: true });
 });
 
 test('clear errors when the environment is missing or the office says no', async () => {

@@ -7,6 +7,8 @@ export type TaskStatus = 'queued' | 'running' | 'done';
 
 /** A task on the 📋 queue whiteboard: a GitHub issue or free text, seated to a worker by itself. */
 export interface QueueTask {
+  /** Tasks that must finish successfully before this task can start. */
+  dependsOn?: string[];
   completion?: CompletionReport;
   id: string;
   provider?: AgentProvider;

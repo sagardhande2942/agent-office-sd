@@ -106,6 +106,61 @@ test('new and legacy tasks without a provider use the configured agent', (t) => 
   assert.deepEqual(f.workers.map((w) => w.provider), ['custom', 'custom']);
 });
 
+test('a task waits for the task it depends on, then is seated on the next pump', (t) => {
+  const f = fixture(); t.after(() => f.close());
+  const q = f.open(() => 1);
+  const first = q.add('Fix login', 'Tester');
+  assert.equal(first, undefined);
+  const a = q.state().tasks[0].id;
+  const err = q.add('Add a test for it', 'Tester', undefined, undefined, undefined, undefined, undefined, undefined, [a]);
+  assert.equal(err, undefined);
+  assert.deepEqual(q.state().tasks[1].dependsOn, [a]);
+  // A free desk and a slot, but it waits for the one before it.
+  assert.equal(q.state().tasks[1].status, 'queued');
+  const taskA = () => q.state().tasks.find((t) => t.id === a)!;
+  const taskB = () => q.state().tasks.find((t) => t.dependsOn?.includes(a))!;
+  // The one it waits on stops short rather than finishing done: still waiting.
+  f.workers[0].status = 'exited';
+  q.onWorker(f.workers[0]);
+  assert.equal(taskA().outcome, 'exited');
+  assert.equal(taskB().status, 'queued');
+  // Requeued and finished properly: it is seated on the next pump.
+  q.retry(a);
+  const seated = f.workers.at(-1)!;
+  seated.status = 'done';
+  q.onWorker(seated);
+  assert.equal(taskA().outcome, 'done');
+  assert.equal(taskB().status, 'running');
+  assert.equal(f.workers.at(-1)?.prompt, 'Add a test for it');
+});
+
+test('a task it waits on has to be on the queue already', (t) => {
+  const f = fixture(); t.after(() => f.close());
+  const q = f.open(() => 0);
+  assert.equal(q.add('Task', 'Tester', undefined, undefined, undefined, undefined, undefined, undefined, ['nope123']), 'No task nope123 on the queue to wait for');
+  assert.equal(q.state().tasks.length, 0);
+});
+
+test('a waiting task keeps its dependencies across a restart, and drops ones that are gone', (t) => {
+  const f = fixture(); t.after(() => f.close());
+  const q = f.open(() => 0);
+  q.add('First', 'Tester');
+  const a = q.state().tasks[0].id;
+  q.add('Second', 'Tester', undefined, undefined, undefined, undefined, undefined, undefined, [a]);
+  q.shutdown();
+  const restored = f.open(() => 0);
+  assert.deepEqual(restored.state().tasks[1].dependsOn, [a]);
+  // Written by hand with a dependency nothing in the file has: it's dropped, not waited on forever.
+  const dir = f.dir;
+  writeFileSync(path.join(dir, 'queue.json'), JSON.stringify({ maxWorkers: 0, tasks: [
+    { id: 'x', title: 'X', prompt: 'X', status: 'queued', dependsOn: ['gone'] },
+    { id: 'y', title: 'Y', prompt: 'Y', status: 'queued', dependsOn: ['x', 'x'] },
+  ] }));
+  const third = f.open(() => 0);
+  assert.deepEqual(third.state().tasks[0].dependsOn, undefined);
+  assert.deepEqual(third.state().tasks[1].dependsOn, ['x']);
+});
+
 test('invalid or unavailable providers are rejected before a task is queued', (t) => {
   const f = fixture(); t.after(() => f.close());
   const q = f.open();
