@@ -60,6 +60,25 @@ test('a worker\'s own model and effort go on Codex\'s command line, in place of 
   assert.deepEqual(codexModelArgs(['-m', 'gpt-6-astra'], undefined, 'xhigh'), ['-m', 'gpt-6-astra', '-c', 'model_reasoning_effort="xhigh"']);
 });
 
+test('Codex planning seats preapprove only their role tools and promotion removes the overrides', () => {
+  const launch = (role: 'candidate' | 'reviewer', locked: boolean, resumeSessionId?: string) =>
+    codex.launch({ h: { info: { planReview: { id: 'p1', role, locked } }, state: codex.createState!() } as never, args: [], setup: { hook: '/data/hook.cjs', mcpScript: '/data/office-workers.js' }, resumeSessionId }).args;
+  for (const role of ['candidate', 'reviewer'] as const) {
+    const tools = ['plan_review_state', ...(role === 'candidate' ? ['submit_candidate_plan'] : ['request_plan_clarification', 'submit_plan_review'])];
+    for (const session of [undefined, 'existing-session']) {
+      const args = launch(role, true, session);
+      assert.ok(args.includes('read-only'));
+      assert.ok(args.includes('never'));
+      assert.ok(args.some(a => a.includes('env_vars=') && a.includes('AGENT_OFFICE_PLAN_ROLE')));
+      assert.ok(args.includes(`mcp_servers.agent-office.enabled_tools=${JSON.stringify(tools)}`));
+      assert.deepEqual(args.filter(a => a.includes('.approval_mode=')), tools.map(t => `mcp_servers.agent-office.tools.${t}.approval_mode="approve"`));
+    }
+    const promoted = launch(role, false);
+    assert.equal(promoted.some(a => /approval_mode|enabled_tools|AGENT_OFFICE_PLAN_ROLE/.test(a)), false);
+    assert.equal(promoted.includes('read-only'), false);
+  }
+});
+
 test('a Codex worker starts, and resumes, on the model and effort picked for it', () => {
   const launch = (info: { model?: string; effort?: string }, more: { prompt?: string; resumeSessionId?: string } = {}) =>
     codex.launch({ h: { info, state: codex.createState!() } as never, args: ['--yolo'], setup: { hook: '/data/hook.cjs' }, ...more }).args;

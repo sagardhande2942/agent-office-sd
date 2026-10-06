@@ -91,4 +91,6 @@ attach <worker-id>            Open a candidate or reviewer terminal
 
 MCP tools: candidates get `plan_review_state` and `submit_candidate_plan`; the reviewer gets `plan_review_state`, `request_plan_clarification` and `submit_plan_review`. Tool schemas describe the full JSON fields. Submissions include the current activity ID and revision returned by state. Authenticated planning participants cannot hire, send home, prompt other workers, use inboxes, request helpers or submit completion checklists through the worker API. The winner receives normal tools after promotion.
 
+Codex planning sessions use a read-only sandbox and never prompt for approval. The office forwards the planning role to its MCP server, exposes only that role's plan tools and preapproves those tools. Normal worker tools return when the winner starts implementation. If an existing comparison reports `MCP tool call requires approval, but approval policy is never`, update and restart the office, then start a new comparison to receive the corrected launch configuration.
+
 ![Plan comparison with accepted and rejected plans](plan-comparison.png)

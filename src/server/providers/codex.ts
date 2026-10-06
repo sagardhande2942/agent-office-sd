@@ -95,7 +95,7 @@ export const codex: ProviderAdapter<CodexState, CodexSetup> = {
     // Resumed too: Codex resumes on whatever its config says now, not on the model the session ran on.
     args = codexModelArgs(args, h.info.model, h.info.effort);
     if (h.info.planReview?.locked) args.push('--sandbox', 'read-only', '--ask-for-approval', 'never');
-    args.push(...codexHookArgs(setup.hook), ...(setup.mcpScript ? codexMcpArgs(setup.mcpScript) : []), '--no-alt-screen');
+    args.push(...codexHookArgs(setup.hook), ...(setup.mcpScript ? codexMcpArgs(setup.mcpScript, h.info.planReview?.locked ? h.info.planReview.role : undefined) : []), '--no-alt-screen');
     if (resumeSessionId) args.push('resume', resumeSessionId);
     if (prompt) args.push('--', prompt);
     tracker(h.state).clear();
