@@ -1,7 +1,12 @@
+import { pumpkinGeometry, pumpkinTextures } from './holiday-pumpkins';
+export { pumpkinGeometry, pumpkinTextures } from './holiday-pumpkins';
+import { ledMaterial, benchScreen, serverRack, waterCooler, ceilingCoves, rackGlow, modernFurniture } from './modern-furniture';
+export { ledMaterial, benchScreen, serverRack, waterCooler, ceilingCoves, rackGlow, modernFurniture } from './modern-furniture';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { BALCONY, DESKS, DESK_SIZE, EXIT_STAIRS, FLOOR, PLANTS, STREET_Y, WALL_HEIGHT, WINDOWS, type DeskDef } from '../../shared/layout';
 import type { Theme } from '../../shared/protocol';
+import { mulberry32 } from '../../shared/rng';
 import { batWingGeometry, glowTexture } from './costumes';
 import { buildDesk, plantLeaves, type Collider, type Office } from './office';
 import { SPOOKY_MOON } from './sky';
@@ -19,28 +24,28 @@ import { mergeByMaterial, mesh, textPlane, toon, toonUnique } from './toon';
  * goes further down the higher your floor is, as the street does (Office.setLevel).
  */
 
-const G = STREET_Y;
+export const G = STREET_Y;
 
 /** Somewhere to put something: its foot at (x, y, z), `r` its size, turned so its front (+z) faces `rotY`. */
-type Spot = [x: number, y: number, z: number, r: number, rotY: number];
+export type Spot = [x: number, y: number, z: number, r: number, rotY: number];
 
-const FACE = { south: 0, north: Math.PI, east: Math.PI / 2, west: -Math.PI / 2 } as const;
+export const FACE = { south: 0, north: Math.PI, east: Math.PI / 2, west: -Math.PI / 2 } as const;
 
 /** A point `lx` along and `lz` out from a desk's middle, in its own frame (see DeskDef.rotY). */
-function onDesk(d: { x: number; z: number; rotY: number }, lx: number, lz: number): [number, number] {
+export function onDesk(d: { x: number; z: number; rotY: number }, lx: number, lz: number): [number, number] {
   const c = Math.cos(d.rotY);
   const s = Math.sin(d.rotY);
   return [d.x + lx * c + lz * s, d.z - lx * s + lz * c];
 }
 
 /** On every desk, in the back corner its own knick-knack leaves free (see buildDesk), facing whoever sits there. */
-const DESK_SPOTS: Spot[] = DESKS.map((d, i) => {
+export const DESK_SPOTS: Spot[] = DESKS.map((d, i) => {
   const [x, z] = onDesk(d, i % 3 === 1 ? 0.78 : -0.78, -0.28);
   return [x, DESK_SIZE.height, z, 0.12, d.rotY];
 });
 
 /** Jack-o'-lanterns: everywhere. */
-function pumpkinSpots(): Spot[] {
+export function pumpkinSpots(): Spot[] {
   const spots: Spot[] = [...DESK_SPOTS];
   // The kitchen counter, and the lounge's coffee table.
   spots.push([-13, 1.03, 12.2, 0.14, FACE.north], [-16.65, 1.03, 12.25, 0.11, FACE.north], [13, 0.46, 0.25, 0.17, FACE.west]);
@@ -75,7 +80,7 @@ function pumpkinSpots(): Spot[] {
 }
 
 /** Where the gravestones stand, on the lawn west of the office, facing its windows. */
-const GRAVES: [x: number, z: number, kind: number][] = [
+export const GRAVES: [x: number, z: number, kind: number][] = [
   [-23.2, -3.4, 0],
   [-23.4, -0.4, 1],
   [-23.1, 2.8, 2],
@@ -86,7 +91,7 @@ const GRAVES: [x: number, z: number, kind: number][] = [
 ];
 
 /** Where the snowmen stand, out front and round the side. */
-const SNOWMEN: [x: number, z: number, rotY: number][] = [
+export const SNOWMEN: [x: number, z: number, rotY: number][] = [
   [-14, 18.6, 0.2],
   [13, 19.2, -0.3],
   [25.5, 6, -Math.PI / 2 + 0.3],
@@ -94,114 +99,10 @@ const SNOWMEN: [x: number, z: number, rotY: number][] = [
 ];
 
 /** The big tree out front, on the lot by the sidewalk. */
-const BIG_TREE = { x: -24, z: 17, height: 7.5 } as const;
-
-// ---- Jack-o'-lanterns ---------------------------------------------------------------------------
-
-/** A ribbed pumpkin 2 m across, sitting on y = 0, its face toward +z (u = 0.25 on the sphere's map). */
-function pumpkinGeometry(): THREE.BufferGeometry {
-  const geo = new THREE.SphereGeometry(1, 36, 20);
-  const pos = geo.attributes.position as THREE.BufferAttribute;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const a = Math.atan2(v.x, v.z);
-    const rib = 1 + 0.06 * Math.cos(10 * a) * Math.sqrt(1 - v.y * v.y);
-    // Squat, with a dimple on top where the stem goes.
-    const dimple = v.y > 0.8 ? (v.y - 0.8) * 0.9 : 0;
-    pos.setXYZ(i, v.x * rib, (v.y - dimple) * 0.78 + 0.78, v.z * rib);
-  }
-  geo.computeVertexNormals();
-  return geo;
-}
-
-/** The carved face, lit from inside, and its skin: [what it looks like, what glows]. */
-function pumpkinTextures(): [THREE.CanvasTexture, THREE.CanvasTexture] {
-  const W = 512;
-  const H = 256;
-  const face = (g: CanvasRenderingContext2D, fill: string, edge?: string) => {
-    const shapes: [number, number][][] = [
-      // Slanted triangle eyes.
-      [
-        [70, 112],
-        [118, 110],
-        [100, 76],
-      ],
-      [
-        [138, 110],
-        [186, 112],
-        [156, 76],
-      ],
-      // A nose.
-      [
-        [118, 132],
-        [138, 132],
-        [128, 116],
-      ],
-      // A jagged grin with two teeth.
-      [
-        [66, 140],
-        [92, 150],
-        [100, 140],
-        [110, 154],
-        [146, 154],
-        [156, 140],
-        [164, 150],
-        [190, 140],
-        [178, 164],
-        [154, 180],
-        [128, 184],
-        [102, 180],
-        [78, 164],
-      ],
-    ];
-    for (const s of shapes) {
-      g.beginPath();
-      s.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y)));
-      g.closePath();
-      g.fillStyle = fill;
-      g.fill();
-      if (edge) {
-        g.lineWidth = 5;
-        g.strokeStyle = edge;
-        g.stroke();
-      }
-    }
-  };
-  const skin = document.createElement('canvas');
-  skin.width = W;
-  skin.height = H;
-  const g = skin.getContext('2d')!;
-  g.fillStyle = '#f28a1d';
-  g.fillRect(0, 0, W, H);
-  // Darker down the grooves between the ribs (see pumpkinGeometry), lighter on the ridges.
-  for (let k = 0; k < 10; k++) {
-    const x = (((0.3 + 0.1 * k) % 1) * W) | 0;
-    const grad = g.createLinearGradient(x - 26, 0, x + 26, 0);
-    grad.addColorStop(0, 'rgba(160, 60, 0, 0)');
-    grad.addColorStop(0.5, 'rgba(160, 60, 0, 0.45)');
-    grad.addColorStop(1, 'rgba(160, 60, 0, 0)');
-    g.fillStyle = grad;
-    g.fillRect(x - 26, 0, 52, H);
-  }
-  face(g, '#ffd23f', '#6b2d00');
-  const glow = document.createElement('canvas');
-  glow.width = W;
-  glow.height = H;
-  const e = glow.getContext('2d')!;
-  e.fillStyle = '#000000';
-  e.fillRect(0, 0, W, H);
-  face(e, '#ffb347');
-  return [skin, glow].map((c) => {
-    const t = new THREE.CanvasTexture(c);
-    t.colorSpace = THREE.SRGBColorSpace;
-    t.anisotropy = 4;
-    return t;
-  }) as [THREE.CanvasTexture, THREE.CanvasTexture];
-}
+export const BIG_TREE = { x: -24, z: 17, height: 7.5 } as const;
 
 /** Places copies of `geo` at `spots` (scaled by r, turned by rotY) as one geometry. */
-function scatter(geo: THREE.BufferGeometry, spots: Spot[], extra?: (m: THREE.Matrix4, i: number) => void): THREE.BufferGeometry {
+export function scatter(geo: THREE.BufferGeometry, spots: Spot[], extra?: (m: THREE.Matrix4, i: number) => void): THREE.BufferGeometry {
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const up = new THREE.Vector3(0, 1, 0);
@@ -216,7 +117,7 @@ function scatter(geo: THREE.BufferGeometry, spots: Spot[], extra?: (m: THREE.Mat
 }
 
 /** Soft glows at `at`, one set of points per size. */
-function halos(at: { p: THREE.Vector3; size: number; color: string }[]): THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>[] {
+export function halos(at: { p: THREE.Vector3; size: number; color: string }[]): THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>[] {
   const map = glowTexture();
   const bySize = new Map<number, { pos: number[]; col: number[] }>();
   for (const h of at) {
@@ -238,7 +139,7 @@ function halos(at: { p: THREE.Vector3; size: number; color: string }[]): THREE.P
 // ---- Gravestones, cobwebs, bats -----------------------------------------------------------------
 
 /** A gravestone (a rounded slab, a cross, or a squat marker) with a mound of earth in front, facing +z. */
-function gravestone(kind: number): THREE.Group {
+export function gravestone(kind: number): THREE.Group {
   const g = new THREE.Group();
   const stone = toon('#9a9ca8');
   if (kind === 1) {
@@ -258,7 +159,7 @@ function gravestone(kind: number): THREE.Group {
 }
 
 /** A spider's web, hub near the top, in a canvas: white threads on nothing. */
-function webTexture(): THREE.CanvasTexture {
+export function webTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas');
   c.width = c.height = 256;
   const g = c.getContext('2d')!;
@@ -300,7 +201,7 @@ function webTexture(): THREE.CanvasTexture {
 }
 
 /** A web strung across a top corner of the room, where the walls meet the ceiling at (x, z). */
-function cobweb(x: number, z: number, map: THREE.Texture): THREE.Mesh {
+export function cobweb(x: number, z: number, map: THREE.Texture): THREE.Mesh {
   const sx = Math.sign(x);
   const sz = Math.sign(z);
   const H = WALL_HEIGHT - 0.02;
@@ -312,7 +213,7 @@ function cobweb(x: number, z: number, map: THREE.Texture): THREE.Mesh {
   return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map, transparent: true, opacity: 0.75, side: THREE.DoubleSide, depthWrite: false }));
 }
 
-interface Bat {
+export interface Bat {
   root: THREE.Group;
   wings: THREE.Object3D[];
   /** Round (cx, cz) at radius r, `speed` radians a second (the sign is which way), at height y. */
@@ -325,7 +226,7 @@ interface Bat {
 }
 
 /** A bat: a black silhouette with flapping wings, flying toward +z. */
-function bat(mat: THREE.Material, scale: number): { root: THREE.Group; wings: THREE.Object3D[] } {
+export function bat(mat: THREE.Material, scale: number): { root: THREE.Group; wings: THREE.Object3D[] } {
   const root = new THREE.Group();
   const body = mesh(new THREE.SphereGeometry(0.12, 10, 8), mat, 0, 0, 0, false);
   body.scale.set(0.8, 0.75, 1.3);
@@ -357,7 +258,7 @@ function bat(mat: THREE.Material, scale: number): { root: THREE.Group; wings: TH
  * A decorated Christmas tree `h` tall standing at 0,0,0: tiers of branches, baubles, lights and a
  * star. `lit` collects where each light is, for their glow at night.
  */
-function christmasTree(h: number, lights: THREE.MeshToonMaterial[], lit?: THREE.Vector3[], trunk = false): THREE.Group {
+export function christmasTree(h: number, lights: THREE.MeshToonMaterial[], lit?: THREE.Vector3[], trunk = false): THREE.Group {
   const g = new THREE.Group();
   const greens = [toon('#1f7a3a'), toon('#2a9d4b'), toon('#23884a')];
   const tiers = 4;
@@ -365,7 +266,8 @@ function christmasTree(h: number, lights: THREE.MeshToonMaterial[], lit?: THREE.
   if (trunk) g.add(mesh(new THREE.CylinderGeometry(h * 0.035, h * 0.045, base + 0.1, 10), toon('#6b4226'), 0, (base + 0.1) / 2, 0));
   const tierH = ((h - base) * 0.92) / (tiers * 0.72);
   const baubles = ['#e63946', '#ffd166', '#4cc9f0', '#f1faee', '#c77dff'].map((c) => toon(c));
-  const rand = mulberry(Math.round(h * 1000));
+  // Seeded, so the trees look the same every time.
+  const rand = mulberry32(Math.round(h * 1000));
   for (let i = 0; i < tiers; i++) {
     const r = (h * 0.34 * (tiers - i)) / tiers + h * 0.05;
     const y0 = base + i * tierH * 0.72;
@@ -406,7 +308,7 @@ function christmasTree(h: number, lights: THREE.MeshToonMaterial[], lit?: THREE.
 }
 
 /** A wrapped present `w` across, sitting on y = 0. */
-function present(w: number, paper: string, ribbon: string): THREE.Group {
+export function present(w: number, paper: string, ribbon: string): THREE.Group {
   const g = new THREE.Group();
   const h = w * 0.8;
   g.add(mesh(new THREE.BoxGeometry(w, h, w), toon(paper), 0, h / 2, 0));
@@ -422,7 +324,7 @@ function present(w: number, paper: string, ribbon: string): THREE.Group {
   return g;
 }
 
-const PAPERS: [string, string][] = [
+export const PAPERS: [string, string][] = [
   ['#e63946', '#ffd166'],
   ['#2a9d4b', '#e63946'],
   ['#4cc9f0', '#fffaf3'],
@@ -431,7 +333,7 @@ const PAPERS: [string, string][] = [
 ];
 
 /** A snowman with a scarf, a carrot nose, coal eyes and buttons, twig arms and a top hat, facing +z. */
-function snowman(): THREE.Group {
+export function snowman(): THREE.Group {
   const g = new THREE.Group();
   const snow = toon('#f4f8ff');
   const coal = toon('#23232b');
@@ -462,7 +364,7 @@ function snowman(): THREE.Group {
 }
 
 /** A small seeded random, so the trees look the same every time. */
-function mulberry(seed: number): () => number {
+export function mulberry(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;
@@ -473,143 +375,26 @@ function mulberry(seed: number): () => number {
   };
 }
 
-// ---- The modern office -------------------------------------------------------------------------
-
-/** The cool white the modern office's LED strips and coves glow in. */
-function ledMaterial(color: string): THREE.MeshToonMaterial {
-  const m = toonUnique(color);
-  m.emissive.set(color);
-  m.emissiveIntensity = 0.7;
-  m.userData.outlineParameters = { visible: false };
-  return m;
-}
-
 /** Frosted glass, for the screens between the benches and the server rack's door. */
-const FROST = new THREE.MeshBasicMaterial({ color: '#e6f4fa', transparent: true, opacity: 0.45, depthWrite: false });
-const RACK_GLASS = new THREE.MeshBasicMaterial({ color: '#173042', transparent: true, opacity: 0.55, depthWrite: false });
+export const FROST = new THREE.MeshBasicMaterial({ color: '#e6f4fa', transparent: true, opacity: 0.45, depthWrite: false });
+export const RACK_GLASS = new THREE.MeshBasicMaterial({ color: '#173042', transparent: true, opacity: 0.55, depthWrite: false });
 
 /**
  * The seam down the middle of each pod, where a modern office stands a frosted-glass screen between
  * two back-to-back benches. The pods are the ones buildDesks lays out (shared/layout.ts): two
  * clusters down the room, each with a back and a front row meeting at `z`.
  */
-const BENCH_SCREENS: readonly [x: number, z: number][] = [
+export const BENCH_SCREENS: readonly [x: number, z: number][] = [
   [-10.5, -4],
   [-1.5, -4],
   [-10.5, 4],
   [-1.5, 4],
 ];
 /** A pod's two 2.2 m desks, side by side, and how high its screen stands over them. */
-const SCREEN_LEN = 4.4;
-const SCREEN_H = 0.5;
+export const SCREEN_LEN = 4.4;
+export const SCREEN_H = 0.5;
 /** Where the modern office stands its water cooler, against the south wall by the kitchen. */
-const WATER_COOLER = { x: -8.7, z: 12.25 } as const;
-
-/** A frosted-glass desk screen: a pane in the seam between two benches, on a slim rail, lit underneath. */
-function benchScreen(led: THREE.Material): THREE.Group {
-  const g = new THREE.Group();
-  const y0 = DESK_SIZE.height;
-  const rail = toon('#c3ccd4');
-  g.add(mesh(new THREE.BoxGeometry(SCREEN_LEN, SCREEN_H, 0.035), FROST, 0, y0 + SCREEN_H / 2, 0, false));
-  g.add(mesh(new THREE.BoxGeometry(SCREEN_LEN + 0.08, 0.045, 0.07), rail, 0, y0 + SCREEN_H + 0.02, 0));
-  g.add(mesh(new THREE.BoxGeometry(SCREEN_LEN - 0.12, 0.014, 0.02), led, 0, y0 + SCREEN_H - 0.03, 0.03, false));
-  for (const sx of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.08, 0.1, 0.13), rail, (sx * SCREEN_LEN) / 2, y0 + 0.03, 0));
-  return g;
-}
-
-/** A server rack: a dark cabinet with a glass door and rows of status LEDs, facing +z. */
-function serverRack(): { group: THREE.Group; leds: THREE.MeshToonMaterial[] } {
-  const g = new THREE.Group();
-  const W = 0.8;
-  const D = 0.7;
-  const H = 1.5;
-  const shell = toon('#3b4249');
-  g.add(mesh(new THREE.BoxGeometry(W, H, D), shell, 0, H / 2, 0));
-  // A recessed front, with the door glass over it, a vent grille on top and feet under it.
-  g.add(mesh(new THREE.BoxGeometry(W - 0.1, H - 0.16, 0.06), toon('#20252a'), 0, H / 2, D / 2 - 0.02, false));
-  g.add(mesh(new THREE.BoxGeometry(W - 0.14, H - 0.2, 0.02), RACK_GLASS, 0, H / 2, D / 2 + 0.01, false));
-  const trim = toon('#59636c');
-  for (let i = 0; i < 5; i++) g.add(mesh(new THREE.BoxGeometry(W - 0.16, 0.02, 0.03), trim, 0, H + 0.005, -0.2 + i * 0.1, false));
-  for (const sx of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(0.07, 0.06, 0.07), trim, sx * (W / 2 - 0.06), 0.03, 0));
-  // The status LEDs, in rows in front of the glass, in three colors that flicker apart (see update).
-  const leds = ['#5dff8a', '#6ee7ff', '#ffd166'].map(ledMaterial);
-  const blink = new THREE.Group();
-  const bulb = new THREE.BoxGeometry(0.028, 0.02, 0.012);
-  for (let r = 0; r < 6; r++) {
-    for (let i = 0; i < 5; i++) blink.add(mesh(bulb, leds[(r + i) % leds.length], -0.28 + i * 0.14, 0.2 + r * 0.22, D / 2 + 0.035, false));
-  }
-  g.add(mergeByMaterial(blink));
-  return { group: g, leds };
-}
-
-/** A water cooler: a stand with two taps and a big bottle on top, facing +z. */
-function waterCooler(): THREE.Group {
-  const g = new THREE.Group();
-  const body = toon('#e9eef2');
-  const trim = toon('#b9c2c9');
-  const W = 0.4;
-  const D = 0.4;
-  const H = 0.95;
-  g.add(mesh(new THREE.BoxGeometry(W, H, D), body, 0, H / 2, 0));
-  g.add(mesh(new THREE.BoxGeometry(W * 0.8, 0.22, 0.02), trim, 0, H - 0.18, D / 2 + 0.005, false));
-  for (const [sx, color] of [
-    [-0.07, '#3a86ff'],
-    [0.07, '#ef476f'],
-  ] as const) {
-    g.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.07, 8), toon(color), sx, H - 0.3, D / 2 + 0.05, false));
-  }
-  g.add(mesh(new THREE.BoxGeometry(0.3, 0.03, 0.14), trim, 0, 0.02, D / 2 + 0.05));
-  // The bottle, neck down in its collar on top.
-  const water = toon('#8ecae6');
-  g.add(mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.12, 12), trim, 0, H + 0.06, 0));
-  g.add(mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.42, 16), water, 0, H + 0.3, 0));
-  g.add(mesh(new THREE.SphereGeometry(0.17, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), water, 0, H + 0.51, 0));
-  return g;
-}
-
-/** Slim LED coves tucked in where each wall meets the ceiling. */
-function ceilingCoves(led: THREE.Material): THREE.Group {
-  const y = WALL_HEIGHT - 0.24;
-  const inset = 0.3;
-  const t = 0.06;
-  const along = (w: number, d: number, x: number, z: number) => mesh(new THREE.BoxGeometry(w, 0.05, d), led, x, y, z, false);
-  const g = new THREE.Group();
-  g.add(along(FLOOR.maxX - FLOOR.minX - 2 * inset, t, 0, FLOOR.minZ + inset), along(FLOOR.maxX - FLOOR.minX - 2 * inset, t, 0, FLOOR.maxZ - inset));
-  g.add(along(t, FLOOR.maxZ - FLOOR.minZ - 2 * inset, FLOOR.minX + inset, 0), along(t, FLOOR.maxZ - FLOOR.minZ - 2 * inset, FLOOR.maxX - inset, 0));
-  return mergeByMaterial(g);
-}
-
-/** How bright the server rack's LED `i` is at `t`: a slow flicker, each in a rhythm of its own. */
-function rackGlow(t: number, i: number): number {
-  return 0.25 + 1.5 * (0.5 + 0.5 * Math.sin(t * (7 + i * 4) + i * 2.1));
-}
-
-/**
- * The modern office's furniture, laid out as the props lab shows it: a frosted screen standing in
- * the seam between two back-to-back benches, the server rack and the water cooler. `update` flickers
- * the rack's LEDs, as Holiday.update does in the office.
- */
-export function modernFurniture(): { group: THREE.Group; update: (t: number) => void } {
-  const group = new THREE.Group();
-  const led = ledMaterial('#9fdcff');
-  const bench = new THREE.Group();
-  const desk = (def: DeskDef, z: number, rotY: number) => {
-    const d = buildDesk({ ...def, x: 0, z, rotY }, 1, toon('#8ecae6'));
-    d.vacancy.visible = false;
-    return d.group;
-  };
-  bench.add(desk(DESKS[0], 0.55, 0), desk(DESKS[0], -0.55, Math.PI), benchScreen(led));
-  group.add(bench);
-  const rack = serverRack();
-  rack.group.position.set(3.4, 0, 0);
-  group.add(rack.group);
-  const cooler = waterCooler();
-  cooler.position.set(-2.7, 0, 0);
-  group.add(mergeByMaterial(cooler));
-  const update = (t: number) => rack.leds.forEach((m, i) => (m.emissiveIntensity = rackGlow(t, i)));
-  update(0);
-  return { group, update };
-}
+export const WATER_COOLER = { x: -8.7, z: 12.25 } as const;
 
 // -----------------------------------------------------------------------------------------------
 
@@ -704,7 +489,7 @@ export class Holiday {
     }
 
     const batMat = new THREE.MeshBasicMaterial({ color: '#150b1f', side: THREE.DoubleSide });
-    const rand = mulberry(31);
+    const rand = mulberry32(31);
     for (let i = 0; i < 12; i++) {
       const b = bat(batMat, 1.2 + rand() * 0.8);
       this.halloween.add(b.root);

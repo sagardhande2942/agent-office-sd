@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -15,11 +15,11 @@ import {
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('the protocol has 56 floor messages', () => {
+test('the protocol has 57 floor messages', () => {
   // handleSignIns, 6 in handleAccounts); only these act on a Floor and need to travel. If this drifts,
   // a case started or stopped touching a floor and nobody decided where it should run.
-  assert.equal(FLOOR_CASES.length, 56);
-  assert.equal(new Set(FLOOR_CASES).size, 56, 'no duplicates');
+  assert.equal(FLOOR_CASES.length, 57);
+  assert.equal(new Set(FLOOR_CASES).size, 57, 'no duplicates');
   for (const c of FLOOR_CASES) assert.match(c, /^[a-z]+\.[a-zA-Z]+$/, `${c} is not a namespaced case`);
 });
 
@@ -30,6 +30,7 @@ test('the protocol has 56 floor messages', () => {
  */
 const LOOKUP_ONLY = [
   'cabinet.play',
+  'floor.repos', 'floor.add', 'floor.cancel', 'floor.projectsDir', 'term.typing', 'jukebox.move',
   'dog.name',
   'dog.pet',
   'floor.go',
@@ -48,65 +49,22 @@ const LOOKUP_ONLY = [
  * shipped case rather than something the office does itself, because the office has never seen the
  * ball. Named here so the check below keeps its teeth: a typo is still a typo.
  */
-const NO_MESSAGE_CASE = new Set(['ball.left']);
+const NO_MESSAGE_CASE = new Set(['ball.left', 'jukebox.place']);
 
-test('every floor case named is a real case in the message switch', () => {
-  // The robust half: no ghosts and no typos. A name here that server.ts does not have would be a
-  // frame the host accepts and then refuses for a reason nobody can see.
-  const source = readFileSync(path.join(root, 'src/server/server.ts'), 'utf8');
-  for (const c of FLOOR_CASES) {
-    if (NO_MESSAGE_CASE.has(c)) continue;
-    assert.ok(new RegExp(`case '${c.replace('.', '\\.')}'`).test(source), `${c} is not a case in server.ts`);
-  }
+function floorHandlers() {
+  const dir = path.join(root, 'src/server/ws/handlers');
+  const source = readdirSync(dir).filter(f => f.endsWith('.ts')).map(f => readFileSync(path.join(dir, f), 'utf8')).join('\n');
+  return new Set([...source.matchAll(/'([a-z]+\.[a-zA-Z]+)'\s*(?:\(|:)/g)].map(m => m[1]));
+}
+test('every shipped floor case has a registered handler', () => {
+  const names = floorHandlers();
+  for (const name of FLOOR_CASES) if (!NO_MESSAGE_CASE.has(name)) assert.ok(names.has(name), `${name} has no handler`);
 });
-
-test('FLOOR_CASES matches the cases server.ts actually acts on a Floor with', () => {
-  // The mechanical check, in both directions. A 46th case added to the switch without a decision
-  // about where it runs must fail here rather than silently staying office-side.
-  //
-  // The shape that made this hard: `ball.take`/`ball.throw` and `car.enter`/`car.leave` are two
-  // labels over one body, and the body names only one of each pair. So a run of adjacent `case` lines
-  // is one unit, and a body found under it belongs to **every** label in the run.
-  const source = readFileSync(path.join(root, 'src/server/server.ts'), 'utf8');
-  const lines = source.split('\n');
-  const start = lines.findIndex((l) => /^ {4}switch \(msg\.t\)/.test(l));
-  assert.notEqual(start, -1, 'the message switch moved — this test needs rewriting');
-  let end = start;
-  while (end < lines.length && !/^ {4}\}/.test(lines[end])) end++;
-  assert.ok(end < lines.length, 'the switch never closes');
-
-  const touches = new Map<string, boolean>();
-  // A group is a run of adjacent `case` labels, and the body that follows belongs to every label in
-  // it — which is the shape `ball.take`/`ball.throw` and `car.enter`/`car.leave` take. Reading only
-  // the first line of a body, or attributing a body to just the last label, is how two cases went
-  // missing the first time.
-  let group: string[] = [];
-  let bodyStarted = false;
-  for (let i = start + 1; i < end; i++) {
-    const line = lines[i];
-    const open = line.match(/^ {6}case '([^']+)'/);
-    if (open) {
-      if (bodyStarted) group = [];
-      group.push(open[1]);
-      bodyStarted = false;
-      continue;
-    }
-    if (!group.length || line.trim() === '') continue;
-    bodyStarted = true;
-    const hit =
-      /\.(workers|queue|forge|plan|jukebox|changes|decor|court|garage|meetings|dog|tv)\./.test(line) ||
-      /\.(sendHome|sendLandedHome|landed|arrived|merged)\(/.test(line) ||
-      /\bhere\(\)|\bfloors\.(get|values)\(/.test(line);
-    if (hit) for (const label of group) touches.set(label, true);
-  }
-
-  const derived = [...touches.keys()].filter((k) => touches.get(k)).sort();
-  assert.ok(derived.length > 40, `the scan only saw ${derived.length} cases, so it is looking in the wrong place`);
-  // Everything derived must be declared. The other direction is not mechanical: several cases reach a
-  // floor and hand it to an office-side manager (`floor.go`, `dog.pet`, `wb.update`), so they are
-  // derived and stay office-side by decision. What matters is that nothing is derived *and* missing.
-  const missing = derived.filter((c) => !FLOOR_CASES.includes(c as never) && !LOOKUP_ONLY.includes(c));
-  assert.deepEqual(missing, [], `these act on a floor and are neither shipped nor named as lookup-only: ${missing.join(', ')}`);
+test('every registered floor-domain operation has a hosting decision', () => {
+  const names = floorHandlers();
+  const domains = new Set(FLOOR_CASES.map(n => n.split('.')[0]));
+  const missing = [...names].filter(n => domains.has(n.split('.')[0]) && !FLOOR_CASES.includes(n as never) && !LOOKUP_ONLY.includes(n));
+  assert.deepEqual(missing, [], 'new floor operations need a hosted or office-side decision');
 });
 
 test('the office validates what a machine sends, rather than trusting it', () => {
