@@ -1,3 +1,4 @@
+import { installPlanReview } from './features/plan-review';
 import './style.css';
 import { installVitals } from './features/vitals';
 import { installFridge } from './features/fridge';
@@ -190,6 +191,7 @@ installChat(ctx);
 parts.talk = installVoice(ctx, { tv: parts.tv });
 installDictation(ctx);
 installCommunications(ctx, parts);
+installPlanReview(ctx, parts);
 parts.hud = installHud(ctx, core, parts);
 
 // ---- Main loop ---------------------------------------------------------------------------------------

@@ -1,3 +1,4 @@
+import { planReview } from './plan-review';
 import { smartphone } from './smartphone';
 import { helpers } from './helpers';
 import { tv } from './tv';
@@ -68,5 +69,5 @@ export const SLICES: readonly Slice[] = [
   accounts,
   signins,
   smartphone,
-  communications,
+  communications, planReview,
 ];

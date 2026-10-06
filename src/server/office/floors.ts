@@ -1,3 +1,4 @@
+import { OFFICE_MAP } from '../../shared/maps/index.js';
 import { communications } from './communications.js';
 import type { FloorActions } from '../floor-actions.js';
 import { RemoteFloor } from '../remote-floor.js';
@@ -88,6 +89,7 @@ export function floorHelpers(ctx: Ctx): FloorHelpers {
 export async function openFloors(ctx: Ctx, hookPort: number): Promise<FloorsOpen> {
   const { cfg, floors, clients } = ctx;
   const floorContext: FloorContext = {
+    planTableAvailable: () => ctx.maps.pick() === OFFICE_MAP,
     helperReport: (floor, helper, host, text) => {
       const meeting = floor.meetings.state().current;
       const link = meeting?.status === 'running' && meeting.seats.some(s => s.workerId === host.id) ? { id: meeting.id, round: meeting.round } : undefined;

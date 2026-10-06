@@ -1,3 +1,4 @@
+import { planReviewHandlers, planReviewView } from './plan-review.js';
 import { forkHandlers, tvView, helpersView } from './fork.js';
 // Every message a browser can send, by type, and the features that keep something per person on a
 // floor. A new feature adds its handler file and a line here.
@@ -40,6 +41,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...githubHandlers,
   ...jukeboxHandlers,
   ...meetingHandlers,
+  ...planReviewHandlers,
   ...planHandlers,
   ...presenceHandlers,
   ...queueHandlers,
@@ -78,5 +80,6 @@ export const views: ViewPieces = {
   jukebox: jukeboxView,
   whiteboard: whiteboardView,
   meeting: meetingView,
+  planReview: planReviewView,
   cabinet: cabinetView,
 };

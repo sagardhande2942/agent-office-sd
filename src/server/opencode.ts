@@ -324,12 +324,20 @@ export const OPENCODE_PLUGIN_SOURCE = String.raw`export default async function A
       const context = response?.hookSpecificOutput?.additionalContext;
       if (typeof context === "string" && context.length <= 10000 && typeof output?.output === "string") output.output += "\n\n" + context;
     }),
+    "tool.execute.before": (input) => {
+      const role = process.env.AGENT_OFFICE_PLAN_ROLE;
+      if (role) {
+        const tools = ["plan_review_state", ...(role === "candidate" ? ["submit_candidate_plan"] : ["request_plan_clarification", "submit_plan_review"])];
+        const allowed = ["read", "glob", "grep", "list", ...tools.flatMap(t => ["agent-office_" + t, "agent_office_" + t])];
+        if (!allowed.includes(input.tool)) throw new Error("This planning session permits repository reads and its role's plan tools only");
 
-    "tool.execute.before": (input) => enqueue(() => {
-      if (input.sessionID === rootSession && !children.has(input.sessionID)) {
-        return send({ type: "tool", sessionId: input.sessionID, tool: input.tool, status: pending.size ? "needs_input" : "working" });
       }
-    }),
+      return enqueue(() => {
+        if (input.sessionID === rootSession && !children.has(input.sessionID)) {
+          return send({ type: "tool", sessionId: input.sessionID, tool: input.tool, status: pending.size ? "needs_input" : "working" });
+        }
+      });
+    },
   };
 }
 `;

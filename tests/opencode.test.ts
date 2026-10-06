@@ -319,3 +319,13 @@ test('marks live OpenCode usage incomplete when hydration fails', async () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('planning plugin denies edits, commands, delegation and unrelated MCP tools for either role',async()=>{
+ const dir=mkdtempSync(path.join(tmpdir(),'office-plan-plugin-'));const previous=process.env.AGENT_OFFICE_PLAN_ROLE;const before=Object.fromEntries(['AGENT_OFFICE_HOOK_URL','AGENT_OFFICE_HOOK_TOKEN','AGENT_OFFICE_WORKER_ID'].map(k=>[k,process.env[k]]));
+ process.env.AGENT_OFFICE_HOOK_URL='http://127.0.0.1:1';process.env.AGENT_OFFICE_HOOK_TOKEN='test';process.env.AGENT_OFFICE_WORKER_ID='candidate';
+ try {const file=writeOpenCodePlugin(dir);const mod=await import(`${pathToFileURL(file).href}?planning=${Date.now()}`);const hooks=await mod.default({});
+ for(const role of ['candidate','reviewer']){process.env.AGENT_OFFICE_PLAN_ROLE=role;for(const tool of ['bash','shell','edit','write','patch','task','agent-office_send_home','other_mcp_tool'])assert.throws(()=>hooks['tool.execute.before']({sessionID:'child',tool}),/planning session/);await hooks['tool.execute.before']({sessionID:'child',tool:'read'});await hooks['tool.execute.before']({sessionID:'child',tool:'agent-office_plan_review_state'});}
+ process.env.AGENT_OFFICE_PLAN_ROLE='candidate';assert.throws(()=>hooks['tool.execute.before']({tool:'agent-office_submit_plan_review'}),/planning session/);
+ process.env.AGENT_OFFICE_PLAN_ROLE='reviewer';assert.throws(()=>hooks['tool.execute.before']({tool:'agent-office_submit_candidate_plan'}),/planning session/);
+ }finally{if(previous===undefined)delete process.env.AGENT_OFFICE_PLAN_ROLE;else process.env.AGENT_OFFICE_PLAN_ROLE=previous;for(const [k,v]of Object.entries(before)){if(v===undefined)delete process.env[k];else process.env[k]=v;}rmSync(dir,{recursive:true,force:true});}
+});

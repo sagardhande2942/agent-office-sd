@@ -1,3 +1,5 @@
+import { planningSeat, planningVersion, promotePlanWorker } from './plan-review.js';
+import type { PlanReviewWorker } from '../../shared/plan-review.js';
 import { submitCompletion } from './completion.js';
 import {holdOffline} from './offline.js';
 import { workerHandle } from './handle.js';
@@ -198,12 +200,10 @@ export class WorkerManager {
     const w = this.workers.get(id);
     return !!w && w.outputAt !== undefined && w.outputAt >= at;
   }
-
   /** The account a worker runs as (see RunAs), if not the office. */
   ownerOf(id: string): string | undefined {
     return this.workers.get(id)?.owner;
   }
-
   /** Each worker's terminal process and directory, to tell whose servers are whose. */
   owners(): ServiceOwner[] {
     return [...this.workers.values()].map((w) => ({
@@ -214,7 +214,6 @@ export class WorkerManager {
       root: this.dir,
     }));
   }
-
   /**
    * Fetches the branch the project is on, so a worktree made next starts from what's on GitHub now
    * (see Worktrees.fetch). Undefined when there's nothing to wait for.
@@ -222,25 +221,20 @@ export class WorkerManager {
   fetchBase(): Promise<void> | undefined {
     return this.trees.fetch();
   }
-
   deskOccupied(deskId: string): boolean {
     for (const w of this.workers.values()) if (w.info.deskId === deskId) return true;
     return false;
   }
   private helperDesk(hostId: string): DeskDef | undefined { return helperOps.helperSeat({get:this.get.bind(this)}, hostId); }
-
   hostOf(id: string): WorkerInfo | undefined { return helperOps.hostOf({get:this.get.bind(this)}, id); }
-
   sendHelper(hostId: string, by: string, provider?: AgentProvider, model?: string, effort?: AgentEffort, owner?: string): WorkerInfo | string { return helperOps.sendHelper({get:this.get.bind(this),prompts:this.prompts,finding:this.finding.bind(this),spawn:this.spawn.bind(this)}, hostId, by, provider, model, effort, owner); }
-
   finding(id: string): string { return helperOps.finding({workers:this.workers,scrollback:this.scrollback}, id); }
-
   /**
    * Hires a worker at a desk. `meeting` seats one at the meeting room's table instead, for that meeting
    * (see meetings.ts), in the meeting's own worktree, which everyone at the table shares. `repos` are
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
-  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', helper?: { hostId: string; hostName: string; worktree?: WorkerInfo['worktree'] }): WorkerInfo | string {
+  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', helper?: { hostId: string; hostName: string; worktree?: WorkerInfo['worktree'] }, planReview?: PlanReviewWorker): WorkerInfo | string {
     // Nobody picked (a board agent, say): the office's default worker, model and effort included.
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
@@ -257,6 +251,8 @@ export class WorkerManager {
     if (this.deskOccupied(deskId) && !(helper && isHelperId(deskId))) return seat.station ? `The ${STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
     if (kind === 'shell' && seat.station) return 'A board agent is always an agent, not a shell';
     if (seat.station && !prompt?.trim()) return 'Tell the board agent what to do';
+    const planError = planningSeat(seat, planReview, kind, worktree, selectedProvider, model, binScript('office-workers.js'), (selectedProvider === this.defaultProvider ? this.agentPath : resolveCommand('opencode')) ?? 'opencode');
+    if (planError) return planError;
     if (!seat.room !== !meeting) return seat.room ? 'Only a meeting seats workers at the meeting table: call one in the meeting room' : 'A meeting seats its workers at the meeting table';
     if (meeting && (kind !== 'agent' || worktree)) return 'A meeting seats agents, in its own worktree';
     if (repos.length && (kind !== 'agent' || !worktree || seat.station || meeting)) return 'Only a worker in its own worktree can work in other repositories too';
@@ -313,6 +309,7 @@ export class WorkerManager {
       viewerIds: [],
       activity: prompt ? truncate(prompt, 80) : undefined,
       meeting: meeting?.id,
+      planReview,
       helper: helper && { hostId: helper.hostId, hostName: helper.hostName },
     };
     const w = newWorker(info, newTracker());
@@ -324,12 +321,10 @@ export class WorkerManager {
     this.persist();
     return info;
   }
-
   /** The workspace of a worker across repositories (see WorkerTrees.makeWorkspace). */
   private makeWorkspace(slug: string, repos: RepoSource[]): { worktree: NonNullable<WorkerInfo['worktree']>; repos: WorkerRepo[]; notes: string[] } | string {
     return this.worktrees.makeWorkspace(slug, repos);
   }
-
   /** Starts a worker that isn't running again, carrying on its session, with `prompt` as its next message. */
   resume(id: string, prompt?: string): string | undefined {
     const w = this.workers.get(id);
@@ -533,6 +528,7 @@ export class WorkerManager {
     w.info.lastInput = { by, at: now };
     return true;
   }
+  promotePlanWorker(id: string, activity: string, prompt: string): string | undefined { return promotePlanWorker(this.ctx, id, activity, prompt, (w, text) => this.launch(w, text, undefined)); }
   submitCompletion(id: string, body: unknown, branch?: string): string | undefined { return submitCompletion(this.ctx, id, body, branch); }
   stageHelperReport(id: string, helperName: string, text: string, messageId?: string): void { return helperOps.stageHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, helperName, text, messageId); }
   clearHelperReport(id: string, messageId: string): void { return helperOps.clearHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, messageId); }
@@ -694,13 +690,15 @@ export class WorkerManager {
     }
     const shell = defaultShell();
     const isShell = info.kind === 'shell';
-    if (!isShell && prompt) prompt = `${prompt}\n\n${WORKER_COORDINATION}`;
+    if (!isShell && prompt && !info.planReview?.locked) prompt = `${prompt}\n\n${WORKER_COORDINATION}`;
     const adapter = isShell ? undefined : providerAdapter(info.provider);
     const configured = !isShell && info.provider === this.defaultProvider;
     const cwd = this.cwd(info);
     const command = this.command(info);
     const commandPath = isShell ? undefined : configured ? this.agentPath : resolveCommand(command);
-    const base = isShell ? (WIN && !process.env.SHELL ? [] : ['-l']) : configured ? [...this.agentArgs] : [];
+    const base = isShell ? (WIN && !process.env.SHELL ? [] : ['-l']) : configured && !info.planReview?.locked ? [...this.agentArgs] : [];
+    const planLaunchError = planningVersion(info, commandPath ?? command);
+    if (planLaunchError) { this.startFailed(w, planLaunchError); return; }
     // Its provider's command line, and anything it sets for this run (see ProviderAdapter.launch).
     const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), args: base, prompt, resumeSessionId, station: DESK_BY_ID.get(info.deskId)?.station, cwd, setup: this.setups[adapter.id] }) : { args: base };
     const { args } = plan;
@@ -714,6 +712,7 @@ export class WorkerManager {
       AGENT_OFFICE_HOOK_TOKEN: w.hookToken,
     });
     Object.assign(env, plan.env);
+    if (info.planReview?.locked) env.AGENT_OFFICE_PLAN_ROLE = info.planReview.role; else delete env.AGENT_OFFICE_PLAN_ROLE;
     // Whichever agent it runs, a worker reaches the office's workers with office-workers, and a board
     // agent the queue with office-queue.
     if (this.officeBin) {

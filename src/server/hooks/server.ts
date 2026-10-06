@@ -1,3 +1,4 @@
+import { workerPlanReview } from './plan-review.js';
 import { completionCheckpoint, workerCompletion } from './completion.js';
 // The loopback-only server for the workers' own calls: their agents' hook events, and the office's
 // queue and workers for the board agents and the office-workers command.
@@ -22,6 +23,7 @@ export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Serv
     } catch {
       return send(res, 400, {});
     }
+    if (await workerPlanReview(ctx, req, res, url)) return;
     if (['/office/workers/completion', '/office/workers/complete'].includes(url.pathname)) return workerCompletion(ctx, req, res, url);
     if (url.pathname === '/office/queue') return officeQueue(ctx, req, res, url);
     if (url.pathname === '/office/workers/helper') return workerHelper(ctx, req, res, url);

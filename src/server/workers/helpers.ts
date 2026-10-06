@@ -73,6 +73,7 @@ export async function deliverHelperReport(ctx: Pick<HelpContext,'workers'|'emitU
 
 export function sendHelper(ctx:Pick<HelpContext,'get'|'prompts'|'finding'|'spawn'>, hostId: string, by: string, provider?: AgentProvider, model?: string, effort?: AgentEffort, owner?: string): WorkerInfo | string {
     const host = ctx.get(hostId);
+    if (host?.planReview?.locked) return 'Planning participants cannot request helpers';
     if (!host) return 'No such worker';
     // A helper helps a worker, not another helper: that would make a chain nobody asked for.
     if (isHelperId(host.deskId)) return `${host.name} is itself a helper`;

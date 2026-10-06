@@ -22,6 +22,8 @@ import { IS_MAC } from '../../ui/termkeys';
 import { openWhiteboard } from '../whiteboard/ui';
 import type { InteractKind, Interactable } from '../../world/types';
 
+export const PALETTE_ENTRIES: Array<() => PaletteEntry[]> = [];
+
 export type PaletteParts = Pick<Parts, 'walking' | 'waiting' | 'actions' | 'hud' | 'hanging' | 'meeting' | 'telescope'>;
 
 /** Listens for Ctrl+K (⌘K) on the window. */
@@ -66,7 +68,7 @@ export function installPalette(ctx: Ctx, parts: PaletteParts) {
   /** Everything the palette finds, in the order it lists them before you type. */
   function paletteEntries(): PaletteEntry[] {
     const { waiting, actions, meeting, hanging } = parts;
-    const out: PaletteEntry[] = [];
+    const out: PaletteEntry[] = PALETTE_ENTRIES.flatMap(make => make());
     for (const w of store.workers.values()) {
       const desk = DESK_BY_ID.get(w.deskId);
       const spot = desk && deskSpot(desk);

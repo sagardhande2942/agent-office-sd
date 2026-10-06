@@ -43,6 +43,7 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     pr: info.pr,
     pastPrs: info.pastPrs,
     meeting: info.meeting,
+    planReview: info.planReview,
     resting: info.resting,
     workedMs: workedMs(info),
     tracker: info.kind === 'agent' ? tracker : undefined,
@@ -107,6 +108,7 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         rows: 30,
         viewers: [],
         viewerIds: [],
+        planReview: DESK_BY_ID.get(s.deskId)?.review && s.planReview && typeof s.planReview.id === 'string' && ['candidate','reviewer'].includes(s.planReview.role) && typeof s.planReview.locked === 'boolean' ? s.planReview : undefined,
         meeting: typeof s.meeting === 'string' && DESK_BY_ID.get(s.deskId)?.room ? s.meeting : undefined,
         workedMs: typeof s.workedMs === 'number' && Number.isFinite(s.workedMs) && s.workedMs > 0 ? s.workedMs : undefined,
       };

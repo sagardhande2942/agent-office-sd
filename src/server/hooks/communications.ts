@@ -23,7 +23,8 @@ export async function workerCommunications(ctx: Ctx, req: http.IncomingMessage, 
     const request = action === '/reply' ? ledger.get(str(b.id, 80)) : undefined;
     const target = findWorker(floor.workers.list(), action === '/reply' ? request?.from.id ?? '' : str(b.worker, 64));
     if (typeof target === 'string') throw new Error(target);
-    if (target.kind !== 'agent') throw new Error('Tracked messages are for agents, not shells');
+    if (target.planReview?.locked) throw new Error('Planning participants do not receive inbox messages');
+      if (target.kind !== 'agent') throw new Error('Tracked messages are for agents, not shells');
     const context = b.context === undefined ? { branch: me.worktree?.branch ?? floor.project.branch } : b.context;
     const meeting = floor.meetings.state().current;
     const participant = (id: string) => meeting?.seats.some(s => s.workerId === id);

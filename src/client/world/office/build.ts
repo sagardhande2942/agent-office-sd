@@ -1,3 +1,4 @@
+import { planReviewTable } from '../../features/plan-review/world';
 import { enhancements } from './enhancements';
 import * as THREE from 'three';
 import type { WallRect } from '../../../shared/decor';
@@ -67,6 +68,7 @@ function floorPlan() {
     signs,
     loft,
     meetingRoom,
+    planReviewTable,
     elevator,
     garageLift,
     gong,

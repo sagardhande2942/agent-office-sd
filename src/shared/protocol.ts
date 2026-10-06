@@ -1,3 +1,5 @@
+import type { PlanReviewClientMsg, PlanReviewServerMsg } from './protocol/plan-review.js';
+export * from './protocol/plan-review.js';
 import type { TvClientMsg } from './protocol/toys.js';
 // Wire protocol between browser and server. Every WebSocket frame is one JSON object.
 //
@@ -35,6 +37,7 @@ export * from './protocol/workers.js';
 export * from './protocol/communications.js';
 
 export type ClientMsg =
+  | PlanReviewClientMsg
   | TvClientMsg
   | PresenceClientMsg
   | RooftopClientMsg
@@ -59,6 +62,7 @@ export type ClientMsg =
   | DogClientMsg;
 
 export type ServerMsg =
+  | PlanReviewServerMsg
   | CommunicationsServerMsg
   | PresenceServerMsg
   | RooftopServerMsg

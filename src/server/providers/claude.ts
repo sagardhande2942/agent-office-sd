@@ -199,6 +199,7 @@ export const claude: ProviderAdapter<undefined, ClaudeSetup> = {
     mcp: mcpScript ? writeClaudeMcpConfig(dataDir, mcpScript) : undefined,
   }),
   launch({ h: { info }, args, prompt, resumeSessionId, station, setup }) {
+    if (info.planReview?.locked) args.push('--tools', 'Read,Glob,Grep', '--strict-mcp-config', '--allowedTools', ...['plan_review_state', ...(info.planReview.role === 'candidate' ? ['submit_candidate_plan'] : ['request_plan_clarification', 'submit_plan_review'])].map(t => 'mcp__agent-office__' + t));
     args.unshift('--settings', setup.settings);
     // The office's MCP server: its workers, to list, hire, send home and tell (see office-workers.ts).
     // Ahead of --settings, which ends the list --mcp-config takes.

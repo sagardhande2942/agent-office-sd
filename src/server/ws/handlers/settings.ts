@@ -87,6 +87,7 @@ export const settingsHandlers = {
     ctx.toastAll(real ? `🕰️ ${c.peer.name} put the sky on the real time of day` : `⏩ ${c.peer.name} set the sky to a whole day every hour`);
   },
   async 'map.set'(ctx, c, msg) {
+    if (msg.map !== undefined && msg.map !== OFFICE_MAP && [...ctx.floors.values()].some(f => f.workers.list().some(w => !!w.planReview))) { ctx.warn(c, 'Close plan comparison activities before switching away from the Office map'); return; }
     const who = c.peer.name;
     // Someone opened the list, or picked a map: either way the folder of maps of your own is read again first.
     const was = ctx.maps.pick();

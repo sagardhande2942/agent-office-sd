@@ -7,7 +7,7 @@ const checkpoints = new WeakMap<Ctx, CommunicationCheckpoints>();
 export function checkpointOutput(ctx: Ctx, workerId: string, token: string, route: string, event: string, payload: unknown): Record<string, unknown> {
   const floor = ctx.workerFloor(workerId);
   const actor = floor?.workers.authenticate(workerId, token);
-  if (!floor || !actor || actor.helperReport?.state === 'interrupting') return {};
+  if (!floor || !actor || actor.planReview?.locked || actor.helperReport?.state === 'interrupting') return {};
   const adapter = providerAdapter(actor.provider);
   if (!adapter || (adapter.hooksAs ?? adapter.id) !== route) return {};
   const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};

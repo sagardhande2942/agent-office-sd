@@ -81,3 +81,6 @@ body.lite { min-height: 100dvh; background: var(--paper); -webkit-tap-highlight-
   .lite-nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .lite-main { padding-bottom: 130px; }
 }
+
+.plan-label-short { display: none; }
+@media (max-width: 480px) { .plan-label-full { display: none; } .plan-label-short { display: inline; } }

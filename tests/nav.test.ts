@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BALCONY, BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, MEETING_ROOM, MEETING_SEATS, PARACHUTE, ROAD, SEATS, STATIONS, WING, deskBuilt, wingMinZ, type DeskDef } from '../src/shared/layout.js';
+import { BALCONY, BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, MEETING_ROOM, MEETING_SEATS, PLAN_REVIEW_SEATS, PARACHUTE, ROAD, SEATS, STATIONS, WING, deskBuilt, wingMinZ, type DeskDef } from '../src/shared/layout.js';
 import { route, walkable, wayHome, wayIn, wayToBalcony, type Pt } from '../src/shared/nav.js';
 
 /** Every place a worker can be on a floor built out `wing` rows, at each build-out there is. */
-const everywhere = (): [DeskDef, number][] => Array.from({ length: WING.rows + 1 }, (_, wing) => [...SEATS, ...STATIONS, ...MEETING_SEATS].filter((d) => deskBuilt(d, wing)).map((d): [DeskDef, number] => [d, wing])).flat();
+const everywhere = (): [DeskDef, number][] => Array.from({ length: WING.rows + 1 }, (_, wing) => [...SEATS, ...STATIONS, ...MEETING_SEATS, ...PLAN_REVIEW_SEATS].filter((d) => deskBuilt(d, wing)).map((d): [DeskDef, number] => [d, wing])).flat();
 
 test('a worker sent home walks round the furniture, out the exit door and off along the sidewalk', () => {
   for (const [seat, wing] of everywhere()) {
@@ -99,4 +99,8 @@ test('the back office is only floor once it is built out, and only as far as it 
   }
   // Nowhere else through the north wall.
   assert.equal(walkable(0, FLOOR.minZ - 1, WING.rows), false);
+});
+
+test('plan candidates and reviewer reach their separate table on open floor',()=>{
+ for(const seat of PLAN_REVIEW_SEATS){const way=wayIn(seat);for(let i=1;i<way.length;i++)clear(way[i-1],way[i],seat.id);const [x,z]=way[way.length-1];assert.ok(Math.hypot(x-seat.x,z-seat.z)<1.3);}
 });

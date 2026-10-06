@@ -1,0 +1,8 @@
+.plan-comparison { max-height: 75vh; overflow: auto; }
+.plan-comparison form { display: flex; flex-direction: column; gap: 12px; }
+.plan-comparison label { display: flex; flex-direction: column; gap: 4px; }
+.plan-model-row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.plan-model-row input { flex: 1; min-width: 130px; }
+.plan-comparison pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; }
+.plan-comparison p { white-space: pre-wrap; overflow-wrap: anywhere; }
+.plan-comparison section { padding: 12px 0; border-bottom: 1px solid var(--ink); }

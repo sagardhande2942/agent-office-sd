@@ -1,3 +1,4 @@
+import type { PlanReviewWorker } from '../plan-review.js';
 import type { CompletionReport } from '../completion.js';
 import type { BossGuard } from '../boss.js';
 import type { HelperState } from '../helper.js';
@@ -99,6 +100,7 @@ export interface WorkerInfo {
   lastInput?: { by: string; at: number };
   /** The meeting it was called to, for a worker at the meeting room's table (see Meeting). */
   meeting?: string;
+  planReview?: PlanReviewWorker;
   /**
    * How long it has spent working (ms), over the stretches that have ended, and when the one it's in
    * now started (while it's working): on the castle map, the longer it has worked, the more worn out it looks.

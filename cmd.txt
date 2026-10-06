@@ -305,3 +305,19 @@ COMPLETION CHECKLIST
     publish PRs or mark work finished. See docs/completion-checklist.md.
   MCP: worker_completion / submit_worker_completion
     Read first; submission requires the returned revision.
+
+PLAN COMPARISON (commands inside agent-office tui after pressing :)
+plans
+  Show the current comparison, detailed plans, criterion scores, accepted/rejected reasons and worker IDs.
+plan-start /absolute/path/task.json
+  Start a local Git plan-only comparison at the separate Office-map table. No additional flags.
+  JSON: brief (10–12000 chars), requirements (1–30 strings), constraints (optional),
+  candidates (1–5 distinct {provider,model,effort?}), reviewer ({provider,model,effort?}),
+  minutes (optional 1–120, default 20), weights (optional whole numbers totaling 100).
+  Providers: claude or opencode 1.x. Explicit models required. Claude aliases sonnet/haiku/opus/fable;
+  OpenCode provider/model IDs. Default weights coverage35 feasibility25 detail20 verification15 simplicity5.
+plan-stop
+  Stop/close the activity, clean planning participants; preserve winning worktree/branch after implementation starts.
+plan-retry
+  Retry failed rejected-worker cleanup; implementation waits until cleanup succeeds.
+  See docs/plan-comparison.md for full configuration, restrictions and MCP schemas.

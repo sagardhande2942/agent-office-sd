@@ -12,7 +12,7 @@ export function completionCheckpoint(ctx: Ctx, id: string, token: string, route:
   const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
   const root = !data.agent_id && !data.agent_type && (!data.session_id || !actor?.sessionId || data.session_id === actor.sessionId || event === 'SessionStart');
   const native = actor?.kind === 'agent' && (route === 'claude' ? actor.provider === 'claude' || actor.provider === 'custom' : route === 'codex' && actor.provider === 'codex' && !!normalizeCodexHook(event, payload));
-  if (actor && root && native && event === 'Stop' && !data.stop_hook_active && output.decision !== 'block' && !actor.helper && !actor.meeting && !DESK_BY_ID.get(actor.deskId)?.station && (actor.prompt || actor.task) && actor.helperReport?.state !== 'interrupting') {
+  if (actor && root && native && event === 'Stop' && !data.stop_hook_active && output.decision !== 'block' && !actor.helper && !actor.meeting && !actor.planReview?.locked && !DESK_BY_ID.get(actor.deskId)?.station && (actor.prompt || actor.task) && actor.helperReport?.state !== 'interrupting') {
     const revision = actor.completionRevision ?? 0;
     let reminders = stops.get(ctx); if (!reminders) stops.set(ctx, reminders = new Map());
     if ((!actor.completion || actor.completion.status === 'needs-attention') && reminders.get(id) !== revision) {

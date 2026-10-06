@@ -4,7 +4,7 @@
 // An office floor built out into the back office (see WING) has more of it to get round: the office's
 // helpers take how many rows it's built out (`wing`), and each level gets a grid of its own.
 
-import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, GREEN_PLANTS, JUKEBOX, KIOSK, LADDER, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PARACHUTE, POLE, POLES, ROAD, STAIRS, STATIONS, WHITEBOARD, WING, builtDesks, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
+import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, GREEN_PLANTS, JUKEBOX, KIOSK, LADDER, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PLAN_REVIEW_TABLE, PLAN_REVIEW_SEATS, PARACHUTE, POLE, POLES, ROAD, STAIRS, STATIONS, WHITEBOARD, WING, builtDesks, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
 
 
 export type Pt = [number, number];
@@ -102,9 +102,11 @@ function obstacles(wing: number): Obstacles {
   rects.push([room.door.x1, room.maxX, room.minZ - G, room.minZ + G]);
   const t = MEETING_TABLE;
   rects.push([t.x - t.width / 2, t.x + t.width / 2, t.z - t.depth / 2, t.z + t.depth / 2]);
-  // Chairs tucked in at the table: just the middle of each, so there's a way round behind them, between
-  // their backs and the glass (or the back wall), which is one cell wide.
-  for (const d of MEETING_SEATS) {
+  const pt=PLAN_REVIEW_TABLE;
+  rects.push([pt.x-pt.width/2,pt.x+pt.width/2,pt.z-pt.depth/2,pt.z+pt.depth/2]);
+  // Chair centers leave the same narrow path behind the meeting and planning tables.
+  for (const d of [...MEETING_SEATS,...PLAN_REVIEW_SEATS]) {
+
     const [cx, cz] = deskPoint(d, 0, 0.85);
     circles.push([cx, cz, 0.18]);
   }
@@ -286,7 +288,7 @@ export class NavGrid {
             : // At the meeting table there's less room behind the chair, before the glass.
               [deskPoint(seat, side * 0.7, 0.95), deskPoint(seat, side * 0.7, seat.room ? 1.4 : 1.75)];
       // A bean bag or a kiosk can stand with one side up against something (the elevator, by the queue).
-      const blocked = !!(seat.beanbag || seat.station) && !this.walkable(down[0], down[1]);
+      const blocked = (!!(seat.beanbag || seat.station) && !this.walkable(down[0], down[1])) || (!!seat.review && (!this.walkable(down[0],down[1]) || !this.walkable(back[0],back[1]) || !this.clearLine(down,back)));
       const pts = [down, ...this.route(back, to)];
       return { pts, cost: (blocked ? 1000 : 0) + pathLength(pts) };
     });
@@ -300,7 +302,9 @@ export class NavGrid {
   wayTo(from: Pt, seat: DeskDef): Pt[] {
     const ways = [-1, 1].map((side) => {
       const pts = [...this.route(from, deskPoint(seat, side * 0.7, seat.room ? 1.4 : 1.75)), deskPoint(seat, side * 0.7, 0.95)];
-      return { pts, cost: pathLength(pts) };
+      const back=deskPoint(seat,side*0.7,seat.room?1.4:1.75),down=deskPoint(seat,side*0.7,0.95);
+      const blocked=!!seat.review && (!this.walkable(back[0],back[1]) || !this.walkable(down[0],down[1]) || !this.clearLine(back,down));
+      return { pts, cost: (blocked?1000:0)+pathLength(pts) };
     });
     return ways[0].cost <= ways[1].cost ? ways[0].pts : ways[1].pts;
   }

@@ -151,6 +151,7 @@ export class WorkerPrs {
     const w = this.ctx.workers.get(id);
     if (!w) return 'No such worker';
     const { info } = w;
+    if (info.planReview?.locked) return 'Plan-only participants cannot open pull requests';
     const wt = info.worktree;
     if (!wt) return `${info.name} works in the main checkout — only workers with their own worktree can open a PR`;
     if (info.prOpening) return `${info.name}'s pull request is already being opened`;
