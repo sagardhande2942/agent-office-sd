@@ -4,6 +4,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
+import tty from 'node:tty';
 import { normalizeRepo, sameRepo } from '../shared/floors.js';
 import type { ForgeKind, RepoChoice } from '../shared/protocol.js';
 import { FORGE_CLI, FORGE_LABEL } from '../shared/protocol.js';
@@ -44,9 +45,14 @@ Options:
   -h, --help              Show this help
 `;
 
-/** Someone's at a terminal to answer questions. */
+/**
+ * Someone's at a terminal to answer questions. Asks about the file descriptors, not process.stdin:
+ * on Windows, opening stdin when it's a pipe another process is reading (`npm run dev`, where tsx
+ * watch waits on it for Enter) blocks forever, and the office never opens. stdout goes first, so
+ * anything run with its output piped (concurrently, a service, CI) doesn't look at stdin at all.
+ */
 export function interactive(): boolean {
-  return !!process.stdin.isTTY && !!process.stdout.isTTY && !process.env.CI;
+  return tty.isatty(1) && tty.isatty(0) && !process.env.CI;
 }
 
 /**
@@ -54,7 +60,7 @@ export function interactive(): boolean {
  * sign-in and the first projects before it opens. Enter skips any of it; the elevator does the same.
  */
 export async function welcome(cfg: Config): Promise<void> {
-  const building = new Building(cfg.dataDir, cfg.projectsDir);
+  const building = new Building(cfg.dataDir, cfg.projectsDir, { terminal: true });
   if (building.list().length) return;
   // --projects is the answer to the first question (the office applies it again as it starts).
   const folderGiven = !!cfg.projects && !building.setProjectsDir(cfg.projects, 'the command line');
@@ -111,7 +117,7 @@ export async function setupCommand(argv: string[]): Promise<number> {
     console.error(`agent-office setup: the office in ${tildify(dir)} is running. Add projects from its elevator, and pick the workspace folder in ⚙️ Settings.`);
     return 1;
   }
-  const building = new Building(dataDir, inProject ? path.join(os.homedir(), 'agent-office') : dir);
+  const building = new Building(dataDir, inProject ? path.join(os.homedir(), 'agent-office') : dir, { terminal: true });
 
   if (projects || repos.length || !interactive()) {
     if (!projects && !repos.length) {

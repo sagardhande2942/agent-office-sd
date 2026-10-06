@@ -1,3 +1,4 @@
+import './plan-review.css';
 import { PLAN_CRITERIA, DEFAULT_PLAN_WEIGHTS } from '../../shared/plan-review';
 import type { AgentChoice } from '../../shared/protocol';
 import type { Net } from '../net';

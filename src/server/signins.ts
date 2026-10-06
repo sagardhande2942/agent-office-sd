@@ -1,94 +1,15 @@
+import { CLAUDE_VARS, GITHUB_VARS, BITBUCKET_VARS, FLOW_MS, LOOK_GAP_MS, LOOK_TIMEOUT_MS, CLAUDE_TOKEN, API_KEY, GITHUB_TOKEN, BITBUCKET_TOKEN, ACCOUNT_ID, BITBUCKET_USER, HELP_WHERE, Saved, Flow, Live, ForgeAs } from './signin-types.js';
+export type { ForgeAs } from './signin-types.js';
+import * as accountConfig from './signin-config.js';
 import { execFile, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import * as pty from '@lydell/node-pty';
 import type { ForgeKind, SignInKind, SignInState, SignInsState } from '../shared/protocol.js';
-
-/*
- * Everyone's own Claude and forges
- * -------------------------------
- * In an office with accounts, each person's workers run on that person's own Claude plan, and the
- * office acts on their code host as them rather than as the machine. Every account gets a folder,
- * .agent-office/homes/<id>/, holding its own Claude config (CLAUDE_CONFIG_DIR), gh config
- * (GH_CONFIG_DIR), bb config (BB's own home, see bitbucketEnv) and git config (GIT_CONFIG_GLOBAL),
- * and whatever runs for that account gets those in its environment in place of the office's: its
- * workers, and what the office does on the forge when they click (comment, merge, open a PR).
- * Nothing global changes, so any number of people can be signed in to different accounts at once.
- *
- * Signing in happens from the office: it runs `claude auth login` or `gh auth login --web` against
- * the account's folders and hands the browser the page to open (and GitHub's one-time code). A
- * token from `claude setup-token`, a GitHub token or a Bitbucket API token can be pasted instead,
- * and a shell at a desk runs with the same folders, so `claude auth login` typed there works too.
- * Admins may keep using the office machine's own sign-ins.
- *
- * An office without accounts (you alone, on the shared password) never comes here: everything runs
- * on the machine's own `claude`, `gh` and `bb`, exactly as before.
- */
-
-/** Credentials the office's own environment may carry. None of them reach anything run as someone else. */
-const CLAUDE_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'CLAUDE_CODE_OAUTH_REFRESH_TOKEN', 'CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'CLAUDE_CONFIG_DIR', 'CLAUDE_SECURESTORAGE_CONFIG_DIR'];
-const GITHUB_VARS = ['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN', 'GH_CONFIG_DIR', 'GIT_CONFIG_GLOBAL'];
-/** bb keeps no configuration directory variable: it reads $BB_USERNAME and $BB_API_TOKEN when logging in, and nothing else. */
-const BITBUCKET_VARS = ['BB_USERNAME', 'BB_API_TOKEN', 'BB_WORKSPACE', 'BB_API_BASE_URL', 'GIT_CONFIG_GLOBAL'];
-/** GitHub's one-time codes last 15 minutes; a Claude sign-in link gets as long. */
-const FLOW_MS = 15 * 60_000;
-/** Someone's sign-ins are looked at again at most this often, unless they ask. */
-const LOOK_GAP_MS = 20_000;
-const LOOK_TIMEOUT_MS = 30_000;
-/** From `claude setup-token` (sk-ant-oat01-…), or an Anthropic API key (sk-ant-api03-…). */
-const CLAUDE_TOKEN = /^sk-ant-[a-z]+\d*-[A-Za-z0-9_-]{20,}$/;
-const API_KEY = /^sk-ant-api/;
-/** ghp_…, github_pat_…, gho_… and the like. */
-const GITHUB_TOKEN = /^[A-Za-z0-9_]{20,255}$/;
-/** Atlassian API tokens: ATBB…, and the older ATATT… app passwords. */
-const BITBUCKET_TOKEN = /^(ATBB|ATATT)[A-Za-z0-9_-]{16,}$/;
-const ACCOUNT_ID = /^[A-Za-z0-9]{6,64}$/;
-/** A Bitbucket username, as bb's --username takes it. */
-const BITBUCKET_USER = /^[A-Za-z0-9._-]{1,64}$/;
-const HELP_WHERE = '☰ → 🔐 Your sign-ins';
-
-interface Saved {
-  /** Unset: its own login, in its folder. A token pasted from `claude setup-token` (or an API key). The office machine's own (admins). */
-  claude?: { use: 'token'; token: string } | { use: 'office' };
-  github?: { use: 'office' };
-  /** bb has no browser flow the office can hand out, so a Bitbucket sign-in is a pasted token. */
-  bitbucket?: { use: 'token'; token: string; username: string } | { use: 'office' };
-  /** Who the last look found each signed in as, so workers can start before the next look. */
-  seen?: { claude?: string; github?: string; bitbucket?: string };
-}
-
-/** A sign-in the office is running for someone. */
-interface Flow {
-  stop(): void;
-  /** Types into it: the code from Claude's sign-in page. */
-  write?(data: string): void;
-}
-
-interface Live {
-  claude: Omit<SignInState, 'how'>;
-  github: Omit<SignInState, 'how'>;
-  bitbucket: Omit<SignInState, 'how'>;
-  flows: Partial<Record<SignInKind, Flow>>;
-  looking?: Promise<void>;
-  lookedAt: number;
-}
-
-/** Whose forge CLI the office runs for someone: their own sign-in's environment. */
-export interface ForgeAs {
-  /** Who the sign-in belongs to (`key` tells logins apart). */
-  key: string;
-  /** Which forge it signs in to. */
-  kind: ForgeKind;
-  /** Who it is, so comments from the office can be shown under that name. */
-  name: string;
-  env: Record<string, string>;
-}
-
 export class SignIns {
   private homes: string;
   private live = new Map<string, Live>();
-
   constructor(
     dataDir: string,
     /** The `claude`, `gh` and `bb` binaries, or null when they aren't installed. */
@@ -103,7 +24,6 @@ export class SignIns {
   ) {
     this.homes = path.join(dataDir, 'homes');
   }
-
   state(id: string): SignInsState {
     const s = this.load(id);
     const l = this.get(id);
@@ -114,35 +34,29 @@ export class SignIns {
       office: this.mayUseOffice(id),
     };
   }
-
   /** Whether `id` has a Claude sign-in its workers can start on, as far as the last look knows. */
   claudeReady(id: string): boolean {
     const s = this.load(id);
     return this.how(id, s, 'claude') !== 'login' || !!s.seen?.claude;
   }
-
   githubReady(id: string): boolean {
     const s = this.load(id);
     return this.how(id, s, 'github') === 'office' || !!s.seen?.github;
   }
-
   bitbucketReady(id: string): boolean {
     const s = this.load(id);
     return this.how(id, s, 'bitbucket') === 'office' || !!s.seen?.bitbucket;
   }
-
   /** Whether `id` is signed in to `kind` far enough for the office to act on it for them. */
   ready(id: string, kind: SignInKind): boolean {
     return kind === 'claude' ? this.claudeReady(id) : kind === 'github' ? this.githubReady(id) : this.bitbucketReady(id);
   }
-
   /** What to tell someone who needs `which` signed in first. */
   why(which: SignInKind): string {
     if (which === 'claude') return `Sign in to Claude first (${HELP_WHERE}): your workers run on your own Claude plan`;
     const forge = which === 'github' ? 'GitHub' : 'Bitbucket';
     return `Sign in to ${forge} first (${HELP_WHERE}): the office acts on ${forge} as you`;
   }
-
   /**
    * Changes whenever what `id`'s Claude signs in with changes (to read its plan's limits afresh).
    * Undefined when it's the office's own.
@@ -153,13 +67,11 @@ export class SignIns {
     if (how === 'office') return undefined;
     return `${how}:${s.claude?.use === 'token' ? s.claude.token.slice(-12) : ''}:${s.seen?.claude ?? ''}`;
   }
-
   /** The login `id` acts as on `kind` (for "you" on comments); undefined when it's the office's own or none. */
   forgeLogin(id: string, kind: ForgeKind): string | undefined {
     const s = this.load(id);
     return this.how(id, s, kind) === 'login' ? s.seen?.[kind]?.replace(/^@/, '') : undefined;
   }
-
   /** The GitHub login `id` acts as (for "you" on comments); undefined when it's the office's own or none. */
   githubLogin(id: string): string | undefined {
     return this.forgeLogin(id, 'github');
@@ -699,69 +611,12 @@ export class SignIns {
     if (this.gh) await run(this.gh, ['auth', 'logout', '--hostname', 'github.com'], this.githubEnv(id));
     rmSync(path.join(this.home(id), 'gh', 'hosts.yml'), { force: true });
   }
+  private seed(dir: string, change?: (c: any) => void) { return accountConfig.seed({base:this.base,home:this.home.bind(this),gh:this.gh,seed:this.seed.bind(this)},dir, change); }
 
-  /** Claude's own settings in an account's folder: its first-run questions already answered. */
-  private seed(dir: string, change?: (c: any) => void) {
-    const file = path.join(dir, '.claude.json');
-    let c: any = {};
-    try {
-      c = JSON.parse(readFileSync(file, 'utf8'));
-    } catch {
-      // new
-    }
-    const before = JSON.stringify(c);
-    c.hasCompletedOnboarding = true;
-    change?.(c);
-    if (JSON.stringify(c) === before) return;
-    try {
-      writeFileSync(file, JSON.stringify(c, null, 2), { mode: 0o600 });
-    } catch (err) {
-      console.error(`agent-office: couldn't write ${file}: ${(err as Error).message}`);
-    }
-  }
+  private trust(configDir: string, dirs: string[]) { return accountConfig.trust({base:this.base,home:this.home.bind(this),gh:this.gh,seed:this.seed.bind(this)},configDir, dirs); }
 
-  /** Folders the office's own Claude trusts, the account's Claude trusts too: they're the same projects. */
-  private trust(configDir: string, dirs: string[]) {
-    let office: any;
-    try {
-      const base = this.base();
-      office = JSON.parse(readFileSync(base.CLAUDE_CONFIG_DIR ? path.join(base.CLAUDE_CONFIG_DIR, '.claude.json') : path.join(os.homedir(), '.claude.json'), 'utf8'));
-    } catch {
-      return;
-    }
-    const trusted = (d: string) => office?.projects?.[d]?.hasTrustDialogAccepted === true;
-    if (!dirs.some(trusted)) return;
-    this.seed(configDir, (c) => {
-      c.projects ??= {};
-      for (const d of dirs) c.projects[d] = { ...c.projects[d], hasTrustDialogAccepted: true };
-    });
-  }
+  private writeGitConfig(id: string, user?: { name: string; email: string }) { return accountConfig.writeGitConfig({base:this.base,home:this.home.bind(this),gh:this.gh,seed:this.seed.bind(this)},id, user); }
 
-  /**
-   * The account's git config: the office's own (included), with gh as the credentials for GitHub,
-   * so pushes go out as them, and their GitHub name and private email on commits once it's known.
-   */
-  private writeGitConfig(id: string, user?: { name: string; email: string }) {
-    const home = this.home(id);
-    const base = this.base();
-    const xdg = base.XDG_CONFIG_HOME || path.join(os.homedir(), '.config');
-    const includes = base.GIT_CONFIG_GLOBAL ? [base.GIT_CONFIG_GLOBAL] : [path.join(xdg, 'git', 'config'), path.join(os.homedir(), '.gitconfig')];
-    const lines = ['# Written by Agent Office: git for this account, on top of the office machine’s own settings.', '[include]', ...includes.map((p) => `\tpath = ${quote(p)}`)];
-    if (this.gh) {
-      for (const host of ['https://github.com', 'https://gist.github.com']) {
-        lines.push(`[credential ${quote(host)}]`, '\thelper =', `\thelper = ${quote(`!'${this.gh.replace(/'/g, `'\\''`)}' auth git-credential`)}`);
-      }
-    }
-    if (user) lines.push('[user]', `\tname = ${quote(user.name)}`, `\temail = ${quote(user.email)}`);
-    const text = `${lines.join('\n')}\n`;
-    const file = path.join(home, 'gitconfig');
-    try {
-      if (existsSync(file) && readFileSync(file, 'utf8') === text) return;
-      writeFileSync(file, text, { mode: 0o600 });
-    } catch (err) {
-      console.error(`agent-office: couldn't write ${file}: ${(err as Error).message}`);
-    }
-  }
 }
 
 /** A value for a git config file, quoted. */
@@ -800,3 +655,6 @@ function run(cmd: string, args: string[], env: Record<string, string>, input?: s
     else p.stdin?.end();
   });
 }
+
+/** Compatibility name used by provider adapters for a per-account forge environment. */
+export type GhAs = ForgeAs;

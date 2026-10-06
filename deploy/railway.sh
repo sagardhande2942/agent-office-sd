@@ -364,6 +364,7 @@ tunnel() {
   fi
   ok "Your office: http://localhost:$port$path"
   echo "   (tunneled over SSH to $SSH_HOST:$SSH_PORT — keep this running while you use it; Ctrl-C closes it)"
+  echo "   Workers' web servers open on this computer too, by themselves, with (in another terminal): agent-office tunnel http://localhost:$port"
   open_url "http://localhost:$port$path"
   wait "$pid" || true
   trap - INT TERM
@@ -420,7 +421,7 @@ cmd_up() {
   fi
   [[ $NO_GH_TOKEN -eq 1 ]] && gh_token=""
 
-  say "Agent Office \"$NAME\" on Railway ($(railway whoami 2>/dev/null | sed -n 's/^Logged in as \(.*\) (.*/\1/p'))"
+  say "Agent Office \"$NAME\" on Railway ($(railway whoami --json 2>/dev/null | json 'j.name || j.email' || true))"
   echo "   app:      this checkout, built with $DOCKERFILE"
   echo "   data:     a volume on /data: accounts, floors, projects (~/workspace), sign-ins, team keys"
   echo "   access:   SSH tunnel only (the office is never exposed), through Railway's TCP proxy"

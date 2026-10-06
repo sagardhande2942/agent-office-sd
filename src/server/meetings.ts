@@ -1,17 +1,21 @@
-import { meetingMessages, unresolvedRequests, contextLabel, type CommunicationsState } from '../shared/communications.js';
+import type { CommunicationsState } from '../shared/communications.js';
+import { communicationGate, keepMeetingCommunications } from './meeting-communications.js';
+import { commitAll, readStart, numbered, list, firstLine, clamp } from './meeting-output.js';
+export { commitAll, readStart, numbered, list, firstLine, clamp } from './meeting-output.js';
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { closeSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { MEETING_SEATS } from '../shared/layout.js';
-import { MAX_MEETING_BUDGET, MEETING_NOTES_DIR, MEETING_PATTERNS, TOKENS_PER_SEAT, isMeetingPattern, meetingRecord, outputProblem, slugify } from '../shared/meetings.js';
-import { fmtTokens, isAgentEffort, isAgentProvider, tokensOf, type AgentChoice, type AgentEffort, type AgentProvider, type Meeting, type MeetingRecord, type MeetingRequest, type MeetingState, type MeetingTurn, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
+import { MEETING_NOTES_DIR, MEETING_PATTERNS, isMeetingPattern, meetingRecord, outputProblem, slugify } from '../shared/meetings.js';
+import { isAgentEffort, isAgentProvider, tokensOf, type AgentChoice, type AgentEffort, type AgentProvider, type Meeting, type MeetingRecord, type MeetingRequest, type MeetingState, type MeetingTurn, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
+import { providerMeta, takesEffort, takesModel } from '../shared/providers.js';
 import { gitError, type WorktreeRef, type WorktreeState } from './worktrees.js';
 import { PROMPTS, fillPrompt, type PromptId, type PromptVars } from '../shared/prompts.js';
 
-const execFileP = promisify(execFile);
+export const execFileP = promisify(execFile);
 
 /** What the meeting room needs from the worker manager. Narrow on purpose, so a test can fake it. */
 export interface MeetingWorkers {
@@ -49,25 +53,25 @@ export interface MeetingEvents {
   prompt?(id: PromptId): string;
 }
 
-const PUMP_MS = 3000;
+export const PUMP_MS = 3000;
 /** A part handed to a worker that sits ready this long without starting on it is handed over again, once. */
-const START_GRACE_MS = 60_000;
+export const START_GRACE_MS = 60_000;
 /** How much of the output file the board in the room shows. */
-const PREVIEW_CHARS = 6000;
-const PAST_MAX = 20;
-const PROMPT_MAX = 20_000;
-const ROLE_MAX = 40;
-const PARTS_MAX = 100;
+export const PREVIEW_CHARS = 6000;
+export const PAST_MAX = 20;
+export const PROMPT_MAX = 20_000;
+export const ROLE_MAX = 40;
+export const PARTS_MAX = 100;
 /** Who the office types a meeting's prompts as. */
-const BY = 'the meeting room';
+export const BY = 'the meeting room';
 /** What a red team or a reviewer writes when it has nothing to report. */
-const NOTHING = /^\W*no findings\b/i;
+export const NOTHING = /^\W*no findings\b/i;
 
 /** Ready for its next part: not starting up, busy, waiting on someone, or asleep. */
-const ready = (s: WorkerStatus) => s === 'idle' || s === 'done';
+export const ready = (s: WorkerStatus) => s === 'idle' || s === 'done';
 
 /** A part of a round, before it's handed over. */
-interface Part {
+export interface Part {
   seat: number;
   doing: string;
   file: string;
@@ -80,8 +84,8 @@ interface Part {
  * through the rounds of its pattern (shared/meetings.ts): in each step every worker with a part gets
  * it as a prompt, and the step is over when each of them has ended its turn with its part written to
  * the file it names. Checking the files, not the talk, is what moves a meeting on. It ends when the
- * output file is written, and stops early, saying why, when it runs over its token budget, when a
- * worker won't write its part, or when a worker that still owes the round a part leaves.
+ * output file is written, and stops early, saying why, when a worker won't write its part or when a
+ * worker leaves. What the table has used is added up to be shown, and never stops it.
  *
  * Everyone at the table shares the meeting's own git worktree (in a git project). When it's done,
  * the office commits the output there, or for a review panel posts it on the pull request. The
@@ -132,8 +136,8 @@ export class MeetingRoom {
     const picked = req.provider !== undefined ? { provider: req.provider, model: req.model, effort: req.effort } : (this.workers.officeDefault ?? { provider: this.workers.defaultProvider });
     const provider = picked.provider;
     if (!isAgentProvider(provider) || (provider === 'custom' && this.workers.defaultProvider !== 'custom')) return 'Unknown agent provider';
-    const model = provider === 'claude' || provider === 'opencode' || provider === 'grok' || provider === 'muse' || provider === 'dsh' ? picked.model || undefined : undefined;
-    const effort = (provider === 'claude' || provider === 'grok' || provider === 'muse' || provider === 'dsh') && isAgentEffort(picked.effort) ? picked.effort : undefined;
+    const model = takesModel(provider) ? picked.model || undefined : undefined;
+    const effort = takesEffort(provider) && isAgentEffort(picked.effort) ? picked.effort : undefined;
     const bad = validateWorkerModel('agent', provider, model) ?? validateWorkerEffort('agent', provider, effort);
     if (bad) return bad;
 
@@ -150,7 +154,6 @@ export class MeetingRoom {
     if (pattern.needs === 'parts' && parts.length < count - 1) return `List at least ${count - 1} part${count === 2 ? '' : 's'} for the mappers, one per line (or seat fewer workers)`;
     const issue = Number.isInteger(req.issue) && (req.issue as number) > 0 ? (req.issue as number) : undefined;
     const rounds = clamp(Math.floor(Number(req.rounds) || pattern.rounds.default), pattern.rounds.min, pattern.rounds.max);
-    const budget = clamp(Math.floor(Number(req.budget) || count * TOKENS_PER_SEAT), 50_000, MAX_MEETING_BUDGET);
     const title = (String(req.title ?? '').replace(/\s+/g, ' ').trim() || (pr !== undefined && req.pattern === 'review' ? `Review of PR #${pr}` : firstLine(prompt))).slice(0, 100);
     const id = randomBytes(4).toString('hex');
     const slug = slugify(title, 32);
@@ -189,7 +192,6 @@ export class MeetingRoom {
       round: 1,
       step: 1,
       turns: [],
-      budget,
       tokens: 0,
       cost: 0,
       costKnown: true,
@@ -220,7 +222,7 @@ export class MeetingRoom {
     if (last) this.archive(last);
     this.current = m;
     this.changed();
-    this.events.toast(`🤝 ${by} called a ${pattern.label} meeting: “${title}” (${count} workers, ${rounds} round${rounds === 1 ? '' : 's'} at most, ${fmtTokens(budget)} tokens)`, 'info');
+    this.events.toast(`🤝 ${by} called a ${pattern.label} meeting: “${title}” (${count} workers, ${rounds} round${rounds === 1 ? '' : 's'} at most)`, 'info');
     return undefined;
   }
 
@@ -307,7 +309,6 @@ export class MeetingRoom {
       return;
     }
     if (m.waitingForCommunications) {
-      if (m.tokens > m.budget) return this.halt(m, `over budget: ${fmtTokens(m.tokens)} of ${fmtTokens(m.budget)} tokens`);
       this.finish(m);
       if (this.dirty) this.changed();
       return;
@@ -332,7 +333,6 @@ export class MeetingRoom {
       }
       return this.halt(m, w ? `the ${s.role}'s agent (${w.name}) exited` : `the ${s.role} (${s.workerName ?? 'its worker'}) was sent home`);
     }
-    if (m.tokens > m.budget) return this.halt(m, `over budget: ${fmtTokens(m.tokens)} of ${fmtTokens(m.budget)} tokens`);
     for (const t of m.turns) {
       if (t.state === 'done') continue;
       changed = this.advance(m, t, byId.get(m.seats[t.seat].workerId!)!) || changed;
@@ -441,20 +441,10 @@ export class MeetingRoom {
   /** The output is written. Commit it on the meeting's branch, or post the review on its pull request. */
   private finish(m: Meeting, allowUnresolved = false) {
     if (this.readPreview(m)) this.dirty = true;
-    const state = this.events.communications?.() ?? { messages: [] };
-    const outstanding = unresolvedRequests(meetingMessages(state.messages, m.id));
-    if (!allowUnresolved && (state.error || outstanding.length)) {
-      if (!m.waitingForCommunications || m.coordinationError !== state.error) {
-        m.waitingForCommunications = true;
-        m.coordinationError = state.error;
-        this.events.toast(state.error ?? `Meeting output is ready; ${outstanding.length} request(s) still need resolution. Read Messages or finish anyway.`, 'warn');
-        this.dirty = true;
-      }
-      return;
-    }
-    m.waitingForCommunications = false;
-    m.coordinationError = undefined;
-    this.dirty = true;
+    const gate = communicationGate(m, this.events.communications?.() ?? { messages: [] }, allowUnresolved);
+    if (gate.changed) this.dirty = true;
+    if (gate.notice) this.events.toast(gate.notice, 'warn');
+    if (gate.blocked) return;
     m.status = 'done';
     m.finishedAt = Date.now();
     m.turns = [];
@@ -549,7 +539,7 @@ export class MeetingRoom {
       // A worker sent home took its figures with it: keep the last ones seen.
       if (w?.usage) {
         s.tokens = tokensOf(w.usage);
-        s.cost = w.usage.costKnown === false || (w.provider === 'codex' && w.usage.costKnown !== true) ? undefined : w.usage.cost;
+        s.cost = w.usage.costKnown === false || (!!providerMeta(w.provider)?.usage.noCost && w.usage.costKnown !== true) ? undefined : w.usage.cost;
       }
       tokens += s.tokens ?? 0;
       if (s.tokens && s.cost === undefined) known = false;
@@ -598,7 +588,6 @@ export class MeetingRoom {
       output: m.output,
       outputPath: path.join(this.cwd(m), m.output),
       rounds: `${m.rounds} round${m.rounds === 1 ? '' : 's'}`,
-      budget: fmtTokens(m.budget),
       where: where + inside,
     });
   }
@@ -739,13 +728,7 @@ export class MeetingRoom {
       if (path.resolve(from) !== path.resolve(to) && existsSync(from)) cpSync(from, to, { recursive: true });
       const out = path.join(this.cwd(m), m.output);
       if (existsSync(out)) cpSync(out, path.join(to, `output-${path.basename(m.output)}`));
-      const state = this.events.communications?.() ?? { messages: [] };
-      const messages = meetingMessages(state.messages, m.id);
-      const unresolved = unresolvedRequests(messages);
-      writeFileSync(path.join(to, 'communications.json'), JSON.stringify({ meetingId: m.id, savedAt: Date.now(), override: m.communicationOverride, error: state.error, unresolved: unresolved.map((r) => r.id), messages }, null, 2), { mode: 0o600 });
-      const lines = [`# Communication record: ${m.title}`, '', `Meeting: ${m.id}`, `Unresolved requests at save: ${unresolved.length}`, ...(m.communicationOverride ? [`Finished anyway by ${m.communicationOverride.by} at ${new Date(m.communicationOverride.at).toISOString()}`] : []), ...(state.error ? [state.error] : []), '', 'Decisions remain in the meeting output; this record preserves requests and replies, not inferred decisions.', ''];
-      for (const message of messages) lines.push(`## ${message.kind} · round ${message.meeting?.round} · ${message.status}`, `${message.from.name} → ${message.to.name}`, `ID: ${message.id} · thread: ${message.threadId}`, '', message.text, '', contextLabel(message.context), '');
-      writeFileSync(path.join(to, 'communications.md'), lines.join('\n'), { mode: 0o600 });
+      keepMeetingCommunications(to, m, this.events.communications?.() ?? { messages: [] });
     } catch {
       // the notes are a courtesy; the meeting is over either way
     }
@@ -777,55 +760,4 @@ export class MeetingRoom {
       // corrupt state file: an empty room
     }
   }
-}
-
-/**
- * Commits everything in a checkout but `leaveOut` (the notes); resolves to the commit's short hash, or
- * undefined when there was nothing to commit.
- */
-async function commitAll(cwd: string, message: string, leaveOut: string): Promise<string | undefined> {
-  const git = async (args: string[]) => (await execFileP('git', args, { cwd, encoding: 'utf8', timeout: 60_000 })).stdout.trim();
-  await git(['add', '-A', '--', '.', `:(exclude)${leaveOut}`]);
-  if (!(await git(['diff', '--cached', '--name-only']))) return undefined;
-  await git(['commit', '-q', '-m', message]);
-  return git(['rev-parse', '--short', 'HEAD']);
-}
-
-/** The start of a file, at most `bytes` of it. */
-function readStart(file: string, bytes: number): string {
-  const fd = openSync(file, 'r');
-  try {
-    const buf = Buffer.alloc(bytes);
-    const n = readSync(fd, buf, 0, bytes, 0);
-    return buf.subarray(0, n).toString('utf8').replace(/�+$/, '');
-  } finally {
-    closeSync(fd);
-  }
-}
-
-/** Roles that repeat get numbered, so each worker at the table has one of its own: Engineer 1, Engineer 2. */
-function numbered(roles: string[]): string[] {
-  const seen = new Map<string, number>();
-  const count = new Map<string, number>();
-  for (const r of roles) count.set(r.toLowerCase(), (count.get(r.toLowerCase()) ?? 0) + 1);
-  return roles.map((r) => {
-    const key = r.toLowerCase();
-    if ((count.get(key) ?? 0) < 2) return r;
-    const n = (seen.get(key) ?? 0) + 1;
-    seen.set(key, n);
-    return `${r} ${n}`;
-  });
-}
-
-/** "a", "a and b", "a, b and c". */
-function list(xs: string[]): string {
-  return xs.length < 2 ? (xs[0] ?? '') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`;
-}
-
-function firstLine(s: string): string {
-  return s.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
-}
-
-function clamp(v: number, lo: number, hi: number) {
-  return Math.max(lo, Math.min(hi, v));
 }
