@@ -1,6 +1,6 @@
 import readline from 'node:readline';
 import { WebSocket } from 'ws';
-import { PANELS, gridColumns, plain, renderDashboard, seats, type Dashboard, type Panel } from './tui-dashboard.js';
+import { PANELS, communicationLines, gridColumns, plain, renderDashboard, seats, type Dashboard, type Panel } from './tui-dashboard.js';
 export { plain } from './tui-dashboard.js';
 import { isAgentProvider, type ClientMsg, type FloorInfo, type FloorView, type ServerMsg, type WorkerInfo } from '../shared/protocol.js';
 
@@ -17,6 +17,7 @@ Commands:
   hire <provider> [prompt]     Hire at the first empty desk
   attach <worker ID or name>  Live terminal; Ctrl+] returns to the office
   prompt <worker> <text> / resume <worker> / pr <worker>
+  messages [request-id]       Read tracked worker requests and replies
   issues / pulls / queue / enqueue <prompt> / chat <text>
   help / quit
 
@@ -94,7 +95,7 @@ function session(ws: WebSocket): Promise<number> {
       process.stdout.write('\x1b[?25l\x1b[H\x1b[2J' + renderDashboard(dashboard, process.stdout.columns || 80, process.stdout.rows || 24));
     };
     const print = (text: string) => { dashboard.notice = plain(text); draw(); };
-    const panel = (next: Panel) => { dashboard.panel = next; dashboard.offset = 0; draw(); };
+    const panel = (next: Panel) => { dashboard.panel = next; dashboard.offset = 0; dashboard.thread = undefined; draw(); };
     const workers = () => panel('office');
     const worker = (key: string): WorkerInfo => {
       const matches = view?.workers.filter((w) => w.id === key || w.name.toLowerCase() === key.toLowerCase()) ?? [];
@@ -153,11 +154,12 @@ function session(ws: WebSocket): Promise<number> {
       } else if ((msg.t === 'term.snapshot' || msg.t === 'term.data') && attached === msg.workerId) process.stdout.write(msg.data);
       else if (msg.t === 'gh.issues' && view) view.issues = msg.state;
       else if (msg.t === 'gh.pulls' && view) view.pulls = msg.state;
+      else if (msg.t === 'communications' && view) view.communications = msg.state;
       else if (msg.t === 'queue' && view) view.queue = msg.state;
       else if (msg.t === 'plan' && view) view.plan = msg.plan;
       else if (msg.t === 'toast') print(`${msg.level}: ${msg.text}`);
       else if (msg.t === 'chat') print(`${msg.name}: ${msg.text}`);
-      if (['floors', 'worker.remove', 'gh.issues', 'gh.pulls', 'queue', 'plan'].includes(msg.t)) draw();
+      if (['communications', 'floors', 'worker.remove', 'gh.issues', 'gh.pulls', 'queue', 'plan'].includes(msg.t)) draw();
     });
     function keypress(text: string | undefined, key: readline.Key) {
       if (attached || finished) return;
@@ -174,18 +176,22 @@ function session(ws: WebSocket): Promise<number> {
       }
       const all = seats(view), seat = all[dashboard.selected];
       const begin = (value: string) => { dashboard.command = value; draw(); };
-      if (key.name === 'escape') return panel('office');
+      if (key.name === 'escape') { if (dashboard.thread) return panel('messages'); return panel('office'); }
       if (key.name === 'tab') return panel(PANELS[(PANELS.indexOf(dashboard.panel) + (key.shift ? PANELS.length - 1 : 1)) % PANELS.length]);
       if (['up', 'down', 'left', 'right'].includes(key.name ?? '')) {
         const direction = key.name === 'up' || key.name === 'left' ? -1 : 1;
         if (dashboard.panel === 'office') dashboard.selected = Math.max(0, Math.min(all.length - 1, dashboard.selected + direction * (key.name === 'up' || key.name === 'down' ? gridColumns(process.stdout.columns || 80) : 1)));
         else {
-          const count = dashboard.panel === 'floors' ? floors.length : dashboard.panel === 'issues' ? view?.issues.items.length : dashboard.panel === 'pulls' ? view?.pulls.items.length : dashboard.panel === 'queue' ? view?.queue.tasks.length : 13;
+          const count = dashboard.panel === 'floors' ? floors.length : dashboard.panel === 'issues' ? view?.issues.items.length : dashboard.panel === 'pulls' ? view?.pulls.items.length : dashboard.panel === 'queue' ? view?.queue.tasks.length : dashboard.panel === 'messages' ? (dashboard.thread ? communicationLines({ ...dashboard, view }, process.stdout.columns || 80).length : view?.communications?.messages.filter((m) => m.kind === 'request').length) : 13;
           dashboard.offset = Math.max(0, Math.min(Math.max(0, (count ?? 0) - 1), dashboard.offset + direction));
         }
         return draw();
       }
       if (key.name === 'return') {
+        if (dashboard.panel === 'messages' && !dashboard.thread) {
+          dashboard.thread = view?.communications?.messages.filter((m) => m.kind === 'request').reverse()[dashboard.offset]?.id;
+          dashboard.offset = 0; return draw();
+        }
         if (dashboard.panel === 'floors') {
           const floor = floors[dashboard.offset]; if (floor && !floor.cloning) send({ t: 'floor.go', floor: floor.id });
           return panel('office');
@@ -200,6 +206,7 @@ function session(ws: WebSocket): Promise<number> {
       if (text === 'p' && seat?.worker) return begin('prompt ' + seat.worker.id + ' ');
       if (text === 'r' && seat?.worker) return command('resume ' + seat.worker.id);
       if (text === 'c') return begin('chat ');
+      if (text === 'm') return panel('messages');
       if (text === 'f') return panel('floors');
       if (text === 'i') return panel('issues');
       if (text === 'b') return panel('pulls');
@@ -217,6 +224,7 @@ function session(ws: WebSocket): Promise<number> {
       if (!cmd) return;
       if (cmd === 'quit' || cmd === 'exit') return done(0);
       if (cmd === 'help') return panel('help');
+      if (cmd === 'messages') { panel('messages'); dashboard.thread = key || undefined; return draw(); }
       if (cmd === 'workers') return workers();
       if (cmd === 'floors') return panel('floors');
       if (cmd === 'go') {

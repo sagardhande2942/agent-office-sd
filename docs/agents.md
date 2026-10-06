@@ -65,3 +65,7 @@ Helper findings appear in the host worker’s terminal window. They are held out
 Helpers carry a laptop showing their own terminal. Aim at the helper or its laptop and press **E**, or click **Open helper terminal** in the hint. You can also open the helper by name in the Workers list. **Needs you** means its agent is waiting: answer the question or approve/reject the permission request inside that helper’s terminal. Close it with Esc or ✕ to return to the office.
 
 Sending a worker home also stops and removes its helper before cleaning up the worker’s checkout. Sending only the helper home leaves the host worker and its worktree intact.
+
+## Coordinating workers
+
+Use `office-workers request`, `inbox`, `reply` and `ack` (or their MCP tools) for persistent requests and responses on the same local floor. Ask coordinated workers to check their inboxes between tasks. See [communications.md](communications.md) for a frontend/API example, context, receipts and the office panels.

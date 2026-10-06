@@ -132,6 +132,7 @@ Environment:
   i                    Issues board.
   b                    Pull requests board.
   t                    Task queue.
+  m                    Worker messages; arrows select a request, Enter opens it.
   n                    Next worker needing input or finished.
   h                    Open hiring command prompt.
   p                    Prompt selected worker.
@@ -162,6 +163,7 @@ special seats are included. See docs/cli-dashboard.png for a sample view.
   issues                          Show issue board.
   pulls                           Show pull request board.
   queue                           Show task queue.
+  messages [request-id]           Show tracked messages, optionally a specific thread.
   enqueue Update documentation    Add task to the existing queue.
   chat Hello team                 Send chat to teammates.
   help                            Show keyboard and command help.
@@ -227,3 +229,36 @@ Further reference:
 
 Pull request:
   https://github.com/sagardhande2942/agent-office-sd/pull/62
+
+9. TRACKED WORKER COMMUNICATIONS (INSIDE A WORKER ENVIRONMENT)
+-----------------------------------------------------------
+These commands queue inbox records and do not interrupt another worker's terminal.
+
+  office-workers request Ada --prompt 'What fields will /users return?' \
+    --branch frontend/users --files src/pages/Users.tsx --key users-contract
+  office-workers inbox --json
+  office-workers ack REQUEST_ID
+  office-workers reply REQUEST_ID --prompt 'The response is { users, nextCursor }' \
+    --branch api/users --commit abcdef123 --files src/routes/users.ts
+  office-workers ack REPLY_ID
+
+Replace REQUEST_ID and REPLY_ID with the returned UUIDs, without angle brackets.
+Workers must check their inboxes between tasks or when waiting for another agent.
+Viewing Messages in the CLI/lite/3D office does not acknowledge on their behalf.
+
+Flags for request and reply:
+  --prompt <text>       Request/reply text (up to 4,000 characters); alternatively use stdin.
+  --branch <name>       Branch context; omitted context defaults to the sender's branch.
+  --commit <hash>       Commit context: 7-40 hexadecimal characters.
+  --files <a,b,...>     Up to 20 paths, each at most 240 characters.
+  --key <value>         Idempotency key (up to 80 characters); reuse for the same logical message.
+  --ttl-minutes <n>     Deadline, 1-10080 minutes; default 1440 (24 hours).
+  --json               JSON output; also accepted by inbox and ack.
+
+Statuses: pending -> delivered (inbox read) -> acknowledged (recipient accepts).
+A reply makes the request answered; requester acknowledgment of the reply makes
+it completed. Completed confirms receipt, not that integration or testing finished.
+Expired requests reject new replies. History survives restarts and is independent
+of terminal scrollback. This release supports the same local floor only.
+
+See docs/communications.md for MCP tools, limits, persistence and all office views.

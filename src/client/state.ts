@@ -1,3 +1,4 @@
+import type { CommunicationsState } from '../shared/communications';
 import type { AccountsState, ChatLine, FloorInfo, FloorView, GhIssue, GhPull, GhState, JailState, LeaveOnMergeState, MachineState, MapState, MeetingState, NotifyState, PeerInfo, PlanLimits, Me, ProjectInfo, ProjectsDirState, PromptsState, QueueState, QueueTask, RepoChoice, ServerMsg, ServicesState, SignInsState, SkyState, TeamState, ThemeState, UpgradeState, Usage, UsageState, WorkerInfo } from '../shared/protocol';
 import type { ScreenState } from './world/laptop';
 import { randomLook, sanitizeLook, type Look } from '../shared/avatar';
@@ -13,7 +14,7 @@ import type { BallState } from '../shared/hoop';
 import { parked, type CarSeat, type CarState } from '../shared/garage';
 import { OFFICE_MAP, planOf, type MapPlan } from '../shared/maps';
 
-export type Topic = 'peers' | 'workers' | 'issues' | 'pulls' | 'chat' | 'project' | 'screens' | 'team' | 'upgrade' | 'services' | 'decor' | 'floorPlan' | 'usage' | 'limits' | 'queue' | 'me' | 'accounts' | 'signins' | 'notify' | 'machine' | 'floors' | 'floor' | 'projectsDir' | 'repos' | 'dog' | 'jukebox' | 'tv' | 'sky' | 'theme' | 'map' | 'leaveOnMerge' | 'whiteboard' | 'drawing' | 'cabinet' | 'cabinetFrame' | 'meeting' | 'prompts' | 'ball' | 'cars' | 'jail' | 'helper';
+export type Topic = 'communications' | 'peers' | 'workers' | 'issues' | 'pulls' | 'chat' | 'project' | 'screens' | 'team' | 'upgrade' | 'services' | 'decor' | 'floorPlan' | 'usage' | 'limits' | 'queue' | 'me' | 'accounts' | 'signins' | 'notify' | 'machine' | 'floors' | 'floor' | 'projectsDir' | 'repos' | 'dog' | 'jukebox' | 'tv' | 'sky' | 'theme' | 'map' | 'leaveOnMerge' | 'whiteboard' | 'drawing' | 'cabinet' | 'cabinetFrame' | 'meeting' | 'prompts' | 'ball' | 'cars' | 'jail' | 'helper';
 
 const zeroUsage = (): Usage => ({ input: 0, output: 0, cacheWrite: 0, cacheRead: 0, cost: 0, calls: 0 });
 
@@ -220,6 +221,7 @@ jukebox: JukeboxState & { since: number } = { on: false, track: JUKEBOX_TUNES[0]
   usage: UsageState = { total: zeroUsage(), today: zeroUsage(), day: '', pauseHiring: false };
   /** The Claude plan's 5-hour and weekly limits. */
   limits: PlanLimits = { windows: [], at: 0 };
+  communications: CommunicationsState = { messages: [] };
   queue: QueueState = { tasks: [], maxWorkers: 0 };
   /** The meeting room: the meeting at the table, and the ones before. */
   meeting: MeetingState = { current: null, past: [] };
@@ -327,6 +329,7 @@ jukebox: JukeboxState & { since: number } = { on: false, track: JUKEBOX_TUNES[0]
     this.issues = v.issues;
     this.pulls = v.pulls;
     this.queue = v.queue;
+    this.communications = v.communications ?? { messages: [] };
     this.meeting = v.meeting;
     this.decor = v.decor;
     this.floorPlan = v.plan ?? EMPTY_PLAN;
@@ -343,7 +346,7 @@ jukebox: JukeboxState & { since: number } = { on: false, track: JUKEBOX_TUNES[0]
     this.ball = v.ball ?? {};
     this.setCars(v.cars ?? parked());
     this.jail = v.jail ?? { prisoners: [], bones: 0 };
-    for (const t of ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'helper', 'jukebox', 'tv', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'jail'] as Topic[]) this.emit(t);
+    for (const t of ['communications', 'floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'helper', 'jukebox', 'tv', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'jail'] as Topic[]) this.emit(t);
   }
 
   private setCars(cars: CarState[]) {
@@ -536,6 +539,8 @@ jukebox: JukeboxState & { since: number } = { on: false, track: JUKEBOX_TUNES[0]
         this.limits = msg.state;
         this.emit('limits');
         break;
+      case 'communications':
+        this.communications = msg.state; this.emit('communications'); break;
       case 'queue':
         this.queue = msg.state;
         this.emit('queue');

@@ -1,3 +1,4 @@
+import { Communications } from './communications.js';
 import http from 'node:http';
 import https from 'node:https';
 import { randomBytes } from 'node:crypto';
@@ -432,6 +433,21 @@ export async function startServer(cfg: Config) {
    * (its worktree and branch go too, unless they hold work), POST /tell types a prompt to one. The
    * worker's own hook token says who's asking, and the floor hears who did what, as from anyone.
    */
+  const communicationStores = new Map<string, Communications>();
+  const communications = (floor: FloorActions) => {
+    let ledger = communicationStores.get(floor.id);
+    if (!ledger) {
+      ledger = new Communications(path.join(cfg.dataDir, 'communications', Buffer.from(floor.id).toString('hex')), (state) => {
+        for (const c of clients.values()) if (c.peer.floor === floor.id) sendTo(c, { t: 'communications', state });
+      });
+      communicationStores.set(floor.id, ledger);
+    }
+    return ledger;
+  };
+  const communicationView = (floor: FloorActions) => {
+    try { return communications(floor).state(); }
+    catch (err) { return { messages: [], error: `Communications unavailable: ${(err as Error).message}` }; }
+  };
   const officeWorkers = async (req: http.IncomingMessage, res: http.ServerResponse, url: URL) => {
     const workerId = url.searchParams.get('worker') ?? '';
     const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
@@ -454,17 +470,38 @@ export async function startServer(cfg: Config) {
         leaveOnMerge: leaveOnMerge.on,
         providers: floor.project.agentProviders,
         defaultProvider: floor.workers.officeDefault.provider,
+        coordination: 'Use office-workers request for tracked messages, inbox between tasks, reply <request-id>, and ack <reply-id>. Messages do not interrupt terminals.',
         freeDesk: free?.id ?? null,
         ...(ledger.hiringPaused ? { hiringPaused: ledger.hiringPaused } : {}),
         workers: list.map((w) => workerRow(w, view, me.id)),
       });
     }
-    if (req.method !== 'POST' || !['', '/home', '/tell', '/helper'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home, /office/workers/tell or /office/workers/helper' });
+    if (req.method === 'GET' && action === '/inbox') {
+      try { return send(res, 200, communications(floor).inbox({ id: me.id, name: me.name })); }
+      catch (err) { return send(res, 400, { error: (err as Error).message }); }
+    }
+    if (req.method !== 'POST' || !['', '/home', '/tell', '/helper', '/request', '/reply', '/ack'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home, /office/workers/tell or /office/workers/helper, GET /office/workers/inbox, POST /office/workers/request, /reply or /ack' });
     let body: unknown;
     try {
       body = JSON.parse((await readBody(req)) || '{}');
     } catch {
       return send(res, 400, { error: 'Send JSON' });
+    }
+
+    if (['/request', '/reply', '/ack'].includes(action)) {
+      try {
+        if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Send an object');
+        const b = body as Record<string, unknown>, ledger = communications(floor);
+        const actor = { id: me.id, name: me.name };
+        if (action === '/ack') return send(res, 200, { message: ledger.acknowledge(actor, str(b.id, 80)) });
+        const request = action === '/reply' ? ledger.get(str(b.id, 80)) : undefined;
+        const target = findWorker(floor.workers.list(), action === '/reply' ? request?.from.id ?? '' : str(b.worker, 64));
+        if (typeof target === 'string') throw new Error(target);
+        if (target.kind !== 'agent') throw new Error('Tracked messages are for agents, not shells');
+        const context = b.context === undefined ? { branch: me.worktree?.branch ?? floor.project.branch } : b.context;
+        const message = action === '/request' ? ledger.request(actor, { id: target.id, name: target.name }, { ...b, context }) : ledger.reply(actor, str(b.id, 80), { ...b, context });
+        return send(res, 200, { message });
+      } catch (err) { return send(res, 400, { error: (err as Error).message }); }
     }
 
     if (action === '/home') {
@@ -897,6 +934,7 @@ export async function startServer(cfg: Config) {
     plan: floor?.plan.state() ?? EMPTY_PLAN,
     services: servicesState(floor),
     helpers: local?.helpers.states() ?? [],
+    communications: floor ? communicationView(floor) : { messages: [] },
     dog: local?.dog.view() ?? null,
     ball: floor?.court.state() ?? {},
     cars: floor?.garage.state() ?? [],
@@ -2785,8 +2823,16 @@ case 'jukebox.place': {
   services.start();
   tailnet.start(() => services.list().map((s) => s.port));
 
+  const communicationClock = setInterval(() => {
+    for (const [id, ledger] of communicationStores) {
+      const state = ledger.state();
+      for (const c of clients.values()) if (c.peer.floor === id) sendTo(c, { t: 'communications', state });
+    }
+  }, 30_000);
+  communicationClock.unref();
   /** With `keep` (a restart), workers' terminals keep running for the next office to pick up. */
   const shutdown = (keep = false) => {
+    clearInterval(communicationClock);
     clearInterval(heartbeat);
     clearInterval(resync);
     clearTimeout(floorsTimer);

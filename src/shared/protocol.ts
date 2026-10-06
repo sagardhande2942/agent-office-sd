@@ -1,3 +1,4 @@
+import type { CommunicationsState } from './communications.js';
 // Wire protocol between browser and server. Every WebSocket frame is one JSON object.
 
 import type { Look } from './avatar.js';
@@ -805,6 +806,7 @@ export interface JailState {
 }
 
 export interface FloorView {
+  communications?: CommunicationsState;
   helpers?: HelperState[];
   /** The floor you're on; null while the building has none. */
   floor: string | null;
@@ -1406,6 +1408,7 @@ export type ClientMsg =
   | { t: 'ping'; at: number };
 
 export type ServerMsg =
+  | { t: 'communications'; state: CommunicationsState }
   | ({
       t: 'welcome';
       you: string;

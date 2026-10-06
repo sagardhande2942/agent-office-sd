@@ -1,3 +1,4 @@
+import { openCommunications } from './ui/communications';
 // The 2D view (/lite): the office without the 3D, for a phone or a computer the 3D office is too
 // much for. Every worker on the floor and how it's doing, the ones waiting on someone first; its
 // terminal, with the keys a phone's keyboard hasn't got and a box to send it a prompt; and the boards
@@ -321,6 +322,7 @@ function showMeeting(preset?: MeetingPreset) {
 
 $('btn-issues').addEventListener('click', () => openBoard('issues', net, boardActions()));
 $('btn-pulls').addEventListener('click', () => openBoard('pulls', net, boardActions()));
+$('btn-messages').addEventListener('click', () => openCommunications(openWorker));
 $('btn-queue').addEventListener('click', () => openQueue(net, { openTerminal: openWorker }));
 $('btn-new').addEventListener('click', () => sendToWorker('✨ New task'));
 
@@ -328,11 +330,13 @@ function renderNav() {
   const count = (id: string, n: number) => ($(id).querySelector('.n')!.textContent = n ? String(n) : '');
   count('btn-issues', store.issues.items.filter((i) => i.state === 'OPEN').length);
   count('btn-pulls', store.pulls.items.filter((p) => p.state === 'OPEN').length);
+  count('btn-messages', store.communications.messages.filter((m) => m.kind === 'request' && !['completed', 'expired'].includes(m.status)).length);
   count('btn-queue', store.queue.tasks.filter((t) => t.status !== 'done').length);
 }
 store.on('issues', renderNav);
 store.on('pulls', renderNav);
 store.on('queue', renderNav);
+store.on('communications', renderNav);
 
 // ---- What you have open, for the others (see PeerInfo.doing) -----------------------------------
 let doingSent: string | undefined;

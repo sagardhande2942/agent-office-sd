@@ -1,7 +1,8 @@
+import { contextLabel } from '../shared/communications.js';
 import { builtDesks } from '../shared/layout.js';
 import type { FloorInfo, FloorView, WorkerInfo } from '../shared/protocol.js';
 
-export const PANELS = ['office', 'issues', 'pulls', 'queue', 'floors', 'help'] as const;
+export const PANELS = ['office', 'issues', 'pulls', 'queue', 'messages', 'floors', 'help'] as const;
 export type Panel = typeof PANELS[number];
 export interface Seat { id: string; label: string; worker?: WorkerInfo }
 export interface Dashboard {
@@ -12,6 +13,7 @@ export interface Dashboard {
   offset: number;
   notice: string;
   command?: string;
+  thread?: string;
 }
 
 /** Dashboard text is untrusted; only attached PTYs may emit terminal controls. */
@@ -33,6 +35,20 @@ export function seats(view?: FloorView): Seat[] {
 export function gridColumns(width: number): number {
   const gridWidth = width >= 100 ? width - 34 : width;
   return Math.max(1, Math.floor((gridWidth + 1) / 25));
+}
+
+export function communicationLines(state: Dashboard, width: number): string[] {
+  const messages = state.view?.communications?.messages ?? [];
+  const roots = messages.filter((m) => m.kind === 'request').reverse();
+  if (!state.thread) return roots.length ? roots.map((m, i) => `${i === state.offset ? '>' : ' '} [${m.status}] ${m.from.name} -> ${m.to.name}: ${m.text}`) : [state.view?.communications?.error ?? 'No worker requests yet. Enter opens a selected thread.'];
+  const root = messages.find((m) => m.id === state.thread);
+  if (!root) return ['Request no longer retained.'];
+  return [root, ...messages.filter((m) => m.threadId === root.id && m.id !== root.id)].flatMap((m) => [
+    `${m.from.name} -> ${m.to.name} [${m.status}]`, m.id, ...m.text.split('\n'), contextLabel(m.context), '',
+  ]).flatMap((line) => {
+    const clean = plain(line).replace(/[^\x20-\x7e]/g, '?');
+    return Array.from({ length: Math.max(1, Math.ceil(clean.length / width)) }, (_, i) => clean.slice(i * width, (i + 1) * width));
+  });
 }
 
 /** Pure renderer: every row fits the terminal, and the selected desk stays in view. */
@@ -76,9 +92,10 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     body = board?.items.map((item) => `#${item.number}  ${item.title}`) ?? [];
     if (!body.length) body = [board?.error ?? 'No items on this board.'];
   } else if (state.panel === 'queue') body = view?.queue.tasks.map((t) => `${t.status.padEnd(8)} ${t.title} ${t.workerName ? '(' + t.workerName + ')' : ''}`) ?? [];
-  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt selected worker    r: resume worker', 'i: issues    b: pull requests    t: task queue', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, issues, pulls, queue, floors, workers, quit'];
+  else if (state.panel === 'messages') body = communicationLines(state, width);
+  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt selected worker    r: resume worker', 'i: issues    b: pull requests    t: task queue    m: messages', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, messages [request-id], issues, pulls, queue, floors, quit'];
   if (state.panel !== 'office') {
-    const start = state.panel === 'floors' ? Math.floor(state.offset / bodyHeight) * bodyHeight : state.offset;
+    const start = state.panel === 'floors' || (state.panel === 'messages' && !state.thread) ? Math.floor(state.offset / bodyHeight) * bodyHeight : state.offset;
     body = body.slice(start, start + bodyHeight).map((line) => fit(line, width));
   }
   lines.push(...Array.from({ length: bodyHeight }, (_, i) => body[i] ?? ''));
