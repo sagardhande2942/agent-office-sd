@@ -7,6 +7,7 @@
 //   height=<m>         how high the camera is over the middle of the prop (default a little above)
 //   dist=<m>           how far back the camera is (default: far enough to fit it)
 //   t=<seconds>        steps the prop's update (if it has one) at 60 fps up to t, then draws one frame
+//   open=1                     show a car’s roof-off cockpit
 //   floor=0            no floor, only its grid, to see what goes under it
 // Once it has drawn, window.__ready holds each prop's size, triangles, draw calls and material names.
 
@@ -146,9 +147,19 @@ const SHOW: Record<string, () => Shown> = {
     [loungeCouch(), coffeeTable(), pouf('#06d6a0'), pouf('#ffd166')].forEach((o, i) => object.add(o.translateX(at[i])));
     return { object };
   },
-  lambo: () => ({ object: supercar('lambo', '#ffd166').root }),
-  ferrari: () => ({ object: supercar('ferrari', '#ef476f').root }),
+  lambo: () => showCar('lambo', '#ffd166'),
+  ferrari: () => showCar('ferrari', '#ef476f'),
 };
+
+/** open=1 shows the roof-off interior used while a car is occupied. */
+function showCar(kind: 'lambo' | 'ferrari', color: string): Shown {
+  const car = supercar(kind, color);
+  if (q.get('open') === '1') {
+    car.top.visible = false;
+    car.open.visible = true;
+  }
+  return { object: car.root };
+}
 
 const q = new URLSearchParams(location.search);
 const only = q.get('show');
