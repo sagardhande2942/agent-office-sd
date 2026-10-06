@@ -63,7 +63,7 @@ export function openPlanReview(net:Net, openWorker:(id:string)=>void) {
     if(store.planReview.error) body.prepend(h('p.error',{role:'alert'},store.planReview.error));
     if(store.planReview.current) body.append(h('button.btn',{onclick:()=>{formView=false;render();}},'Back to current comparison'));
   };
-  const offs=[store.on('plan-review',render),store.on('workers',()=>{if(!formView)render();})];
+  const offs=[store.on('planReview',render),store.on('workers',()=>{if(!formView)render();})];
   const modal=openModal(el,{doing:'at the plan comparison table',onClose:()=>offs.forEach(off=>off())});
   close.addEventListener('click',()=>modal.close());render();return modal;
 }
