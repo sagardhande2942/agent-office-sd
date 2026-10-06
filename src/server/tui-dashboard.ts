@@ -77,7 +77,7 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     }
     if (side) {
       const w = all[selected]?.worker;
-      const details = w ? ['SELECTED WORKER', w.name, w.id, `Status: ${w.status}`, `Agent: ${w.provider ?? w.kind}`, '', w.task?.name ?? '', w.task?.summary ?? w.activity ?? '', '', `By: ${w.createdBy}`, w.pr ? `PR #${w.pr.number}` : '', 'Enter: live terminal', 'p: prompt   r: resume'] : ['EMPTY DESK', all[selected]?.label ?? '', '', 'Enter: hire here', '', 'h: hire an agent', ': command prompt'];
+      const details = w ? ['SELECTED WORKER', w.name, w.id, `Status: ${w.status}`, `Agent: ${w.provider ?? w.kind}`, '', w.task?.name ?? '', w.task?.summary ?? w.activity ?? '', '', `By: ${w.createdBy}`, w.pr ? `PR #${w.pr.number}` : '', 'Enter: live terminal', 'p: prompt   r: resume', 'x: send home'] : ['EMPTY DESK', all[selected]?.label ?? '', '', 'Enter: hire here', '', 'h: hire an agent', ': command prompt'];
       const gridWidth = width - 34;
       body = Array.from({ length: bodyHeight }, (_, i) => {
         const grid = body[i] ?? '';
@@ -93,12 +93,12 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     if (!body.length) body = [board?.error ?? 'No items on this board.'];
   } else if (state.panel === 'queue') body = view?.queue.tasks.map((t) => `${t.status.padEnd(8)} ${t.title} ${t.workerName ? '(' + t.workerName + ')' : ''}`) ?? [];
   else if (state.panel === 'messages') body = communicationLines(state, width);
-  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt selected worker    r: resume worker', 'i: issues    b: pull requests    t: task queue    m: messages', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, messages [request-id], issues, pulls, queue, floors, quit'];
+  else body = ['Arrow keys: select a desk or scroll a board', 'Enter: attach to worker / hire at empty desk / switch floor', 'Tab: next panel    f: floors    n: next worker needing attention', 'h: hire    p: prompt    r: resume    x: send home (Enter confirms)', 'i: issues    b: pull requests    t: task queue    m: messages', 'c: chat    : open command prompt    ?: help', 'Esc: cancel command / return to office    q or Ctrl+C: quit', 'Attached terminal: Ctrl+] returns to the office', '', 'Commands: hire <provider> [prompt], prompt <worker> <text>,', 'home <worker> [--cleanup auto|keep|worktree|all],', 'resume <worker>, pr <worker>, go <floor>, enqueue <text>,', 'chat <text>, messages [request-id], issues, pulls, queue, floors, quit'];
   if (state.panel !== 'office') {
     const start = state.panel === 'floors' || (state.panel === 'messages' && !state.thread) ? Math.floor(state.offset / bodyHeight) * bodyHeight : state.offset;
     body = body.slice(start, start + bodyHeight).map((line) => fit(line, width));
   }
   lines.push(...Array.from({ length: bodyHeight }, (_, i) => body[i] ?? ''));
-  lines.push('-'.repeat(width), fit(state.notice, width), fit(state.command !== undefined ? ':' + state.command.slice(-Math.max(0, width - 2)) + '_' : 'Arrows select | Enter open | Tab panels | f floors | h hire | : command | q quit', width));
+  lines.push('-'.repeat(width), fit(state.notice, width), fit(state.command !== undefined ? ':' + state.command.slice(-Math.max(0, width - 2)) + '_' : 'Arrows select | Enter open | Tab panels | f floors | x send home | : command | q quit', width));
   return lines.slice(0, height).join('\r\n');
 }

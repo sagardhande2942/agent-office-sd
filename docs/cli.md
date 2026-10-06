@@ -24,6 +24,7 @@ After login, the office fills your terminal with a live desk grid. Workers are c
 | `f`, `i`, `b`, `t`, `m` | Floors, issues, PRs, task queue, worker messages |
 | `n` | Next worker needing input or finished |
 | `h`, `p`, `r` | Hire, prompt selected worker, resume selected worker |
+| `x` | Send selected worker home: Enter confirms, Esc cancels |
 | `c` | Write a chat message |
 | `:` | Open the command prompt |
 | Esc | Cancel the prompt or return to the desk grid |
@@ -42,6 +43,7 @@ Type commands after pressing `:`:
 | `attach <worker>` | Open the shared live terminal; Ctrl+] returns to the office |
 | `prompt <worker> <text>` | Send the worker a prompt |
 | `resume <worker>` | Resume a stopped worker |
+| `home <worker> [--cleanup auto\|keep\|worktree\|all]` | Send a worker home; default auto cleanup preserves unpushed work |
 | `pr <worker>` | Ask the office to push and open the worker's PR |
 | `messages [request-id]` | Read tracked worker requests and replies; Enter opens a thread |
 | `issues`, `pulls`, `queue` | Read the current boards and queue |
