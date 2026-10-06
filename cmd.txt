@@ -161,7 +161,9 @@ special seats are included. See docs/cli-dashboard.png for a sample view.
   resume <worker-id>               Resume stopped worker.
   home <worker-id> [--cleanup auto|keep|worktree|all]
                                    Send home (auto preserves unpushed work).
-  Dashboard: x prepares send-home for the selected worker; Enter confirms, Esc cancels.
+  Dashboard: x opens send-home choices (delete both, keep branch, keep both).
+  Arrows or 1/2/3 select; Enter confirms; Esc cancels. Keep both is selected initially.
+  home without --cleanup opens the same chooser.
   pr <worker-id>                   Request push and pull request creation.
   issues                          Show issue board.
   pulls                           Show pull request board.
