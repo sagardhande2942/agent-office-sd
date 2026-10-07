@@ -201,3 +201,17 @@ every later call refused by name once the machine goes.
 | `src/server/floor-actions.ts` | the surface both satisfy, and why it splits the way it does |
 | `src/server/floor-host-cli.ts` | `agent-office floor-host` |
 | `src/shared/floorhost.ts` | the frames, the 50 floor cases, and the validators |
+
+## Typing in remote terminals
+
+Remote worker terminals include **Local typing** below the live terminal in Lite, 2D and 3D. Type and edit there to see text immediately in your browser, even when the floor-host connection is slow. **Enter** or **Send ↵** pastes the draft into the terminal's current input and then presses Enter; **Shift+Enter** adds a line. **Insert** pastes without submitting. Existing text in the terminal is kept, so clear it there first if you want to replace it. Multiline text follows the program's normal paste behavior. Use the live terminal/keypad for shortcuts, completion, interactive menus and hidden input.
+
+Drafts remain browser-local until sent, survive closing/reopening the terminal during this page session, and are not saved to disk or shared with other viewers. Sending is disabled until a terminal snapshot arrives or while its worker is offline. Terminal output and direct key controls still travel through the office and floor host; local drafting removes the wait while editing, not network latency after submission.
+
+Update both the central office and `floor-host` CLI for the complete transport improvement: terminal input and resize use ordered WebSocket frames without creating pending requests, timers or acknowledgements, and the host no longer sends eleven unrelated room-state snapshots for every key. The protocol remains compatible with older versions: an old host can still acknowledge the untracked input, and a new host still answers an old office's numbered terminal calls. Keep both updated to avoid the old host's room-state traffic.
+
+Verify with `npm run typecheck`, `npm test`, `npm run build`, and `node --import tsx scripts/e2e-remote-terminal.mjs`. The browser check uses a real office and paired host fixture with a 600 ms echo delay. It verifies immediate local editing without PTY input, ordered send/insert, draft recovery, mobile layout and modal closing. Evidence is written to `/tmp/agent-office-remote-terminal-evidence`; this is a controlled check, not a measurement of your ngrok connection.
+
+![Local typing below a remote worker terminal](remote-terminal-typing.png)
+
+The same browser harness checks that both Esc and ✕ restore actual game mouse-look. It suppresses scene rendering during that focus check to avoid software-WebGL overhead; the screenshot above comes from the normal Lite client.

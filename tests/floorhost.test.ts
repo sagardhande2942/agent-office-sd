@@ -157,14 +157,14 @@ test('every refusal is about capacity or kind, never about who is asking', () =>
   for (const r of reasons) assert.doesNotMatch(r, /admin|role|member|owner|account/i);
 });
 
-test('every frame the proxy ships is one the host answers', () => {
+test('every frame the proxy ships is one the host handles', () => {
   // The two are hand-written on either side of a socket, so they drift — and drift here is silent: a
   // shipped frame with no case falls through the host's `default`, pays a full round trip, and comes
   // back refused. Four had already drifted (`worker.search`, `queue.dropIssue`, `gh.claim`,
   // `meeting.stop`) before this existed.
   const proxy = readFileSync(path.join(root, 'src/server/remote-floor.ts'), 'utf8');
   const host = readFileSync(path.join(root, 'src/server/host-floor.ts'), 'utf8');
-  const shipped = new Set([...proxy.matchAll(/call\('([a-zA-Z.]+)'/g)].map((m) => m[1]));
+  const shipped = new Set([...proxy.matchAll(/(?:call|terminal)\('([a-zA-Z.]+)'/g)].map((m) => m[1]));
   const answered = new Set([...host.matchAll(/case '([a-zA-Z.]+)'/g)].map((m) => m[1]));
   assert.ok(shipped.size > 40, `the proxy scan saw only ${shipped.size}, so it is looking in the wrong place`);
   const unanswered = [...shipped].filter((t) => !answered.has(t)).sort();

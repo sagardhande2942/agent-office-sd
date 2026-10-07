@@ -247,6 +247,11 @@ export class RemoteFloor implements FloorActions {
     });
   }
 
+  /** Ordered socket writes: no pending request or timeout for terminal input. */
+  private terminal(t: 'term.input' | 'term.resize', payload: Record<string, unknown>) {
+    this.socket()?.send({ t, floorId: this.id, seq: 0, ...payload });
+  }
+
   /** A read, answered from what the host has already streamed. */
   private last<T>(key: string, empty: T): T {
     return (this.mirror.get(key) as T) ?? empty;
@@ -328,8 +333,8 @@ export class RemoteFloor implements FloorActions {
       // and who typed into it, and an anonymous viewer there is a viewer nobody can see.
       attach: async (id, clientId, name) => (await remote.call('worker.attach', { workerId: id, clientId, name })) as { data: string; cols: number; rows: number } | undefined,
       detach: (id, clientId) => void remote.call('worker.detach', { workerId: id, clientId }),
-      write: (id, data, by) => void remote.call('term.input', { workerId: id, data, by }),
-      resize: (id, cols, rows) => void remote.call('term.resize', { workerId: id, cols, rows }),
+      write: (id, data, by) => remote.terminal('term.input', { workerId: id, data, by }),
+      resize: (id, cols, rows) => remote.terminal('term.resize', { workerId: id, cols, rows }),
       search: async (needle, perWorker) => (await remote.call('worker.search', { needle, perWorker })) as { hits: TerminalHit[]; more: boolean },
 
       rebuild: async (id) => (await remote.call('worker.rebuild', { workerId: id })) as { rebuilt?: boolean; note?: string; error?: string },

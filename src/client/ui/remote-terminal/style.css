@@ -1,0 +1,6 @@
+.modal.term .remote-terminal-draft { flex: none; padding: 8px 12px; background: var(--paper); border-top: 3px solid var(--ink); }
+.remote-terminal-draft label { display: grid; gap: 4px; font-weight: 800; }
+.modal.term .remote-terminal-draft textarea { width: 100%; min-height: 54px; max-height: 140px; resize: vertical; font-family: ui-monospace, monospace; }
+.remote-terminal-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.remote-terminal-actions small { flex: 1; color: var(--muted); }
+@media (max-width: 640px) { .remote-terminal-actions { flex-wrap: wrap; } .remote-terminal-actions small { flex-basis: 100%; } }
