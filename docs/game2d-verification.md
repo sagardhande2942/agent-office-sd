@@ -9,7 +9,7 @@ npm run build
 node --import tsx scripts/e2e-game2d.mjs
 ```
 
-Typecheck and build passed. The full suite passed **977 tests**, including the size and client structure guards. The browser harness passed **15 check groups** with no page errors:
+Typecheck and build passed. The full suite passed **978 tests**, including the size and client structure guards. The browser harness passed **15 check groups** with no page errors:
 
 - Protected `/2d`, `/2d.html` and `/game2d.html`, login return path and a non-default floor.
 - Keyboard movement, click-to-walk and desk collisions.
