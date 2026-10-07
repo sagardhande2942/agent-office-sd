@@ -10,6 +10,7 @@ export function cutaway(scene: THREE.Scene, plane: THREE.Plane) {
       if (seen.has(mat)) continue;
       seen.add(mat);
       mat.clippingPlanes = [...(mat.clippingPlanes ?? []), plane];
+      mat.clipShadows = true; // Cut-away ceilings must not shadow the visible room.
       mat.needsUpdate = true;
     }
   });
