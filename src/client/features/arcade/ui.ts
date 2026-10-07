@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../topdown/camera';
 import * as THREE from 'three';
 import { h, openModal, type Modal } from '../../ui/dom';
 import { H, Minesweeper, W } from './minesweeper';
@@ -34,7 +35,7 @@ export class ScreenZoom {
   }
 
   /** Moves the camera toward the screen while `on`, and back after. Call it once the player has placed the camera. */
-  update(camera: THREE.PerspectiveCamera, dt: number, on: boolean) {
+  update(camera: SceneCamera, dt: number, on: boolean) {
     const want = on ? 1 : 0;
     if (this.zoom === want) {
       if (!want) return;
@@ -187,7 +188,7 @@ export class Arcade {
   }
 
   /** Moves the camera toward the monitor while you play, and back after. Call it once the player has placed the camera. */
-  update(camera: THREE.PerspectiveCamera, dt: number) {
+  update(camera: SceneCamera, dt: number) {
     this.view.update(camera, dt, !!this.modal);
   }
 

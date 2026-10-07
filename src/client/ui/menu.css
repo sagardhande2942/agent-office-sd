@@ -2,7 +2,7 @@
 .backdrop.menu-backdrop { background: none; display: block; padding: 0; animation: none; }
 .hud-menu {
   position: absolute; width: min(560px, calc(100vw - 16px)); overflow: auto;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; padding: 8px 10px 6px;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; padding: 42px 10px 6px;
   background: var(--paper); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 5px 0 var(--ink);
   animation: menu-in .14s ease-out; transform-origin: top right;
 }

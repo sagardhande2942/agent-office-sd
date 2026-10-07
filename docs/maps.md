@@ -362,6 +362,6 @@ A map without a dungeon can still have a script: a guard who walks each worker t
 
 ## 2D Game map support
 
-`/2d` currently renders **Office only**, including its built back-office wing and occupied overflow/meeting/plan seats, with placeholder art. It shares desk IDs and `officeNav(wing)` with the existing Office. Gray footprints represent blocked furniture, including noninteractive fixtures. Click routing and keyboard movement stay on walkable cells.
+`/2d` renders the same Office, Castle, Station and custom-map scenes as 3D. Desks, fixtures, collision geometry and map changes all come from the shared world modules. The Office elevator reaches every project floor, the rooftop and the garage, with the same project-management panel as 3D.
 
-Selecting Castle, Station or a custom map elsewhere does not change it back to Office. 2D Game shows an Office-only notice and keeps the selected floor; use its View selector for 3D or Lite. No additional maps or recreational activities are playable in this first version.
+The orthographic camera shows a cutaway of the current walking level so ceilings and floors above it do not hide the room. It follows outside the room and zooms with the mouse wheel. Shared activities use their original camera while active, then return to the plan view. Choosing 2D does not alter the building's selected map.

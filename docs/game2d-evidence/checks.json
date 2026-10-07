@@ -1,85 +1,100 @@
 {
   "checks": [
     {
-      "name": "auth and direct routes",
+      "name": "authentication and shared bootstrap",
       "status": "passed",
-      "evidence": "Signed-out /2d retains login next; three protected entry aliases serve the game; non-default floor selected."
+      "evidence": "Protected aliases return through login to /2d; complete office composition connects once on the requested floor."
     },
     {
-      "name": "movement and collision",
+      "name": "physical elevator and floor management",
       "status": "passed",
-      "evidence": "Arrows and WASD move; a ground click reaches its destination; holding D against a desk stays outside its blocked cells."
+      "evidence": "Approach/E opens the existing elevator with floor status, add/remove project actions, rooftop and garage; actual rides switch floors."
     },
     {
-      "name": "worker terminal and focus",
+      "name": "movement and shared collision physics",
       "status": "passed",
-      "evidence": "Map click and nearby E attach the existing real shell; input uses term.input; ✕ and Esc suspend and immediately restore movement without another click."
+      "evidence": "Arrows/WASD, ground click-to-walk and collision against the original desk geometry work in the orthographic scene."
     },
     {
-      "name": "existing dialogs",
+      "name": "complete office dialogs",
       "status": "passed",
-      "evidence": "Issues, PRs, Queue, Manager and Plan Comparison open from both HUD and map; each has ✕, consumes Esc, and restores canvas controls."
+      "evidence": "Shared Issues/PR/Queue, Boss, Smartphone, Services, Whiteboard, Meeting, Search, Settings, view controls and Plan Comparison open from the same menu with close/Esc focus recovery."
     },
     {
-      "name": "worker action dialogs",
+      "name": "real arcade interaction",
       "status": "passed",
-      "evidence": "Shared prompt, helper, send-home confirmation and provider/repository hiring dialogs open and cancel without spawning or killing a worker."
+      "evidence": "Boss Control Center launches playable Minesweeper with its original camera and canvas; closing restores the orthographic view and controls."
     },
     {
-      "name": "nested dialogs and queue APIs",
+      "name": "menu and palette recovery",
       "status": "passed",
-      "evidence": "Real queue.limit/add/remove run against the isolated floor; Escape unwinds three nested board/issue/confirmation dialogs while controls remain suspended."
+      "evidence": "The full menu and command palette have top-right close buttons and restore controls immediately."
     },
     {
-      "name": "existing action contracts",
+      "name": "shared worker terminal",
       "status": "passed",
-      "evidence": "Runtime helper, Manager and hiring forms emit existing worker.helper/station.prompt/worker.spawn requests; provider launches are captured as fixtures."
+      "evidence": "Clicking the rendered worker opens the existing terminal and real shell input without a replacement worker/session."
+    },
+    {
+      "name": "office visual and zoom",
+      "status": "passed",
+      "evidence": "Two screenshots show the actual 3D office artwork in a flat cutaway projection, original HUD, elevator and fixtures; wheel zoom updates pointer projection."
+    },
+    {
+      "name": "rooftop game interaction",
+      "status": "passed",
+      "evidence": "The actual shared darts interaction starts its aiming activity on the roof and E returns to the top-down view."
+    },
+    {
+      "name": "real car interaction",
+      "status": "passed",
+      "evidence": "The original car interaction enters the driver, WASD emits real car.drive frames, and E exits back to the plan view."
+    },
+    {
+      "name": "rooftop and garage access",
+      "status": "passed",
+      "evidence": "Real elevator rides reach the full rooftop/bar/game fixtures and garage/car fixtures, then return to the selected office floor."
+    },
+    {
+      "name": "other maps",
+      "status": "passed",
+      "evidence": "Castle and Station load and stay playable through the existing map.set server API; returns to Office without changing worker/session IDs."
+    },
+    {
+      "name": "real golf interaction",
+      "status": "passed",
+      "evidence": "The shared tee interaction starts golf with its original aiming camera; E puts the club away and restores the plan view."
+    },
+    {
+      "name": "activity camera and registries",
+      "status": "passed",
+      "evidence": "Golf, cars, bar games, arcade and climbing use the original shared activity modules; camera ownership switches to perspective and back without another session."
     },
     {
       "name": "multiplayer",
       "status": "passed",
-      "evidence": "Two authenticated 2D pages exchange actual move frames; the other player disappears on floor change and disconnect."
+      "evidence": "Two real top-down clients exchange existing peer movement and remove the old peer on disconnect."
     },
     {
-      "name": "map and worker statuses",
+      "name": "3D/Lite handoff",
       "status": "passed",
-      "evidence": "Desktop screenshots at 1440×900 and 1120×760 show placeholder Office fixtures, named workers, and live working/needs input/done/offline labels."
-    },
-    {
-      "name": "3D focus regression",
-      "status": "passed",
-      "evidence": "Closing the 3D View dialog restores canvas focus, enabled controls and mouse-look without another click."
-    },
-    {
-      "name": "view switching and 3D interoperability",
-      "status": "passed",
-      "evidence": "2D → Lite → 3D → 2D retains floor f2 and all worker/session IDs, sends no spawn/resume, leaves one peer; a 3D page receives real 2D player movement."
-    },
-    {
-      "name": "reconnect lifecycle",
-      "status": "passed",
-      "evidence": "Dropping the socket reconnects once and sends exactly one worker.attach for the open terminal."
-    },
-    {
-      "name": "repeated switching",
-      "status": "passed",
-      "evidence": "Two additional rapid Lite/2D round trips preserve worker sessions and leave exactly one positioned peer."
-    },
-    {
-      "name": "Office-only guard",
-      "status": "passed",
-      "evidence": "An unsupported-map fixture disables game input and shows the view-switch notice while retaining the selected floor."
+      "evidence": "2D → Lite → 3D → 2D preserves non-default floor and worker/session IDs with no spawn/resume requests."
     },
     {
       "name": "browser runtime",
       "status": "passed",
-      "evidence": "No page errors across 2D, Lite and 3D."
+      "evidence": "No page errors across Office, rooftop, garage, alternate maps and view switching."
     }
   ],
   "screenshots": [
     "office-1440.png",
     "office-1120.png",
     "terminal.png",
-    "plans.png"
+    "rooftop.png",
+    "garage.png",
+    "castle.png",
+    "station.png",
+    "plans.png",
+    "arcade.png"
   ]
 }

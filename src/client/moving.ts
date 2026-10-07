@@ -1,3 +1,4 @@
+import type { SceneCamera } from './features/topdown/camera';
 import * as THREE from 'three';
 import { FLOOR, JUKEBOX, MEETING_ROOM } from '../shared/layout';
 import { blocksOpening, jukeboxBox, jukeboxSpot } from '../shared/jukebox';
@@ -60,7 +61,7 @@ export class Mover {
 
   constructor(
     private net: Net,
-    private camera: THREE.PerspectiveCamera,
+    private camera: SceneCamera,
     canvas: HTMLElement,
     private player: PlayerController,
     private office: Office,

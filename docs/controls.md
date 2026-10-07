@@ -65,17 +65,18 @@ At the boss chair, sit down and press **E** to open **Boss Control Center**. Cho
 
 ## 2D Game (desktop)
 
-Open `/2d`, or select **2D Game** from **View** in 3D or Lite. The floor selector changes the existing project floor.
+Open `/2d`, or select **2D Game** from **View**. The office has the same fixtures, maps, elevator, dialogs and activities as 3D; the exploration camera has a flat, top-down projection.
 
 | Control | Action |
 | --- | --- |
-| WASD / arrows | Walk with collisions; diagonal movement has the same speed |
-| Click ground / furniture | Walk to a reachable nearby cell around obstacles |
-| Click worker / empty desk | Open its terminal / hiring dialog |
-| O within reach | Open the nearest worker terminal, including station workers |
-| E within reach | Interact with the nearest worker, desk, kiosk, board or plan table |
-| P / U / R / X within reach | Prompt / helper / resume / send-home confirmation for a worker |
-| Toolbar | Issues, PRs, Queue, Manager request, Plan Comparison, New task |
-| ✕ / Esc | Close the top dialog; movement resumes as soon as the last dialog closes |
+| WASD / arrows | Walk with the shared collision physics; forward is toward the top of the map |
+| Click ground | Walk there using the existing navigation and collision rules |
+| Click worker | Open the existing terminal |
+| Click fixture | Approach and use its existing action |
+| E / P / U / R / X / O / C / L | The same nearby interaction and worker actions as 3D |
+| Scroll | Zoom the map in/out |
+| Tab | Complete office menu, including Elevator, Settings and 2D view controls |
+| Elevator / project name | Floors, add/remove projects, rooftop and garage |
+| ✕ / Esc | Close the top dialog and immediately restore game controls |
 
-Keyboard movement cancels click-to-walk. Opening a dialog, changing floors, leaving the tab or losing connection clears movement and held keys. Esc closes terminals without sending Escape to their process; use the terminal's existing **Esc** button or **Ctrl+[** to send it. Nested dialogs keep game controls suspended. Office only; no touch movement or recreational controls.
+Keyboard movement cancels click-to-walk. Activities that take over the camera (including golf, driving, telescope and arcade screens) retain their original camera and controls; finishing returns to the top-down projection. The elevator and floor list retain running worker sessions. Dialogs use the shared modal stack and suspend movement, including nested dialogs. Lite remains available for mobile or a browser without WebGL.

@@ -1,3 +1,4 @@
+import type { SceneCamera } from './features/topdown/camera';
 import { youtubeApi, type YoutubePlayer, type HandCover, type ListenerPosition } from './tv-youtube';
 import { homography, blocks } from './tv-projection';
 export { homography, blocks } from './tv-projection';
@@ -181,7 +182,7 @@ export class TvScreen {
    * Every frame: keep the picture where the floor says it should be, then put it on the TV's
    * rectangle — or take it away, if the TV isn't somewhere you can see it (call after rendering).
    */
-  update(camera: THREE.PerspectiveCamera, show: boolean, colliders: readonly Collider[], listener: ListenerPosition, soundHere = show) {
+  update(camera: SceneCamera, show: boolean, colliders: readonly Collider[], listener: ListenerPosition, soundHere = show) {
     this.setListener(listener, soundHere);
     try {
       this.align(store.officeNow());
@@ -388,7 +389,7 @@ export class TvScreen {
   // ---- Where it goes on screen ----------------------------------------------------------------
 
   /** The TV's corners here and in pixels, the way it's looking now: false when it isn't in view. */
-  private sited(camera: THREE.PerspectiveCamera, colliders: readonly Collider[]): boolean {
+  private sited(camera: SceneCamera, colliders: readonly Collider[]): boolean {
     this.screen.updateWorldMatrix(true, false);
     const geo = this.screen.geometry;
     geo.computeBoundingBox();
@@ -439,7 +440,7 @@ export class TvScreen {
    * into a small canvas that the browser stretches over the frame (see .tv-frame in style.css), and
    * the whole frame is taken away rather than masked when every last cell is behind something.
    */
-  private occlude(camera: THREE.PerspectiveCamera, colliders: readonly Collider[]) {
+  private occlude(camera: SceneCamera, colliders: readonly Collider[]) {
     const ctx = this.maskCtx;
     const pixels = this.maskPixels;
     if (!ctx || !pixels) return;
@@ -523,7 +524,7 @@ export class TvScreen {
    * A collider that reaches the TV's rectangle on screen (or straddles the camera, where its corners
    * say nothing) is kept; the rest of the building is culled.
    */
-  private inTheWay(camera: THREE.PerspectiveCamera, colliders: readonly Collider[]): Collider[] {
+  private inTheWay(camera: SceneCamera, colliders: readonly Collider[]): Collider[] {
     const w = this.layer!.clientWidth || window.innerWidth;
     const hgt = this.layer!.clientHeight || window.innerHeight;
     let tvMinX = Infinity;

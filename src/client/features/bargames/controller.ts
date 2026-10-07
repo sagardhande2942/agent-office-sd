@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../topdown/camera';
 import * as THREE from 'three';
 import { GREEN, ROUND, landing, meterAt, targetFrame, throwSpot, type BarGame, type Toss } from '../../../shared/bargames';
 import { isTyping, type PlayerController } from '../../player';
@@ -90,7 +91,7 @@ export class Thrower {
   constructor(
     private readonly player: PlayerController,
     private readonly me: Person,
-    private readonly camera: THREE.PerspectiveCamera,
+    private readonly camera: SceneCamera,
     private readonly canvas: HTMLElement,
     private readonly hooks: ThrowHooks,
   ) {

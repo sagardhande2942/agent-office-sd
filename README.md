@@ -498,10 +498,8 @@ Codex input alerts require a visible sign-in/trust prompt or a permission hook; 
 
 ### Playable 2D Game
 
-Open **`/2d`** for a desktop, top-down Office alongside 3D and the Lite dashboard (`/lite`). Use the **View** selector to switch among all three in the same tab. They share authentication, floor selection, running workers, terminals and server state; changing views does not hire or resume workers.
+Open **`/2d`** for the complete office in a desktop, top-down view. It uses the same artwork, rooms, furniture, characters, collisions and feature modules as 3D. **Tab** opens the same menu: boards, Queue, Plan Comparison, Boss Control Center, Smartphone, meetings, messages, services, whiteboard, settings and the other office actions.
 
-Walk with **WASD / arrows**, click the floor to walk around furniture, or click a worker to open its existing terminal. Approach a desk and press **E** to open its worker or hire at an empty desk; **P** prompts, **U** brings a helper and **X** opens send-home confirmation. Issues, PRs, Queue, Manager and Plan Comparison are available from their map fixtures and the toolbar. Close dialogs with the top-right **✕** or **Esc** to resume movement immediately.
+Walk with **WASD / arrows**, click the floor to walk there, click a worker to open its existing terminal, and use **E** beside a fixture. Scroll to zoom; the Manager uses its existing kiosk. The physical **elevator** and its menu provide all floors, project management, the rooftop bar and the garage. Castle, Station and custom maps work too. Golf, cars, arcade and the other activities keep their existing controls and aiming cameras, returning to the flat office view when finished.
 
-The first version uses placeholder shapes and supports the **Office map and desktop controls only**. Other maps display an Office-only notice with the view selector available; they do not change the building's map. Mobile controls, custom sprites and recreational activities are outside this view. See [controls](docs/controls.md#2d-game-desktop) and [architecture](docs/code-layout.md#playable-2d-client).
-
-Production screenshots and reproducible checks are in [2D Game verification](docs/game2d-verification.md).
+The **View** selector switches 3D, 2D Game and Lite in the same tab while retaining the floor and running workers. Close dialogs with **✕** or **Esc** to resume controls immediately. 2D Game uses WebGL like 3D; **Lite** remains the lightweight, phone-friendly option. See [controls](docs/controls.md#2d-game-desktop), [architecture](docs/code-layout.md#playable-2d-client), and [screenshots and verification](docs/game2d-verification.md).

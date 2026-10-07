@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../topdown/camera';
 import * as THREE from 'three';
 import { GAME, type CabinetFrame } from '../../../shared/cabinet';
 import type { WorkerInfo } from '../../../shared/protocol';
@@ -131,7 +132,7 @@ export class Cabinet {
   }
 
   /** Runs the game, sends it to everyone watching, keeps the screens drawn and moves the camera. Call it once the player has placed the camera. */
-  update(camera: THREE.PerspectiveCamera, dt: number) {
+  update(camera: SceneCamera, dt: number) {
     const g = this.game;
     const now = performance.now();
     if (this.mode === 'play' && g) {

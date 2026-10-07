@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../topdown/camera';
 import * as THREE from 'three';
 import { PICTURE_MAX, PICTURE_MIN, clampToWall, frameRect, overlaps, pictureSize, type WallId } from '../../../shared/decor';
 import type { Net } from '../../net';
@@ -61,7 +62,7 @@ export class Hanger {
 
   constructor(
     private net: Net,
-    private camera: THREE.PerspectiveCamera,
+    private camera: SceneCamera,
     canvas: HTMLElement,
     private player: PlayerController,
     private office: Office,

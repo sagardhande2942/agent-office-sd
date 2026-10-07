@@ -1,6 +1,8 @@
-# 2D Game verification
+# Complete 2D view verification
 
-The production bundle was checked against an isolated office with two temporary Git floors, real shell workers and headless Chromium. The harness is `scripts/e2e-game2d.mjs`; it never connects to the live office. Provider-producing hiring, helper and Manager requests are captured before launch. Queue operations and terminal input use the real server.
+The `/2d` entry loads the same office composition and feature registries as 3D. Exploration uses an orthographic cutaway camera; activities retain their existing aiming cameras and return to the map afterward. Lite remains a separate lightweight client.
+
+The headless harness runs against its own isolated server, temporary Git project floors and a real shell worker, without connecting to the live office.
 
 ```sh
 npm run typecheck
@@ -9,35 +11,42 @@ npm run build
 node --import tsx scripts/e2e-game2d.mjs
 ```
 
-Typecheck and build passed. The full suite passed **978 tests**, including the size and client structure guards. The browser harness passed **15 check groups** with no page errors:
+Typecheck and build passed. All **976 tests** passed, including size, structure, camera projection and raycasting checks. All **17 browser check groups** passed with no page errors:
 
-- Protected `/2d`, `/2d.html` and `/game2d.html`, login return path and a non-default floor.
-- Keyboard movement, click-to-walk and desk collisions.
-- Real shell terminal input; click and nearby E attach the same worker.
-- All five destination dialogs from toolbar and map; top-right ✕ and Esc restore controls immediately.
-- Worker prompt, helper, send-home and hiring dialogs, plus existing request contracts.
-- Three nested board/issue/confirmation dialogs and real paused-queue add/remove operations.
-- Same-floor multiplayer movement and removal on floor change/disconnect.
-- Worker working, needs input, done and offline fixtures at two desktop viewport sizes.
-- 3D mouse-look recovery after closing a shared dialog.
-- 2D → Lite → 3D → 2D retains floor and worker/session IDs without spawn/resume requests; 3D receives 2D movement.
-- Reconnect sends one terminal reattach; repeated switches leave one positioned peer.
-- Unsupported-map input guard retains the selected floor.
+- **authentication and shared bootstrap**: Protected aliases return through login to /2d; complete office composition connects once on the requested floor.
+- **physical elevator and floor management**: Approach/E opens the existing elevator with floor status, add/remove project actions, rooftop and garage; actual rides switch floors.
+- **movement and shared collision physics**: Arrows/WASD, ground click-to-walk and collision against the original desk geometry work in the orthographic scene.
+- **complete office dialogs**: Shared Issues/PR/Queue, Boss, Smartphone, Services, Whiteboard, Meeting, Search, Settings, view controls and Plan Comparison open from the same menu with close/Esc focus recovery.
+- **real arcade interaction**: Boss Control Center launches playable Minesweeper with its original camera and canvas; closing restores the orthographic view and controls.
+- **menu and palette recovery**: The full menu and command palette have top-right close buttons and restore controls immediately.
+- **shared worker terminal**: Clicking the rendered worker opens the existing terminal and real shell input without a replacement worker/session.
+- **office visual and zoom**: Two screenshots show the actual 3D office artwork in a flat cutaway projection, original HUD, elevator and fixtures; wheel zoom updates pointer projection.
+- **rooftop game interaction**: The actual shared darts interaction starts its aiming activity on the roof and E returns to the top-down view.
+- **real car interaction**: The original car interaction enters the driver, WASD emits real car.drive frames, and E exits back to the plan view.
+- **rooftop and garage access**: Real elevator rides reach the full rooftop/bar/game fixtures and garage/car fixtures, then return to the selected office floor.
+- **other maps**: Castle and Station load and stay playable through the existing map.set server API; returns to Office without changing worker/session IDs.
+- **real golf interaction**: The shared tee interaction starts golf with its original aiming camera; E puts the club away and restores the plan view.
+- **activity camera and registries**: Golf, cars, bar games, arcade and climbing use the original shared activity modules; camera ownership switches to perspective and back without another session.
+- **multiplayer**: Two real top-down clients exchange existing peer movement and remove the old peer on disconnect.
+- **3D/Lite handoff**: 2D → Lite → 3D → 2D preserves non-default floor and worker/session IDs with no spawn/resume requests.
+- **browser runtime**: No page errors across Office, rooftop, garage, alternate maps and view switching.
 
-Detailed machine-readable results are in [checks.json](game2d-evidence/checks.json).
+Detailed results are in [checks.json](game2d-evidence/checks.json). Live microphone/screen sharing and every individual recreation submode were not exercised; their implementations are shared with 3D. HTTP test fixtures return 404 for unrelated local-office discovery probes while retaining their request/auth assertions.
 
-The live office's local-server discovery initially hit the TUI test fixture at `/`, causing its login-only assertion to fail. The fixture now returns 404 for that unrelated probe while preserving its login assertions; the subsequent full suite passed.
+![office 1440](game2d-evidence/office-1440.png)
 
-## Office, 1440 × 900
+![office 1120](game2d-evidence/office-1120.png)
 
-![Office map with workers and live statuses](game2d-evidence/office-1440.png)
+![terminal](game2d-evidence/terminal.png)
 
-## Office, 1120 × 760
+![rooftop](game2d-evidence/rooftop.png)
 
-![Smaller desktop view](game2d-evidence/office-1120.png)
+![garage](game2d-evidence/garage.png)
 
-## Shared dialogs
+![castle](game2d-evidence/castle.png)
 
-![Existing worker terminal in 2D](game2d-evidence/terminal.png)
+![station](game2d-evidence/station.png)
 
-![Existing plan comparison dialog in 2D](game2d-evidence/plans.png)
+![plans](game2d-evidence/plans.png)
+
+![arcade](game2d-evidence/arcade.png)
