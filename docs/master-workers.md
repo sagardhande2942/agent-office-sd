@@ -34,6 +34,16 @@ After an office restart, an unfinished activity starts paused. Resume explicitly
 
 Activity state lives in each floor's `.agent-office/master-workers.json`; the latest ten previous activities are retained. Shared presets live in the office data directory's `master-workers-presets.json`. Files are saved atomically with owner-only permissions. Stop preserves unintegrated work; removing old worktrees remains a separate user action.
 
+## Replay a task
+
+Choose **Replay** in the activity window for the current activity or one of the retained previous activities. The same read-only timeline is available in Lite, 2D and 3D, including while participants are working. Filter by participant, task and event type, then expand an event to inspect its available instructions, messages, result evidence, review reasons, commits, checks and PR link. Close Replay with its top-right ✕ or Esc to return to the appropriate game controls.
+
+New activities record start, plan submission, assignment, worker result, blocker, retry, review decision, integration, pause/resume, stop and final PR events. Events carry stable IDs, recorded timestamps, activity IDs and applicable participant/task references. Viewing the timeline does not rerun agents, execute recorded commands, modify branches or make model calls. Existing floor access and participant authorization rules continue to apply.
+
+Worker and master check claims are labeled **reported**. The office can independently establish integration ancestry and final PR validation; those facts do not mean it independently ran the reported test commands. Missing evidence, older activities without event recording, and omitted history are shown explicitly rather than reconstructed with invented timestamps.
+
+Replay events persist with activity state across restarts. Each activity retains its latest 500 events; older events are removed with a visible dropped count. The current activity and latest ten previous activities share the existing activity retention policy. Each recorded text field is limited to 4,000 characters and arrays are bounded. Replay stores structured activity evidence, excluding full terminal recordings and keystrokes; credential and environment assignment patterns in recorded text are redacted. Keep secrets out of activity briefs and evidence, which are also part of existing activity state. Atomic persistence and paused recovery remain unchanged. Repeated recovery and repeated submissions do not replay agent work or duplicate the same recorded transition.
+
 ## CLI and MCP
 
 In `agent-office tui`, press `:` and use:
@@ -90,5 +100,7 @@ The coordinator has an optional policy hook before dispatch for future budget en
 ## Verification
 
 Run `npm run typecheck`, `npm test`, and `npm run build`. Then run `node --import tsx scripts/e2e-master-workers.mjs` with installed Chromium under `~/.cache/ms-playwright` or `CHROMIUM_PATH`. Browser screenshots and checks are saved to `/tmp/agent-office-master-workers-evidence` (override with `TEAM_ARTIFACTS`). The harness uses an isolated office and fake agent sessions, not paid model calls; game focus checks suppress GPU scene drawing while exercising the real modal/player controls. The real-server test exercises a mixed Claude/Codex roster, actual Git worktrees and commits, API restrictions and final PR verification against a fake forge.
+
+Run `node --import tsx scripts/e2e-task-replay.mjs` for Replay browser checks and screenshots in `/tmp/agent-office-task-replay-evidence` (override with `REPLAY_ARTIFACTS`). This also uses fake agent sessions without paid model calls.
 
 For a live provider smoke test, load a small existing repository, select installed authenticated models, and ask for two independent small changes plus tests. Confirm each worker submits local commits, the master integrates them, the required checks pass, and only the master creates a PR. Live model behavior remains subject to provider availability and permissions.
