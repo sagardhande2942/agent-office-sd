@@ -13,6 +13,7 @@ Every harness takes both a **Model** and an **Effort**, each optional: leave one
 | Claude Code | Fable 5.1, Opus 5.5, Sonnet 5.5 or Haiku 4.5 (`--model`) | `--effort` |
 | OpenCode | a `provider/model`, typed or picked from the suggestions `opencode models` gives (`--model`) | the model's variant |
 | Codex | one of the models `codex debug models` lists (`--model`) | `-c model_reasoning_effort` |
+| Antigravity | model slug from `agy models` (`--model`) | `--effort` |
 | Grok | one of the models `grok models` lists (`--model`) | `--effort` |
 | Muse | a model id, typed (`--model`) | `--reasoning-effort` |
 | DeepSeek Harness | a model id from its catalog, typed | its `reasoning_effort` option |
@@ -110,3 +111,17 @@ Sending a worker home also stops and removes its helper before cleaning up the w
 ## Coordinating workers
 
 Use `office-workers request`, `inbox`, `reply` and `ack` (or their MCP tools) for persistent requests and responses on the same local floor. Ask coordinated workers to check their inboxes between tasks. See [communications.md](communications.md) for a frontend/API example, context, receipts and the office panels.
+
+## Antigravity CLI
+
+Install [Google Antigravity CLI](https://antigravity.google/docs/cli/install/) and launch `agy` as the user running the office to finish Google login and initial setup. The office uses that machine’s credentials; the Your sign-ins panel remains Claude/GitHub. Choose **Antigravity** in the existing provider pickers, including hiring, default workers, board agents, helpers, queues and comparison candidates/reviewers. Set the office default with `--agent agy` (an absolute path to `agy` works too). This is the terminal CLI, not the Antigravity desktop editor launcher.
+
+Pick an optional model slug from `agy models` and an effort, or leave either on Default for the CLI’s settings. Models are typed because the authenticated catalogue output has not been verified here. The office starts its interactive terminal with `--prompt-interactive`, `--model` and `--effort`. **R** resumes exactly the conversation reported by its hooks using `--conversation`; it never resumes the machine’s most recent conversation. Comparison planning seats additionally use `--mode plan`. Native tool permission, sandbox and artifact review settings remain in effect. Launch flags that switch to print mode, reuse another conversation or skip permissions are removed from `--agent-args`.
+
+The office adds a named per-worker entry to `.agents/hooks.json` in the worker’s workspace, preserving project entries and leaving global settings untouched. Its entry is removed when the process ends or the worker is sent home. A file created by the office is excluded from Git changes. Malformed existing JSON fails the launch without overwriting it. Hooks forward only the conversation ID and tool name over the authenticated loopback bridge, never tool arguments, output, transcripts or model responses, and return `{}` without permission decisions. `PreInvocation` marks work, tool hooks show activity, and `Stop` completes the turn. Foreign conversation events are ignored after the root is established; switching conversations inside the TUI requires restarting the desk to track the new root. There is no startup or permission-request hook: setup and approval may require opening the terminal, and a waiting permission prompt can still show as working. Usage, quotas and billing remain in Antigravity; office spend and daily budgets do not meter it.
+
+Launch flags verified against Antigravity CLI **1.3.1** (`--help`); hook schema follows the [official hook contract](https://antigravity.google/docs/hooks/). Automated checks use fixtures and make no paid model calls. Live authenticated turns and catalogue output remain unverified.
+
+![Antigravity model and effort in the shared hire dialog](antigravity-cli.png)
+
+Reproduce the browser check with `npm run build && node --import tsx scripts/e2e-antigravity.mjs`; it uses an isolated Git floor and saves a screenshot under `/tmp/agent-office-antigravity-evidence`. Provider tests exercise launch, token validation, root conversation isolation, hook cleanup and restart/resume with a fake CLI.

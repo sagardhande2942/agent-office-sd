@@ -4,7 +4,7 @@
 //
 // Browser-safe: no node imports, the hire dialog reads this too.
 
-export const AGENT_PROVIDERS = ['claude', 'opencode', 'codex', 'grok', 'muse', 'dsh', 'pi', 'cursor', 'custom'] as const;
+export const AGENT_PROVIDERS = ['claude', 'opencode', 'codex', 'grok', 'muse', 'dsh', 'pi', 'cursor', 'antigravity', 'custom'] as const;
 
 export type AgentProvider = (typeof AGENT_PROVIDERS)[number];
 
@@ -319,6 +319,16 @@ export const PROVIDER_META: Record<AgentProvider, ProviderMeta> = {
       invalid: 'Use a Cursor model id: letters, digits and . _ -, with any overrides in brackets, like model[effort=high] (up to 128 characters).',
     },
     usage: { note: 'Cursor uses the Cursor CLI login on the office machine. Usage and cost stay in its terminal and your Cursor account; the office does not meter them.' },
+  },
+  antigravity: {
+    label: 'Antigravity', name: 'Antigravity', bin: 'agy',
+    validModel: isValidCodexModel,
+    invalidModel: 'Invalid Antigravity model (expected a model slug without whitespace)',
+    models: { pick: 'typed', unset: 'Default (Antigravity settings)', max: CODEX_MODEL_MAX,
+      hint: 'Optional model slug from `agy models`; leave empty to use Antigravity settings.',
+      invalid: 'Use a model slug: letters, digits and . _ : / - (up to 128 characters).' },
+    takesEffort: true,
+    usage: { note: 'Antigravity uses the office machine’s Google login. Usage and cost remain in Antigravity; the office does not meter them.' },
   },
   custom: {
     label: 'Custom',

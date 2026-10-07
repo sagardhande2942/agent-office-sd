@@ -1727,3 +1727,37 @@ process.stdout.write('PROBE:' + (resolveCommand('office-probe-agent') ?? 'null')
   const found = await waitFor(() => (/PROBE:(\S+)/.exec(seen)?.[1] ?? ''), (v) => v === agent || v === 'null', 30_000);
   assert.equal(found, agent, `probe should resolve the command on the login shell's PATH (saw: ${JSON.stringify(seen.slice(-400))})`);
 });
+
+test('Antigravity workers launch interactively, authenticate hooks, restore and resume their own conversation', async (t) => {
+  const f = fixture();
+  isolateProviderEnvironment(f, t);
+  writeFileSync(path.join(path.dirname(f.claude), 'agy'), fakeAgent, { mode: 0o700 });
+  const oldLog = process.env.FAKE_AGENT_LOG;
+  process.env.FAKE_AGENT_LOG = f.log;
+  t.after(() => { if (oldLog === undefined) delete process.env.FAKE_AGENT_LOG; else process.env.FAKE_AGENT_LOG = oldLog; f.close(); });
+  const workers = new WorkerManager(f.root, f.data, f.claude, [], { url: 'http://127.0.0.1:1', token: '' }, events([]), ledger(f.data));
+  t.after(() => workers.shutdown());
+  const worker = workers.spawn('desk-1', 'test', 'Implement task', false, 'agent', 'antigravity', 'gemini-model', 'high');
+  assert.notEqual(typeof worker, 'string'); if (typeof worker === 'string') return;
+  const calls = await waitFor(f.read, x => x.some(r => r.kind === 'agy'));
+  const first = calls.find(r => r.kind === 'agy')!;
+  assert.deepEqual(first.args, ['--model', 'gemini-model', '--effort', 'high', '--prompt-interactive', coordinated('Implement task')]);
+  const hook = (event: string, token = first.env.hookToken!) => workers.handleProviderHook('antigravity', worker.id, token, event, { conversationId: 'root-agy' });
+  assert.equal(hook('PreInvocation', 'wrong'), false);
+  assert.equal(hook('PreInvocation'), true);
+  assert.equal(worker.status, 'working');
+  assert.equal(worker.sessionId, 'root-agy');
+  assert.equal(hook('Stop'), true);
+  assert.equal(worker.status, 'done');
+  assert.equal(workers.handleProviderHook('antigravity', worker.id, first.env.hookToken!, 'Stop', { conversationId: 'foreign' }), false);
+  workers.shutdown();
+  assert.equal(existsSync(path.join(f.root, '.agents/hooks.json')), false);
+  const restored = manager(f, f.claude, [], []);
+  t.after(() => restored.shutdown());
+  await restored.start();
+  const resumed = await waitFor(f.read, x => x.filter(r => r.kind === 'agy' && !r.stdin).length >= 2);
+  const next = resumed.filter(r => r.kind === 'agy' && !r.stdin).at(-1)!;
+  assert.deepEqual(next.args, ['--conversation', 'root-agy', '--model', 'gemini-model', '--effort', 'high']);
+  assert.notEqual(next.env.hookToken, first.env.hookToken);
+  assert.equal(restored.get(worker.id)?.provider, 'antigravity');
+});
