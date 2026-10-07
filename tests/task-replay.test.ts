@@ -349,3 +349,14 @@ test('rejected or stale submissions do not append replay events',async()=>{
   assert.equal(events.filter(e=>e.type==='result').length,1);
  }finally{f.dispose();}
 });
+
+
+test('plan task definitions redact quoted secrets before JSON escaping',async()=>{
+ const f=fixture();try{
+  const m=f.s.state().current!.masterId!;
+  await f.action(m,{action:'plan',plan:'Review credentials safely',tasks:[{...task(),instructions:'password="multi word credential" and export CONFIG="multi word env"'}]});
+  const message=f.s.state().current!.replay!.events.find(e=>e.type==='plan')!.details.message!;
+  assert.ok(!message.includes('credential'));assert.ok(!message.includes('word env'));
+  assert.ok(message.includes('[redacted]'));
+ }finally{f.dispose();}
+});

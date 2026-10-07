@@ -2,7 +2,7 @@ import { planModelIdentity } from '../../shared/plan-providers.js';
 import type { TeamRequest, TeamRun, TeamTask } from '../../shared/master-workers.js';
 import type { AgentChoice } from '../../shared/protocol.js';
 import { recordEvent } from './recorder.js';
-import { shorten } from './sanitize.js';
+import { recordedText, shorten } from './sanitize.js';
 
 type TaskDef = Pick<TeamTask, 'id' | 'title' | 'instructions' | 'acceptance' | 'files' | 'dependencies'>;
 
@@ -16,7 +16,7 @@ export function recordStart(run: TeamRun, req: TeamRequest) {
 }
 
 export function recordPlan(run: TeamRun, plan: string, tasks: TaskDef[]) {
-  const definitions = JSON.stringify(tasks.map((t) => ({ id: t.id, title: t.title, instructions: t.instructions, acceptance: t.acceptance, files: t.files, dependencies: t.dependencies })));
+  const definitions = JSON.stringify(tasks.map((t) => ({ id: t.id, title: recordedText(t.title).text, instructions: recordedText(t.instructions).text, acceptance: recordedText(t.acceptance).text, files: t.files.map(f => recordedText(f).text), dependencies: t.dependencies })));
   return recordEvent(run, { type: 'plan', participantId: run.masterId, summary: `Plan published with ${tasks.length} task${tasks.length === 1 ? '' : 's'}`, details: { instructions: plan, message: `Task definitions: ${definitions}` } });
 }
 
