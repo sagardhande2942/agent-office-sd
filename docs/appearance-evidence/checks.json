@@ -1,0 +1,29 @@
+{
+  "checks": [
+    {
+      "name": "unique building allocation, overflow, synchronization and persistence",
+      "status": "passed"
+    },
+    {
+      "name": "twenty portraits, draft preservation and Settings close controls",
+      "status": "passed"
+    },
+    {
+      "name": "live visual swaps and shared typing, walking, waiting and celebration poses",
+      "status": "passed"
+    },
+    {
+      "name": "vacancy promotes oldest fictional fallback without duplicates",
+      "status": "passed"
+    },
+    {
+      "name": "immediate Original reset preserves agent sessions",
+      "status": "passed"
+    },
+    {
+      "name": "real 3D appearance rendering and Esc/close mouse-look restoration",
+      "status": "passed"
+    }
+  ],
+  "errors": []
+}

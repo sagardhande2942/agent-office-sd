@@ -15,3 +15,9 @@ The visual factory registry and Settings extension registry allow future appeara
 ## Verification
 
 Run `npm run typecheck`, `npm test`, `npm run build`, and `node --import tsx scripts/e2e-appearances.mjs`. The browser check uses an isolated two-floor office and real shell workers, verifies synchronized allocation and live changes, and records screenshots under `docs/appearance-evidence` (or `APPEARANCE_ARTIFACTS`).
+
+The browser harness keeps real network, input and simulation ticks running but renders the full office on demand to keep software GPU checks practical. It uses a second Lite viewer to verify building-wide state, then loads the first-person office for the final screenshot and mouse-look checks.
+
+![The 20 fictional character portraits](appearance-evidence/roster.png)
+
+![A fictional worker at its desk in the first-person office](appearance-evidence/office-3d.png)
