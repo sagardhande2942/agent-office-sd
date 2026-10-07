@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -9,6 +9,7 @@ import {
   writeOpenCodePlugin,
 } from '../src/server/opencode.js';
 import { opencode } from '../src/server/providers/opencode.js';
+import { openCodeNeedsStandalone } from '../src/server/providers/opencode-cli.js';
 
 test('merges the inline OpenCode config and preserves user plugins', () => {
   const plugin = 'file:///tmp/agent-office-opencode.mjs';
@@ -21,6 +22,31 @@ test('does not duplicate the generated plugin in inline config', () => {
   const plugin = 'file:///tmp/agent-office-opencode.mjs';
   const merged = JSON.parse(mergeOpenCodeConfigContent(JSON.stringify({ plugin: [plugin] }), plugin));
   assert.deepEqual(merged.plugin, [plugin]);
+});
+
+test('standalone detection reads the CLI major version, caches it, and leaves an unknown CLI alone', (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-office-opencode-cli-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const script = (name: string, source: string) => {
+    const file = path.join(dir, name);
+    writeFileSync(file, `#!/usr/bin/env node\n${source}\n`, { mode: 0o755 });
+    return file;
+  };
+  assert.equal(openCodeNeedsStandalone(script('v2', 'process.stdout.write("opencode v2.0.24\\n");')), true, 'v2 workers get their own server');
+  assert.equal(openCodeNeedsStandalone(script('v1', 'process.stdout.write("1.99.0\\n");')), false, 'v1 keeps the shared service');
+  assert.equal(openCodeNeedsStandalone(script('odd', 'process.stdout.write("not a version\\n");')), false, 'an unreadable version is not v2');
+  assert.equal(openCodeNeedsStandalone(path.join(dir, 'missing')), false, 'a command that cannot run is left alone');
+  assert.equal(openCodeNeedsStandalone(undefined), false);
+  // One probe per executable: the answer is asked once and kept, so a version that changes mid-run
+  // cannot flip the flag under a launch the office already decided.
+  const count = path.join(dir, 'count');
+  const once = script('once', `const fs = require('node:fs');
+    const n = (fs.existsSync(${JSON.stringify(count)}) ? Number(fs.readFileSync(${JSON.stringify(count)}, 'utf8')) : 0) + 1;
+    fs.writeFileSync(${JSON.stringify(count)}, String(n));
+    process.stdout.write(n === 1 ? '2.0.0' : '1.0.0');`);
+  assert.equal(openCodeNeedsStandalone(once), true);
+  assert.equal(openCodeNeedsStandalone(once), true);
+  assert.equal(readFileSync(count, 'utf8'), '1');
 });
 
 test('an OpenCode worker is told its effort and model for a fresh session, and neither for a resumed one', () => {
