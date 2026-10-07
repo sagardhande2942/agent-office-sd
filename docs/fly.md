@@ -5,7 +5,7 @@ The full story behind `deploy/fly.sh`. The short version is in the [README](../R
 You need an up-to-date **flyctl, logged in** (`fly auth login`; [install it](https://fly.io/docs/flyctl/install/) with `brew install flyctl` or `curl -L https://fly.io/install.sh | sh`, and update an old one with `fly version upgrade`), plus `ssh`, `curl`, Node.js and a clone of this repo:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 deploy/fly.sh up --claude-token "$(claude setup-token)"
 ```
 

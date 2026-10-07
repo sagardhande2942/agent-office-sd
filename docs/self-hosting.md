@@ -5,10 +5,10 @@ Any Ubuntu or Debian server, with one line, or set up by hand behind Caddy or ng
 Run this on any Ubuntu or Debian server, as root or as a user with sudo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/deploy/provision.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/deploy/provision.sh | bash
 ```
 
-Or run it from your computer without logging in first: `ssh root@203.0.113.7 'curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/deploy/provision.sh | bash'`.
+Or run it from your computer without logging in first: `ssh root@203.0.113.7 'curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/deploy/provision.sh | bash'`.
 
 It takes a few minutes the first time:
 
@@ -32,7 +32,7 @@ Everything goes through SSH, so there are no certificates to manage, and `localh
 **On your own domain.** Point a DNS record at the server, open ports 80 and 443, and add `--domain`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/deploy/provision.sh | bash -s -- --domain office.example.com
+curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/deploy/provision.sh | bash -s -- --domain office.example.com
 ```
 
 It installs [Caddy](https://caddyserver.com), which gets a certificate from Let's Encrypt by itself and serves the office on https://office.example.com. The claim link is then `https://office.example.com/claim?t=…`. Give teammates an invite link each from **🔑 Accounts**.
@@ -40,7 +40,7 @@ It installs [Caddy](https://caddyserver.com), which gets a certificate from Let'
 **On your Tailscale network.** No domain, and no ports to open: add `--tailscale`, and the server joins your tailnet and serves the office on `https://agent-office.<your-tailnet>.ts.net` with [Tailscale Serve](https://tailscale.com/kb/1312/serve), which brings its own certificate:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/deploy/provision.sh | bash -s -- --tailscale
+curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/deploy/provision.sh | bash -s -- --tailscale
 ```
 
 It prints a link to add the machine to your tailnet (or pass `--tailscale-auth-key tskey-auth-…`), and the first time, one that turns on MagicDNS and HTTPS Certificates for the tailnet. It waits for each. `--tailscale-hostname` names the machine (`agent-office` by default). Then anyone on your tailnet opens the link, and workers' web servers get links of their own, `https://agent-office.<your-tailnet>.ts.net:<port>`, still behind the office sign-in. For someone outside your tailnet, share the machine with them from Tailscale's Machines page. Re-running the script keeps it on the tailnet. Turn off key expiry for the machine on that page, or it drops off after 180 days. The details, and what else the tailnet can reach on the machine, are in the [AWS reference](aws.md#tailscale), since `deploy/aws.sh up --tailscale` does the same thing.

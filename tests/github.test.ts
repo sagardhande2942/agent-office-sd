@@ -20,7 +20,7 @@ test('a forked checkout is worked on as the fork, not the repository it was fork
   checkout('remote', 'add', 'origin', 'git@github.com:sagardhande2942/agent-office-sd.git');
   // What forking looks like: origin is yours, upstream is where it came from. gh, asked about this
   // checkout, would answer for upstream, which is what the boards used to fill themselves with.
-  checkout('remote', 'add', 'upstream', 'https://github.com/AgentSystemLabs/agent-office.git');
+  checkout('remote', 'add', 'upstream', 'https://github.com/example-owner/office-fixture.git');
   delete process.env.GH_REPO;
   assert.equal(workRepo(fork), 'sagardhande2942/agent-office-sd', 'the boards and pull requests are on the repository origin points at');
   // A checkout with no origin on GitHub is left to gh, to answer or to say why it can't.
@@ -28,9 +28,9 @@ test('a forked checkout is worked on as the fork, not the repository it was fork
   checkout('remote', 'set-url', 'origin', 'https://gitlab.com/o/r.git');
   assert.equal(originRepo(fork), undefined, 'a remote off GitHub names no repository');
   // Started with GH_REPO, the office works on the repository that names.
-  process.env.GH_REPO = 'github.com/AgentSystemLabs/agent-office';
+  process.env.GH_REPO = 'github.com/example-owner/office-fixture';
   try {
-    assert.equal(workRepo(fork), 'AgentSystemLabs/agent-office');
+    assert.equal(workRepo(fork), 'example-owner/office-fixture');
   } finally {
     delete process.env.GH_REPO;
   }

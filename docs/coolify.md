@@ -10,7 +10,7 @@ You need a **[Coolify](https://coolify.io) v4 server** with its API turned on, a
 - **HEAD pushed to a public repository.** Coolify builds from git, never from your files (see below).
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 export COOLIFY_API_TOKEN=<your token>
 deploy/coolify.sh up --url https://coolify.example.com --claude-token "$(claude setup-token)"
 ```
