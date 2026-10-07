@@ -1,3 +1,4 @@
+import { codexBlocked } from './codex-screen.js';
 // Codex: its native lifecycle hooks (see ../codex.ts), set on its command line, report on
 // /hooks/codex; its usage is read from the root session's rollout (see codex-usage.ts).
 import { homedir } from 'node:os';
@@ -101,7 +102,7 @@ export const codex: ProviderAdapter<CodexState, CodexSetup> = {
     tracker(h.state).clear();
     return { args, rotateToken: true };
   },
-  bootHint: 'Open the terminal: complete login and review Office hooks in /hooks',
+  screen: { blocked: codexBlocked },
   hook: { strictJson: true, handle: codexHook },
   usage: {
     persisted: true,
