@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { loadConfig } from '../src/server/config.ts';
 import { startServer } from '../src/server/server.ts';
-import { DESKS } from '../src/shared/desks.ts';
+import { DESKS } from '../src/shared/layout.ts';
 
 const output = path.resolve(process.env.GAME2D_ARTIFACTS ?? '/tmp/agent-office-2d-graphics-evidence');
 mkdirSync(output, { recursive: true });
