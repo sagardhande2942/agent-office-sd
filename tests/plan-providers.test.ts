@@ -7,7 +7,7 @@ import {PLAN_REVIEW_SEATS} from '../src/shared/layout.js';
 import {main} from '../bin/office-plan.js';
 import {request, plan} from './fixtures/plan-review.js';
 
-const models = {claude:'sonnet',opencode:'anthropic/haiku',codex:'gpt-5',grok:'grok-code',muse:'muse-spark',dsh:'deepseek',pi:'openai/gpt-5',cursor:'gpt-5'} as const;
+const models = {claude:'sonnet',opencode:'anthropic/haiku',codex:'gpt-5',grok:'grok-code',muse:'muse-spark',dsh:'deepseek',pi:'openai/gpt-5',cursor:'gpt-5',antigravity:'gemini-3.6-flash-medium'} as const;
 const env = {AGENT_OFFICE_WORKER_ID:'worker',AGENT_OFFICE_HOOK_TOKEN:'test-token',AGENT_OFFICE_HOOK_URL:'http://127.0.0.1:1234',AGENT_OFFICE_PLAN_ROLE:'candidate'};
 
 test('every selectable coding provider can be a candidate and reviewer without conflating local model IDs', () => {
