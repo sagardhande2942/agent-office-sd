@@ -30,7 +30,7 @@ export interface WorkerRig {
   armL: THREE.Object3D;
   armR: THREE.Object3D;
   feet: THREE.Mesh[];
-  pupils: THREE.Mesh[];
+  pupils: THREE.Object3D[];
   bulb: THREE.MeshToonMaterial;
   bulbMesh: THREE.Mesh;
   /** What it acts out with: the papers in its hands and the globe beside its laptop (see worker-props.ts). */

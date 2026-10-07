@@ -38,6 +38,7 @@ export function floorHelpers(ctx: Ctx): FloorHelpers {
   let floorsSent = '';
   let floorsTimer: NodeJS.Timeout | undefined;
   const floorsChanged = () => {
+    ctx.appearances?.reconcile();
     floorsTimer ??= setTimeout(() => {
       floorsTimer = undefined;
       const list = floorInfos();

@@ -285,6 +285,8 @@ export class RemoteFloor implements FloorActions {
 
   // --- the surface server.ts calls. Writes ship; reads are mirrored; events push. -----------------------------
 
+  workerIds(): readonly string[] { return [...this.roster]; }
+
   get workers(): FloorWorkers {
     const remote = this;
     return {

@@ -65,6 +65,7 @@ export interface Core {
 
 /** Made once the hook server listens, before any floor opens (office/services.ts). */
 export interface BuildingServices {
+  appearances: import('../appearances.js').Appearances;
   sky: Sky;
   themes: Themes;
   maps: Maps;

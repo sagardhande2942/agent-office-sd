@@ -1,5 +1,8 @@
 import type { MasterWorkersClientMsg, MasterWorkersServerMsg } from './protocol/master-workers.js';
 export * from './protocol/master-workers.js';
+
+import type { AppearanceClientMsg, AppearanceServerMsg } from './protocol/appearances.js';
+export * from './protocol/appearances.js';
 import type { PlanReviewClientMsg, PlanReviewServerMsg } from './protocol/plan-review.js';
 export * from './protocol/plan-review.js';
 import type { TvClientMsg } from './protocol/toys.js';
@@ -40,6 +43,8 @@ export * from './protocol/communications.js';
 
 export type ClientMsg =
   | MasterWorkersClientMsg
+
+  | AppearanceClientMsg
   | PlanReviewClientMsg
   | TvClientMsg
   | PresenceClientMsg
@@ -66,6 +71,8 @@ export type ClientMsg =
 
 export type ServerMsg =
   | MasterWorkersServerMsg
+
+  | AppearanceServerMsg
   | PlanReviewServerMsg
   | CommunicationsServerMsg
   | PresenceServerMsg
