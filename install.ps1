@@ -1,10 +1,10 @@
 # Install the latest Agent Office release on Windows and start it, no clone needed. In PowerShell:
 #
-#   irm https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/install.ps1 | iex
 #
 # To pass the office options, run it as a script block instead:
 #
-#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/install.ps1))) --port 4700
+#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/install.ps1))) --port 4700
 #
 # The first time the office starts it asks where to clone your projects, signs the GitHub CLI in if
 # it isn't, and lets you pick your first repository to clone as a floor.
@@ -37,7 +37,7 @@
     # Windows PowerShell 5.1 may not offer TLS 1.2 by default, and GitHub requires it.
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-    $repo = 'AgentSystemLabs/agent-office'
+    $repo = 'sagardhande2942/agent-office-sd'
     $marker = 'agent-office launcher, written by install.ps1'
     $installDir = if ($env:AGENT_OFFICE_INSTALL_DIR) { $env:AGENT_OFFICE_INSTALL_DIR } else { Join-Path $env:LOCALAPPDATA 'agent-office' }
     # Windows can't hold an empty environment variable (setting one to '' deletes it), so where

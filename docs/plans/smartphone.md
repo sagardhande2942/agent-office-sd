@@ -1,6 +1,6 @@
 # Smartphone integration
 
-Adapted from AgentSystemLabs/agent-office PR299, on top of the upstream integration.
+Adapted from the original upstream PR #299, on top of the upstream integration.
 
 - J and the HUD menu open contacts, including helpers and their host names.
 - Calls navigate to the worker (or helper host) and open the selected session’s terminal.

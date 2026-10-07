@@ -1,5 +1,7 @@
 # agent-office
 
+- All PRs for this project must target `sagardhande2942/agent-office-sd`. Contributors with push access may push feature branches directly there; contributors without push access may push to their own fork and open a PR against this repository. Verify the push remote before publishing. Use `gh pr create --repo sagardhande2942/agent-office-sd --base main` and, for a fork, explicitly specify `--head <your-github-user>:<branch>`. Never open project PRs against another repository or rely on GitHub CLI fork-parent defaults.
+
 - Ship every code change as a PR branched from freshly fetched `origin/main`, and end with the PR URL instead of stopping at a local commit or asking first.
 - The main checkout is shared with other live sessions and board agents, so do branch work in a worktree and never stash, reset or commit anyone else's changes there.
 - Verify with `npm run typecheck`, `npm test` and `npm run build`, plus a headless-browser screenshot for visual changes, rather than slow manual playthroughs.

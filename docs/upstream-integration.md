@@ -1,6 +1,6 @@
 # Upstream integration
 
-This release brings upstream AgentSystemLabs/agent-office through `7f7211ea10` into the fork.
+This release brings the original upstream project through `7f7211ea10` into the fork.
 
 Added upstream features include the space-station map and airlock, drifting workers, Pi and Cursor agents, model and effort catalogues, automatic worker PR detection and `office-workers pr` / MCP `link_pr`, needs-input navigation and alarms, dictation, terminal web tabs, automatic service tunnels, TURN support, real-time skies and lamplight, first-person bodies and hands, dog breeds and coats, expanded meetings, immediate issue claiming, clone progress/cancellation/restart, and Coolify deployment support. The client, protocol and server now use upstream's feature registries.
 
