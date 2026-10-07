@@ -59,7 +59,7 @@ try {
  await call(master,{action:'plan',plan:'Delegate API implementation, inspect result evidence, integrate reviewed commits.',tasks:[task]});
  const dispatched=await call(master,{action:'dispatch',task:'api',choice:{provider:'claude',model:'haiku'},reason:'A scoped API task for the eligible model.'});
  const worker=dispatched.current.tasks[0].attempts[0].workerId;
- await call(worker,{action:'result',task:'api',summary:'API contract inspected.',commits:[],checks:'Reported: scoped contract checks passed.'});
+ const submitted=await call(worker,{action:'result',task:'api',summary:'API contract inspected.',commits:[],checks:'Reported: scoped contract checks passed.'});
  const replay=()=>page.getByRole('dialog',{name:'Replay task',exact:true});
  const openReplay=async()=>{await page.getByRole('button',{name:'Replay',exact:true}).first().click();await replay().waitFor();};
  await openReplay();
@@ -75,6 +75,10 @@ try {
  await replay().getByLabel('Participant',{exact:true}).selectOption(worker);
  await replay().getByLabel('Task',{exact:true}).selectOption('api');
  await page.screenshot({path:path.join(output,'lite-result.png')});
+ const inspectToken=JSON.parse(readFileSync(path.join(dir,'.agent-office/workers.json'),'utf8')).find(w=>w.id===master).hookToken;
+ const inspected=await (await fetch(`http://127.0.0.1:${office.hookPort}/office/team?worker=${master}`,{headers:{authorization:`Bearer ${inspectToken}`}})).json();
+ assert.equal(inspected.current.revision,submitted.current.revision,'Replay inspection and filters never mutate activity state');
+ assert.equal(inspected.current.workers.length,1,'Replay never launches participants');
  check('Lite filters, chronological events, expandable reported evidence and missing details');
  await call(master,{action:'review',task:'api',accept:true,evidence:'Inspected contract report; no code commits to integrate.'});
  // Open result and all selected filters must survive a live state update.
@@ -85,6 +89,7 @@ try {
  await replay().getByLabel('Task',{exact:true}).selectOption('');
  await replay().getByLabel('Event type',{exact:true}).selectOption('');
  await page.waitForFunction(()=>[...document.querySelectorAll('.replay-event')].some(x=>x.textContent.toLowerCase().includes('integration')));
+ for(const summary of await replay().locator('.replay-event[open] > summary').all())await summary.click();
  await page.screenshot({path:path.join(output,'lite-timeline.png')});
  check('Live inspection retains filters and expanded detail without interrupting fake participants');
  await page.setViewportSize({width:390,height:844});
@@ -99,9 +104,9 @@ try {
   const menu=async()=>{await page.keyboard.press('Tab');await page.getByRole('menuitem',{name:/Master \/ Workers/}).click();await openReplay();};
   await menu();await page.screenshot({path:path.join(output,view+'-replay.png')});
   await page.keyboard.press('Escape');
-  await page.waitForFunction(()=>!document.querySelector('.backdrop')&&document.activeElement?.id==='scene'&&window.__office.player.enabled&&window.__office.player.hasMouse);
+  await page.waitForFunction(view=>!document.querySelector('.backdrop')&&document.activeElement?.id==='scene'&&window.__office.player.enabled&&(view==='2d'?!window.__office.player.mouseLook:window.__office.player.hasMouse),view);
   await menu();await replay().getByRole('button',{name:'Close',exact:true}).click();
-  await page.waitForFunction(()=>!document.querySelector('.backdrop')&&document.activeElement?.id==='scene'&&window.__office.player.enabled&&window.__office.player.hasMouse);
+  await page.waitForFunction(view=>!document.querySelector('.backdrop')&&document.activeElement?.id==='scene'&&window.__office.player.enabled&&(view==='2d'?!window.__office.player.mouseLook:window.__office.player.hasMouse),view);
   check(view+' Replay available; Escape and X restore game controls');
  }
  await page.goto(base+'/lite');
@@ -115,6 +120,7 @@ try {
  await page.getByText('Previous activities',{exact:true}).click();
  const previous=page.locator('section').filter({has:page.getByText('Replay the users API task from request to review.',{exact:true})});
  await previous.getByRole('button',{name:'Replay',exact:true}).click();await replay().waitFor();
+ await replay().locator('.replay-event').filter({hasText:'Worker result'}).locator('summary').click();
  assert.match(await replay().innerText(),/API contract inspected/);
  await page.screenshot({path:path.join(output,'retained-replay.png')});
  check('Retained previous activities remain inspectable after a new activity starts');

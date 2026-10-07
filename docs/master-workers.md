@@ -38,6 +38,8 @@ Activity state lives in each floor's `.agent-office/master-workers.json`; the la
 
 Choose **Replay** in the activity window for the current activity or one of the retained previous activities. The same read-only timeline is available in Lite, 2D and 3D, including while participants are working. Filter by participant, task and event type, then expand an event to inspect its available instructions, messages, result evidence, review reasons, commits, checks and PR link. Close Replay with its top-right ✕ or Esc to return to the appropriate game controls.
 
+![Recorded activity timeline with participant, task and event filters](task-replay.png)
+
 New activities record start, plan submission, assignment, worker result, blocker, retry, review decision, integration, pause/resume, stop and final PR events. Events carry stable IDs, recorded timestamps, activity IDs and applicable participant/task references. Viewing the timeline does not rerun agents, execute recorded commands, modify branches or make model calls. Existing floor access and participant authorization rules continue to apply.
 
 Worker and master check claims are labeled **reported**. The office can independently establish integration ancestry and final PR validation; those facts do not mean it independently ran the reported test commands. Missing evidence, older activities without event recording, and omitted history are shown explicitly rather than reconstructed with invented timestamps.
