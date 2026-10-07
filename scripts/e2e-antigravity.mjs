@@ -1,0 +1,44 @@
+// npm run build && node --import tsx scripts/e2e-antigravity.mjs
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+import { execFileSync } from 'node:child_process';
+import { chromium } from 'playwright-core';
+import { loadConfig } from '../src/server/config.ts';
+import { startServer } from '../src/server/server.ts';
+const dir = mkdtempSync(path.join(os.tmpdir(), 'office-agy-browser-'));
+const checkout = path.join(dir, 'project'); mkdirSync(checkout);
+execFileSync('git', ['init', '-b', 'main'], { cwd: checkout, stdio: 'ignore' });
+execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '--allow-empty', '-m', 'fixture'], { cwd: checkout, stdio: 'ignore' });
+const data = path.join(dir, '.agent-office'); mkdirSync(data);
+writeFileSync(path.join(data, 'floors.json'), JSON.stringify([{ id: 'f1', name: 'CLI fixture', dir: checkout, palette: 0, addedBy: 'test', addedAt: Date.now() }]));
+const cfg = loadConfig(['--home', dir, '--password', 'fixture', '--no-open']); cfg.port = 0;
+const office = await startServer(cfg, { publicDir: path.resolve('dist/public') });
+const base = `http://127.0.0.1:${office.server.address().port}`;
+const cache = path.join(os.homedir(), '.cache/ms-playwright');
+const executablePath = process.env.CHROMIUM_PATH ?? path.join(cache, readdirSync(cache).find(x => x.startsWith('chromium-')), 'chrome-linux64/chrome');
+let browser;
+try {
+  browser = await chromium.launch({ executablePath, headless: true, args: ['--no-sandbox'] });
+  const context = await browser.newContext({ viewport: { width: 1200, height: 900 } });
+  await context.addInitScript(() => localStorage.setItem('agent-office.profile', JSON.stringify({ name: 'CLI tester', color: '#ef476f', look: { skin: 0, hair: 0, style: 0 } })));
+  assert.ok((await context.request.post(base + '/api/login', { data: { password: 'fixture' } })).ok());
+  const page = await context.newPage();
+  page.setDefaultTimeout(15000);
+  await page.goto(base + '/lite?floor=f1');
+  console.log('Loaded Lite');
+  await page.locator('#btn-new').click();
+  console.log('Opened task picker');
+  await page.getByRole('button', { name: '✏️ Edit', exact: true }).click();
+  await page.getByRole('combobox', { name: 'Worker provider' }).selectOption('antigravity');
+  await page.locator('#ask-provider-model-id').fill('gemini-3.6-flash-medium');
+  await page.getByRole('combobox', { name: 'Antigravity reasoning effort' }).selectOption('high');
+  assert.ok(await page.locator('.backdrop button.close').count());
+  mkdirSync('/tmp/agent-office-antigravity-evidence', { recursive: true });
+  await page.screenshot({ path: '/tmp/agent-office-antigravity-evidence/hire.png', fullPage: true });
+  await page.keyboard.press('Escape');
+  await page.locator('.backdrop').waitFor({ state: 'detached' });
+  console.log('PASS Antigravity picker, model, effort and Escape close');
+} catch (error) { console.error(error); office.shutdown(); await browser?.close(); process.exit(1); } finally { await browser?.close(); office.shutdown(); }
+process.exit(0);

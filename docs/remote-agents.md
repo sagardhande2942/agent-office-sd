@@ -33,7 +33,7 @@ own**, and that has to be designed rather than assumed.
 
 The office's security notes say it plainly today:
 
-> Anyone who can sign in can drive Claude Code, OpenCode, Codex, Grok, Muse or DeepSeek Harness in
+> Anyone who can sign in can drive Claude Code, OpenCode, Codex, Grok, Muse, DeepSeek Harness, Pi, Cursor or Antigravity in
 > that directory, and through it run commands as the user that runs the office. Treat the password,
 > the accounts and the invite links like SSH access.
 

@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 ## What it is
 
 - **A floor per project.** Ride the elevator, pick one of your GitHub repos, and the office clones it (showing how far along it is) and opens a floor for it. Every worker, board and queue on that floor works in that checkout.
-- **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse, DeepSeek Harness, Pi or Cursor, each with its model and reasoning effort. The agent's live terminal shows on its laptop, and anyone can open it and type.
+- **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse, DeepSeek Harness, Pi, Cursor or Antigravity, each with its model and reasoning effort. The agent's live terminal shows on its laptop, and anyone can open it and type.
 - **Talk instead of typing.** Hold **Ctrl+Space** (or the **🎤**) in a worker's terminal or a prompt box and say what you want: it's typed in for you to send. Your browser does the listening, so there's nothing to install.
 - **You can't miss who needs you.** A worker that stops to ask you something lights a red beacon over its desk, puts a banner on your screen saying who and what for, and sounds an alarm. One that has finished jumps up and down and dings. Press **N** to go straight to whoever is waiting.
 - **From your phone, too.** `/lite` is the Lite dashboard: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
@@ -48,7 +48,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **Other maps.** Turn the whole building into a castle: sit on a throne of iron blades while your workers line up before you when they're done, send new ones off through the Hand of the King, and watch their beards grow long and grey as they toil. Send one home and the Kingsguard runs up from the dungeon, marches it down the stairs and throws it in a cell, where it starves, dies and rots down to a skeleton. Or into a space station in orbit, the Earth turning outside its windows: you run it from the captain's chair on the bridge, and a worker sent home is marched to the airlock and blown out into space, to drift off past the observation windows with everyone who went before it. Or make a map of your own, with its own way of seeing workers off in JSON ([docs/maps.md](docs/maps.md)).
 
 - **A floor per project.** Ride the elevator, pick one of your GitHub repos, and the office clones it and opens a floor for it. Every worker, board and queue on that floor works in that checkout.
-- **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse or DeepSeek Harness. The agent's live terminal shows on its laptop, and anyone can open it and type.
+- **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse, DeepSeek Harness, Pi, Cursor or Antigravity. The agent's live terminal shows on its laptop, and anyone can open it and type.
 - **You can see who needs you.** A worker that needs input or has finished jumps up and down and dings. Press **N** to go straight to the one that has waited longest.
 - **A helper, when one is stuck.** Press **U** at a worker that's going in circles and a second agent walks over, stands at the desk with a laptop, re-reads the failure the first one can't see past, tells the worker what it found, and goes home. It works in that worker's own checkout and cannot edit, commit or open a pull request: the work never moves off the worker you're helping. The same shared walk starts when another agent requests help through `office-workers helper`, and refreshing a local floor restores its active helpers.
 - **From your phone, too.** `/lite` is the Lite dashboard: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
@@ -70,10 +70,10 @@ There's a lot more (a rooftop bar, an office dog, an arcade, a fridge stocked wi
 On the machine that runs the office:
 
 - **Node.js 20+**
-- At least one agent CLI, signed in as the user that runs the office: **Claude Code** (`claude`), **Codex** (`codex`), **OpenCode** (`opencode`), **Grok** (`grok`), **Muse** (`muse`), **DeepSeek Harness** (`dsh`), **Pi** (`pi`, 0.87.1+) or the **Cursor** CLI (`cursor-agent`). With [accounts](#add-users), everyone can sign in to their own Claude from the office instead.
+- At least one agent CLI, signed in as the user that runs the office: **Claude Code** (`claude`), **Codex** (`codex`), **OpenCode** (`opencode`), **Grok** (`grok`), **Muse** (`muse`), **DeepSeek Harness** (`dsh`), **Pi** (`pi`, 0.87.1+), the **Cursor** CLI (`cursor-agent`) or **Antigravity CLI** (`agy`). With [accounts](#add-users), everyone can sign in to their own Claude from the office instead.
 - **git**, and the **GitHub CLI** (`gh auth login`) for cloning repos and the issue and PR boards
 
-- At least one agent CLI, signed in as the user that runs the office: **Claude Code** (`claude`), **Codex** (`codex`), **OpenCode** (`opencode`), **Grok** (`grok`), **Muse** (`muse`) or **DeepSeek Harness** (`dsh`). With [accounts](#add-users), everyone can sign in to their own Claude from the office instead.
+- At least one agent CLI, signed in as the user that runs the office: **Claude Code** (`claude`), **Codex** (`codex`), **OpenCode** (`opencode`), **Grok** (`grok`), **Muse** (`muse`), **DeepSeek Harness** (`dsh`), **Pi** (`pi`), **Cursor** (`cursor-agent`) or **Antigravity CLI** (`agy`). With [accounts](#add-users), everyone can sign in to their own Claude from the office instead.
 - **git**, and a forge CLI for cloning repos and the issue and PR boards: the **GitHub CLI** (`gh auth login`) for GitHub projects, or the [Bitbucket CLI](https://bitbucket-cli.paulvanderlei.com) (`bb`, `npm install -g @pilatos/bitbucket-cli`) for Bitbucket ones. Each floor works out which one from its own remote, so you can use GitHub, Bitbucket or both. Two different tools answer to `bb`: if the one on your machine is [Atlassian's own Bitbucket CLI](https://bitbucket.org/atlassianls/bitbucket-cli) rather than the one above, the office says so by name instead of failing with `unknown flag: --json`.
 
 ## Run locally
@@ -108,7 +108,7 @@ Common options:
 agent-office ~/code/my-project              # use a project you already have as the first floor
 agent-office --password 'correct horse'     # choose the password
 agent-office --port 4700
-agent-office --agent pi                     # default agent: claude, codex, opencode, grok, muse, dsh, pi or cursor-agent
+agent-office --agent pi                     # default agent: claude, codex, opencode, grok, muse, dsh, pi, cursor-agent or agy
 agent-office --no-open                      # print the sign-in link instead of opening a browser
 agent-office tui                            # join the running office from your terminal
 agent-office setup                          # the first-start walkthrough again (office stopped)
@@ -478,7 +478,7 @@ Helpers carry a laptop showing their own terminal. Aim at the helper or its lapt
 
 Sending a worker home also stops and removes its helper before cleaning up the worker’s checkout. Sending only the helper home leaves the host worker and its worktree intact.
 
-Use **Compare plans** to seat up to five independent models and one reviewer at a separate table. Candidates submit detailed plans against the same requirements and fixed rubric. The reviewer explains acceptance and rejection, the server selects the highest-rated eligible plan, cleans up the rejected workers, and starts the winner in a fresh implementation conversation. Available in 3D, lite and the terminal dashboard; candidates and reviewers can use Claude Code, OpenCode 1.x, Codex, Grok, Muse Code, DeepSeek Harness, Pi or Cursor on local Git floors using the Office map. OpenCode planning uses its built-in Plan agent with the office read/plan-tool guard for Zen compatibility; provider-side free-model errors may still require another authorized model. Codex planning tools are preapproved for each role while its checkout stays read-only. See [plan comparison](docs/plan-comparison.md).
+Use **Compare plans** to seat up to five independent models and one reviewer at a separate table. Candidates submit detailed plans against the same requirements and fixed rubric. The reviewer explains acceptance and rejection, the server selects the highest-rated eligible plan, cleans up the rejected workers, and starts the winner in a fresh implementation conversation. Available in 3D, lite and the terminal dashboard; candidates and reviewers can use Claude Code, OpenCode 1.x, Codex, Grok, Muse Code, DeepSeek Harness, Pi, Cursor or Antigravity on local Git floors using the Office map. OpenCode planning uses its built-in Plan agent with the office read/plan-tool guard for Zen compatibility; provider-side free-model errors may still require another authorized model. Codex planning tools are preapproved for each role while its checkout stays read-only. See [plan comparison](docs/plan-comparison.md).
 
 Workers can record a **completion checklist** with actual check results, changed files and a PR link (or reasons they do not apply). Inspect it in worker terminals, lite cards, CLI worker details and finished queue tasks. Failed checks remain visible as needing attention; a ready terminal alone is not proof of success. See [completion checklists](docs/completion-checklist.md) for CLI/MCP submission and lifecycle.
 See [the upstream integration notes](docs/upstream-integration.md) for the imported features and preserved fork behavior.
@@ -505,3 +505,5 @@ Walk with **WASD / arrows**, click the floor to walk there, click a worker to op
 The **View** selector switches 3D, 2D Game and Lite in the same tab while retaining the floor and running workers. Close dialogs with **✕** or **Esc** to resume controls immediately. 2D Game uses WebGL like 3D; **Lite** remains the lightweight, phone-friendly option. See [controls](docs/controls.md#2d-game-desktop), [architecture](docs/code-layout.md#playable-2d-client), and [screenshots and verification](docs/game2d-verification.md).
 
 The top bar has a direct **2D / 3D** toggle, available in both views. Switching preserves the selected floor and running workers. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.
+
+Antigravity CLI is selectable when hiring, configuring board agents and queue tasks, or choosing comparison candidates/reviewers. Install and sign in with `agy` on the office machine, then use `agent-office --agent agy` for the default. See [agent setup](docs/agents.md#antigravity-cli).
