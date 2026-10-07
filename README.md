@@ -431,6 +431,7 @@ npm install
 npm run dev          # Vite with hot reload on :5173, the server on :4600 (password: 123)
 npm run typecheck
 npm test
+npm run build && npm run e2e:live-view-toggle   # browser check of the live 2D/3D Y toggle
 ```
 
 Server edits restart the server, not the workers. After changing `ptyhost.ts`, bump `PTY_PROTOCOL` in `ptys.ts` so the next server replaces the PTY host.
