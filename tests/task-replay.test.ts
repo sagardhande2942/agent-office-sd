@@ -59,6 +59,7 @@ test('a full activity records a chronological trail with reported and verified e
   assert.match(assignment.details.message!,/Files: src\/one\.ts/);
   assert.equal(result.participantId,w);assert.equal(result.taskId,'one');
   assert.equal(result.details.evidence,'Implemented and tested');
+  assert.equal(result.details.instructions,'Implement one in scope');
   assert.equal(result.details.reportedChecks,'Scoped tests passed');
   assert.deepEqual(result.details.commits,['b'.repeat(40)]);
   assert.ok(!('verifiedChecks' in result.details),'worker checks are never labelled verified');
@@ -273,5 +274,78 @@ test('losing the master during a tick records the pause with its reason',async()
   assert.equal(f.s.state().current!.phase,'paused');
   assert.equal(events.at(-1)!.type,'pause');
   assert.match(events.at(-1)!.details.message!,/Master is unavailable/);
+ }finally{f.dispose();}
+});
+
+test('saved replay drops duplicate or invalid identifiers and unrenderable dates deterministically',()=>{
+ const valid={id:'stable',timestamp:100,type:'start',summary:'recorded',details:{}};
+ const raw={events:[valid,{...valid},{...valid,id:'bad-date',timestamp:1e100},{...valid,id:''},{...valid,id:'x'.repeat(81)}],dropped:2};
+ const normalized=normalizeLog(raw,'activity');
+ assert.deepEqual(normalized.events.map(e=>e.id),['stable']);
+ assert.equal(normalized.dropped,6);
+ assert.deepEqual(normalizeLog(raw,'activity'),normalized,'no new random IDs appear on reload');
+ assert.ok(Number.isFinite(new Date(normalized.events[0].timestamp).getTime()));
+});
+
+test('redaction covers quoted values, environment references, private keys and every evidence array',()=>{
+ const run={id:'privacy'} as TeamRun;
+ const privateKey='-----BEGIN OPENSSH PRIVATE KEY-----\n'+ 'sensitive-private-material'.repeat(40)+'\n-----END OPENSSH PRIVATE KEY-----';
+ const secrets=['multi word password','environment-value','lowercase-value','private-material','commit-secret','missing-secret'];
+ recordEvent(run,{type:'blocker',summary:'Inspect privacy',details:{
+  evidence:'{"password":"multi word password"}\nHOME=environment-value\nexport custom=lowercase-value\n${DATABASE_URL}\n'+privateKey,
+  commits:['token=commit-secret'],missing:['password="missing-secret"'],
+ }});
+ const encoded=JSON.stringify(run.replay);
+ for(const secret of secrets)assert.ok(!encoded.includes(secret),`must redact ${secret}`);
+ assert.ok(!encoded.includes('${DATABASE_URL}'));
+ assert.ok(encoded.includes('[redacted]'));
+});
+
+test('failed attempts survive identical replans and cannot be removed or reset to bypass retry limits',async()=>{
+ const f=fixture();try{
+  const m=f.s.state().current!.masterId!;await f.plan();
+  await f.action(m,{action:'dispatch',task:'one',choice:cheap,reason:'First attempt'});
+  const w=f.s.state().current!.tasks[0].attempts[0].workerId;
+  await f.action(w,{action:'result',task:'one',summary:'Blocked',commits:[],checks:'Could not complete',failed:true});
+  const attempts=f.s.state().current!.tasks[0].attempts;
+  await f.plan();
+  assert.deepEqual(f.s.state().current!.tasks[0].attempts,attempts);
+  await assert.rejects(f.action(m,{action:'plan',plan:'Reset',tasks:[{...task(),instructions:'changed'},task('two',['one'])]}),/Started task/);
+  await assert.rejects(f.action(m,{action:'plan',plan:'Remove',tasks:[task('two')]}),/Keep started/);
+  await assert.rejects(f.action(m,{action:'dispatch',task:'one',choice:cheap,reason:'Same model again'}),/different eligible model/);
+ }finally{f.dispose();}
+});
+
+test('master events carry participant identity and closing completed terminals records one stop',async()=>{
+ const f=fixture();try{
+  const m=f.s.state().current!.masterId!;await f.plan();
+  await f.action(m,{action:'takeover',task:'one',evidence:'Master implements first task',complete:true});
+  await f.action(m,{action:'takeover',task:'two',evidence:'Master verifies integration',complete:true});
+  await f.action(m,{action:'finish',pr:'https://example.test/pr/99',summary:'Complete',checks:'Tests reported passing; CI pending'});
+  f.s.control('stop');f.s.control('stop');
+  const r=f.s.state().current!;
+  assert.equal(r.phase,'done','closing terminals retains final activity phase');
+  assert.equal(r.replay!.events.filter(e=>e.type==='stop').length,1);
+  for(const e of r.replay!.events)assert.equal(e.participantId,m,`${e.type} should reference master`);
+  const final=r.replay!.events.find(e=>e.type==='final-pr')!;
+  assert.match(final.details.reportedChecks!,/CI pending/);
+  assert.match(final.details.verifiedChecks!,/no failure/);
+  assert.ok(!final.details.verifiedChecks!.includes('tests passed'));
+ }finally{f.dispose();}
+});
+
+test('rejected or stale submissions do not append replay events',async()=>{
+ const f=fixture();try{
+  const m=f.s.state().current!.masterId!;await f.plan();
+  await f.action(m,{action:'dispatch',task:'one',choice:cheap,reason:'Scoped'});
+  const w=f.s.state().current!.tasks[0].attempts[0].workerId;
+  const before=f.s.state().current!;
+  const result={action:'result',task:'one',summary:'Complete',commits:[],checks:'Reported passed'};
+  await f.action(w,result);
+  const events=f.s.state().current!.replay!.events;
+  await assert.rejects(f.s.action(w,{id:before.id,revision:before.revision,...result} as TeamAction),/Stale/);
+  await assert.rejects(f.action(w,result),/No running assignment/);
+  assert.deepEqual(f.s.state().current!.replay!.events,events);
+  assert.equal(events.filter(e=>e.type==='result').length,1);
  }finally{f.dispose();}
 });

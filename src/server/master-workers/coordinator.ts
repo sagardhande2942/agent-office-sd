@@ -55,11 +55,13 @@ export class TeamCoordinator {
     const req = request(raw);
     if (this.current) this.past = [...this.past, this.current].slice(-10);
     const r: TeamRun = { ...req, id: randomUUID(), owner, createdAt: Date.now(), revision: 0, phase: 'starting', workers: [], tasks: [], notifications: {} };
-    recordStart(r, req);
+    const started = recordStart(r, req);
     this.current = r; this.persist();
     try {
       const master = this.io.spawn(req.master, masterPrompt(r), owner, undefined, {id:r.id,role:'master'});
-      r.masterId = master.id; r.masterWorktree = master.worktree; r.phase = 'running'; this.update();
+      r.masterId = master.id; r.masterWorktree = master.worktree; r.phase = 'running';
+      if (started) started.participantId = master.id;
+      this.update();
     } catch (e) { r.phase = 'paused'; r.error = (e as Error).message; recordControl(r, 'pause', `Master failed to start: ${r.error}`); this.update(); }
   }
   control(action: 'pause' | 'resume' | 'stop', owner?: string) {
@@ -68,7 +70,8 @@ export class TeamCoordinator {
     if (!r) throw Error('No team activity');
     if (r.owner && r.owner !== owner) throw Error('Only the activity owner can control this team');
     if (action === 'stop') {
-      if (r.phase !== 'done') { r.phase = 'stopped'; recordControl(r, 'stop'); } this.snapshot(); this.update();
+      if (r.phase !== 'done') r.phase = 'stopped';
+      recordControl(r, 'stop'); this.snapshot(); this.update();
       for (const id of [r.masterId, ...r.workers.map(w => w.workerId)]) if (id) this.io.stop(id);
       return;
     }
@@ -94,7 +97,7 @@ export class TeamCoordinator {
       const a=t.attempts.at(-1),w=list.find(w=>w.id===a?.workerId);
       if(t.status==='running'&&a&&w&&['offline','exited'].includes(w.status)){
         const error=this.io.prompt(w.id,workerPrompt(r,t)+'\nResume existing work; inspect your branch and avoid duplicate commits.');
-        if(error){a.status='failed';a.summary=error;t.status='pending';this.notify(r,`task ${t.id} could not resume`);this.update();}
+        if(error){a.status='failed';a.summary=error;t.status='pending';recordBlocker(r, { task: t, workerId: w.id, summary: `Task ${t.id} could not resume`, message: error });this.notify(r,`task ${t.id} could not resume`);this.update();}
       }
     }
   }
@@ -126,13 +129,13 @@ export class TeamCoordinator {
             if (!/^[a-zA-Z0-9_-]+$/.test(id)) throw Error('Task IDs use letters, digits, underscores or hyphens');
             if (!Array.isArray(t.files) || !Array.isArray(t.dependencies) || t.files.length > 100 || t.dependencies.length > 100) throw Error('Provide file and dependency arrays');
             const old = r.tasks.find(v => v.id === id);
-            if (old && old.status !== 'pending') {
+            if (old && (old.status !== 'pending' || old.attempts.length)) {
               if (JSON.stringify([old.title,old.instructions,old.acceptance,old.files,old.dependencies]) !== JSON.stringify([t.title,t.instructions,t.acceptance,t.files,t.dependencies])) throw Error('Started task definitions cannot be changed');
               return old;
             }
             return { id, title: text(t.title,'title',240), instructions:text(t.instructions,'instructions'), acceptance:text(t.acceptance,'acceptance'), files:t.files.map(f=>text(f,'file',500)), dependencies:t.dependencies.map(d=>text(d,'dependency',80)), status:'pending', attempts:[] };
           });
-          if (new Set(tasks.map(t=>t.id)).size !== tasks.length || r.tasks.some(t=>t.status !== 'pending' && !tasks.some(v=>v.id===t.id))) throw Error('Keep started tasks and unique IDs');
+          if (new Set(tasks.map(t=>t.id)).size !== tasks.length || r.tasks.some(t=>(t.status !== 'pending' || t.attempts.length) && !tasks.some(v=>v.id===t.id))) throw Error('Keep started tasks and unique IDs');
           const visited = new Set<string>(), visiting = new Set<string>();
           const walk = (id: string) => { if (visiting.has(id)) throw Error('Cyclic dependencies'); if (visited.has(id)) return; const t = tasks.find(v=>v.id===id); if (!t) throw Error('Unknown dependency'); visiting.add(id); t.dependencies.forEach(walk); visiting.delete(id); visited.add(id); };
           tasks.forEach(t=>walk(t.id)); r.tasks = tasks; r.plan = plan; recordPlan(r, plan, tasks); break;

@@ -32,14 +32,14 @@ function buildDetails(raw: ReplayDetails | undefined): ReplayDetails {
   }
   const commits = (Array.isArray(source.commits) ? source.commits : [])
     .filter((c): c is string => typeof c === 'string' && !!c.trim())
-    .map((c) => c.trim().slice(0, 80));
+    .map((c) => recordedText(c).text.slice(0, 80));
   if (commits.length) out.commits = commits.slice(0, REPLAY_COMMITS_LIMIT);
   const notes: string[] = [];
   if (commits.length > REPLAY_COMMITS_LIMIT) notes.push(`${commits.length - REPLAY_COMMITS_LIMIT} additional commit IDs omitted`);
   if (truncated) notes.push(`text longer than ${REPLAY_TEXT_LIMIT} characters was truncated`);
   const gaps = (Array.isArray(source.missing) ? source.missing : [])
     .filter((m): m is string => typeof m === 'string' && !!m.trim())
-    .map((m) => m.trim().slice(0, 300));
+    .map((m) => recordedText(m).text.slice(0, 300));
   if (gaps.length || notes.length) out.missing = [...gaps.slice(0, Math.max(0, REPLAY_MISSING_LIMIT - notes.length)), ...notes];
   return out as ReplayDetails;
 }
@@ -84,9 +84,10 @@ export function normalizeLog(raw: unknown, activityId: string): ReplayLog {
   const source = raw as Partial<ReplayLog>;
   let dropped = typeof source.dropped === 'number' && Number.isFinite(source.dropped) && source.dropped > 0 ? Math.floor(source.dropped) : 0;
   const events: ReplayEvent[] = [];
+  const seen = new Set<string>();
   for (const item of Array.isArray(source.events) ? source.events : []) {
     const event = restoreEvent(item, activityId);
-    if (event) events.push(event);
+    if (event && !seen.has(event.id)) { seen.add(event.id); events.push(event); }
     else dropped++;
   }
   while (events.length > REPLAY_EVENT_LIMIT) {
@@ -99,11 +100,12 @@ export function normalizeLog(raw: unknown, activityId: string): ReplayLog {
 function restoreEvent(item: unknown, activityId: string): ReplayEvent | null {
   if (!item || typeof item !== 'object') return null;
   const stored = item as Partial<ReplayEvent>;
-  if (typeof stored.timestamp !== 'number' || !Number.isFinite(stored.timestamp)) return null;
+  if (typeof stored.timestamp !== 'number' || !Number.isFinite(stored.timestamp) || Math.abs(stored.timestamp) > 8640000000000000) return null;
+  if (typeof stored.id !== 'string' || !stored.id.trim() || stored.id.length > 80) return null;
   if (typeof stored.type !== 'string' || !EVENT_TYPES.includes(stored.type as ReplayEventType)) return null;
   if (typeof stored.summary !== 'string' || !stored.summary.trim()) return null;
   return {
-    id: typeof stored.id === 'string' && stored.id ? stored.id.slice(0, 80) : randomUUID(),
+    id: stored.id,
     timestamp: stored.timestamp,
     activityId,
     type: stored.type as ReplayEventType,

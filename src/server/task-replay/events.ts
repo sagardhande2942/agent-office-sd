@@ -12,12 +12,12 @@ function modelOf(choice: AgentChoice): string {
 
 export function recordStart(run: TeamRun, req: TeamRequest) {
   const instructions = [`Brief: ${req.brief}`, 'Requirements:', ...req.requirements.map((r) => `- ${r}`), `Constraints: ${req.constraints?.trim() || 'none'}`].join('\n');
-  return recordEvent(run, { type: 'start', summary: `Activity started: ${shorten(req.brief)}`, details: { instructions } });
+  return recordEvent(run, { type: 'start', participantId: run.masterId, summary: `Activity started: ${shorten(req.brief)}`, details: { instructions } });
 }
 
 export function recordPlan(run: TeamRun, plan: string, tasks: TaskDef[]) {
   const definitions = JSON.stringify(tasks.map((t) => ({ id: t.id, title: t.title, instructions: t.instructions, acceptance: t.acceptance, files: t.files, dependencies: t.dependencies })));
-  return recordEvent(run, { type: 'plan', summary: `Plan published with ${tasks.length} task${tasks.length === 1 ? '' : 's'}`, details: { instructions: plan, message: `Task definitions: ${definitions}` } });
+  return recordEvent(run, { type: 'plan', participantId: run.masterId, summary: `Plan published with ${tasks.length} task${tasks.length === 1 ? '' : 's'}`, details: { instructions: plan, message: `Task definitions: ${definitions}` } });
 }
 
 export interface ReplayDispatch {
@@ -44,7 +44,7 @@ export function recordRetry(run: TeamRun, info: ReplayDispatch) {
 }
 
 export interface ReplayResult {
-  task: { id: string };
+  task: { id: string; instructions?: string };
   workerId: string;
   summary: string;
   checks: string;
@@ -58,7 +58,7 @@ export function recordResult(run: TeamRun, info: ReplayResult) {
     participantId: info.workerId,
     taskId: info.task.id,
     summary: info.failed ? `Task ${info.task.id} result reported as failed by ${info.workerId}` : `Task ${info.task.id} result submitted by ${info.workerId}`,
-    details: { evidence: info.summary, reportedChecks: info.checks, commits: info.commits },
+    details: { instructions: info.task.instructions, evidence: info.summary, reportedChecks: info.checks, commits: info.commits },
   });
 }
 
@@ -99,11 +99,11 @@ export function recordIntegration(run: TeamRun, info: ReplayIntegration) {
 
 export function recordControl(run: TeamRun, kind: 'pause' | 'resume' | 'stop', message?: string) {
   const summary = kind === 'pause' ? 'Activity paused' : kind === 'resume' ? 'Activity resumed' : 'Activity stopped';
-  return recordEvent(run, { type: kind, summary, details: { message } });
+  return recordEvent(run, { type: kind, participantId: run.masterId, summary, details: { message } });
 }
 
 export function recordRecovery(run: TeamRun, error: string) {
-  return recordEvent(run, { type: 'pause', summary: 'Recovered after an office restart; activity paused for reconciliation', details: { message: error, missing: ['activity events recorded while the office was down'] } });
+  return recordEvent(run, { type: 'pause', participantId: run.masterId, summary: 'Recovered after an office restart; activity paused for reconciliation', details: { message: error, missing: ['activity events recorded while the office was down'] } });
 }
 
 export interface ReplayFinalPr {
@@ -114,5 +114,5 @@ export interface ReplayFinalPr {
 }
 
 export function recordFinalPr(run: TeamRun, info: ReplayFinalPr) {
-  return recordEvent(run, { type: 'final-pr', summary: `Final PR recorded: ${shorten(info.pr, 200)}`, details: { pr: info.pr, evidence: info.summary, reportedChecks: info.checks, verifiedChecks: info.verified } });
+  return recordEvent(run, { type: 'final-pr', participantId: run.masterId, summary: `Final PR recorded: ${shorten(info.pr, 200)}`, details: { pr: info.pr, evidence: info.summary, reportedChecks: info.checks, verifiedChecks: info.verified } });
 }
