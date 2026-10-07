@@ -14,6 +14,10 @@ execFileSync('git',['init','-q','-b','main'],{cwd:dir});execFileSync('git',['-c'
 const cfg=loadConfig([dir,'--password','team-browser','--no-open','--agent',binary]);cfg.port=0;
 const preset={id:'test-preset',name:'Economical coding team',master:{provider:'claude',model:'opus'},models:[{provider:'claude',model:'haiku'},{provider:'claude',model:'sonnet'}],maxWorkers:5};
 writeFileSync(path.join(cfg.dataDir,'master-workers-presets.json'),JSON.stringify([preset]));
+// A retained activity written before event recording was introduced has no invented history.
+mkdirSync(path.join(dir,'.agent-office'),{recursive:true});
+const historical={...preset,id:'legacy-activity',brief:'Historical task without recorded events',requirements:['Inspect missing history'],createdAt:1700000000000,revision:1,phase:'done',tasks:[],workers:[],notifications:{}};
+writeFileSync(path.join(dir,'.agent-office/master-workers.json'),JSON.stringify({current:null,past:[historical]}));
 const office=await startServer(cfg,{publicDir:path.resolve('dist/public')}),base=`http://127.0.0.1:${office.server.address().port}`;
 const cache=path.join(os.homedir(),'.cache/ms-playwright'),executable=process.env.CHROMIUM_PATH??path.join(cache,readdirSync(cache).find(x=>x.startsWith('chromium-')),'chrome-linux64/chrome');
 const errors=[],checks=[];let browser,page,state;
@@ -29,6 +33,16 @@ try {
  page.on('websocket',ws=>ws.on('framereceived',frame=>{try{const m=JSON.parse(String(frame.payload));if(m.t==='welcome'||m.t==='floor.enter')state=m.masterWorkers;if(m.t==='master-workers')state=m.state;}catch{}}));
  await page.goto(base+'/lite');
  await page.getByRole('button',{name:'Master / Workers',exact:true}).click();
+ await page.getByText('Previous activities',{exact:true}).click();
+ await page.locator('section').filter({has:page.getByText('Historical task without recorded events',{exact:true})}).getByRole('button',{name:'Replay',exact:true}).click();
+ const legacyReplay=page.getByRole('dialog',{name:'Replay task',exact:true});
+ await legacyReplay.waitFor();
+ assert.match(await legacyReplay.innerText(),/historical|not recorded|missing/i);
+ assert.equal(await legacyReplay.locator('.replay-event').count(),0);
+ await page.screenshot({path:path.join(output,'missing-history.png')});
+ await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'Master / Workers',exact:true}).click();
+ check('Old retained activity shows missing historical evidence without fabricated events');
  await page.getByLabel('Team preset').selectOption('test-preset');
  await page.getByLabel('Task brief').fill('Replay the users API task from request to review.');
  await page.getByLabel('Requirements',{exact:true}).fill('Implement users API and inspect structured evidence');
@@ -105,7 +119,7 @@ try {
  await page.screenshot({path:path.join(output,'retained-replay.png')});
  check('Retained previous activities remain inspectable after a new activity starts');
  assert.deepEqual(errors,[]);check('No browser runtime errors');
- writeFileSync(path.join(output,'checks.json'),JSON.stringify({checks,screenshots:['lite-result.png','lite-timeline.png','lite-mobile.png','3d-replay.png','2d-replay.png','retained-replay.png']},null,2));
+ writeFileSync(path.join(output,'checks.json'),JSON.stringify({checks,screenshots:['missing-history.png','lite-result.png','lite-timeline.png','lite-mobile.png','3d-replay.png','2d-replay.png','retained-replay.png']},null,2));
 } catch(e){if(page)await page.screenshot({path:path.join(output,'failure.png')}).catch(()=>{});console.error(errors);console.error('URL:',page?.url());console.error('Menu:',await page?.getByRole('menuitem').allTextContents().catch(()=>[]));throw e;}
 finally{await browser?.close();office.shutdown();await new Promise(r=>setTimeout(r,250));rmSync(dir,{recursive:true,force:true});}
 console.log(`Evidence: ${output}`);
