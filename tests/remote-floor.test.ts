@@ -397,3 +397,22 @@ test('breaks refuse legacy hosts, travel to capable hosts and reset on reconnect
   assert.match((await floor.workers.rest('worker', false))!, /Update the floor host/);
   assert.equal(host.sent.length, 1);
 });
+
+test('remote input and resize allocate no pending replies and keep ordinary RPCs working', async () => {
+  const host = fakeHost(), floor = make(host);
+  for (let i = 0; i < 500; i++) floor.workers.write('w1', String(i), 'Alice');
+  floor.workers.resize('w1', 100, 30);
+  assert.equal(host.sent.length, 501);
+  assert.ok(host.sent.every(m => m.seq === 0 && m.floorId === 'f1'));
+  assert.deepEqual(host.sent.slice(0, 2).map(m => m.data), ['0', '1']);
+  assert.equal((floor as any).pending.size, 0);
+  // A legacy host can answer seq=0 without disturbing an ordinary outstanding RPC.
+  const search = floor.workers.search('needle', 1);
+  const request = host.sent.at(-1)!;
+  floor.deliver({ t: 'result', floorId: 'f1', seq: 0, value: null });
+  floor.deliver({ t: 'result', floorId: 'f1', seq: request.seq as number, value: { hits: [], more: false } });
+  assert.deepEqual(await search, { hits: [], more: false });
+  host.setReachable(false);
+  floor.workers.write('w1', 'not queued while offline', 'Alice');
+  assert.equal(host.sent.length, 502);
+});

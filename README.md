@@ -505,3 +505,5 @@ Walk with **WASD / arrows**, click the floor to walk there, click a worker to op
 The **View** selector switches 3D, 2D Game and Lite in the same tab while retaining the floor and running workers. Close dialogs with **✕** or **Esc** to resume controls immediately. 2D Game uses WebGL like 3D; **Lite** remains the lightweight, phone-friendly option. See [controls](docs/controls.md#2d-game-desktop), [architecture](docs/code-layout.md#playable-2d-client), and [screenshots and verification](docs/game2d-verification.md).
 
 The top bar has a direct **2D / 3D** toggle, available in both views. Switching preserves the selected floor and running workers. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.
+
+Remote worker terminals provide **Local typing** for responsive editing over slow floor-host connections. Draft locally, then press Enter to send or use Insert to paste without submitting. Update both office and floor host to remove per-key acknowledgements and room-state refresh traffic. See [remote terminal typing](docs/floor-hosts.md#typing-in-remote-terminals).

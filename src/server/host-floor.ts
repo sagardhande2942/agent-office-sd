@@ -238,12 +238,15 @@ export class HostFloors {
     const floor = this.floors.get(floorId);
     const seq = 'seq' in msg && typeof msg.seq === 'number' ? msg.seq : undefined;
     if (seq === undefined) return;
+    const terminal = msg.t === 'term.input' || msg.t === 'term.resize';
     if (!floor) {
-      this.parts.send({ t: 'refused', floorId, reason: 'that floor is not open on this machine', seq });
+      if (!terminal || seq !== 0) this.parts.send({ t: 'refused', floorId, reason: 'that floor is not open on this machine', seq });
       return;
     }
     try {
       const value = await this.apply(floor, msg);
+      // Terminal input changes no room state. seq=0 opts out of acknowledgements; old callers still get replies.
+      if (terminal && seq === 0) return;
       // A method returning a `string` has failed — that is the office's own convention — so it is a
       // refusal. Anything else is the answer, and it travels whole: a `WorkerInfo`, a `Decoration`, a
       // `{ prs }`, a `string[]`. Flattening those to a string is how the office came to dereference
@@ -252,9 +255,9 @@ export class HostFloors {
       else this.parts.send({ t: 'result', floorId, seq, value: value ?? null });
       // Some calls change a room, and the office has no event to hear it by — its own Floor reads
       // those states directly. A hosted floor must say so, or the office's copy goes stale forever.
-      this.reportRooms(floorId, floor);
+      if (!terminal) this.reportRooms(floorId, floor);
     } catch (err) {
-      this.parts.send({ t: 'refused', floorId, reason: (err as Error).message, seq });
+      if (!terminal || seq !== 0) this.parts.send({ t: 'refused', floorId, reason: (err as Error).message, seq });
     }
   }
 
