@@ -3,6 +3,7 @@ import type { AgentChoice, Usage, WorkerInfo } from '../../shared/protocol.js';
 import type { TeamAction, TeamAttempt, TeamRequest, TeamRun, TeamState, TeamTask } from '../../shared/master-workers.js';
 import { load, modelKey, request, restored, save, text, TeamPresets } from './storage.js';
 import { masterPrompt, workerPrompt } from './prompts.js';
+import { recordAssignment, recordBlocker, recordControl, recordFinalPr, recordIntegration, recordPlan, recordResult, recordRetry, recordReview, recordRecovery, recordStart } from '../task-replay/index.js';
 export interface TeamAdapter {
   list(): WorkerInfo[];
   spawn(choice: AgentChoice, prompt: string, owner?: string, base?: { commit: string; from: string }, role?: WorkerInfo['masterWorkers']): WorkerInfo;
@@ -34,7 +35,10 @@ export class TeamCoordinator {
           const a=r.tasks.find(t=>t.id===w.masterWorkers?.task)?.attempts.at(-1);
           if(a&&!a.workerId){a.workerId=w.id;if(!r.workers.some(p=>p.workerId===w.id))r.workers.push({workerId:w.id,choice:a.choice});}
         }
-        this.current.phase = 'paused'; this.current.error = 'Office restarted: resume to reconcile team state'; this.persist();
+        const previous = this.current.phase;
+        this.current.phase = 'paused'; this.current.error = 'Office restarted: resume to reconcile team state';
+        if (previous !== 'paused') recordRecovery(this.current, this.current.error);
+        this.persist();
       }
     } catch (e) { this.error = `Cannot read team activity: ${(e as Error).message}`; }
   }
@@ -51,11 +55,12 @@ export class TeamCoordinator {
     const req = request(raw);
     if (this.current) this.past = [...this.past, this.current].slice(-10);
     const r: TeamRun = { ...req, id: randomUUID(), owner, createdAt: Date.now(), revision: 0, phase: 'starting', workers: [], tasks: [], notifications: {} };
+    recordStart(r, req);
     this.current = r; this.persist();
     try {
       const master = this.io.spawn(req.master, masterPrompt(r), owner, undefined, {id:r.id,role:'master'});
       r.masterId = master.id; r.masterWorktree = master.worktree; r.phase = 'running'; this.update();
-    } catch (e) { r.phase = 'paused'; r.error = (e as Error).message; this.update(); }
+    } catch (e) { r.phase = 'paused'; r.error = (e as Error).message; recordControl(r, 'pause', `Master failed to start: ${r.error}`); this.update(); }
   }
   control(action: 'pause' | 'resume' | 'stop', owner?: string) {
     const r = this.current;
@@ -63,12 +68,13 @@ export class TeamCoordinator {
     if (!r) throw Error('No team activity');
     if (r.owner && r.owner !== owner) throw Error('Only the activity owner can control this team');
     if (action === 'stop') {
-      if (r.phase !== 'done') r.phase = 'stopped'; this.snapshot(); this.update();
+      if (r.phase !== 'done') { r.phase = 'stopped'; recordControl(r, 'stop'); } this.snapshot(); this.update();
       for (const id of [r.masterId, ...r.workers.map(w => w.workerId)]) if (id) this.io.stop(id);
       return;
     }
     if (['done','stopped'].includes(r.phase)) throw Error('This activity has ended');
-    if (action === 'pause') { r.phase = 'paused'; this.update(); return; }
+    if (action === 'pause') { const was = r.phase; r.phase = 'paused'; if (was !== 'paused') recordControl(r, 'pause'); this.update(); return; }
+    const was = r.phase;
     if (!r.masterId) {
       const master = this.io.spawn(r.master, masterPrompt(r), r.owner, undefined, {id:r.id,role:'master'});
       r.masterId = master.id; r.masterWorktree = master.worktree;
@@ -76,12 +82,13 @@ export class TeamCoordinator {
     this.io.head(r.masterId,true); // Preserve partial work while reconciling interrupted runs.
     r.phase = 'running'; delete r.error;
     r.notifications[r.masterId] = `Resume activity ${r.id}. Read team_state and inbox, reconcile existing commits and accepted tasks; do not duplicate work or PRs.`;
+    if (was !== 'running') recordControl(r, 'resume');
     this.update();
     const list=this.io.list();
     const master=list.find(w=>w.id===r.masterId);
     if(master&&['offline','exited'].includes(master.status)){
       const prompt=r.notifications[r.masterId];delete r.notifications[r.masterId];this.update();
-      const error=this.io.prompt(r.masterId,prompt);if(error){r.phase='paused';r.error=error;this.update();}
+      const error=this.io.prompt(r.masterId,prompt);if(error){r.phase='paused';r.error=error;recordControl(r, 'pause', `Resume failed: ${error}`);this.update();}
     }
     if(r.phase==='running')for(const t of r.tasks){
       const a=t.attempts.at(-1),w=list.find(w=>w.id===a?.workerId);
@@ -128,7 +135,7 @@ export class TeamCoordinator {
           if (new Set(tasks.map(t=>t.id)).size !== tasks.length || r.tasks.some(t=>t.status !== 'pending' && !tasks.some(v=>v.id===t.id))) throw Error('Keep started tasks and unique IDs');
           const visited = new Set<string>(), visiting = new Set<string>();
           const walk = (id: string) => { if (visiting.has(id)) throw Error('Cyclic dependencies'); if (visited.has(id)) return; const t = tasks.find(v=>v.id===id); if (!t) throw Error('Unknown dependency'); visiting.add(id); t.dependencies.forEach(walk); visiting.delete(id); visited.add(id); };
-          tasks.forEach(t=>walk(t.id)); r.tasks = tasks; r.plan = plan; break;
+          tasks.forEach(t=>walk(t.id)); r.tasks = tasks; r.plan = plan; recordPlan(r, plan, tasks); break;
         }
         case 'dispatch': {
           if (!r.plan) throw Error('Publish a plan first');
@@ -162,7 +169,13 @@ export class TeamCoordinator {
               worker = this.io.spawn(selected,workerPrompt(r,t),r.owner,{commit:base,from:r.masterWorktree!.branch},{id:r.id,role:'worker',task:t.id});
               pending.workerId = worker.id; r.workers.push({workerId:worker.id,choice:selected});
             }
-          } catch (e) { pending.status = 'failed'; pending.summary = (e as Error).message; t.status = 'pending'; this.notify(r,`task ${t.id} could not launch`); this.update(); throw e; }
+            const dispatched = { task: t, workerId: worker.id, attempt: t.attempts.length, choice: selected, reason };
+            if (t.attempts.length === 1) recordAssignment(r, dispatched); else recordRetry(r, dispatched);
+          } catch (e) {
+            pending.status = 'failed'; pending.summary = (e as Error).message; t.status = 'pending';
+            recordBlocker(r, { task: t, workerId: pending.workerId || undefined, summary: `Task ${t.id} could not launch`, message: (e as Error).message });
+            this.notify(r,`task ${t.id} could not launch`); this.update(); throw e;
+          }
           break;
         }
         case 'result': {
@@ -173,13 +186,16 @@ export class TeamCoordinator {
           if (b.failed !== undefined && typeof b.failed !== 'boolean') throw Error('failed must be a boolean');
           const commits=this.io.commits(actor,a.base,b.commits,b.failed);
           a.summary=summary; a.checks=checks; a.commits=commits; a.status=b.failed?'failed':'submitted'; t.status=b.failed?'pending':'review';
+          recordResult(r, { task: t, workerId: actor, summary, checks, commits, failed: b.failed === true });
           this.snapshot(); this.notify(r,`task ${t.id} ${b.failed?'failed':'has a result to review'}`); break;
         }
         case 'cancel': {
           const t=this.task(r,b.task),a=t.attempts.at(-1);
           if(t.status!=='running'||!a)throw Error('No running assignment to cancel');
           const evidence=text(b.evidence,'cancellation evidence');this.snapshot();this.io.stop(a.workerId);
-          a.status='failed';a.summary=evidence;t.status='pending';break;
+          a.status='failed';a.summary=evidence;t.status='pending';
+          recordBlocker(r, { task: t, workerId: a.workerId || undefined, summary: `Assignment cancelled for task ${t.id}`, evidence });
+          break;
         }
         case 'review': {
           const t=this.task(r,b.task), a=t.attempts.at(-1);
@@ -189,20 +205,29 @@ export class TeamCoordinator {
           if (b.accept) this.io.head(actor);
           if (b.accept && !this.io.contains(actor,a.commits??[])) throw Error('Integrate submitted commits into the master branch before acceptance');
           a.review=evidence; a.status=b.accept?'accepted':'rejected'; t.status=b.accept?'done':'pending';
-          if (b.accept) { t.integrated=a.commits; t.evidence=evidence; } break;
+          recordReview(r, { task: t, workerId: actor, outcome: b.accept ? 'accepted' : 'rejected', reason: evidence });
+          if (b.accept) {
+            t.integrated=a.commits; t.evidence=evidence;
+            recordIntegration(r, { task: t, workerId: actor, commits: a.commits ?? [], verified: 'Independent git check: submitted commits verified as ancestors of the master branch HEAD via git merge-base' });
+          }
+          break;
         }
         case 'takeover': {
           const t=this.task(r,b.task); this.ready(r,t);
           if (t.status==='done' || ['running','review'].includes(t.status)) throw Error('Resolve active worker result before taking over');
           const evidence=text(b.evidence,'master takeover evidence');
           if(b.complete !== undefined && typeof b.complete !== 'boolean') throw Error('complete must be a boolean');
-          if(b.complete) this.io.head(actor);
-          t.evidence=evidence; t.status=b.complete?'done':'takeover'; break;
+          const head = b.complete ? this.io.head(actor) : undefined;
+          t.evidence=evidence; t.status=b.complete?'done':'takeover';
+          recordReview(r, { task: t, workerId: actor, outcome: 'takeover', reason: evidence });
+          if (b.complete) recordIntegration(r, { task: t, workerId: actor, commits: head ? [head] : [], verified: 'Independent git check: the master branch HEAD is clean and on the team integration branch' });
+          break;
         }
         case 'finish': {
           if (!r.plan || !r.tasks.length || r.tasks.some(t=>t.status!=='done')) throw Error('Finish every task first');
           const summary=text(b.summary,'completion summary'), checks=text(b.checks,'final verification evidence'), pr=text(b.pr,'PR URL',1000);
           await this.io.verifyPr(actor,pr);
+          recordFinalPr(r, { pr, summary, checks, verified: `Independent PR validation: open non-draft PR on branch ${r.masterWorktree?.branch ?? 'the team branch'}, its head matches the master's pushed HEAD, exactly one open PR for the branch, forge checks report no failure, and the completion checklist matches the final commit` });
           r.summary=summary; r.checks=checks; r.pr=pr; r.phase='done'; r.notifications={}; this.snapshot(); break;
         }
         default: throw Error('Unknown team action');
@@ -221,15 +246,15 @@ export class TeamCoordinator {
     this.busy=true;
     try {
       const list=this.io.list(), master=list.find(w=>w.id===r.masterId);
-      if (!master || ['offline','exited'].includes(master.status)) { r.phase='paused'; r.error='Master is unavailable; resume after checking its terminal and checkout'; this.snapshot(); this.update(); return; }
+      if (!master || ['offline','exited'].includes(master.status)) { r.phase='paused'; r.error='Master is unavailable; resume after checking its terminal and checkout'; recordControl(r, 'pause', r.error); this.snapshot(); this.update(); return; }
       let changed=false;
       for (const t of r.tasks) {
         const a=t.attempts.at(-1); if(t.status!=='running' || !a) continue;
         const w=list.find(v=>v.id===a.workerId);
-        if(w?.status==='needs_input' && a.notice!=='needs_input'){a.notice='needs_input';this.notify(r,`task ${t.id} needs input; inspect its blocker, cancel/retry or take over if appropriate`);changed=true;}
+        if(w?.status==='needs_input' && a.notice!=='needs_input'){a.notice='needs_input';recordBlocker(r, { task: t, workerId: a.workerId || undefined, summary: `Task ${t.id} needs input`, message: 'Worker reported needs_input; awaiting master guidance' });this.notify(r,`task ${t.id} needs input; inspect its blocker, cancel/retry or take over if appropriate`);changed=true;}
         else if(w&&w.status!=='needs_input'&&a.notice){delete a.notice;changed=true;}
         if (!w || ['offline','exited','done'].includes(w.status)) {
-          a.status='failed'; a.summary='Worker stopped without submitting a result; inspect and preserve its work'; t.status='pending'; this.notify(r,`task ${t.id} stopped without a result`); changed=true;
+          a.status='failed'; a.summary='Worker stopped without submitting a result; inspect and preserve its work'; t.status='pending'; recordBlocker(r, { task: t, workerId: a.workerId || undefined, summary: `Task ${t.id} worker stopped without a result`, message: 'Worker exited without submitting a result; its work was preserved' }); this.notify(r,`task ${t.id} stopped without a result`); changed=true;
         }
       }
       for (const [id,message] of Object.entries(r.notifications)) {
@@ -240,7 +265,7 @@ export class TeamCoordinator {
         if(err) { r.notifications[id]=message; r.error=err; changed=true; }
       }
       if(changed) { this.snapshot(); this.update(); }
-    } catch(e) { r.phase='paused'; r.error=(e as Error).message; this.update(); }
+    } catch(e) { r.phase='paused'; r.error=(e as Error).message; recordControl(r, 'pause', r.error); this.update(); }
     finally { this.busy=false; }
   }
 }
