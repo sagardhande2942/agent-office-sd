@@ -1,5 +1,7 @@
 # Controls
 
+Press **Y** to switch instantly between 2D Game and 3D exploration. The top-bar toggle and View selector use the same live switch. No reload or reconnect occurs: position, floor and running workers remain intact, and returning to 3D restores the previous camera view and facing. Typing, open dialogs and camera-controlled activities keep their own controls; finish the activity before switching. Lite continues to use page navigation.
+
 Back to the [README](../README.md).
 
 | Key | Action |

@@ -7,6 +7,7 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['👑', 'Master / Workers in the menu: choose a master and eligible models, save reusable presets, and let the team deliver one PR. Open its activity to follow assignments or pause/resume.'],
   ['W A S D', 'Walk (hold Shift to run)'],
   ['Space', 'Jump'],
+  ['Y', 'Switch instantly between 2D and 3D exploration without reloading. Finish camera-controlled activities first.'],
   ['☕', 'Press E at the coffee machine in the kitchen for a minute of quicker walking and higher jumps. Three cups in a row gives you the jitters'],
   ['Mouse', 'Look around in first person (click to capture the mouse, Esc to free it)'],
   ['Click / E', "Use what you look at: hire a worker, open its terminal, read a board, call a meeting in the meeting room, watch the TV, put a song on the jukebox, tee off from the balcony, sit on a couch, a beanbag, a chair or the balcony bench (walk off to get up)"],

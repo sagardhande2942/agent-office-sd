@@ -4,9 +4,12 @@ import { rememberFloor } from '../state/persist';
 import { h, openModal } from '../ui/dom';
 
 export const VIEWS = [{ path: '/', label: '3D' }, { path: '/2d', label: '2D Game' }, { path: '/lite', label: 'Lite' }] as const;
+let liveView: ((path: string) => boolean) | undefined;
+export function registerLiveView(change: (path: string) => boolean) { liveView = change; }
 /** One transport per page; hand the floor over even when local storage is unavailable. */
 export function switchView(path: string, net: Net) {
   if (!VIEWS.some(v => v.path === path)) return;
+  if (liveView?.(path)) return;
   rememberFloor(store.floor);
   net.disconnect();
   const url = new URL(path, location.origin);
