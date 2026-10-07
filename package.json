@@ -24,7 +24,8 @@
     "start": "node bin/agent-office.js",
     "prepare": "npm run build",
     "e2e:floor-host": "node --import tsx scripts/e2e-floor-host.mjs",
-    "e2e:floor-ride": "node --import tsx scripts/e2e-floor-ride.mjs"
+    "e2e:floor-ride": "node --import tsx scripts/e2e-floor-ride.mjs",
+    "e2e:live-view-toggle": "node --import tsx scripts/e2e-live-view-toggle.mjs"
   },
   "engines": {
     "node": ">=20"

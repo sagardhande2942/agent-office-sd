@@ -55,4 +55,6 @@ Detailed results are in [checks.json](game2d-evidence/checks.json). Live microph
 
 Graphics quality is checked separately with `node --import tsx scripts/e2e-game2d-graphics.mjs` after building. It uses an isolated authenticated office to verify immediate switching, saved preferences, activity rendering, and Esc/✕ controls, and captures both quality modes under `/tmp/agent-office-2d-graphics-evidence`. The harness freezes animation only while taking screenshots so software rendering can drain its GPU queue.
 
+The live 2D/3D toggle is checked with `npm run build && npm run e2e:live-view-toggle`. It presses **Y** in a real authenticated office and checks that switching both ways keeps the same context, the same open socket, the player's position, the floor and session, and a seated worker; that a held key, typing in a field and an open dialog do not toggle it; and that `/?3d=1` loads the 3D view ready to toggle. It writes its screenshots and `checks.json` under `/tmp/agent-office-2d-graphics-evidence` (override with `GAME2D_ARTIFACTS`).
+
 ![Enhanced graphics setting in the playable 2D office](game2d-evidence/graphics-enhanced.png)

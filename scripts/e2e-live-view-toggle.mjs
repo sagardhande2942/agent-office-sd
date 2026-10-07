@@ -1,5 +1,5 @@
 // Reproducible desktop checks using the production bundle and an isolated real office.
-// npm run build && node --import tsx scripts/e2e-game2d-graphics.mjs
+// npm run build && npm run e2e:live-view-toggle
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -84,12 +84,16 @@ try {
   assert.equal(new URL(page.url()).pathname, '/2d');
   assert.equal(await page.locator('#typing-fixture').inputValue(), 'y');
   await page.evaluate(() => document.getElementById('typing-fixture').remove());
+  // A full load, so the client store is rebuilt from the server's state: the worker comes back that way,
+  // it is not preserved across the reload. Only the deep link and the toggle are under test here.
   await page.goto(base + '/?3d=1&floor=f2');
   await page.waitForFunction(() => window.__game2d?.ctx.player.enabled && !window.__game2d.core.trip && window.__game2d.camera.perspective);
   await page.waitForSelector('#loading', { state: 'hidden' });
   await page.keyboard.press('y');
   await page.waitForFunction(() => location.pathname === '/2d' && !window.__game2d.camera.perspective);
+  assert.equal(await page.evaluate(() => document.body.classList.contains('topdown')), true);
   assert.deepEqual(errors, []);
-  check('live toggle', 'Y switches both ways without rebuilding context, moving the player or changing floor/session; dialogs suppress it.');
+  check('live toggle', 'Y switches both ways without rebuilding context, reopening the socket, moving the player, changing floor/session or dropping a seated worker; a held key and typing in a field do not toggle it, dialogs suppress it, and /?3d=1 loads 3D ready to toggle.');
 } finally { await browser?.close(); office.shutdown(); }
+writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks, screenshots: ['live-3d.png', 'live-2d.png'] }, null, 2));
 process.exit(0);
