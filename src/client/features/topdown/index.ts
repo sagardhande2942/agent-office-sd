@@ -4,6 +4,7 @@ import type { CoreState } from '../../core/ctx';
 import type { Parts } from '../../core/parts';
 import { modalOpen, h, openModal } from '../../ui/dom';
 import { HUD_ACTIONS } from '../../ui/menu';
+import { groundAt } from '../../player/collide';
 import { PlanCamera } from './camera';
 export { isTopdownRoute } from './camera';
 import { store } from '../../state';
@@ -44,7 +45,9 @@ export function installTopdown(ctx: Ctx, core: CoreState, parts: Parts) {
     camera.perspective = !plan;
     ctx.renderer.shadowMap.enabled = !plan;
     camera.updateProjectionMatrix();
-    cut.constant = plan ? ctx.player.pos.y + 2.5 : 1e6;
+    // Follow the supporting floor, not the airborne player's jump arc.
+    const floorY = Math.max(groundAt(ctx.player.colliders, ctx.player.pos.x, ctx.player.pos.z, ctx.player.pos.y), ctx.player.street);
+    cut.constant = plan ? floorY + 2.5 : 1e6;
     ctx.player.mouseLook = !plan;
     if (!plan) return;
     ctx.me.root.visible = true; // The plan camera never sits inside your character.
@@ -53,8 +56,8 @@ export function installTopdown(ctx: Ctx, core: CoreState, parts: Parts) {
     const clamp = (at: number, min: number, max: number, half: number) => max - min <= half * 2 ? (min + max) / 2 : THREE.MathUtils.clamp(at, min + half, max - half);
     const x = indoors ? clamp(p.x, room.minX, room.maxX, camera.span * camera.aspect / 2) : p.x;
     const z = indoors ? clamp(p.z, room.minZ, room.maxZ, camera.span * 0.55) : p.z;
-    camera.position.set(x, p.y + 50, z + 24);
-    camera.lookAt(x, p.y, z);
+    camera.position.set(x, floorY + 50, z + 24);
+    camera.lookAt(x, floorY, z);
     camera.updateMatrixWorld();
   } });
   ctx.ticks.add('env', () => {

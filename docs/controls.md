@@ -80,3 +80,5 @@ Open `/2d`, or select **2D Game** from **View**. The office has the same fixture
 | ✕ / Esc | Close the top dialog and immediately restore game controls |
 
 Keyboard movement cancels click-to-walk. Activities that take over the camera (including golf, driving, telescope and arcade screens) retain their original camera and controls; finishing returns to the top-down projection. The elevator and floor list retain running worker sessions. Dialogs use the shared modal stack and suspend movement, including nested dialogs. Lite remains available for mobile or a browser without WebGL.
+
+The top bar has a direct **2D / 3D** toggle, available in both views. Switching preserves the selected floor and running workers. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.

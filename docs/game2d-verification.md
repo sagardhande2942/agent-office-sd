@@ -11,10 +11,11 @@ npm run build
 node --import tsx scripts/e2e-game2d.mjs
 ```
 
-Typecheck and build passed. All **976 tests** passed, including size, structure, camera projection and raycasting checks. All **17 browser check groups** passed with no page errors:
+Typecheck and build passed. All **976 tests** passed, including size, structure, camera projection and raycasting checks. All **19 browser check groups** passed with no page errors:
 
 - **authentication and shared bootstrap**: Protected aliases return through login to /2d; complete office composition connects once on the requested floor.
 - **physical elevator and floor management**: Approach/E opens the existing elevator with floor status, add/remove project actions, rooftop and garage; actual rides switch floors.
+- **jump camera stability**: Real Space jump lifts the character while camera height and projection remain unchanged.
 - **movement and shared collision physics**: Arrows/WASD, ground click-to-walk and collision against the original desk geometry work in the orthographic scene.
 - **complete office dialogs**: Shared Issues/PR/Queue, Boss, Smartphone, Services, Whiteboard, Meeting, Search, Settings, view controls and Plan Comparison open from the same menu with close/Esc focus recovery.
 - **real arcade interaction**: Boss Control Center launches playable Minesweeper with its original camera and canvas; closing restores the orthographic view and controls.
@@ -29,6 +30,7 @@ Typecheck and build passed. All **976 tests** passed, including size, structure,
 - **activity camera and registries**: Golf, cars, bar games, arcade and climbing use the original shared activity modules; camera ownership switches to perspective and back without another session.
 - **multiplayer**: Two real top-down clients exchange existing peer movement and remove the old peer on disconnect.
 - **3D/Lite handoff**: 2D → Lite → 3D → 2D preserves non-default floor and worker/session IDs with no spawn/resume requests.
+- **direct view toggle**: Visible HUD buttons switch 2D to 3D and back, preserving floor and worker sessions.
 - **browser runtime**: No page errors across Office, rooftop, garage, alternate maps and view switching.
 
 Detailed results are in [checks.json](game2d-evidence/checks.json). Live microphone/screen sharing and every individual recreation submode were not exercised; their implementations are shared with 3D. HTTP test fixtures return 404 for unrelated local-office discovery probes while retaining their request/auth assertions.

@@ -11,6 +11,11 @@
       "evidence": "Approach/E opens the existing elevator with floor status, add/remove project actions, rooftop and garage; actual rides switch floors."
     },
     {
+      "name": "jump camera stability",
+      "status": "passed",
+      "evidence": "Real Space jump lifts the character while camera height and projection remain unchanged."
+    },
+    {
       "name": "movement and shared collision physics",
       "status": "passed",
       "evidence": "Arrows/WASD, ground click-to-walk and collision against the original desk geometry work in the orthographic scene."
@@ -79,6 +84,11 @@
       "name": "3D/Lite handoff",
       "status": "passed",
       "evidence": "2D → Lite → 3D → 2D preserves non-default floor and worker/session IDs with no spawn/resume requests."
+    },
+    {
+      "name": "direct view toggle",
+      "status": "passed",
+      "evidence": "Visible HUD buttons switch 2D to 3D and back, preserving floor and worker sessions."
     },
     {
       "name": "browser runtime",
