@@ -11,7 +11,7 @@ import { store } from '../../state';
 import { planClick } from './click';
 import { cutaway } from './cutaway';
 import { configureGraphics } from './graphics';
-import { installViewMode } from './mode';
+import { configureViewMode } from './mode';
 import './topdown.css';
 
 /** Same office, every feature installed once; only exploration projection and pointing differ. */
@@ -22,7 +22,7 @@ export function installTopdown(ctx: Ctx, core: CoreState, parts: Parts) {
   ctx.renderer.localClippingEnabled = true;
   const clip = cutaway(ctx.scene, cut);
   const available = () => !ctx.activities.any('takesCamera') && !ctx.activities.running('driver') && !ctx.view.covered() && !parts.hanging.hanger.active && !parts.telescope.active;
-  const topdown = installViewMode(ctx, available);
+  const topdown = configureViewMode(ctx, available);
   const exploring = () => topdown() && available();
   const zoom = (amount: number) => { camera.span = THREE.MathUtils.clamp(camera.span * amount, 12, 80); camera.updateProjectionMatrix(); };
   HUD_ACTIONS.push({ id: 'plan-camera', icon: '🧭', label: '2D view controls', section: 'Office', status: () => true, chip: () => '2D', run: () => {

@@ -4,7 +4,7 @@ import { modalOpen, toast } from '../../ui/dom';
 import { isTopdownRoute } from './camera';
 
 /** Change projection in the existing scene, retaining the player and socket. */
-export function installViewMode(ctx: Ctx, available: () => boolean) {
+export function configureViewMode(ctx: Ctx, available: () => boolean) {
   let topdown = isTopdownRoute();
   let saved = { view: ctx.player.view, yaw: ctx.player.camYaw, pitch: ctx.player.lookPitch };
   const paint = () => document.body.classList.toggle('topdown', topdown);
