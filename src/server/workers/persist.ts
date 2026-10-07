@@ -1,3 +1,4 @@
+import { restoreTeamRole } from '../master-workers/role.js';
 import { restoreCompletion } from '../completion.js';
 // workers.json: every worker as the office last saw it, to pick them all back up after a restart.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -44,6 +45,7 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     pastPrs: info.pastPrs,
     meeting: info.meeting,
     planReview: info.planReview,
+    masterWorkers: info.masterWorkers,
     resting: info.resting,
     workedMs: workedMs(info),
     tracker: info.kind === 'agent' ? tracker : undefined,
@@ -109,6 +111,7 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         viewers: [],
         viewerIds: [],
         planReview: DESK_BY_ID.get(s.deskId)?.review && s.planReview && typeof s.planReview.id === 'string' && ['candidate','reviewer'].includes(s.planReview.role) && typeof s.planReview.locked === 'boolean' ? s.planReview : undefined,
+        masterWorkers: restoreTeamRole(s.masterWorkers),
         meeting: typeof s.meeting === 'string' && DESK_BY_ID.get(s.deskId)?.room ? s.meeting : undefined,
         workedMs: typeof s.workedMs === 'number' && Number.isFinite(s.workedMs) && s.workedMs > 0 ? s.workedMs : undefined,
       };

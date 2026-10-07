@@ -1,3 +1,4 @@
+import { masterWorkersHandlers, masterWorkersView } from './master-workers.js';
 import { planReviewHandlers, planReviewView } from './plan-review.js';
 import { forkHandlers, tvView, helpersView } from './fork.js';
 // Every message a browser can send, by type, and the features that keep something per person on a
@@ -41,6 +42,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...githubHandlers,
   ...jukeboxHandlers,
   ...meetingHandlers,
+  ...masterWorkersHandlers,
   ...planReviewHandlers,
   ...planHandlers,
   ...presenceHandlers,
@@ -80,6 +82,7 @@ export const views: ViewPieces = {
   jukebox: jukeboxView,
   whiteboard: whiteboardView,
   meeting: meetingView,
+  masterWorkers: masterWorkersView,
   planReview: planReviewView,
   cabinet: cabinetView,
 };

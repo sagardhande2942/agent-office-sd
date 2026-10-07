@@ -1,5 +1,6 @@
 import { installTopdown, isTopdownRoute } from './features/topdown';
 import { installViewSelector } from './features/view-selector';
+import { installMasterWorkers } from './features/master-workers';
 import { installPlanReview } from './features/plan-review';
 import './style.css';
 import { installVitals } from './features/vitals';
@@ -194,6 +195,7 @@ parts.talk = installVoice(ctx, { tv: parts.tv });
 installDictation(ctx);
 installCommunications(ctx, parts);
 installPlanReview(ctx, parts);
+installMasterWorkers(ctx, parts);
 installViewSelector(ctx);
 installTopdown(ctx, core, parts);
 parts.hud = installHud(ctx, core, parts);

@@ -1,0 +1,16 @@
+.modal.team-window { width: min(880px, 94vw); }
+.team-mode { display: grid; gap: 14px; }
+.team-mode form { display: grid; gap: 12px; }
+.team-mode label { display: grid; gap: 6px; }
+.team-model, .team-presets, .team-card { padding: 14px; border: 1px solid var(--line, #566175); border-radius: 10px; }
+.team-model { display: grid; gap: 8px; }
+.team-presets, .team-pool { display: grid; gap: 10px; }
+.team-buttons, .team-overview { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.team-mode pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 340px; overflow: auto; }
+.team-mode input, .team-mode textarea, .team-mode select { max-width: 100%; }
+.team-mode .team-overview { justify-content: space-between; }
+
+.team-pool { grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.team-model .provider-choice { display: grid; grid-template-columns: auto 1fr; }
+.team-model .provider-note, .team-model .provider-model { grid-column: 1 / -1; }
+.team-mode h3, .team-mode p { margin: 6px 0; }
