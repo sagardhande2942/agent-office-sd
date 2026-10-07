@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { loadConfig } from '../src/server/config.ts';
 import { startServer } from '../src/server/server.ts';
+import { DESKS } from '../src/shared/desks.ts';
 
 const output = path.resolve(process.env.GAME2D_ARTIFACTS ?? '/tmp/agent-office-2d-graphics-evidence');
 mkdirSync(output, { recursive: true });
@@ -53,10 +54,13 @@ try {
     await page.screenshot({ path: path.join(output, name), timeout: 90000, animations: 'disabled' });
     await page.evaluate(() => window.__unfreeze());
   }
-  await page.evaluate(() => { window.__liveIdentity = { ctx: window.__game2d.ctx, me: window.__game2d.store.me, floor: window.__game2d.store.floor, pos: window.__game2d.ctx.player.pos.clone() }; });
+  const worker = office.floors().find(f => f.id === 'f2').workers.spawn(DESKS[0].id, 'view toggle fixture', undefined, false, 'shell');
+  assert.equal(typeof worker, 'object');
+  await page.waitForFunction(id => window.__game2d.store.workers.has(id), worker.id);
+  await page.evaluate(() => { window.__liveIdentity = { ctx: window.__game2d.ctx, socket: window.__game2d.ctx.net.ws, me: window.__game2d.store.me, floor: window.__game2d.store.floor, pos: window.__game2d.ctx.player.pos.clone() }; });
   await page.keyboard.press('y');
   await page.waitForFunction(() => location.pathname === '/' && window.__game2d.camera.perspective && !document.body.classList.contains('topdown'));
-  assert.equal(await page.evaluate(() => { const g = window.__game2d, s = window.__liveIdentity; return g.ctx === s.ctx && g.store.me === s.me && g.store.floor === s.floor && g.ctx.player.pos.distanceTo(s.pos) < 0.05; }), true);
+  assert.equal(await page.evaluate(() => { const g = window.__game2d, s = window.__liveIdentity; return g.ctx === s.ctx && g.ctx.net.ws === s.socket && s.socket.readyState === WebSocket.OPEN && g.store.me === s.me && g.store.floor === s.floor && g.ctx.player.pos.distanceTo(s.pos) < 0.05; }), true);
   await capture('live-3d.png');
   await page.keyboard.press('y');
   await page.waitForFunction(() => location.pathname === '/2d' && !window.__game2d.camera.perspective);
@@ -68,6 +72,23 @@ try {
   await page.keyboard.press('y');
   await page.waitForFunction(() => location.pathname === '/' && window.__game2d.camera.perspective);
   assert.equal(await page.evaluate(() => window.__game2d.ctx === window.__liveIdentity.ctx), true);
+  assert.equal(await page.evaluate(id => window.__game2d.store.workers.has(id), worker.id), true);
+  await page.keyboard.down('y');
+  await page.waitForFunction(() => location.pathname === '/2d');
+  await page.keyboard.down('y');
+  assert.equal(new URL(page.url()).pathname, '/2d');
+  await page.keyboard.up('y');
+  await page.keyboard.press('Escape');
+  await page.evaluate(() => { const input = document.createElement('input'); input.id = 'typing-fixture'; document.body.append(input); input.focus(); });
+  await page.keyboard.press('y');
+  assert.equal(new URL(page.url()).pathname, '/2d');
+  assert.equal(await page.locator('#typing-fixture').inputValue(), 'y');
+  await page.evaluate(() => document.getElementById('typing-fixture').remove());
+  await page.goto(base + '/?3d=1&floor=f2');
+  await page.waitForFunction(() => window.__game2d?.ctx.player.enabled && !window.__game2d.core.trip && window.__game2d.camera.perspective);
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  await page.keyboard.press('y');
+  await page.waitForFunction(() => location.pathname === '/2d' && !window.__game2d.camera.perspective);
   assert.deepEqual(errors, []);
   check('live toggle', 'Y switches both ways without rebuilding context, moving the player or changing floor/session; dialogs suppress it.');
 } finally { await browser?.close(); office.shutdown(); }
