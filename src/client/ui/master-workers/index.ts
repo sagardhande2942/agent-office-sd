@@ -7,7 +7,7 @@ import { fmtCost, tokensOf, fmtTokens } from '../../../shared/protocol';
 import { store } from '../../state';
 import { h, openModal, toast } from '../dom';
 import { agentFields } from '../provider';
-import { openTaskReplay } from '../task-replay';
+import { openTaskReplay, safePrUrl } from '../task-replay';
 import type { TeamRun } from '../../../shared/master-workers';
 export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
   const close=h('button.btn.close',{'aria-label':'Close'},'✕'),body=h('div.body.team-mode');
@@ -27,7 +27,7 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
     return {el:h('div.team-model',{},h('strong',{},label),fields.element),read:fields.choice,valid:()=>fields.valid()&&!!fields.model()};
   };
   const replayButton=(run:TeamRun)=>h('button.btn',{type:'button',onclick:()=>{modal.close();openTaskReplay(run);}},'Replay');
-  const pastActivities=()=>h('details',{},h('summary',{},'Previous activities'),...store.masterWorkers.past.map(p=>h('section',{},h('strong',{},p.brief),h('p',{},p.phase),replayButton(p))));
+  const pastActivities=()=>h('details',{},h('summary',{},'Previous activities'),...store.masterWorkers.past.map(p=>h('section',{},h('strong',{},p.brief),h('p',{},p.phase),replayButton(p),...(safePrUrl(p.pr)?[h('a',{href:safePrUrl(p.pr),target:'_blank',rel:'noopener noreferrer'},'Open PR')]:[]))));
   const renderForm=()=>{
     const saved=store.masterWorkers.presets;
     const select=h('select',{'aria-label':'Team preset'},h('option',{value:''},'Choose a saved preset'),...saved.map(p=>h('option',{value:p.id},p.name))) as HTMLSelectElement;
