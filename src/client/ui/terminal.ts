@@ -1,3 +1,4 @@
+import { remoteTerminalDraft } from './remote-terminal';
 import { renderCompletion } from './completion';
 import { renderHelperReport } from './helperreport';
 import './terminal.css';
@@ -137,7 +138,16 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
   const say = h('input', { type: 'text', placeholder: 'Reply, or tell it what to do next…', 'aria-label': 'Prompt', enterkeyhint: 'send', autocomplete: 'off' }) as HTMLInputElement;
   const sayBtn = h('button.btn.primary', { type: 'submit' }, 'Send');
   const sayForm = h('form.term-say', {}, dictateField(say), sayBtn);
-  const keypad = opts.keypad ? h('div.term-keypad', {}, keys, sayForm) : null;
+  let draftSubmit: ReturnType<typeof setTimeout> | undefined;
+  const draft = store.currentFloor()?.host ? remoteTerminalDraft(workerId, (text, submit) => {
+    if (draftSubmit || !net.up || !ready || isAsleep(store.workers.get(workerId)?.status ?? 'exited')) return false;
+    sendSize(true); sayTyping(); term.paste(text);
+    if (submit) {
+      draftSubmit = setTimeout(() => { if (current?.workerId === workerId && net.up) term.input('\r'); draftSubmit = undefined; }, 120);
+    }
+    return true;
+  }) : null;
+  const keypad = opts.keypad || draft ? h('div.term-keypad', {}, opts.keypad ? keys : null, draft?.element ?? sayForm) : null;
   const tabs = termTabs(workerId, { host, keypad, focusTerm: () => term.focus() });
   // What you say is typed in at the terminal's cursor, as a paste, for you to read over and send (see dictate.ts).
   const mic = dictation(
@@ -153,7 +163,7 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
   );
   host.append(mic.live);
   // The keypad has an Esc of its own, and a 🎤 on its prompt box.
-  const el = h('div.modal.term', { role: 'dialog', 'aria-label': `${info.name} terminal` }, h('header', {}, dot, title, pill, cost, viewers, typed, modelsBtn, keypad ? null : mic.button, keypad ? null : escBtn, onChanges ? changesBtn : null, closeBtn), completion, helperReport, tabs.bar, host, tabs.pages, keypad);
+  const el = h('div.modal.term', { role: 'dialog', 'aria-label': `${info.name} terminal` }, h('header', {}, dot, title, pill, cost, viewers, typed, modelsBtn, opts.keypad ? null : mic.button, opts.keypad ? null : escBtn, onChanges ? changesBtn : null, closeBtn), completion, helperReport, tabs.bar, host, tabs.pages, keypad);
 
 
   const term = new Terminal({
@@ -254,6 +264,7 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
 
   const refresh = () => {
     const w = store.workers.get(workerId);
+    draft?.update(ready && net.up && !!w && !isAsleep(w.status));
     if (!w) {
       modal.close();
       return;
@@ -352,6 +363,7 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
       unsub();
       unsubPeers();
       clearInterval(typingTimer);
+      clearTimeout(draftSubmit);
       ro.disconnect();
       mic.drop();
       net.send({ t: 'worker.detach', workerId });
@@ -512,5 +524,5 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
   ro.observe(host);
   refresh();
   net.send({ t: 'worker.attach', workerId });
-  if (!opts.keypad) setTimeout(() => term.focus(), 50);
+  if (!opts.keypad) setTimeout(() => draft ? draft.focus() : term.focus(), 50);
 }

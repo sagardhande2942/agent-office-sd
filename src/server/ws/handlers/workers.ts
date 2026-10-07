@@ -119,7 +119,7 @@ export const workerHandlers = {
     const wid = str(msg.workerId, 32);
     c.attached.delete(wid);
     c.typingAt.delete(wid);
-    ctx.workerFloor(wid)?.workers.detach(wid, c.id);
+    ctx.actionWorkerFloor(wid)?.workers.detach(wid, c.id);
   },
   async 'worker.prompt'(ctx, c, msg) {
     const who = c.peer.name;
@@ -187,7 +187,7 @@ export const workerHandlers = {
   },
   async 'term.input'(ctx, c, msg) {
     const who = c.peer.name;
-    if (c.attached.has(msg.workerId)) ctx.workerFloor(msg.workerId)?.workers.write(msg.workerId, str(msg.data, 64 * 1024), who);
+    if (c.attached.has(msg.workerId)) ctx.actionWorkerFloor(msg.workerId)?.workers.write(msg.workerId, str(msg.data, 64 * 1024), who);
   },
   async 'term.typing'(ctx, c, msg) {
     // Everyone else in that terminal sees who's typing. A typist says so about once a second.
@@ -201,7 +201,7 @@ export const workerHandlers = {
     }
   },
   async 'term.resize'(ctx, c, msg) {
-    if (c.attached.has(msg.workerId)) ctx.workerFloor(msg.workerId)?.workers.resize(msg.workerId, num(msg.cols), num(msg.rows));
+    if (c.attached.has(msg.workerId)) ctx.actionWorkerFloor(msg.workerId)?.workers.resize(msg.workerId, num(msg.cols), num(msg.rows));
   },
 } satisfies HandlerMap<Exclude<WorkerClientMsg, {t: 'worker.helper'}>>;
 

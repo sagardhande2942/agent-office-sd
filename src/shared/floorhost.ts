@@ -154,6 +154,7 @@ export type ToOffice =
    * office's dispatch and the host's are the same code. The payload is left as the union member of
    * `ClientMsg` rather than narrowed here, so a case that gains a field needs no change here.
    */
+  // seq=0 on term.input/term.resize is an ordered write without a reply; other calls use positive IDs.
   | ({ floorId: string; seq: number; t: FloorCase | HostCall } & Record<string, unknown>)
   /**
    * The office's answer to a hello: the token to keep (empty when the machine already had one), and
