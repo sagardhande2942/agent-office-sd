@@ -113,15 +113,17 @@ isn't possible in a browser at all. So the picture is an ordinary HTML element �
    camera to viewport pixels.
 2. The 2D projective transform (a homography, solved as an 8×8 system) that maps the element's four
    corners onto those four points becomes a CSS `matrix3d(...)`.
-3. What's in front of the TV becomes the frame's own mask (`TvScreen.occlude`). Ordinary HTML can't
+3. What's in front of the TV becomes the frame's own mask (`TvSiting.occlude`). Ordinary HTML can't
    be depth-tested against the scene, so the screen is divided into a small grid and each cell is
    asked whether a wall, a desk, a plant or someone standing there is between your eye and that
    point. The cells that are spoken for go into a little canvas the browser stretches over the frame
    as its `mask-image`, so the picture is hidden behind what's in front of it rather than painted
    over it. Glass and fences don't count, being things you can see through; people do, though they
-   aren't colliders. It's worked out at most every 80 ms, into a 32×18 grid, and only the colliders
+   aren't colliders. It's worked out at most every 80 ms, into a 96×54 grid, and only the colliders
    whose outline on screen can reach the TV's are tested at all — the office has a few hundred and
-   most of them are nowhere near the lounge.
+   most of them are nowhere near the lounge. So is everyone else: a person can only be in the way if
+   they stand in the wedge between your eye and the picture, which grows no wider than the screen's
+   own half-diagonal.
 4. The layer is set to `display: none` whenever the TV can't be seen at all: you're on the roof, on
    another map, the camera has turned past it, or every last cell of the mask is behind something.
    The meeting room's and the loft's glass panes are colliders with `glass: true`, so looking at the
@@ -135,6 +137,35 @@ your controls.
 The alternative — CSS3DRenderer — was rejected: it wants scene units to be CSS pixels, the office
 measures in metres, and it draws over geometry regardless of depth. A single projected quad needs
 neither.
+
+### What a playing link costs
+
+All of the above runs every frame, and a link makes all of it run at once, so it's kept as cheap as
+it can honestly be. Measured on a 320-collider office with a few people about (the mask pass, in
+`node --import tsx`): **6.99 ms → 0.74 ms** with twenty pieces of furniture in the way, **21.3 ms →
+1.84 ms** with sixty. The old figure was most of a whole frame, a dozen times a second, which is what
+made looking around and walking around stutter while something was playing.
+
+Where it went:
+
+- **The mask only exists while something hides the picture.** A mask that hides nothing is a no-op the
+  browser still has to honour: it can't hand a masked layer straight to the compositor, and it repaints
+  the whole picture under it whenever the mask changes. With nothing in the way — which is most of the
+  time in the lounge — the frame carries no mask at all, and when something walks in front of the TV
+  the mask comes back.
+- **An unchanged mask is never re-encoded.** Encoding it is a PNG of the grid, and putting it on the
+  frame is a repaint of the picture. What stands in the way moves slowly, so the cells are compared
+  with what the frame is already wearing and the same mask is left alone.
+- **The cells' places in the world are worked out once** (the TV's screen doesn't move), the people
+  are read once a pass instead of once a cell, and their boxes are reused rather than rebuilt, so the
+  pass allocates nothing: the slab test in `blocks` is written out by hand for the same reason.
+- **The transform and `display` are only written when they change**, and a player is only told its
+  volume when the whole percent has actually changed — YouTube's API takes each order as a message
+  across the frame into the player, and it was being told the same thing sixty times a second.
+
+The mask's arithmetic lives in `src/client/tv-mask.ts` with no DOM in it at all, which is what makes
+it measurable and testable under node (`tests/tv-mask.test.ts` pins the slab test against the long
+way round, over 800,000 rays, and the mask's own decisions).
 
 ## The drinks reach the picture too
 
@@ -198,12 +229,16 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
 | `src/server/server.ts` | The `tv.*` cases in the message router, `tvChanged` to the floor, `tv:` in `floorView()` |
 | `src/shared/protocol.ts` | The five messages, `{ t: 'tv', state }` and `FloorView.tv` |
 | `src/client/state.ts` | The `tv` topic, `store.tv`, `enter()` and `apply()` |
-| `src/client/tvscreen.ts` | The layer: what to load for a link, keeping every player in step, the per-frame projection, the mask of what's in front of it, and how drunk the picture is |
+| `src/client/tvscreen.ts` | The link: what to load for it, keeping every player in step, and your own speakers |
+| `src/client/tv-siting.ts` | The picture's half: the layer, the per-frame projection onto the TV, the mask of what's in front of it, and how drunk the picture is |
+| `src/client/tv-mask.ts` | The mask's arithmetic — the cells, what's in front of them, and who could be — with no DOM in it, so it can be measured and tested under node |
+| `src/client/tv-projection.ts` | The homography onto the TV's corners, and the slab test `tv-mask.ts` asks thousands of times a pass |
 | `src/client/drunkframe.ts` | The drunk effect for the picture, as an SVG filter — the same one `world/drunk.ts` puts on the canvas |
 | `src/client/world/office.ts` | The TV itself is unchanged; its glass panes are colliders marked `glass: true`, so they don't hide it, and the switch's bit of wall is a fixture so no picture hangs over it |
 | `src/client/main.ts` | Wiring: **E** at the TV and at the switch, the hint bar, painting the screen dark under the picture, the per-frame `update`, and how drunk the picture is |
 | `src/client/ui/tv.ts` | The TV window: what's on, ▶️/⏸️/⏹️, a scrubber, the **The room** row, the Dance floor choice, the link box, **Open in a tab ↗**, **Share screen** and your own sound (mute and volume) |
-| `tests/tv.test.ts` | Link parsing and validation, `positionAt`, the switch leaving the film alone, and `class Tv` surviving a restart |
+| `tests/tv.test.ts` | Link parsing and validation, `positionAt`, the switch leaving the film alone, `class Tv` surviving a restart, and the whiteboard's panel masking the picture but its walking envelope not |
+| `tests/tv-mask.test.ts` | The mask: the slab test against the long way round, the cells lying where the screen does, what does and doesn't hide the picture, and the frame wearing a mask only while it has to |
 | `tests/drunkframe.test.ts` | How much drink puts the filter on the picture, and the numbers the shader's own lines give |
 | `src/client/world/sky.ts` | `setTheatre` and the `skyRoomLight` dim in the shader, `indoors` for the halos |
 | `src/client/world/theatre.ts` | `buildTheatre`: the switch on the wall, its rocker and lamp, and the light off the screen |

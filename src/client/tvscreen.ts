@@ -1,41 +1,40 @@
-import type { SceneCamera } from './features/topdown/camera';
 import { youtubeApi, type YoutubePlayer, type HandCover, type ListenerPosition } from './tv-youtube';
-import { homography, blocks } from './tv-projection';
+import { TvSiting, WIDTH, HEIGHT } from './tv-siting';
+import { h } from './ui/dom';
+import type { SceneCamera } from './features/topdown/camera';
+import type { Collider } from './world/office';
 export { homography, blocks } from './tv-projection';
+export { WIDTH, HEIGHT } from './tv-siting';
+export { MASK_W, MASK_H } from './tv-mask';
 // The big TV's picture: an ordinary `<iframe>` or `<video>` laid over the canvas and re-projected
 // onto the TV's rectangle every frame, because WebGL can't draw a cross-origin player (see
 // docs/tv-streaming.md). What's on it is shared state like the jukebox's; this keeps whatever is
 // playing here in step with it, and takes the picture away whenever the TV can't be seen.
+//
+// This file is the link and the player: what it is, what it should be doing, and how loud it is.
+// Where the picture goes on screen — the projection, the occlusion mask and the layer over the
+// canvas — is tv-siting.ts, and the mask's arithmetic is tv-mask.ts, which has no DOM in it so it can
+// be measured and tested without a browser.
 
-import * as THREE from 'three';
+import type * as THREE from 'three';
 import { TV } from '../shared/layout';
 import { TV_OFF, classify, embedUrl, positionAt, youtubeId, type TvKind, type TvState } from '../shared/tv';
-import { DrunkPicture } from './drunkframe';
 import { roomMediaGain } from './spatial-audio';
 import { store } from './state';
-import { h, toast } from './ui/dom';
-import type { Collider } from './world/office';
+import { toast } from './ui/dom';
 
-/** The picture's own size: the TV is 16:9, so what goes on it is too (see .tv-frame in style.css). */
-export const WIDTH = 1280;
-export const HEIGHT = 720;
 /** Seconds out of step with the floor before the picture is dragged back to where it should be. */
 export const CATCH_UP = 1.5;
 /** How often that's checked (ms). */
 export const TICK = 500;
-/** The grid the picture's occlusion is worked out on: one cell per mask pixel (the TV is 16:9 too). */
-export const MASK_W = 96;
-export const MASK_H = 54;
-/** How often that's worked out (ms). People move slowly, and building the mask isn't free. */
-export const MASK_TICK = 80;
+
+/** The two things that can be playing, as far as the sound knob is concerned (see applySound). */
+type MediaPlayer = HTMLVideoElement | YoutubePlayer;
+
 /** The link on the TV, as it plays here: the element itself, and where it is against everyone else's. */
 export class TvScreen {
-  /** The layer over the canvas (index.html); null on a page without one. */
-  private readonly layer: HTMLElement | null;
-  /** The 1280×720 element that gets transformed onto the TV's corners. */
-  private readonly frame: HTMLElement;
-  /** So the picture goes with the rest of the office once you've been drinking (see drunkframe.ts). */
-  private readonly drunk: DrunkPicture | null;
+  /** Where it goes on screen, and what stands in front of it (see tv-siting.ts). */
+  private readonly siting: TvSiting;
   private state: TvState = TV_OFF;
   /** How the picture is being driven, which is embed rather than youtube when the API can't load. */
   private kind: TvKind | null = null;
@@ -63,44 +62,26 @@ export class TvScreen {
   private soundHere = false;
   /** Told when the sound changes here rather than in the window (the autoplay fallback does it). */
   onSound: (() => void) | null = null;
-  /**
-   * Where your own hands cover the screen just now, or null when they aren't drawn. They're over the
-   * world, but the picture is ordinary HTML over the canvas the hands are painted in, so it would
-   * sit on top of them; the picture hides behind them instead, as it does behind anything else in
-   * front of the TV (see main.ts). Asked whenever the mask is rebuilt.
-   */
-  handCover: (() => HandCover | null) | null = null;
-  private readonly corners = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-  private readonly scratch = new THREE.Vector3();
-  /** A second scratch for the occlusion cull, which needs the point both in view and in world space. */
-  private readonly probe = new THREE.Vector3();
-  private readonly eye = new THREE.Vector3();
-  /** The last thing in front of each cell of the picture, as a mask for the frame (see occlude). */
-  private readonly mask = document.createElement('canvas');
-  private readonly maskCtx = this.mask.getContext('2d');
-  private readonly maskPixels = this.maskCtx?.createImageData(MASK_W, MASK_H);
-  private maskedAt = 0;
-  private maskUrl = '';
-  private walled = false;
-  /** The layer's size in CSS pixels, and the homography taking the picture's own pixels onto it (see sited). */
-  private viewW = 0;
-  private viewH = 0;
-  private onto: number[] | null = null;
-  private readonly pixels: [number, number][] = [
-    [0, 0],
-    [0, 0],
-    [0, 0],
-    [0, 0],
-  ];
+  /** What the player was last told: which one, how loud, and whether it was muted (see applySound). */
+  private player: MediaPlayer | null = null;
+  private sounding = -1;
+  private silenced = true;
 
-  constructor(private readonly screen: THREE.Mesh) {
-    this.layer = document.getElementById('stream-layer');
-    this.frame = h('div.tv-frame');
-    this.layer?.append(this.frame);
-    // Only a page with a layer ever shows the picture, so only one pays for the filter.
-    this.drunk = this.layer ? new DrunkPicture(this.frame) : null;
-    this.mask.width = MASK_W;
-    this.mask.height = MASK_H;
+  constructor(screen: THREE.Mesh) {
+    this.siting = new TvSiting(screen);
+  }
+
+  /** The 1280×720 element whatever plays goes in; the picture on the wall is tv-siting.ts's. */
+  get frame(): HTMLElement {
+    return this.siting.frame;
+  }
+
+  /** Where your own hands cover the screen, for the picture to hide behind (see TvSiting.handCover). */
+  get handCover(): (() => HandCover | null) | null {
+    return this.siting.handCover;
+  }
+  set handCover(cover: (() => HandCover | null) | null) {
+    this.siting.handCover = cover;
   }
 
   /** The floor says the TV changed: take it down, put what's on it up, or bring it back in step. */
@@ -124,11 +105,10 @@ export class TvScreen {
   /**
    * How drunk you are, so the picture on the TV goes with the rest of the office: it wobbles,
    * doubles and smears too, on the same clock as the world (see drunkframe.ts, the same effect
-   * world/drunk.ts puts on the canvas). `motion` false holds it still, as it does there. Sober, the
-   * picture carries no filter at all and this costs nothing.
+   * world/drunk.ts puts on the canvas).
    */
   setDrunk(amount: number, time: number, motion: boolean) {
-    this.drunk?.apply(amount, time, motion);
+    this.siting.setDrunk(amount, time, motion);
   }
 
   /** Your own speakers: how loud, and whether they're off. False when this player won't take it. */
@@ -159,22 +139,34 @@ export class TvScreen {
    * Puts the level and the mute on whatever is playing here, so the window, the settings and the
    * autoplay fallback all come out the same. Not every player takes orders: an arbitrary embed has
    * no sound knob at all, and says so (see the window).
+   *
+   * The level is worked out to the whole percent YouTube counts in, and a player is only told about
+   * it when that percent or the mute has actually changed. This is asked for every frame while you
+   * walk — your distance from the TV moves by centimetres a frame, and so does your own slider —
+   * and YouTube's API takes each order as a message across the frame into the player, so telling it
+   * the same thing sixty times a second is sixty messages a second for nothing.
    */
   private applySound(notify = true): boolean {
     const media = this.kind === 'media' && this.el instanceof HTMLVideoElement ? this.el : null;
     const youtube = this.kind === 'youtube' && this.yt && this.ready ? this.yt : null;
     if (!media && !youtube) return false;
     const off = this.muted || this.volume === 0;
-    const gain = roomMediaGain(this.volume, this.soundDistance, this.soundHere);
-    if (media) {
-      media.volume = gain;
-      media.muted = off;
-    } else if (youtube) {
-      youtube.setVolume(Math.round(gain * 100));
-      if (off) youtube.mute();
-      else youtube.unMute();
+    const level = Math.round(roomMediaGain(this.volume, this.soundDistance, this.soundHere) * 100);
+    const player = media ?? youtube;
+    if (this.player !== player || this.sounding !== level || this.silenced !== off) {
+      this.player = player;
+      this.sounding = level;
+      this.silenced = off;
+      if (media) {
+        media.volume = level / 100;
+        media.muted = off;
+      } else if (youtube) {
+        youtube.setVolume(level);
+        if (off) youtube.mute();
+        else youtube.unMute();
+      }
+      if (notify) this.onSound?.();
     }
-    if (notify) this.onSound?.();
     return true;
   }
 
@@ -189,9 +181,7 @@ export class TvScreen {
     } catch {
       // A player that won't answer is no reason to take the frame down; the next tick tries again.
     }
-    if (!this.layer) return;
-    const sited = show && this.state.on && !!this.el && this.sited(camera, colliders);
-    this.layer.style.display = sited && !this.walled ? '' : 'none';
+    this.siting.update(camera, show, colliders, this.state.on && !!this.el);
   }
 
   // ---- What's on it ---------------------------------------------------------------------------
@@ -199,7 +189,7 @@ export class TvScreen {
   private load() {
     this.clear();
     const s = this.state;
-    if (!this.layer || !s.on || !s.url) return;
+    if (!this.siting.layer || !s.on || !s.url) return;
     this.link = s.url;
     this.kind = classify(s.url);
     this.from = positionAt(s, store.officeNow());
@@ -221,14 +211,10 @@ export class TvScreen {
     this.from = 0;
     this.started = 0;
     this.ran = false;
-    // The mask belongs to what was on, not to what comes next.
-    this.walled = false;
-    this.maskedAt = 0;
-    if (this.maskUrl) {
-      this.maskUrl = '';
-      this.frame.style.maskImage = '';
-      this.frame.style.setProperty('-webkit-mask-image', '');
-    }
+    // What comes next is a different player, and a new link has said nothing about what stands in
+    // front of it: both are told afresh, and the mask comes off (see siting.forget).
+    this.player = null;
+    this.siting.forget();
   }
 
   /** A direct media file: the only player that can be asked anything at all, and asked at once. */
@@ -384,186 +370,5 @@ export class TvScreen {
     // An embed can't be asked, so it's reloaded when the floor moves it on or back.
     const have = this.from + (this.ran ? (Date.now() - this.started) / 1000 : 0);
     if (s.playing !== this.ran || Math.abs(want - have) > CATCH_UP) this.load();
-  }
-
-  // ---- Where it goes on screen ----------------------------------------------------------------
-
-  /** The TV's corners here and in pixels, the way it's looking now: false when it isn't in view. */
-  private sited(camera: SceneCamera, colliders: readonly Collider[]): boolean {
-    this.screen.updateWorldMatrix(true, false);
-    const geo = this.screen.geometry;
-    geo.computeBoundingBox();
-    const box = geo.boundingBox;
-    if (!box) return false;
-    const local: [number, number][] = [
-      [box.min.x, box.max.y],
-      [box.max.x, box.max.y],
-      [box.max.x, box.min.y],
-      [box.min.x, box.min.y],
-    ];
-    const w = this.layer!.clientWidth || window.innerWidth;
-    const hgt = this.layer!.clientHeight || window.innerHeight;
-    for (let i = 0; i < 4; i++) {
-      const corner = this.corners[i].set(local[i][0], local[i][1], 0).applyMatrix4(this.screen.matrixWorld);
-      // Behind your eye: it would project inside out, so it isn't on screen at all.
-      this.scratch.copy(corner).applyMatrix4(camera.matrixWorldInverse);
-      if (this.scratch.z > -camera.near) return false;
-      corner.project(camera);
-      this.pixels[i] = [(corner.x * 0.5 + 0.5) * w, (-corner.y * 0.5 + 0.5) * hgt];
-    }
-    this.eye.copy(camera.position);
-    const from: [number, number][] = [
-      [0, 0],
-      [WIDTH, 0],
-      [WIDTH, HEIGHT],
-      [0, HEIGHT],
-    ];
-    const matrix = homography(from, this.pixels);
-    if (!matrix) return false;
-    // Kept for the mask's own cells to be placed on the screen (see occlude).
-    this.viewW = w;
-    this.viewH = hgt;
-    this.onto = matrix;
-    const [a, b, c, d, e, f, g, i] = matrix;
-    this.frame.style.transform = `matrix3d(${a},${d},0,${g},${b},${e},0,${i},0,0,1,0,${c},${f},0,1)`;
-    // What's standing in front of it, so the picture is hidden behind it (see occlude).
-    this.occlude(camera, colliders);
-    return true;
-  }
-
-  /**
-   * Puts what's between your eye and each part of the screen into the frame's own mask, so the
-   * picture is hidden behind it. Ordinary HTML can't be depth-tested against the scene, and the TV
-   * is only ever a metre or two from a wall, a desk, a plant or someone standing in the way — so
-   * each cell of the picture is asked whether anything is in front of it. Glass you can see through
-   * and fences aren't in the way; people are, and so are your own hands. Answered every MASK_TICK,
-   * into a small canvas that the browser stretches over the frame (see .tv-frame in style.css), and
-   * the whole frame is taken away rather than masked when every last cell is behind something.
-   */
-  private occlude(camera: SceneCamera, colliders: readonly Collider[]) {
-    const ctx = this.maskCtx;
-    const pixels = this.maskPixels;
-    if (!ctx || !pixels) return;
-    const now = performance.now();
-    if (now - this.maskedAt < MASK_TICK) return;
-    this.maskedAt = now;
-    const box = this.screen.geometry.boundingBox;
-    if (!box) return;
-    const inTheWay = this.inTheWay(camera, colliders);
-    // Your own hands are over the world but not part of it: the canvas paints them on top, so the
-    // picture has to be hidden by hand where they cover it (see main.ts).
-    const hands = this.handCover?.() ?? null;
-    const eye = this.eye;
-    const scratch = this.scratch;
-    const data = pixels.data;
-    let hidden = 0;
-    for (let my = 0; my < MASK_H; my++) {
-      // The mask is stretched over the frame as it is, so row 0 is the top of the picture.
-      const y = box.max.y - ((my + 0.5) / MASK_H) * (box.max.y - box.min.y);
-      for (let mx = 0; mx < MASK_W; mx++) {
-        const x = box.min.x + ((mx + 0.5) / MASK_W) * (box.max.x - box.min.x);
-        scratch.set(x, y, 0).applyMatrix4(this.screen.matrixWorld);
-        let blocked = false;
-        for (const c of inTheWay) {
-          if (blocks(eye, scratch, c)) {
-            blocked = true;
-            break;
-          }
-        }
-        if (!blocked) {
-          for (const p of store.peers.values()) {
-            if (p.id === store.you || p.lite || !store.onMyFloor(p)) continue;
-            // People aren't colliders: a person-sized box standing where they are.
-            if (blocks(eye, scratch, { minX: p.x - 0.35, maxX: p.x + 0.35, minZ: p.z - 0.35, maxZ: p.z + 0.35, bottom: p.y, top: p.y + 1.8 })) {
-              blocked = true;
-              break;
-            }
-          }
-        }
-        if (!blocked && hands && this.overHands(hands, (mx + 0.5) / MASK_W, (my + 0.5) / MASK_H)) blocked = true;
-        const i = (my * MASK_W + mx) * 4;
-        data[i] = data[i + 1] = data[i + 2] = 255;
-        data[i + 3] = blocked ? 0 : 255;
-        if (blocked) hidden++;
-      }
-    }
-    ctx.putImageData(pixels, 0, 0);
-    const url = `url("${this.mask.toDataURL()}")`;
-    if (url !== this.maskUrl) {
-      this.maskUrl = url;
-      this.frame.style.maskImage = url;
-      this.frame.style.setProperty('-webkit-mask-image', url);
-    }
-    this.walled = hidden === MASK_W * MASK_H;
-  }
-
-  /**
-   * Whether your own hands are over this part of the picture, given where that part lands on your
-   * screen. `u` runs across the picture and `v` down it, both 0–1, as the homography takes them to
-   * the layer (see handCover).
-   */
-  private overHands(hands: HandCover, u: number, v: number): boolean {
-    const m = this.onto;
-    if (!m || !this.viewW || !this.viewH) return false;
-    const x = u * WIDTH;
-    const y = v * HEIGHT;
-    const den = m[6] * x + m[7] * y + 1;
-    if (!den) return false;
-    const px = (m[0] * x + m[1] * y + m[2]) / den / this.viewW;
-    const py = (m[3] * x + m[4] * y + m[5]) / den / this.viewH;
-    if (px < 0 || px >= 1 || py < 0 || py >= 1) return false;
-    const cx = Math.min(hands.width - 1, (px * hands.width) | 0);
-    // The cover's rows are the other way up (WebGL reads a target from the bottom).
-    const cy = Math.min(hands.height - 1, ((1 - py) * hands.height) | 0);
-    return hands.data[(cy * hands.width + cx) * 4 + 3] > 8;
-  }
-
-  /**
-   * The colliders that could possibly show up in front of the TV from here: the office has hundreds,
-   * and testing every one against every cell of the mask would cost more than the rest of the frame.
-   * A collider that reaches the TV's rectangle on screen (or straddles the camera, where its corners
-   * say nothing) is kept; the rest of the building is culled.
-   */
-  private inTheWay(camera: SceneCamera, colliders: readonly Collider[]): Collider[] {
-    const w = this.layer!.clientWidth || window.innerWidth;
-    const hgt = this.layer!.clientHeight || window.innerHeight;
-    let tvMinX = Infinity;
-    let tvMinY = Infinity;
-    let tvMaxX = -Infinity;
-    let tvMaxY = -Infinity;
-    for (const [x, y] of this.pixels) {
-      if (x < tvMinX) tvMinX = x;
-      if (x > tvMaxX) tvMaxX = x;
-      if (y < tvMinY) tvMinY = y;
-      if (y > tvMaxY) tvMaxY = y;
-    }
-    const out: Collider[] = [];
-    const scratch = this.scratch;
-    for (const c of colliders.flatMap(c => c.glass || c.fence ? [] : c.occlusion ?? [c])) {
-      // Glass you can see a TV through; a fence is only there to stop you walking into something.
-      if (c.glass || c.fence) continue;
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-      let straddles = false;
-      for (let i = 0; i < 8 && !straddles; i++) {
-        scratch.set(i & 1 ? c.maxX : c.minX, i & 2 ? c.top : (c.bottom ?? 0), i & 4 ? c.maxZ : c.minZ);
-        if (this.probe.copy(scratch).applyMatrix4(camera.matrixWorldInverse).z > -camera.near) {
-          // Behind your eye: its corners project inside out, so it can't be culled by them.
-          straddles = true;
-          break;
-        }
-        scratch.project(camera);
-        const px = (scratch.x * 0.5 + 0.5) * w;
-        const py = (-scratch.y * 0.5 + 0.5) * hgt;
-        if (px < minX) minX = px;
-        if (px > maxX) maxX = px;
-        if (py < minY) minY = py;
-        if (py > maxY) maxY = py;
-      }
-      if (straddles || (maxX >= tvMinX && minX <= tvMaxX && maxY >= tvMinY && minY <= tvMaxY)) out.push(c);
-    }
-    return out;
   }
 }
