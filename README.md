@@ -503,3 +503,4 @@ Walk with **WASD / arrows**, click the floor to walk around furniture, or click 
 The first version uses placeholder shapes and supports the **Office map and desktop controls only**. Other maps display an Office-only notice with the view selector available; they do not change the building's map. Mobile controls, custom sprites and recreational activities are outside this view. See [controls](docs/controls.md#2d-game-desktop) and [architecture](docs/code-layout.md#playable-2d-client).
 
 Production screenshots and reproducible checks are in [2D Game verification](docs/game2d-verification.md).
+Codex input alerts require a visible sign-in/trust prompt or a permission hook; missing startup hooks alone do not mean the worker needs you. See [agent status tracking](docs/agents.md).
