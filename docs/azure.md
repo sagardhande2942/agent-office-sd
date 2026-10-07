@@ -5,7 +5,7 @@ The full story behind `deploy/azure.sh`. The short version is in the [README](..
 It's the Azure twin of [`deploy/aws.sh`](aws.md): the same commands, the same [`deploy/provision.sh`](../deploy/provision.sh) on the machine, and the same rule that the office is only ever reached through an SSH tunnel. If you have the Azure CLI signed in (`az login`), one command gives you your own office on an Azure VM:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 deploy/azure.sh up
 ```
 

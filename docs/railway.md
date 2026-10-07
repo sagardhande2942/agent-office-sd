@@ -5,7 +5,7 @@ The full story behind `deploy/railway.sh`. The short version is in the [README](
 You need the **Railway CLI 5 or newer, logged in** (`railway login`; update an older one with `railway upgrade` or `brew upgrade railway`), plus `ssh`, `curl`, Node.js and a clone of this repo:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 deploy/railway.sh up --claude-token "$(claude setup-token)"
 ```
 

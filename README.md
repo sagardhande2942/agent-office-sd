@@ -16,8 +16,8 @@ Full-screen agents retain up to 3,000 lines in the office's searchable, saved te
 Sit **Claude Code**, **Codex**, **OpenCode**, **Grok**, **Muse**, **DeepSeek Harness** and **Cursor** workers at desks, watch each one's terminal on the laptop in front of it,
 and jump into any of them together. Every GitHub repo is a floor of the building.
 
-[![Release](https://img.shields.io/github/v/release/AgentSystemLabs/agent-office?style=flat-square&color=e8c547&label=release)](https://github.com/AgentSystemLabs/agent-office/releases)
-[![Build](https://img.shields.io/github/actions/workflow/status/AgentSystemLabs/agent-office/release.yml?style=flat-square&label=build)](https://github.com/AgentSystemLabs/agent-office/actions)
+[![Release](https://img.shields.io/github/v/release/sagardhande2942/agent-office-sd?style=flat-square&color=e8c547&label=release)](https://github.com/sagardhande2942/agent-office-sd/releases)
+[![Build](https://img.shields.io/github/actions/workflow/status/sagardhande2942/agent-office-sd/release.yml?style=flat-square&label=build)](https://github.com/sagardhande2942/agent-office-sd/actions)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square)](#run-locally)
 [![Built with TypeScript](https://img.shields.io/badge/built%20with-TypeScript-3178c6?style=flat-square)](https://www.typescriptlang.org)
@@ -27,7 +27,7 @@ and jump into any of them together. Every GitHub repo is a floor of the building
 [**Run locally**](#run-locally) · [**Deploy to AWS**](#deploy-to-aws-ec2) · [**Azure**](#deploy-to-azure) · [**Railway**](#deploy-to-railway) · [**Fly.io**](#deploy-to-flyio) · [**Dokploy**](#deploy-to-dokploy) · [**Any server**](#deploy-to-any-ubuntu-or-debian-server) · [**Add users**](#add-users) · [**Controls**](#controls) · [**Features**](docs/features.md) · [**How it works**](docs/how-it-works.md) · [**Ideas**](docs/ideas.md)
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/install.sh | bash
 ```
 
 </div>
@@ -81,13 +81,13 @@ On the machine that runs the office:
 Install the latest release and start the office:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/install.sh | bash
 ```
 
 On Windows, in PowerShell:
 
 ```powershell
-irm https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/install.ps1 | iex
 ```
 
 This puts an `agent-office` command on your PATH, so next time just run `agent-office`. Run the install line again to update. The installer's settings (a particular release, install without starting) are listed at the top of [`install.sh`](install.sh) and [`install.ps1`](install.ps1).
@@ -121,7 +121,7 @@ Every option is in [docs/configuration.md](docs/configuration.md). Choosing mode
 To run it from a clone instead:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 npm install          # also builds the client and server
 npm install -g .     # puts `agent-office` on your PATH
 agent-office
@@ -134,7 +134,7 @@ agent-office
 One script, using only the AWS CLI. You need the **AWS CLI signed in** (`aws configure` or `aws sso login`), `ssh`, `curl` and a clone of this repo:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 deploy/aws.sh up --project your-org/your-repo --claude-token "$(claude setup-token)"
 ```
 
@@ -189,7 +189,7 @@ It works with every way of running the office on a server, and needs the `agent-
 The same thing on an Azure VM, using only the Azure CLI. You need the **Azure CLI signed in** (`az login`), `ssh`, `curl` and a clone of this repo:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 deploy/azure.sh up --project your-org/your-repo --claude-token "$(claude setup-token)"
 ```
 
@@ -202,7 +202,7 @@ Every command from the AWS script works the same, with `deploy/azure.sh` in its 
 No machine to look after: one script, using the Railway CLI. You need the **Railway CLI 5 or newer, logged in** (`railway login`), `ssh`, `curl`, Node.js and a clone of this repo:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 deploy/railway.sh up --claude-token "$(claude setup-token)"
 ```
 
@@ -231,7 +231,7 @@ The details, and what's on the volume, are in [docs/railway.md](docs/railway.md)
 The same container on a [Fly.io](https://fly.io) machine, using flyctl. You need **flyctl logged in** (`fly auth login`), `ssh`, `curl`, Node.js and a clone of this repo:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 deploy/fly.sh up --claude-token "$(claude setup-token)"
 ```
 
@@ -262,7 +262,7 @@ deploy/fly.sh destroy                 # delete the app and its volume (asks firs
 Already run a [Dokploy](https://dokploy.com) server? One script puts the office on it, through Dokploy's API. You need an **API key** (Dokploy: **Settings → Profile → API/CLI Keys**, with rate limiting off), `ssh`, `curl`, `git`, Node.js and a clone of this repo:
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 export DOKPLOY_API_KEY=<your key>
 deploy/dokploy.sh up --url https://dokploy.example.com --claude-token "$(claude setup-token)"
 ```
@@ -292,7 +292,7 @@ The details, and what's on the volume, are in [docs/dokploy.md](docs/dokploy.md)
 Already run a [Coolify](https://coolify.io) server? One script puts the office on it, through Coolify's API. You need **API Access** turned on (Coolify: **Settings → Configuration → Advanced**), an **API token** with read, write and deploy (**Keys & Tokens → API tokens**), `ssh`, `curl`, `git`, Node.js and a clone of this repo. Coolify builds from git, so the commit you deploy has to be pushed to a public repository: by default, the upstream of your branch.
 
 ```bash
-git clone https://github.com/AgentSystemLabs/agent-office && cd agent-office
+git clone https://github.com/sagardhande2942/agent-office-sd && cd agent-office-sd
 export COOLIFY_API_TOKEN=<your token>
 deploy/coolify.sh up --url https://coolify.example.com --claude-token "$(claude setup-token)"
 ```
@@ -323,7 +323,7 @@ The details, what's on the volume, and troubleshooting are in [docs/coolify.md](
 Another cloud, or your own machine? Run one line on the server, as root or as a user with sudo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/deploy/provision.sh | bash
+curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/deploy/provision.sh | bash
 ```
 
 It installs Node 22, git, the GitHub CLI, Claude Code and the office as a systemd service. Run as root, it creates an `agentoffice` user to run the office, so workers never run as root. The office listens on `127.0.0.1:4600` only, and the script ends by printing the SSH tunnel command and a link that shows the office password once. Run the same line again to update.
@@ -505,3 +505,5 @@ Walk with **WASD / arrows**, click the floor to walk there, click a worker to op
 The **View** selector switches 3D, 2D Game and Lite in the same tab while retaining the floor and running workers. Close dialogs with **✕** or **Esc** to resume controls immediately. 2D Game uses WebGL like 3D; **Lite** remains the lightweight, phone-friendly option. See [controls](docs/controls.md#2d-game-desktop), [architecture](docs/code-layout.md#playable-2d-client), and [screenshots and verification](docs/game2d-verification.md).
 
 The top bar has a direct **2D / 3D** toggle, available in both views. Switching preserves the selected floor and running workers. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.
+
+Repository contributions and deployment defaults target **`sagardhande2942/agent-office-sd`**. Create PRs with `gh pr create --repo sagardhande2942/agent-office-sd --base main`. Release installers download this repository’s published release artifacts; if no release is available, use the source installation instructions above.

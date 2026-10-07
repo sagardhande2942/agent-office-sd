@@ -1,5 +1,7 @@
 # agent-office
 
+- All pushes and PRs for this project must target `sagardhande2942/agent-office-sd` only. Use an explicit `--repo sagardhande2942/agent-office-sd` for GitHub CLI publishing commands and verify the push remote before publishing. Never publish to another repository or rely on GitHub CLI fork-parent defaults.
+
 - Ship every code change as a PR branched from freshly fetched `origin/main`, and end with the PR URL instead of stopping at a local commit or asking first.
 - The main checkout is shared with other live sessions and board agents, so do branch work in a worktree and never stash, reset or commit anyone else's changes there.
 - Verify with `npm run typecheck`, `npm test` and `npm run build`, plus a headless-browser screenshot for visual changes, rather than slow manual playthroughs.
