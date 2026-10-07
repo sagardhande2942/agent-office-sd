@@ -63,7 +63,9 @@ export function createScene(canvas: HTMLCanvasElement, renderer: THREE.WebGLRend
   // The sky's color and the fog change with the time of day and the weather (world/sky.ts).
   scene.background = new THREE.Color('#bfe3ff');
   scene.fog = new THREE.Fog('#bfe3ff', 40, 90);
-  const camera = isTopdownRoute() ? new PlanCamera(0.1, FAR) : new THREE.PerspectiveCamera(FOV, 1, 0.1, FAR);
+  const camera = new PlanCamera(0.1, FAR);
+  camera.perspective = !isTopdownRoute();
+  camera.updateProjectionMatrix();
 
   const hemi = new THREE.HemisphereLight('#fff5e6', '#c9a27a', 1.5);
   const ambient = new THREE.AmbientLight('#ffffff', 0.5);
