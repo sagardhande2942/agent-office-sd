@@ -1,4 +1,5 @@
 import type { AgentChoice, Usage } from './protocol.js';
+import type { ReplayLog } from './task-replay.js';
 export interface TeamConfig { master: AgentChoice; models: AgentChoice[]; maxWorkers: number; }
 export interface TeamPreset extends TeamConfig { id: string; name: string; }
 export interface TeamRequest extends TeamConfig { brief: string; requirements: string[]; constraints?: string; }
@@ -15,6 +16,7 @@ export interface TeamTask {
 }
 export interface TeamParticipant { workerId: string; choice: AgentChoice; usage?: Usage; }
 export interface TeamRun extends TeamRequest {
+  replay?: ReplayLog;
   id: string; owner?: string; createdAt: number; revision: number;
   phase: 'starting' | 'running' | 'paused' | 'stopped' | 'done';
   masterId?: string; masterWorktree?: { path: string; branch: string };
