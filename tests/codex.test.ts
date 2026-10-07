@@ -1,3 +1,4 @@
+import { codexBlocked } from '../src/server/providers/codex-screen.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -158,4 +159,15 @@ test('helper forwards only the bounded root event fields to the authenticated br
     await new Promise<void>((resolve) => server.close(() => resolve()));
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+
+test('Codex input alerts require visible onboarding, never a missing startup hook', () => {
+  assert.equal(codex.bootHint, undefined);
+  assert.equal(codexBlocked('OpenAI Codex (v0.160.1)\nPull up a prompt.\n› Ask Codex to do anything'), undefined);
+  assert.equal(codexBlocked('Working for 30s\nReading repository files'), undefined);
+  assert.match(codexBlocked('Do you trust the contents of this directory?\n1. Yes\n2. No') ?? '', /trust prompt/);
+  assert.match(codexBlocked('Welcome to Codex\n1. Sign in with ChatGPT\n2. Provide your own API key') ?? '', /sign-in/);
+  assert.equal(codexBlocked('Welcome to Codex\nSign in with ChatGPT\n› Ask Codex to do anything'), undefined);
+  assert.equal(codexBlocked('The documentation mentions API key and Sign in with ChatGPT.'), undefined);
 });

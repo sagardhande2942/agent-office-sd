@@ -493,3 +493,5 @@ TV playback controls and theatre lighting update every viewer on the floor immed
 
 At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
 
+
+Codex input alerts require a visible sign-in/trust prompt or a permission hook; missing startup hooks alone do not mean the worker needs you. See [agent status tracking](docs/agents.md).

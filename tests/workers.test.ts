@@ -633,7 +633,7 @@ test('Codex workers preserve native approvals, follow authenticated root hooks, 
   const calls = await waitFor(f.read, x => x.some(r => r.kind === 'codex'));
   const first = calls.find(r => r.kind === 'codex')!;
   const token = first.env.hookToken!;
-  assert.equal(worker.status, 'starting');
+  assert.equal(worker.status, 'idle', 'missing startup hooks do not imply a login or permission request');
   assert.ok(first.args.includes('--no-alt-screen'));
   // The office's MCP server, with the office's variables passed on to it, which Codex doesn't do unasked.
   assert.ok(first.args.some((a) => a.startsWith('mcp_servers.agent-office.args=') && a.includes('office-workers.js')));
