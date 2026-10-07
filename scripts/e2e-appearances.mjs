@@ -93,8 +93,8 @@ try {
  // Stand at the rendered fictional worker and aim the actual office camera at its face.
  await page.evaluate(()=>{const g=window.__office;const v=[...g.workerViews.values()].find(v=>v.model.appearanceId==='naruto');if(!v)throw Error('No fictional body');v.model.blink(0,1);const at=v.model.root.getWorldPosition(g.camera.position.clone());g.camera.position.copy(at).add({x:1.6,y:1.05,z:2.0});g.camera.lookAt(at.x,at.y+.7,at.z);g.renderer.render(g.scene,g.camera);});
  await page.screenshot({path:path.join(output,'office-3d.png')});
- await page.keyboard.press('Tab');await page.getByRole('menuitem',{name:/Settings/}).click({force:true});await page.keyboard.press('Escape');await wait(()=>!document.querySelector('.backdrop'));assert.ok(await page.evaluate(()=>document.pointerLockElement?.id==='scene'));
- await page.keyboard.press('Tab');await page.getByRole('menuitem',{name:/Settings/}).click({force:true});await page.locator('.modal.settings button.close').click({force:true});await wait(()=>!document.querySelector('.backdrop'));assert.ok(await page.evaluate(()=>document.pointerLockElement?.id==='scene'));
+ await page.keyboard.press('Tab');await page.getByRole('menuitem',{name:/Settings/}).click({force:true});await page.keyboard.press('Escape');await wait(()=>!document.querySelector('.backdrop'));await wait(()=>document.pointerLockElement?.id==='scene');
+ await page.keyboard.press('Tab');await page.getByRole('menuitem',{name:/Settings/}).click({force:true});await page.locator('.modal.settings button.close').click({force:true});await wait(()=>!document.querySelector('.backdrop'));await wait(()=>document.pointerLockElement?.id==='scene');
  check('real 3D appearance rendering and Esc/close mouse-look restoration');
  assert.deepEqual(errors,[]);
 } finally {
