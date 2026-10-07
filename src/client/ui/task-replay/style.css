@@ -1,0 +1,17 @@
+.modal.replay-window { width: min(1000px, 94vw); }
+.replay-body { display: grid; gap: 12px; }
+.replay-body > h3, .replay-body > p { margin: 0; }
+.replay-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.replay-filters label { display: grid; gap: 6px; }
+.replay-filters select { width: 100%; min-width: 0; }
+.replay-timeline { display: grid; gap: 10px; }
+.replay-event { border: 1px solid var(--line); border-left: 4px solid var(--accent, #6d9fe8); border-radius: 8px; }
+.replay-event > summary { padding: 12px; cursor: pointer; overflow-wrap: anywhere; }
+.replay-event > summary time { font-size: .85em; opacity: .75; margin-right: 12px; }
+.replay-event > summary strong { margin-right: 10px; }
+.replay-details { padding: 0 16px 14px; overflow-wrap: anywhere; }
+.replay-details h4 { margin: 12px 0 4px; }
+.replay-details pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 250px; overflow: auto; }
+.replay-details p { margin: 6px 0; }
+.replay-notice { padding: 10px; border: 1px solid var(--line); border-radius: 6px; }
+@media (max-width: 600px) { .replay-filters { grid-template-columns: 1fr; } .replay-event > summary time { display: block; } }

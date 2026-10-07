@@ -7,6 +7,8 @@ import { fmtCost, tokensOf, fmtTokens } from '../../../shared/protocol';
 import { store } from '../../state';
 import { h, openModal, toast } from '../dom';
 import { agentFields } from '../provider';
+import { openTaskReplay } from '../task-replay';
+import type { TeamRun } from '../../../shared/master-workers';
 export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
   const close=h('button.btn.close',{'aria-label':'Close'},'✕'),body=h('div.body.team-mode');
   const el=h('div.modal.team-window',{role:'dialog','aria-label':'Master / Workers'},h('header',{},h('h2',{},'Master / Workers'),close),body);
@@ -24,6 +26,8 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
     fields.element.querySelector('select')!.setAttribute('aria-label',`${label} provider`);
     return {el:h('div.team-model',{},h('strong',{},label),fields.element),read:fields.choice,valid:()=>fields.valid()&&!!fields.model()};
   };
+  const replayButton=(run:TeamRun)=>h('button.btn',{type:'button',onclick:()=>{modal.close();openTaskReplay(run);}},'Replay');
+  const pastActivities=()=>h('details',{},h('summary',{},'Previous activities'),...store.masterWorkers.past.map(p=>h('section',{},h('strong',{},p.brief),h('p',{},p.phase),replayButton(p))));
   const renderForm=()=>{
     const saved=store.masterWorkers.presets;
     const select=h('select',{'aria-label':'Team preset'},h('option',{value:''},'Choose a saved preset'),...saved.map(p=>h('option',{value:p.id},p.name))) as HTMLSelectElement;
@@ -50,6 +54,7 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
     const form=h('form',{},h('p',{},'One master plans, delegates to models you allow, reviews their work, and delivers one verified PR. Up to five workers can help; the master also contributes.'),h('section.team-presets',{},h('h3',{},'Reusable team preset'),select,name,h('div.team-buttons',{},h('button.btn',{type:'button',onclick:()=>savePreset()},'Save preset'),h('button.btn',{type:'button',onclick:()=>savePreset(true)},'Save as new'),h('button.btn',{type:'button',disabled:!presetId,onclick:()=>{capture();net.send({t:'master-workers.preset',remove:presetId});presetId='';presetName='';}},'Delete preset'))),master.el,h('h3',{},'Eligible worker models'),h('p.muted',{},'The master chooses suitable models for each task. Models can be reused; no capability notes are needed.'),pool,h('button.btn',{type:'button',onclick:()=>add(fallback)},'Add eligible model'),h('label',{},'Maximum workers (master is additional)',limit),h('label',{},'Task brief',brief),h('label',{},'Requirements',requirements),h('label',{},'Constraints',constraints),h('button.btn.primary',{type:'submit'},'Start Master / Workers'));
     form.addEventListener('submit',e=>{e.preventDefault();if(!valid())return;if(!draft.brief.trim()||!draft.requirements.length){toast('Provide a brief and requirements','error');return;}net.send({t:'master-workers.start',request:draft});formView=false;});
     body.replaceChildren(form);
+    if(store.masterWorkers.past.length)body.append(pastActivities());
     if(store.masterWorkers.current)body.append(h('button.btn',{onclick:()=>{capture();formView=false;render();}},'Back to activity'));
   };
   const render=()=>{
@@ -75,11 +80,11 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
     }
     if(!r.tasks.length)body.append(h('p.muted',{},'The master is inspecting the project and planning the work.'));
     if(r.pr)body.append(h('a.btn.primary',{href:r.pr,target:'_blank',rel:'noopener noreferrer'},'Open completed PR'),h('p',{},r.summary),h('pre',{},r.checks));
-    const buttons=h('div.team-buttons');
+    const buttons=h('div.team-buttons',{},replayButton(r));
     if(!['done','stopped'].includes(r.phase)){buttons.append(h('button.btn',{onclick:()=>control(r.phase==='paused'?'resume':'pause')},r.phase==='paused'?'Resume':'Pause'),h('button.btn',{onclick:()=>control('stop')},'Stop (keep all work)'));body.append(h('p.muted',{},'Pause holds new orchestration; running assignments can still report results. Stop preserves all branches and worktrees.'));}
     else buttons.append(h('button.btn',{onclick:()=>control('stop')},'Close team terminals (keep work)'),h('button.btn',{onclick:()=>{formView=true;render();}},'New activity'));
     body.append(buttons);
-    if(state.past.length)body.append(h('details',{},h('summary',{},'Previous activities'),...state.past.map(p=>h('section',{},h('strong',{},p.brief),h('p',{},p.phase),...(p.pr?[h('a',{href:p.pr,target:'_blank',rel:'noopener noreferrer'},'Open PR')]:[])))));
+    if(state.past.length)body.append(pastActivities());
   };
   const offs=[store.on('masterWorkers',()=>{if(formView)capture();render();}),store.on('workers',()=>{if(!formView)render();})];
   const modal=openModal(el,{doing:'managing a master and workers',onClose:()=>offs.forEach(off=>off())});
