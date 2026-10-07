@@ -97,6 +97,10 @@ const path = require('node:path');
 const log = process.env.FAKE_AGENT_LOG;
 const kind = path.basename(process.argv[1]);
 const args = process.argv.slice(2);
+if (kind === 'opencode' && args.includes('--version')) {
+  process.stdout.write(process.env.FAKE_OPENCODE_VERSION || '1.99.0');
+  process.exit(0);
+}
 const record = (extra = {}) => fs.appendFileSync(log, JSON.stringify({
   kind,
   args,
@@ -385,7 +389,8 @@ test('OpenCode model overrides configured model flags on first launch and is omi
   if (typeof worker === 'string') return;
   const first = await waitFor(() => f.read(), (records) => records.some((r) => r.kind === 'opencode'));
   const firstInvocation = first.find((r) => r.kind === 'opencode')!;
-  assert.deepEqual(firstInvocation.args, ['--keep', 'yes', '--model', 'openai/gpt-5/nested', '--prompt', coordinated('modelled prompt')]);
+  assert.deepEqual(firstInvocation.args, ['--keep', 'yes', '--prompt', coordinated('modelled prompt')]);
+  assert.equal(JSON.parse(firstInvocation.env.opencodeConfig!).model, 'openai/gpt-5/nested');
   assert.equal(workers.get(worker.id)?.model, 'openai/gpt-5/nested');
 
   assert.equal(workers.handleOpenCodeHook(worker.id, firstInvocation.env.hookToken!, { type: 'session', sessionId: 'oc-model', status: 'starting' }), true);
@@ -397,17 +402,22 @@ test('OpenCode model overrides configured model flags on first launch and is omi
   assert.ok(resumed.args.includes('oc-model'));
   assert.equal(resumed.args.includes('--model'), false);
   assert.equal(resumed.args.includes('openai/gpt-5/nested'), false);
+  assert.equal(JSON.parse(resumed.env.opencodeConfig!).model, undefined);
 });
 
-test('OpenCode keeps configured model flags when no explicit model is selected, then strips them on resume', async (t) => {
+test('OpenCode translates configured model flags when no explicit model is selected, then omits the override on resume', async (t) => {
   const f = fixture();
   const updates: WorkerInfo[] = [];
   isolateProviderEnvironment(f, t);
   const previousExit = process.env.FAKE_AGENT_EXIT_MS;
   const previousLog = process.env.FAKE_AGENT_LOG;
+  const previousVersion = process.env.FAKE_OPENCODE_VERSION;
+  process.env.FAKE_OPENCODE_VERSION = 'opencode v2.0.24';
   process.env.FAKE_AGENT_EXIT_MS = '180';
   process.env.FAKE_AGENT_LOG = f.log;
   t.after(() => {
+    if (previousVersion === undefined) delete process.env.FAKE_OPENCODE_VERSION;
+    else process.env.FAKE_OPENCODE_VERSION = previousVersion;
     if (previousExit === undefined) delete process.env.FAKE_AGENT_EXIT_MS;
     else process.env.FAKE_AGENT_EXIT_MS = previousExit;
     if (previousLog === undefined) delete process.env.FAKE_AGENT_LOG;
@@ -422,16 +432,20 @@ test('OpenCode keeps configured model flags when no explicit model is selected, 
   if (typeof worker === 'string') return;
   const first = await waitFor(() => f.read(), (records) => records.some((r) => r.kind === 'opencode'));
   const firstInvocation = first.find((r) => r.kind === 'opencode')!;
-  assert.ok(firstInvocation.args.includes('--model'));
-  assert.ok(firstInvocation.args.includes('configured/model'));
+  assert.equal(firstInvocation.args[0], '--standalone', 'v2 workers must receive their own inline config');
+  assert.equal(firstInvocation.args.includes('--model'), false);
+  assert.equal(firstInvocation.args.includes('configured/model'), false);
+  assert.equal(JSON.parse(firstInvocation.env.opencodeConfig!).model, 'configured/model');
   assert.equal(workers.handleOpenCodeHook(worker.id, firstInvocation.env.hookToken!, { type: 'session', sessionId: 'oc-configured', status: 'starting' }), true);
   await waitFor(() => workers.get(worker.id)?.status, (status) => status === 'exited');
   assert.equal(workers.resume(worker.id), undefined);
   const all = await waitFor(() => f.read(), (records) => records.filter((r) => r.kind === 'opencode').length >= 2);
   const resumed = all.filter((r) => r.kind === 'opencode')[1];
+  assert.equal(resumed.args[0], '--standalone');
   assert.ok(resumed.args.includes('--session'));
   assert.equal(resumed.args.includes('--model'), false);
   assert.equal(resumed.args.includes('configured/model'), false);
+  assert.equal(JSON.parse(resumed.env.opencodeConfig!).model, undefined);
   assert.ok(resumed.args.includes('--keep'));
 });
 

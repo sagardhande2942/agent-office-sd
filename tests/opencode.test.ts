@@ -33,7 +33,8 @@ test('an OpenCode worker is told its effort and model for a fresh session, and n
   };
   const model = 'anthropic/claude-opus-5-5';
   const fresh = launch({ model, effort: 'high' });
-  assert.deepEqual(fresh.args, ['--model', model]);
+  assert.deepEqual(fresh.args, []);
+  assert.equal(fresh.config.model, model);
   assert.deepEqual([fresh.effort, fresh.model], ['high', model]);
   // The person's own agents are left alone: the effort goes through the plugin.
   assert.equal(fresh.config.agent, undefined);
@@ -42,7 +43,32 @@ test('an OpenCode worker is told its effort and model for a fresh session, and n
   assert.deepEqual([launch({ model }).effort, launch({ model }).model], ['', model]);
   const resumed = launch({ model, effort: 'high' }, 'ses_1');
   assert.deepEqual(resumed.args, ['--session', 'ses_1']);
+  assert.equal(resumed.config.model, undefined);
   assert.deepEqual([resumed.effort, resumed.model], ['', '']);
+});
+
+test('OpenCode translates configured model arguments to inline config with explicit choices taking precedence', () => {
+  const launch = (args: string[], model?: string, resumeSessionId?: string) => {
+    const plan = opencode.launch({ h: { info: { model }, state: {} } as never, args, resumeSessionId, setup: { plugin: '/data/plugin.mjs' } });
+    const env = { OPENCODE_CONFIG_CONTENT: JSON.stringify({ model: 'user/default', plugin: ['user-plugin'], permission: { edit: 'ask' } }) };
+    plan.finishEnv!(env);
+    return { args: plan.args, config: JSON.parse(env.OPENCODE_CONFIG_CONTENT) };
+  };
+  for (const flags of [['--model', 'configured/model'], ['-m', 'configured/model'], ['--model=configured/model'], ['-mconfigured/model'], ['-m=configured/model']]) {
+    const fresh = launch(['--continue', ...flags]);
+    assert.deepEqual(fresh.args, ['--continue']);
+    assert.equal(fresh.config.model, 'configured/model');
+    assert.deepEqual(fresh.config.plugin, ['user-plugin', 'file:///data/plugin.mjs']);
+    assert.deepEqual(fresh.config.permission, { edit: 'ask' });
+    assert.equal(launch(flags, 'worker/model').config.model, 'worker/model');
+    const resumed = launch(flags, 'worker/model', 'ses_saved');
+    assert.deepEqual(resumed.args, ['--session', 'ses_saved']);
+    assert.equal(resumed.config.model, 'user/default', 'resume retains user config without injecting the launch model');
+  }
+  assert.equal(launch(['--model', 'first/model', '-m', 'last/model']).config.model, 'last/model');
+  assert.equal(launch([]).config.model, 'user/default', 'Default leaves user settings intact');
+  assert.deepEqual(launch(['--model', '--continue']).args, ['--continue']);
+  assert.deepEqual(launch(['--', '--model=directory']).args, ['--', '--model=directory']);
 });
 
 /** Loads the office's plugin as a worker hired with `effort` (and `model`) would, and hands back its chat.message hook. */

@@ -13,6 +13,8 @@
 
 Full-screen agents retain up to 3,000 lines in the office's searchable, saved terminal scrollback. See [how it works](docs/how-it-works.md) for persistence and search behavior.
 
+OpenCode model selections use per-process configuration, including models set in the default worker or `--agent-args`; no `--model` flag is sent to its interactive CLI. OpenCode 2 workers start private servers so each receives its own settings. Leave Model on **Default** to retain your OpenCode settings. See [agents](docs/agents.md) for model and resume behavior.
+
 Sit **Claude Code**, **Codex**, **OpenCode**, **Grok**, **Muse**, **DeepSeek Harness** and **Cursor** workers at desks, watch each one's terminal on the laptop in front of it,
 and jump into any of them together. Every GitHub repo is a floor of the building.
 
