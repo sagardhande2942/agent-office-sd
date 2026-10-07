@@ -5,6 +5,7 @@ import type { AgentChoice } from '../../shared/protocol.js';
 import { validateWorkerModel, validateWorkerEffort } from '../agents.js';
 import { planModelIdentity } from '../../shared/plan-providers.js';
 import { isAgentProvider } from '../../shared/providers.js';
+import { normalizeLog } from '../task-replay/index.js';
 export function text(value: unknown, label: string, max = 20000): string {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw Error(`Provide ${label} (1–${max} characters)`);
   return value.trim();
@@ -63,6 +64,7 @@ export function restored(raw: unknown): { current: TeamRun | null; past: TeamRun
   if (!value || !Array.isArray(value.past)) throw Error('Invalid activity file');
   for (const r of [...value.past, ...(value.current ? [value.current] : [])]) {
     request(r); text(r.id, 'activity ID', 80);
+    r.replay = normalizeLog(r.replay, r.id);
     if (!Array.isArray(r.tasks) || !Array.isArray(r.workers) || !r.notifications || !Number.isInteger(r.revision) || !['starting','running','paused','stopped','done'].includes(r.phase)) throw Error('Invalid saved activity');
     if (r.tasks.length>100 || r.workers.length>1000 || value.past.length>10) throw Error('Invalid saved activity limits');
     for(const w of r.workers){text(w.workerId,'worker ID',80);choice(w.choice);}
