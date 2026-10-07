@@ -52,3 +52,7 @@ Detailed results are in [checks.json](game2d-evidence/checks.json). Live microph
 ![plans](game2d-evidence/plans.png)
 
 ![arcade](game2d-evidence/arcade.png)
+
+Graphics quality is checked separately with `node --import tsx scripts/e2e-game2d-graphics.mjs` after building. It uses an isolated authenticated office to verify immediate switching, saved preferences, activity rendering, and Esc/✕ controls, and captures both quality modes under `/tmp/agent-office-2d-graphics-evidence`. The harness freezes animation only while taking screenshots so software rendering can drain its GPU queue.
+
+![Enhanced graphics setting in the playable 2D office](game2d-evidence/graphics-enhanced.png)

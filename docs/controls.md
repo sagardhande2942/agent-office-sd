@@ -82,3 +82,5 @@ Open `/2d`, or select **2D Game** from **View**. The office has the same fixture
 Keyboard movement cancels click-to-walk. Activities that take over the camera (including golf, driving, telescope and arcade screens) retain their original camera and controls; finishing returns to the top-down projection. The elevator and floor list retain running worker sessions. Dialogs use the shared modal stack and suspend movement, including nested dialogs. Lite remains available for mobile or a browser without WebGL.
 
 The top bar has a direct **2D / 3D** toggle, available in both views. Switching preserves the selected floor and running workers. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.
+
+In **2D Game**, open **Tab → 2D graphics settings** to choose **Reduced (current)** or **Enhanced**. Reduced is the default and preserves the existing quality. Enhanced increases rendering resolution (2–3× pixel ratio) and enables real-time shadows. Changes apply immediately, persist in this browser, and affect only 2D exploration; activities retain their original rendering. Choose Reduced on slower hardware.

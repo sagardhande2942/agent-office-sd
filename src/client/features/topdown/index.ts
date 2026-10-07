@@ -10,6 +10,7 @@ export { isTopdownRoute } from './camera';
 import { store } from '../../state';
 import { planClick } from './click';
 import { cutaway } from './cutaway';
+import { configureGraphics } from './graphics';
 import './topdown.css';
 
 /** Same office, every feature installed once; only exploration projection and pointing differ. */
@@ -43,7 +44,6 @@ export function installTopdown(ctx: Ctx, core: CoreState, parts: Parts) {
   ctx.view.add({ update: () => {
     const plan = exploring();
     camera.perspective = !plan;
-    ctx.renderer.shadowMap.enabled = !plan;
     camera.updateProjectionMatrix();
     // Follow the supporting floor, not the airborne player's jump arc.
     const floorY = Math.max(groundAt(ctx.player.colliders, ctx.player.pos.x, ctx.player.pos.z, ctx.player.pos.y), ctx.player.street);
@@ -64,6 +64,7 @@ export function installTopdown(ctx: Ctx, core: CoreState, parts: Parts) {
     clip();
     if (exploring() && ctx.scene.fog instanceof THREE.Fog) { ctx.scene.fog.near = 100; ctx.scene.fog.far = 200; }
   });
+  configureGraphics(ctx, exploring);
   planClick(ctx, core, parts, exploring, () => cut.constant);
   // Browser diagnostics use the real registries and transport, never a second session.
   (window as any).__game2d = { ctx, core, parts, camera, exploring, store };
