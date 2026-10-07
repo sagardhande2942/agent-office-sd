@@ -18,6 +18,8 @@ export interface ProviderFloor {
 /** One run of a worker, for its adapter to turn into a command line. */
 export interface LaunchInput<S, P> {
   h: WorkerHandle<S>;
+  /** Resolved executable, when available, for provider-specific CLI compatibility checks. */
+  command?: string;
   /**
    * The command line so far: the office's --agent-args when it runs the office's --agent, nothing
    * otherwise. A fresh copy, its own to change.

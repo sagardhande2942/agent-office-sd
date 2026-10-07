@@ -700,7 +700,7 @@ export class WorkerManager {
     const planLaunchError = planningVersion(info, commandPath ?? command);
     if (planLaunchError) { this.startFailed(w, planLaunchError); return; }
     // Its provider's command line, and anything it sets for this run (see ProviderAdapter.launch).
-    const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), args: base, prompt, resumeSessionId, station: DESK_BY_ID.get(info.deskId)?.station, cwd, setup: this.setups[adapter.id] }) : { args: base };
+    const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), command: commandPath ?? command, args: base, prompt, resumeSessionId, station: DESK_BY_ID.get(info.deskId)?.station, cwd, setup: this.setups[adapter.id] }) : { args: base };
     const { args } = plan;
     if (plan.rotateToken) w.hookToken = randomBytes(16).toString('hex');
     const env = childEnv();

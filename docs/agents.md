@@ -11,7 +11,7 @@ Every harness takes both a **Model** and an **Effort**, each optional: leave one
 | Harness | Model | Effort |
 | --- | --- | --- |
 | Claude Code | Fable 5.1, Opus 5.5, Sonnet 5.5 or Haiku 4.5 (`--model`) | `--effort` |
-| OpenCode | a `provider/model`, typed or picked from the suggestions `opencode models` gives (`--model`) | the model's variant |
+| OpenCode | a `provider/model`, typed or picked from the suggestions `opencode models` gives (per-process config) | the model's variant |
 | Codex | one of the models `codex debug models` lists (`--model`) | `-c model_reasoning_effort` |
 | Antigravity | model slug from `agy models` (`--model`) | `--effort` |
 | Grok | one of the models `grok models` lists (`--model`) | `--effort` |
@@ -24,6 +24,10 @@ The efforts are low, medium, high, extra high and max. Where a harness's own cat
 What's picked shows next to the worker everywhere it's named (the Workers panel, its task card, its terminal's title, the queue), by the model's name rather than its family: **Opus 5.5**, not "Opus". For Claude Code that name comes from the session itself once the worker has spoken, so a worker left on Default says which model the default is, and one switched with `/model` in its terminal says the new one.
 
 For OpenCode, the **Model** field selects the initial model for a new worker or queue task. Suggestions come from `opencode models`; you can also enter a `provider/model` ID. Leave it empty to use your OpenCode settings (including configured CLI arguments). An explicit choice overrides configured model arguments for that launch and stays with a queued task when retried. **Effort** is what OpenCode calls the model's *variant*. Its TUI has no flag for one, and sends each message at the variant it remembers for the model from whichever session used it last, so the office's plugin puts the worker's first message on the effort picked for it; the TUI carries on from that message, and `Ctrl+T` in the terminal still changes it. An effort the model has no variant for changes nothing.
+
+The office passes OpenCode's initial model through `OPENCODE_CONFIG_CONTENT`, preserving other config and plugins without editing your config files. This avoids the unsupported `--model` flag in OpenCode 2's interactive CLI. Existing `--agent-args` model options (`--model`, `-m`, and their attached-value forms) are translated into the same config, with an explicit worker model taking precedence. Resuming omits the initial model override so the saved session keeps its selection.
+
+OpenCode 2 workers use `--standalone` so the private server receives that worker's config instead of reusing a shared service's startup environment. OpenCode 1 launches without this flag. An explicit `--server` in your agent arguments is retained; that external server owns its configuration.
 
 **Pi** is available in the worker picker, queued tasks, meetings, and the office default. Install and sign in to the Pi coding-agent CLI on the machine running the office (`npm install -g @earendil-works/pi-coding-agent`, then `pi` and `/login`). The integration targets Pi 0.87.1 or later, using its `agent_settled` and UI prompt extension events. Choose Pi when hiring, or start the office with `--agent pi`. Windows npm `.cmd` launchers are supported.
 

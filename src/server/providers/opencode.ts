@@ -7,6 +7,7 @@ import { reportedUsage } from '../reported-usage.js';
 import type { WorkerHandle } from '../workers/types.js';
 import { truncate } from '../workers/util.js';
 import type { ProviderAdapter } from './types.js';
+import { openCodeNeedsStandalone } from './opencode-cli.js';
 
 /** What a worker that reports statuses (OpenCode's plugin, Pi's extension) keeps of them. */
 export interface StatusState {
@@ -27,18 +28,26 @@ interface OpenCodeSetup {
   mcpScript?: string;
 }
 
-function withoutOpenCodeModel(args: string[]): string[] {
+function takeOpenCodeModel(args: string[]): { args: string[]; model?: string } {
   const clean: string[] = [];
+  let model: string | undefined;
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
+    if (arg === '--') {
+      clean.push(...args.slice(i));
+      break;
+    }
     if (arg === '--model' || arg === '-m') {
-      if (args[i + 1] !== undefined && !args[i + 1].startsWith('-')) i++;
+      if (args[i + 1] !== undefined && !args[i + 1].startsWith('-')) model = args[++i];
       continue;
     }
-    if (arg.startsWith('--model=') || (arg.startsWith('-m') && arg.length > 2)) continue;
+    if (arg.startsWith('--model=') || (arg.startsWith('-m') && arg.length > 2)) {
+      model = arg.startsWith('--model=') ? arg.slice(8) : arg.slice(2).replace(/^=/, '');
+      continue;
+    }
     clean.push(arg);
   }
-  return clean;
+  return { args: clean, model };
 }
 
 function isOpenCodeHookEvent(value: unknown): value is OpenCodeStatusEvent {
@@ -113,11 +122,15 @@ export const opencode: ProviderAdapter<StatusState, OpenCodeSetup> = {
   id: 'opencode',
   createState: () => ({}),
   prepare: ({ dataDir, mcpScript }) => ({ plugin: writeOpenCodePlugin(dataDir), mcpScript }),
-  launch({ h, args, prompt, resumeSessionId, setup }) {
+  launch({ h, command, args, prompt, resumeSessionId, setup }) {
     const { info } = h;
     if (info.planReview?.locked) args.push('--agent', 'plan');
-    if (resumeSessionId || info.model) args = withoutOpenCodeModel(args);
-    if (!resumeSessionId && info.model) args.push('--model', info.model);
+    // OpenCode 2's interactive CLI no longer accepts --model/-m. Inline config works
+    // with both CLI generations, including model flags from the office's agent args.
+    const configured = takeOpenCodeModel(args);
+    args = configured.args;
+    if (!args.some((arg) => arg === '--standalone' || arg === '--server' || arg.startsWith('--server=')) && openCodeNeedsStandalone(command)) args.unshift('--standalone');
+    const model = !resumeSessionId && (info.model || configured.model);
     if (resumeSessionId) args.push('--session', resumeSessionId);
     if (prompt) args.push('--prompt', prompt);
     h.state.error = false;
@@ -131,6 +144,11 @@ export const opencode: ProviderAdapter<StatusState, OpenCodeSetup> = {
         env.AGENT_OFFICE_EFFORT = (!resumeSessionId && info.effort) || '';
         env.AGENT_OFFICE_MODEL = (!resumeSessionId && info.model) || '';
         env.OPENCODE_CONFIG_CONTENT = mergeOpenCodeConfigContent(env.OPENCODE_CONFIG_CONTENT, openCodePluginSpecifier(setup.plugin), setup.mcpScript ? openCodeMcp(setup.mcpScript) : undefined);
+        if (model) {
+          const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
+          config.model = model;
+          env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
+        }
         if (info.planReview?.locked) {
           const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
           const permission: Record<string, string> = { '*': 'deny', read: 'allow', glob: 'allow', grep: 'allow', list: 'allow', bash: 'ask' };
