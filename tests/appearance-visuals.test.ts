@@ -30,6 +30,7 @@ test('swaps keep animation anchors and status props; dispose geometry while shar
 });
 test('blinking keeps eye centers in place and pupil anchors follow the shared look pose',()=>{
  const v=fictionalFactories.naruto();const root=assembled(v);const eye=v.eyes[0];root.updateMatrixWorld(true);const center=new THREE.Box3().setFromObject(eye).getCenter(new THREE.Vector3());
+ const height=new THREE.Box3().setFromObject(eye).getSize(new THREE.Vector3()).y;eye.scale.y=1;assert.ok(Math.abs(new THREE.Box3().setFromObject(eye).getSize(new THREE.Vector3()).y-height)<1e-6);
  eye.scale.y=.1;root.updateMatrixWorld(true);assert.ok(center.distanceTo(new THREE.Box3().setFromObject(eye).getCenter(new THREE.Vector3()))<1e-6);
  const pupil=v.pupils[0];const before=pupil.getWorldPosition(new THREE.Vector3());pupil.position.y+=.05;assert.ok(Math.abs(pupil.getWorldPosition(new THREE.Vector3()).y-before.y-.05)<1e-6);disposeWorkerVisual(v);
 });

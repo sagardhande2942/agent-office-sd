@@ -22,10 +22,10 @@ export function rig(armColor: string, shoeColor = C.ink): WorkerVisual {
 }
 export function face(v: WorkerVisual, y: number, z: number, spread=.11, dark=false, size=.065) {
   for(const sx of [-1,1]) {
-    const eye=ball(v.body,dark ? C.ink : C.white,sx*spread,y,z,size,size*1.15,.025);eye.name='eye';v.eyes.push(eye);
+    const eye=ball(v.body,dark ? C.ink : C.white,sx*spread,y,z,size,size*1.15,.025);eye.geometry.scale(...eye.scale.toArray());eye.scale.set(1,1,1);eye.name='eye';v.eyes.push(eye);
     if(!dark) {
       const anchor=new THREE.Group();anchor.position.y=.7;
-      const pupil=ball(anchor,C.ink,sx*spread,y-.7,z+.028,size*.48,size*.65,.018);pupil.name='pupil';
+      const pupil=ball(anchor,C.ink,sx*spread,y-.7,z+.028,size*.48,size*.65,.018);pupil.geometry.scale(...pupil.scale.toArray());pupil.scale.set(1,1,1);pupil.name='pupil';
       v.body.add(anchor);v.pupils.push(anchor);v.eyes.push(pupil);
     }
   }
