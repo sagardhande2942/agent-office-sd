@@ -68,7 +68,7 @@ export function requestHandler(ctx: Ctx, routes: readonly Route[]) {
       if (!session) {
         if (p.startsWith('/api/')) return send(res, 401, { error: 'Not logged in' });
         // Back to the 2D view after signing in, if that's where they were going.
-        res.writeHead(302, { location: p === '/lite' ? '/login?next=/lite' : '/login' }).end();
+        res.writeHead(302, { location: ['/lite', '/lite.html', '/2d', '/2d.html', '/game2d.html'].includes(p) ? `/login?next=${p.startsWith('/lite') ? '/lite' : '/2d'}` : '/login' }).end();
         return;
       }
       for (const route of signedIn) if (route.auth === 'session' && matches(route, req.method, p)) return await route.handle(ctx, { ...r, session });

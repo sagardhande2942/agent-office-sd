@@ -1,0 +1,21 @@
+import './styles/base.css';
+import './game2d/game2d.css';
+import { createGame } from './game2d/context';
+import { installActions } from './game2d/actions';
+import { installMovement } from './game2d/movement';
+import { installPresence } from './game2d/presence';
+import { installRender } from './game2d/render';
+import { installInteractions } from './game2d/interactions';
+import { installFocus } from './game2d/focus';
+import { installHud } from './game2d/hud';
+import { bootstrap } from './game2d/bootstrap';
+
+const game = createGame();
+const actions = installActions(game);
+installMovement(game);
+installPresence(game);
+installRender(game);
+installInteractions(game, actions);
+installFocus(game);
+installHud(game, actions);
+void bootstrap(game);

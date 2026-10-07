@@ -1,0 +1,85 @@
+{
+  "checks": [
+    {
+      "name": "auth and direct routes",
+      "status": "passed",
+      "evidence": "Signed-out /2d retains login next; three protected entry aliases serve the game; non-default floor selected."
+    },
+    {
+      "name": "movement and collision",
+      "status": "passed",
+      "evidence": "Arrows and WASD move; a ground click reaches its destination; holding D against a desk stays outside its blocked cells."
+    },
+    {
+      "name": "worker terminal and focus",
+      "status": "passed",
+      "evidence": "Map click and nearby E attach the existing real shell; input uses term.input; ✕ and Esc suspend and immediately restore movement without another click."
+    },
+    {
+      "name": "existing dialogs",
+      "status": "passed",
+      "evidence": "Issues, PRs, Queue, Manager and Plan Comparison open from both HUD and map; each has ✕, consumes Esc, and restores canvas controls."
+    },
+    {
+      "name": "worker action dialogs",
+      "status": "passed",
+      "evidence": "Shared prompt, helper, send-home confirmation and provider/repository hiring dialogs open and cancel without spawning or killing a worker."
+    },
+    {
+      "name": "nested dialogs and queue APIs",
+      "status": "passed",
+      "evidence": "Real queue.limit/add/remove run against the isolated floor; Escape unwinds three nested board/issue/confirmation dialogs while controls remain suspended."
+    },
+    {
+      "name": "existing action contracts",
+      "status": "passed",
+      "evidence": "Runtime helper, Manager and hiring forms emit existing worker.helper/station.prompt/worker.spawn requests; provider launches are captured as fixtures."
+    },
+    {
+      "name": "multiplayer",
+      "status": "passed",
+      "evidence": "Two authenticated 2D pages exchange actual move frames; the other player disappears on floor change and disconnect."
+    },
+    {
+      "name": "map and worker statuses",
+      "status": "passed",
+      "evidence": "Desktop screenshots at 1440×900 and 1120×760 show placeholder Office fixtures, named workers, and live working/needs input/done/offline labels."
+    },
+    {
+      "name": "3D focus regression",
+      "status": "passed",
+      "evidence": "Closing the 3D View dialog restores canvas focus, enabled controls and mouse-look without another click."
+    },
+    {
+      "name": "view switching and 3D interoperability",
+      "status": "passed",
+      "evidence": "2D → Lite → 3D → 2D retains floor f2 and all worker/session IDs, sends no spawn/resume, leaves one peer; a 3D page receives real 2D player movement."
+    },
+    {
+      "name": "reconnect lifecycle",
+      "status": "passed",
+      "evidence": "Dropping the socket reconnects once and sends exactly one worker.attach for the open terminal."
+    },
+    {
+      "name": "repeated switching",
+      "status": "passed",
+      "evidence": "Two additional rapid Lite/2D round trips preserve worker sessions and leave exactly one positioned peer."
+    },
+    {
+      "name": "Office-only guard",
+      "status": "passed",
+      "evidence": "An unsupported-map fixture disables game input and shows the view-switch notice while retaining the selected floor."
+    },
+    {
+      "name": "browser runtime",
+      "status": "passed",
+      "evidence": "No page errors across 2D, Lite and 3D."
+    }
+  ],
+  "screenshots": [
+    "office-1440.png",
+    "office-1120.png",
+    "terminal.png",
+    "plans.png"
+  ]
+}

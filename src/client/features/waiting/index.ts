@@ -1,3 +1,4 @@
+import { visitWorker } from '../../shared/worker-terminal';
 /**
  * Who's waiting on you: N (and the count in the Workers panel) takes you to each in turn, and the
  * compass points to the ones you can't see. Also going to a worker's desk, opening its terminal
@@ -112,12 +113,10 @@ export function installWaiting(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
 
   /** Opening a sleeping worker's terminal wakes it, so there's nothing to press first. */
   function openWorkerTerminal(id: string, find?: TerminalFind, doing?: string) {
-    const w = store.workers.get(id);
-    if (!w) return;
-    const { actions } = parts;
-    if (w.lost) return actions.fixLostWorktree(w);
-    if (isAsleep(w.status)) actions.resumeWorker(w);
-    openTerminal(net, id, () => openWorkerChanges(id), find, { doing });
+    visitWorker(id, {
+      lost: parts.actions.fixLostWorktree, resume: parts.actions.resumeWorker,
+      terminal: () => openTerminal(net, id, () => openWorkerChanges(id), find, { doing }),
+    });
   }
 
   /** 🔎 the chat and every terminal; a terminal line opens that terminal right at it. */

@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agent Office · 2D Game</title><link rel="icon" href="/favicon.svg"></head>
+<body class="game2d">
+<header id="game-hud"><strong>Agent Office <small>2D Game</small></strong><label>Floor <select id="floor" aria-label="Floor"></select></label><span id="views"></span><nav id="actions" aria-label="Office actions"></nav></header>
+<main id="game-stage"><canvas id="office-map" tabindex="0" aria-label="Office map: WASD or arrows to move, click to walk, E to interact"></canvas><p id="notice" role="status"></p></main>
+<footer id="game-help">WASD / arrows · Click to walk · E interact · P prompt · U helper · R resume · X send home · Esc close</footer>
+<div id="toasts"></div><div id="conn" class="conn">Connecting…</div><div id="modal-root"></div>
+<script type="module" src="./game2d.ts"></script></body></html>

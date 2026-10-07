@@ -1,3 +1,4 @@
+import { installViewSelector } from './features/view-selector';
 import { installPlanReview } from './features/plan-review';
 import './style.css';
 import { installVitals } from './features/vitals';
@@ -192,6 +193,7 @@ parts.talk = installVoice(ctx, { tv: parts.tv });
 installDictation(ctx);
 installCommunications(ctx, parts);
 installPlanReview(ctx, parts);
+installViewSelector(ctx);
 parts.hud = installHud(ctx, core, parts);
 
 // ---- Main loop ---------------------------------------------------------------------------------------

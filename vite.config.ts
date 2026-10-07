@@ -37,7 +37,15 @@ function excalidrawFonts(): Plugin {
 export default defineConfig({
   root: resolve(import.meta.dirname, 'src/client'),
   publicDir: resolve(import.meta.dirname, 'src/client/public'),
-  plugins: [excalidrawFonts()],
+  plugins: [excalidrawFonts(), {
+    name: 'game2d-route',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (/^\/2d(?:\.html)?(?:\?|$)/.test(req.url ?? '')) req.url = (req.url ?? '').replace(/^\/2d(?:\.html)?/, '/game2d.html');
+        next();
+      });
+    },
+  }],
   define: {
     __EXCALIDRAW_ASSETS__: JSON.stringify(EXCALIDRAW_ASSETS),
   },
@@ -54,6 +62,7 @@ export default defineConfig({
       input: {
         main: resolve(import.meta.dirname, 'src/client/index.html'),
         lite: resolve(import.meta.dirname, 'src/client/lite.html'),
+        game2d: resolve(import.meta.dirname, 'src/client/game2d.html'),
         login: resolve(import.meta.dirname, 'src/client/login.html'),
         claim: resolve(import.meta.dirname, 'src/client/claim.html'),
         join: resolve(import.meta.dirname, 'src/client/join.html'),

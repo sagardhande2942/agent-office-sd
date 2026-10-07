@@ -8,6 +8,8 @@ import { spawn } from '@lydell/node-pty';
 // Exercise real raw terminal input so Enter cannot leak into a worker during attachment.
 test('dashboard navigation, terminal input, floor switching and cleanup over a PTY', { timeout: 20_000 }, async () => {
   const server = http.createServer((req, res) => {
+    // The live office may discover ephemeral local servers while this fixture runs.
+    if (req.url === '/') { res.writeHead(404); res.end(); return; }
     assert.equal(req.url, '/api/login');
     res.writeHead(200, { 'set-cookie': 'ao_session=test; HttpOnly' }); res.end('{}');
   });

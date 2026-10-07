@@ -40,7 +40,7 @@ Back to the [README](../README.md).
 
 You can also click a nearby desk to interact with it, or click a worker in the Workers panel (**🤖 Workers**, top right) to open its terminal.
 
-On a phone, use the 2D view at `/lite` instead: a terminal there has a row of keys under it (**1** **2** **3**, the arrows, Enter, Tab, Esc, Ctrl+C) and a box to send a prompt. See [Features](features.md).
+On a phone, use the Lite dashboard at `/lite` instead: a terminal there has a row of keys under it (**1** **2** **3**, the arrows, Enter, Tab, Esc, Ctrl+C) and a box to send a prompt. See [Features](features.md).
 
 ## In a terminal
 
@@ -62,3 +62,20 @@ At a regular worker’s desk, press U or click **U — Bring a helper** to open 
 Helpers carry a laptop showing their own terminal. Aim at the helper or its laptop and press **E**, or click **Open helper terminal** in the hint. You can also open the helper by name in the Workers list. **Needs you** means its agent is waiting: answer the question or approve/reject the permission request inside that helper’s terminal. Close it with Esc or ✕ to return to the office.
 
 At the boss chair, sit down and press **E** to open **Boss Control Center**. Choose **Play Minesweeper** to use the existing game. The center is also available from the menu or the Workers panel’s **Boss** button.
+
+## 2D Game (desktop)
+
+Open `/2d`, or select **2D Game** from **View** in 3D or Lite. The floor selector changes the existing project floor.
+
+| Control | Action |
+| --- | --- |
+| WASD / arrows | Walk with collisions; diagonal movement has the same speed |
+| Click ground / furniture | Walk to a reachable nearby cell around obstacles |
+| Click worker / empty desk | Open its terminal / hiring dialog |
+| O within reach | Open the nearest worker terminal, including station workers |
+| E within reach | Interact with the nearest worker, desk, kiosk, board or plan table |
+| P / U / R / X within reach | Prompt / helper / resume / send-home confirmation for a worker |
+| Toolbar | Issues, PRs, Queue, Manager request, Plan Comparison, New task |
+| ✕ / Esc | Close the top dialog; movement resumes as soon as the last dialog closes |
+
+Keyboard movement cancels click-to-walk. Opening a dialog, changing floors, leaving the tab or losing connection clears movement and held keys. Esc closes terminals without sending Escape to their process; use the terminal's existing **Esc** button or **Ctrl+[** to send it. Nested dialogs keep game controls suspended. Office only; no touch movement or recreational controls.

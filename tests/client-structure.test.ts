@@ -76,3 +76,15 @@ test('the 2D view loads no three.js, and none of the 3D office: what it shares w
     assert.ok(graph(path.join(client, 'main.ts')).has(path.join(client, shared)), `the 3D office uses ${shared}`);
   }
 });
+
+test('2D Game loads only pure registries and three.js-free modules', () => {
+  const modules = graph(path.join(client, 'game2d.ts'));
+  for (const file of modules) {
+    const rel = path.relative(client, file);
+    assert.doesNotMatch(read(file), /from 'three(?:\/[^']*)?'/, `${rel} loads three.js`);
+    assert.ok(!/^(features|input|world|player)\//.test(rel), `2D Game loads 3D module ${rel}`);
+    assert.ok(!rel.startsWith('core/') || rel === 'core/registry.ts', `2D Game loads scene core ${rel}`);
+  }
+  const entry = read(path.join(client, 'game2d.ts'));
+  for (const name of ['Actions', 'Movement', 'Presence', 'Render', 'Interactions', 'Focus', 'Hud']) assert.equal(entry.split(`install${name}(game`).length - 1, 1);
+});

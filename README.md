@@ -40,7 +40,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse, DeepSeek Harness, Pi or Cursor, each with its model and reasoning effort. The agent's live terminal shows on its laptop, and anyone can open it and type.
 - **Talk instead of typing.** Hold **Ctrl+Space** (or the **🎤**) in a worker's terminal or a prompt box and say what you want: it's typed in for you to send. Your browser does the listening, so there's nothing to install.
 - **You can't miss who needs you.** A worker that stops to ask you something lights a red beacon over its desk, puts a banner on your screen saying who and what for, and sounds an alarm. One that has finished jumps up and down and dings. Press **N** to go straight to whoever is waiting.
-- **From your phone, too.** `/lite` is the office in 2D: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
+- **From your phone, too.** `/lite` is the Lite dashboard: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
 - **GitHub on the walls.** Issues and pull requests hang on cork boards. Hand an issue to a worker, queue tasks, give a worker its own git worktree and open its PR with one key (if one gets deleted behind the office's back, the worker waits at its desk until you rebuild it). One task can span several projects: the worker gets a worktree of each, and a PR in each that links the others.
 - **Agents that manage agents.** Every worker can list, hire, message and send home the others, through an `agent-office` MCP server (Claude Code, Codex, OpenCode) or the `office-workers` command. Ask one to "send everyone whose PR merged home" and it does, deleting their worktrees and branches unless they hold unpushed work. A worker that opens its pull request itself (`gh pr create`) shows it at its desk, and one the office missed can be told which is its own (`office-workers pr`).
 - **Together.** Voice, chat, screen sharing on the lounge TV and a shared whiteboard.
@@ -51,7 +51,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse or DeepSeek Harness. The agent's live terminal shows on its laptop, and anyone can open it and type.
 - **You can see who needs you.** A worker that needs input or has finished jumps up and down and dings. Press **N** to go straight to the one that has waited longest.
 - **A helper, when one is stuck.** Press **U** at a worker that's going in circles and a second agent walks over, stands at the desk with a laptop, re-reads the failure the first one can't see past, tells the worker what it found, and goes home. It works in that worker's own checkout and cannot edit, commit or open a pull request: the work never moves off the worker you're helping. The same shared walk starts when another agent requests help through `office-workers helper`, and refreshing a local floor restores its active helpers.
-- **From your phone, too.** `/lite` is the office in 2D: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
+- **From your phone, too.** `/lite` is the Lite dashboard: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
 - **GitHub or Bitbucket on the walls.** Issues and pull requests hang on cork boards, for the repository the checkout's `origin` points at (your own, for a fork). Hand an issue to a worker, queue tasks, give a worker its own git worktree and open its PR with one key (if one gets deleted behind the office's back, the worker waits at its desk until you rebuild it). One task can span several projects: the worker gets a worktree of each, and a PR in each that links the others.
 - **Tracked worker communication.** Agents can queue requests, reply with branch/commit/file context, and acknowledge responses through persistent inboxes. Watch the exchanges in the CLI messages panel, `/lite` Messages, or the 3D menu. Workers read their inboxes between tasks; messages do not interrupt terminals. See [docs/communications.md](docs/communications.md).
 - **Meeting messages:** review round-linked requests inside the meeting room, resolve outstanding handoffs before completion, or finish anyway with a recorded override. Communication snapshots stay with the saved meeting notes.
@@ -493,3 +493,13 @@ TV playback controls and theatre lighting update every viewer on the floor immed
 
 At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
 
+
+### Playable 2D Game
+
+Open **`/2d`** for a desktop, top-down Office alongside 3D and the Lite dashboard (`/lite`). Use the **View** selector to switch among all three in the same tab. They share authentication, floor selection, running workers, terminals and server state; changing views does not hire or resume workers.
+
+Walk with **WASD / arrows**, click the floor to walk around furniture, or click a worker to open its existing terminal. Approach a desk and press **E** to open its worker or hire at an empty desk; **P** prompts, **U** brings a helper and **X** opens send-home confirmation. Issues, PRs, Queue, Manager and Plan Comparison are available from their map fixtures and the toolbar. Close dialogs with the top-right **✕** or **Esc** to resume movement immediately.
+
+The first version uses placeholder shapes and supports the **Office map and desktop controls only**. Other maps display an Office-only notice with the view selector available; they do not change the building's map. Mobile controls, custom sprites and recreational activities are outside this view. See [controls](docs/controls.md#2d-game-desktop) and [architecture](docs/code-layout.md#playable-2d-client).
+
+Production screenshots and reproducible checks are in [2D Game verification](docs/game2d-verification.md).
