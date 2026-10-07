@@ -1,3 +1,4 @@
+import { teamTargetError } from '../master-workers/role.js';
 import type http from 'node:http';
 import type { Ctx } from '../office/context.js';
 import { findWorker, workerRow } from '../office-workers.js';
@@ -17,6 +18,7 @@ export async function workerHelper(ctx: Ctx, req: http.IncomingMessage, res: htt
     const b = JSON.parse((await readBody(req)) || '{}') as { worker?: unknown; provider?: unknown; model?: unknown; effort?: unknown };
     const host = findWorker(floor.workers.list(), str(b.worker, 64));
     if (typeof host === 'string') return send(res, 404, { error: host });
+    const managed=teamTargetError(host);if(managed)return send(res,403,{error:managed});
     if (host.id === me.id) return send(res, 400, { error: "That's you: a helper goes to another worker" });
     if (b.provider !== undefined && (!isAgentProvider(b.provider) || !floor.project.agentProviders.includes(b.provider))) return send(res, 400, { error: 'Unknown agent provider' });
     const provider = isAgentProvider(b.provider) ? b.provider : undefined;

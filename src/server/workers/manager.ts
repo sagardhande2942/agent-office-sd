@@ -1,3 +1,4 @@
+import { teamPromptError } from '../master-workers/role.js';
 import { planningSeat, planningVersion, planningPrompt, promotePlanWorker } from './plan-review.js';
 import type { PlanReviewWorker } from '../../shared/plan-review.js';
 import { submitCompletion } from './completion.js';
@@ -234,7 +235,7 @@ export class WorkerManager {
    * (see meetings.ts), in the meeting's own worktree, which everyone at the table shares. `repos` are
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
-  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', helper?: { hostId: string; hostName: string; worktree?: WorkerInfo['worktree'] }, planReview?: PlanReviewWorker): WorkerInfo | string {
+  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', helper?: { hostId: string; hostName: string; worktree?: WorkerInfo['worktree'] }, planReview?: PlanReviewWorker, teamBase?: { commit: string; from: string }, teamRole?: WorkerInfo['masterWorkers']): WorkerInfo | string {
     // Nobody picked (a board agent, say): the office's default worker, model and effort included.
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
@@ -275,7 +276,7 @@ export class WorkerManager {
     let others: WorkerRepo[] | undefined;
     if (worktree) {
       const slug = `${name.toLowerCase()}-${id.slice(0, 4)}`;
-      const made = repos.length ? this.makeWorkspace(slug, repos) : this.trees.create(slug);
+      const made = repos.length ? this.makeWorkspace(slug, repos) : this.trees.create(slug, undefined, undefined, teamBase);
       if (typeof made === 'string') return made;
       if ('repos' in made) {
         ({ worktree: wt, repos: others } = made);
@@ -309,7 +310,7 @@ export class WorkerManager {
       viewerIds: [],
       activity: prompt ? truncate(prompt, 80) : undefined,
       meeting: meeting?.id,
-      planReview,
+      planReview, masterWorkers: teamRole,
       helper: helper && { hostId: helper.hostId, hostName: helper.hostName },
     };
     const w = newWorker(info, newTracker());
@@ -347,7 +348,6 @@ export class WorkerManager {
     this.launch(w, carryOn ? CARRY_ON_PROMPT : first, w.info.sessionId);
     return undefined;
   }
-
   /**
    * A request for the agent standing by a board (see STATIONS): typed into its session, which is woken
    * up with it if it's asleep, or it's hired there with it when nobody is. Returns what went wrong, or
@@ -369,7 +369,6 @@ export class WorkerManager {
     const err = running ? this.prompt(w.info.id, clean, by) : this.resume(w.info.id, clean);
     return err ?? { info: w.info, hired: false };
   }
-
   /** The worker whose terminal holds this hook token: how a worker proves it's asking for itself. */
   authenticate(id: string, token: string): WorkerInfo | undefined {
     const w = this.workers.get(id);
@@ -536,6 +535,7 @@ export class WorkerManager {
   prompt(id: string, text: string, by?: string, guard?: BossGuard): string | undefined {
     const w = this.workers.get(id);
     if (!w) return 'No such worker';
+    const managed=teamPromptError(w.info,by);if(managed)return managed;
     if (guard !== undefined && (!validBossGuard(w.info, guard) || !validBossPrompt(text))) return 'Worker changed or is unavailable for a boss prompt';
     if (w.dsh) {
       const clean = text.replace(/\r\n?/g, '\n').trim();

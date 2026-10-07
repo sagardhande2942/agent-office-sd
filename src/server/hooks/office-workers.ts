@@ -1,3 +1,4 @@
+import { teamTargetError } from '../master-workers/role.js';
 import type http from 'node:http';
 import { notLeaving } from '../leave-on-merge.js';
 import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow, type PullsView } from '../office-workers.js';
@@ -86,7 +87,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
         const landed = floor.landed(w);
         if (!landed) continue;
         const why = landed.prs?.length ? `its pull requests merged (${landed.prs.join(', ')})` : `PR #${landed.pr} merged`;
-        const staying = w.id === me.id ? "that's you" : notLeaving(w);
+        const staying = teamTargetError(w) ?? (w.id === me.id ? "that's you" : notLeaving(w));
         if (staying) results.push({ worker: w.name, id: w.id, skipped: `${why}, but it's ${staying}` });
         else going.push({ w, why });
       }
@@ -94,6 +95,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
       for (const key of ask.workers) {
         const w = findWorker(floor.workers.list(), key);
         if (typeof w === 'string') results.push({ worker: key, error: w });
+        else if (teamTargetError(w)) results.push({worker:w.name,id:w.id,error:teamTargetError(w)});
         else if (w.id === me.id) results.push({ worker: w.name, id: w.id, error: "That's you: someone else has to send you home" });
         else if (!going.some((g) => g.w === w)) going.push({ w });
       }
@@ -117,6 +119,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     const b = (body ?? {}) as { worker?: unknown; prompt?: unknown };
     const w = findWorker(floor.workers.list(), str(b.worker, 64));
     if (typeof w === 'string') return send(res, 404, { error: w });
+    const managed=teamTargetError(w);if(managed)return send(res,403,{error:managed});
     if (w.id === me.id) return send(res, 400, { error: "That's you" });
     // A shell would run it as a command, in someone's terminal.
     if (w.kind !== 'agent') return send(res, 400, { error: `${w.name} is a shell, not an agent` });
@@ -135,6 +138,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     const w = ask.worker ? findWorker(floor.workers.list(), ask.worker) : me;
     if (typeof w === 'string') return send(res, 404, { error: w });
     if (w.kind !== 'agent') return send(res, 400, { error: `${w.name} is a shell, not an agent` });
+    const managed=teamTargetError(w);if(managed)return send(res,403,{error:managed});
     const pr = ask.pr === undefined ? undefined : await pullOf(floor, ask.pr, ask.repo);
     if (typeof pr === 'string') return send(res, 400, { error: pr });
     const err = floor.workers.linkPr(w.id, pr);

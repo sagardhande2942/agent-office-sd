@@ -1,3 +1,4 @@
+import { workerTeam } from './master-workers.js';
 import { workerManager } from './manager.js';
 import { workerPlanReview } from './plan-review.js';
 import { completionCheckpoint, workerCompletion } from './completion.js';
@@ -24,6 +25,7 @@ export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Serv
     } catch {
       return send(res, 400, {});
     }
+    if (await workerTeam(ctx, req, res, url)) return;
     if (['/office/report', '/office/workers/report'].includes(url.pathname)) return workerManager(ctx, req, res, url);
     if (await workerPlanReview(ctx, req, res, url)) return;
     if (['/office/workers/completion', '/office/workers/complete'].includes(url.pathname)) return workerCompletion(ctx, req, res, url);

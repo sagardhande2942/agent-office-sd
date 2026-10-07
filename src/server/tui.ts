@@ -1,3 +1,4 @@
+import { teamCommand } from './master-workers/tui.js';
 import { readFileSync } from 'node:fs';
 import readline from 'node:readline';
 import { WebSocket } from 'ws';
@@ -21,6 +22,8 @@ Commands:
   home <worker> [--cleanup auto|keep|worktree|all]  Send a worker home
   messages [request-id]       Read tracked worker requests and replies
   issues / pulls / queue / enqueue <prompt> / chat <text>
+  teams / team-start <JSON-file> / team-pause / team-resume / team-stop
+  team-preset <JSON-file> / team-preset-delete <ID>
   help / quit
 
 The office keeps running when you leave. Requires an interactive terminal.`;
@@ -146,7 +149,8 @@ function session(ws: WebSocket): Promise<number> {
           print('Welcome. Select a desk with arrows; Enter opens its terminal.');
         }
         dashboard.selected = 0; dashboard.offset = 0; draw();
-      } else if (msg.t === 'plan-review' && view) view.planReview=msg.state;
+      } else if (msg.t === 'master-workers' && view) view.masterWorkers=msg.state;
+      else if (msg.t === 'plan-review' && view) view.planReview=msg.state;
       else if (msg.t === 'floors') floors = msg.floors;
       else if (msg.t === 'worker.update' && view) {
         view.workers = [...view.workers.filter((w) => w.id !== msg.worker.id), msg.worker];
@@ -241,6 +245,7 @@ function session(ws: WebSocket): Promise<number> {
     function command(line: string) {
       const [cmd, key = '', ...tail] = line.split(/\s+/), text = tail.join(' ');
       if (!cmd) return;
+      if (teamCommand(line, send, () => panel('teams'))) return;
       if (cmd === 'quit' || cmd === 'exit') return done(0);
       if (cmd === 'help') return panel('help');
       if (cmd === 'messages') { panel('messages'); dashboard.thread = key || undefined; return draw(); }

@@ -1,3 +1,5 @@
+import type { MasterWorkersClientMsg, MasterWorkersServerMsg } from './protocol/master-workers.js';
+export * from './protocol/master-workers.js';
 import type { PlanReviewClientMsg, PlanReviewServerMsg } from './protocol/plan-review.js';
 export * from './protocol/plan-review.js';
 import type { TvClientMsg } from './protocol/toys.js';
@@ -37,6 +39,7 @@ export * from './protocol/workers.js';
 export * from './protocol/communications.js';
 
 export type ClientMsg =
+  | MasterWorkersClientMsg
   | PlanReviewClientMsg
   | TvClientMsg
   | PresenceClientMsg
@@ -62,6 +65,7 @@ export type ClientMsg =
   | DogClientMsg;
 
 export type ServerMsg =
+  | MasterWorkersServerMsg
   | PlanReviewServerMsg
   | CommunicationsServerMsg
   | PresenceServerMsg

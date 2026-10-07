@@ -3,7 +3,8 @@ import { contextLabel } from '../shared/communications.js';
 import { builtDesks } from '../shared/layout.js';
 import type { FloorInfo, FloorView, WorkerInfo, WorktreeCleanup } from '../shared/protocol.js';
 
-export const PANELS = ['office', 'issues', 'pulls', 'queue', 'messages', 'plans', 'floors', 'help'] as const;
+import { teamLines } from './master-workers/tui.js';
+export const PANELS = ['office', 'issues', 'pulls', 'queue', 'messages', 'plans', 'teams', 'floors', 'help'] as const;
 export type Panel = typeof PANELS[number];
 export interface Seat { id: string; label: string; worker?: WorkerInfo }
 export interface Dashboard {
@@ -116,6 +117,7 @@ export function renderDashboard(state: Dashboard, width: number, height: number)
     body = board?.items.map((item) => `#${item.number}  ${item.title}`) ?? [];
     if (!body.length) body = [board?.error ?? 'No items on this board.'];
   } else if (state.panel === 'queue') body = view?.queue.tasks.map((t) => `${t.status.padEnd(8)} ${t.title} ${t.workerName ? '(' + t.workerName + ')' : ''}`) ?? [];
+  else if (state.panel === 'teams') body = teamLines(view);
   else if (state.panel === 'plans') {
     const m=view?.planReview?.current;
     const wrap=(line:string)=>{const safe=plain(line);return Array.from({length:Math.max(1,Math.ceil(safe.length/width))},(_,i)=>safe.slice(i*width,(i+1)*width));};

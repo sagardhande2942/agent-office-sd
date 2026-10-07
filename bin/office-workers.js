@@ -7,6 +7,7 @@
 // same as an MCP server on stdio, which the office hands the agents that take one. Plain Node, no
 // build step, no dependencies.
 
+import { TEAM_TOOLS, callTeam } from './office-team-tools.js';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { createInterface } from 'node:readline';
@@ -547,6 +548,7 @@ TOOLS.push(
   {name:'request_plan_clarification',description:'Reviewer only: request one clarification round before scoring. Do not change requirements. Candidates submit complete revised plans.',inputSchema:object({id:string,revision:{type:'integer'},requests:array(object({candidate:string,question:string}))})},
   {name:'submit_plan_review',description:'Reviewer only: rate every plan, with evidence and eligibility gates. Highest weighted eligible score wins; tie breakers coverage, feasibility, alphabetical label. Summary explains accepted and rejected plans. Server saves decisions, cleans losers and starts the winner.',inputSchema:object({id:string,revision:{type:'integer'},winner:{type:['string','null']},summary:string,ratings:array(object({candidate:string,scores,scoreReasons:reasons,gates,strengths:array(string),weaknesses:array(string),decision:{type:'string',enum:['accept','reject']},reason:string}))})},
 );
+TOOLS.push(...TEAM_TOOLS);
 export function toolsForRole(role) {
   if (!role) return TOOLS;
   const names=role==='candidate'?['plan_review_state','submit_candidate_plan']:role==='reviewer'?['plan_review_state','request_plan_clarification','submit_plan_review']:[];
@@ -570,6 +572,7 @@ const INSTRUCTIONS =
 /** Runs a tool; resolves to its text, and whether nothing it was asked came off, or throws with why it failed. */
 async function runTool(name, args, io) {
   const a = args && typeof args === 'object' ? args : {};
+  if (name === 'team_state' || name === 'team_action') return callTeam(name, a, io);
   const planTools={plan_review_state:'plan-review',submit_candidate_plan:'plan',request_plan_clarification:'plan-review/clarify',submit_plan_review:'plan-review/verdict'};
   if (planTools[name]) return {text:JSON.stringify(await call(planTools[name],a,io),null,2)};
   const communicationTools = { worker_inbox: 'inbox', request_worker: 'request', reply_worker: 'reply', ack_worker_message: 'ack' };

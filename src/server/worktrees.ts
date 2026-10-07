@@ -58,10 +58,11 @@ export class Worktrees {
    * `slug`, which is in `root` (the worker's own floor, when that isn't this project). The path it
    * returns is relative to `root`.
    */
-  create(slug: string, sub?: string, root = this.dir): (Required<Omit<WorktreeRef, 'made'>> & { from?: string; note?: string }) | string {
+  create(slug: string, sub?: string, root = this.dir, teamBase?: { commit: string; from: string }): (Required<Omit<WorktreeRef, 'made'>> & { from?: string; note?: string }) | string {
     try {
-      const from = this.currentBranch();
-      const { base, note } = this.startPoint(from);
+      const from = teamBase?.from ?? this.currentBranch();
+      if (teamBase && !/^[0-9a-f]{40}$/.test(teamBase.commit)) throw Error('Invalid team base commit');
+      const { base, note } = teamBase ? { base: teamBase.commit, note: undefined } : this.startPoint(from);
       const rel = path.join(WORKTREES_DIR, slug, sub ?? '');
       const branch = `${BRANCH_PREFIX}${slug}`;
       this.gitSync(['worktree', 'add', '-b', branch, path.resolve(root, rel), base]);
