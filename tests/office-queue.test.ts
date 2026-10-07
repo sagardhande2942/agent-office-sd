@@ -190,6 +190,8 @@ test('list and remove print what the office sent back', async () => {
 test('runs as a command: a heredoc prompt goes over HTTP with the agent\'s own token', async (t) => {
   const seen: { method?: string; url?: string; auth?: string; body: string }[] = [];
   const server = http.createServer((req, res) => {
+    // Local office discovery is unrelated to the CLI requests this fixture records.
+    if (req.method === 'GET' && req.url === '/') { res.writeHead(404); res.end(); return; }
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {

@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../features/topdown/camera';
 import * as THREE from 'three';
 import { FLOOR, SLAB, STREET_Y, WING, inWing, wingMinZ } from '../../shared/layout';
 import type { ViewMode } from '../state';
@@ -42,7 +43,7 @@ export interface Followed {
  * Puts the camera where you see from: at your eyes in first person (bobbing `bob` as you walk, and
  * `lift` up or down while you sit), or round behind you in third, where it eases over unless `snap`.
  */
-export function aimCamera(camera: THREE.PerspectiveCamera, p: Followed, bob: number, lift: number, snap: boolean) {
+export function aimCamera(camera: SceneCamera, p: Followed, bob: number, lift: number, snap: boolean) {
   if (p.view === 'first') {
     camera.position.set(p.pos.x, p.pos.y + EYE_HEIGHT + bob + p.stepOffset + lift, p.pos.z);
     camera.rotation.set(p.lookPitch, p.camYaw, 0);
@@ -110,7 +111,7 @@ export function aimCamera(camera: THREE.PerspectiveCamera, p: Followed, bob: num
 }
 
 /** The jitters: the view trembles a little, on top of wherever you're looking. Drunk, it rolls and sways. `t` is the jitters' clock. */
-export function shakeCamera(camera: THREE.PerspectiveCamera, t: number, drunk: number, jitter: number) {
+export function shakeCamera(camera: SceneCamera, t: number, drunk: number, jitter: number) {
   if (drunk > 0) {
     const d = drunk;
     camera.rotation.z += d * (0.07 * Math.sin(t * 0.9) + 0.025 * Math.sin(t * 2.3 + 1));

@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../topdown/camera';
 import * as THREE from 'three';
 import { BALCONY, GOLF_HOLE } from '../../../shared/layout';
 import { isTyping, type PlayerController } from '../../player';
@@ -88,7 +89,7 @@ export class Golfer {
   constructor(
     private readonly player: PlayerController,
     private readonly me: Person,
-    private readonly camera: THREE.PerspectiveCamera,
+    private readonly camera: SceneCamera,
     private readonly hooks: GolfHooks,
   ) {
     this.rest = h('span.golf-rest');

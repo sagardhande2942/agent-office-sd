@@ -1,3 +1,4 @@
+import { switchView } from '../../shared/view-selector';
 /**
  * The HUD: a few buttons on the top bar, everything else in the ☰ menu (Tab), with H for the controls
  * and F to hang a picture; the project in the corner (click it for the floors); Settings, and your
@@ -95,7 +96,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       { id: 'signins', icon: '🔐', label: 'Your sign-ins', section: 'Together', shown: () => !!store.me.account, tone: () => (needsSigningIn() ? 'danger' : undefined), status: needsSigningIn, chip: () => 'Sign in to Claude', title: () => 'The Claude plan and GitHub account your workers run on: your own', run: () => openSignIns(net) },
       { id: 'settings', icon: '⚙️', label: 'Settings', section: 'Office', run: showSettings },
       { id: 'help', icon: '❓', label: 'Controls', section: 'Office', key: 'H', run: openHelp },
-      { id: 'lite', icon: '📱', label: '2D view', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => location.assign('/lite') },
+      { id: 'lite', icon: '📱', label: 'Lite', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => switchView('/lite', net) },
       {
         id: 'upgrade',
         icon: '⬆️',

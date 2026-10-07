@@ -40,7 +40,7 @@ Back to the [README](../README.md).
 
 You can also click a nearby desk to interact with it, or click a worker in the Workers panel (**🤖 Workers**, top right) to open its terminal.
 
-On a phone, use the 2D view at `/lite` instead: a terminal there has a row of keys under it (**1** **2** **3**, the arrows, Enter, Tab, Esc, Ctrl+C) and a box to send a prompt. See [Features](features.md).
+On a phone, use the Lite dashboard at `/lite` instead: a terminal there has a row of keys under it (**1** **2** **3**, the arrows, Enter, Tab, Esc, Ctrl+C) and a box to send a prompt. See [Features](features.md).
 
 ## In a terminal
 
@@ -62,3 +62,23 @@ At a regular worker’s desk, press U or click **U — Bring a helper** to open 
 Helpers carry a laptop showing their own terminal. Aim at the helper or its laptop and press **E**, or click **Open helper terminal** in the hint. You can also open the helper by name in the Workers list. **Needs you** means its agent is waiting: answer the question or approve/reject the permission request inside that helper’s terminal. Close it with Esc or ✕ to return to the office.
 
 At the boss chair, sit down and press **E** to open **Boss Control Center**. Choose **Play Minesweeper** to use the existing game. The center is also available from the menu or the Workers panel’s **Boss** button.
+
+## 2D Game (desktop)
+
+Open `/2d`, or select **2D Game** from **View**. The office has the same fixtures, maps, elevator, dialogs and activities as 3D; the exploration camera has a flat, top-down projection.
+
+| Control | Action |
+| --- | --- |
+| WASD / arrows | Walk with the shared collision physics; forward is toward the top of the map |
+| Click ground | Walk there using the existing navigation and collision rules |
+| Click worker | Open the existing terminal |
+| Click fixture | Approach and use its existing action |
+| E / P / U / R / X / O / C / L | The same nearby interaction and worker actions as 3D |
+| Scroll | Zoom the map in/out |
+| Tab | Complete office menu, including Elevator, Settings and 2D view controls |
+| Elevator / project name | Floors, add/remove projects, rooftop and garage |
+| ✕ / Esc | Close the top dialog and immediately restore game controls |
+
+Keyboard movement cancels click-to-walk. Activities that take over the camera (including golf, driving, telescope and arcade screens) retain their original camera and controls; finishing returns to the top-down projection. The elevator and floor list retain running worker sessions. Dialogs use the shared modal stack and suspend movement, including nested dialogs. Lite remains available for mobile or a browser without WebGL.
+
+The top bar has a direct **2D / 3D** toggle, available in both views. Switching preserves the selected floor and running workers. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.

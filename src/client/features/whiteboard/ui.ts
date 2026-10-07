@@ -1,3 +1,4 @@
+import { isTopdownRoute } from '../topdown/camera';
 import './ui.css';
 // The 📝 whiteboard window, and the drawing on the whiteboard in the office. Excalidraw itself is in
 // whiteboard-app.ts, loaded the first time either needs it.
@@ -57,7 +58,7 @@ export function openWhiteboard(net: Net) {
     floor,
     people,
     modal: openModal(el, {
-      escCloses: false,
+      escCloses: isTopdownRoute(),
       doing: '🖍️ at the whiteboard',
       onClose: () => {
         window.removeEventListener('keydown', onKey, true);

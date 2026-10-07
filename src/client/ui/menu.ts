@@ -213,7 +213,7 @@ export function mountHud(actions: HudAction[], settings: Settings, save: () => v
     const onKey = (e: KeyboardEvent) => menuKey(el, e);
     menu = openModal(el, {
       // A dropdown under ☰, which closes it again, like a click anywhere else.
-      closeButton: false,
+      closeButton: true,
       onClose: () => {
         menu = null;
         menuBtn.setAttribute('aria-expanded', 'false');

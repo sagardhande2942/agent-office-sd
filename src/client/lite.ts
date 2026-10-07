@@ -1,3 +1,4 @@
+import { viewSelector, switchView } from './shared/view-selector';
 import { openPlanReview } from './ui/plan-review';
 import { completionLabel } from '../shared/completion';
 import { openCommunications } from './ui/communications';
@@ -44,6 +45,9 @@ if (new URLSearchParams(location.search).get('why') === 'webgl') {
 const saved = loadProfile();
 store.profile = { name: saved?.name ?? 'Guest', color: saved?.color ?? AVATAR_COLORS[1], look: saved?.look ?? randomLook() };
 const net = new Net(() => store.profile, () => null, true);
+$('to-3d').after(viewSelector(net));
+$('to-3d').addEventListener('click', e => { e.preventDefault(); switchView('/', net); });
+window.addEventListener('pagehide', () => net.disconnect());
 const settings = loadSettings();
 const notifier = new DesktopNotifier(() => settings.notify, (id) => openWorker(id));
 

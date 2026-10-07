@@ -1,8 +1,10 @@
+import { installTopdown, isTopdownRoute } from './features/topdown';
+import { installViewSelector } from './features/view-selector';
 import { installPlanReview } from './features/plan-review';
 import './style.css';
 import { installVitals } from './features/vitals';
 import { installFridge } from './features/fridge';
-import { Net } from './net';
+import { Net, loginUrl } from './net';
 import { DesktopNotifier } from './notify';
 import { store, loadProfile, loadSettings } from './state';
 import { PlayerController, groundAt } from './player';
@@ -75,7 +77,7 @@ import { installWorkerViews } from './features/workers/views';
 // The loading screen stays up until there's an office to see (see boot and whoami at the end).
 const loading = loadingScreen(onModelsProgress);
 // Came here from the 2D view's 🏢 3D button: it isn't offered straight back.
-const chose3d = new URLSearchParams(location.search).has('3d');
+const chose3d = new URLSearchParams(location.search).has('3d') || isTopdownRoute();
 if (chose3d) history.replaceState(null, '', location.pathname);
 /** Offers the 2D view (/lite) where the 3D is hard going. */
 const offer2d = (why: 'touch' | 'slow') => chose3d || offerLite(why);
@@ -192,6 +194,8 @@ parts.talk = installVoice(ctx, { tv: parts.tv });
 installDictation(ctx);
 installCommunications(ctx, parts);
 installPlanReview(ctx, parts);
+installViewSelector(ctx);
+installTopdown(ctx, core, parts);
 parts.hud = installHud(ctx, core, parts);
 
 // ---- Main loop ---------------------------------------------------------------------------------------
@@ -208,7 +212,7 @@ function boot() {
 async function whoami() {
   try {
     const res = await fetch('/api/whoami', { cache: 'no-store' });
-    if (res.status === 401) location.href = '/login';
+    if (res.status === 401) location.href = loginUrl();
     const { me } = (await res.json()) as { me?: typeof store.me };
     if (me) store.me = me;
   } catch {

@@ -1,3 +1,4 @@
+import { PlanCamera, isTopdownRoute, type SceneCamera } from '../features/topdown/camera';
 /**
  * What the office is drawn on and with: the renderer on its canvas, the scene and its lights, the
  * camera, the office building, the sky and the holiday decorations.
@@ -24,7 +25,7 @@ export interface Stage {
   /** Draws the scene with the toon outline (see drawFrame in core/loop.ts). */
   readonly effect: OutlineEffect;
   readonly scene: THREE.Scene;
-  readonly camera: THREE.PerspectiveCamera;
+  readonly camera: SceneCamera;
   readonly hemi: THREE.HemisphereLight;
   readonly ambient: THREE.AmbientLight;
   /** The sun by day and the moon by night; the sky moves it (world/sky.ts). */
@@ -62,7 +63,7 @@ export function createScene(canvas: HTMLCanvasElement, renderer: THREE.WebGLRend
   // The sky's color and the fog change with the time of day and the weather (world/sky.ts).
   scene.background = new THREE.Color('#bfe3ff');
   scene.fog = new THREE.Fog('#bfe3ff', 40, 90);
-  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, FAR);
+  const camera = isTopdownRoute() ? new PlanCamera(0.1, FAR) : new THREE.PerspectiveCamera(FOV, 1, 0.1, FAR);
 
   const hemi = new THREE.HemisphereLight('#fff5e6', '#c9a27a', 1.5);
   const ambient = new THREE.AmbientLight('#ffffff', 0.5);

@@ -40,7 +40,7 @@ They're in `core/registry.ts`, and each is a field of `ctx`. Every registration 
 - **`ui/`** is the app shell: the HUD, the menu and the windows (settings, the palette, terminals, changes, the queue, and the GitHub windows in `ui/github/`). Each module imports its own stylesheet (`import './palette.css'`), as a feature's `ui.ts` does (`import './ui.css'`).
 - **`world/`** is the engine and the scenery: toon materials and shapes (`toon.ts`), the characters (`world/character/`), the office floor (`world/office/`), the castle (`world/castle/`), the space station (`world/station/`), the scenic loop, the sky and the city. The types they share (what you bump into, what you can use, the seats, `Office`) are in `world/types.ts`.
 - **`sound/`** is the office's sound. `OfficeSound` (`sound/index.ts`, the `ctx.sound` every part uses) is a facade over `AudioCore` (`sound/core.ts`: the audio context, its buses, where your ears are) and the recipes, each in a file of its own, here (`weather.ts`, `steps.ts`) or in its feature's folder (`features/gong/sound.ts`).
-- **`shared/`** (`src/client/shared/`) is what the 3D office and the 2D view at `/lite` both use: the tab title and hiring. The 2D view loads no three.js and nothing from `core/`, `features/`, `input/`, `world/` or `player/`; `tests/client-structure.test.ts` follows `lite.ts`'s imports to check.
+- **`shared/`** (`src/client/shared/`) is what the 3D office and the Lite dashboard at `/lite` both use: the tab title and hiring. Lite loads no three.js and nothing from `core/`, `features/`, `input/`, `world/` or `player/`; `tests/client-structure.test.ts` follows `lite.ts`'s imports to check.
 
 ### Stylesheets
 
@@ -92,3 +92,13 @@ One adapter file in `src/server/providers/`, one entry in `PROVIDERS` in `src/se
 `tests/size.test.ts` holds every `.ts` and `.css` file under `src/` to 600 lines. It asks `git ls-files` for them (tracked, and new ones that aren't ignored) rather than walking the folder, so a worktree checked out inside the repo can't trip it. The files that were longer when it came in are listed in `CEILINGS`, each with the length it had then: they may shrink, but never grow past it. Once one is down to 600 lines or fewer, or gone, the test fails until you take it off the list, so the list only gets shorter.
 
 When it fails, split the file along the registries: a feature's code goes in its folder, a message handler in its domain's file, a tick or a key in the feature it's for, and what the page keeps of it in its own slice. Raising a ceiling, or adding a file to the list, only hands the problem to the next person, so the honest way to make room is to split the file. When you shrink a listed file, lower its ceiling to its new length in the same change, so it can't grow back.
+
+## Playable 2D client
+
+`game2d.html` uses the same page shell as 3D; `game2d.ts` loads `main.ts`, the complete office composition. `features/topdown` installs once through the existing registries, gated by the `/2d` route. Every other feature, transport, worker policy, dialog and map is the same instance as in 3D. Structure tests require this shared import graph; Lite retains its separate three.js-free boundary.
+
+`features/topdown/camera.ts` provides `PlanCamera`, an orthographic camera with the common `SceneCamera` type and a perspective projection for activities that own the camera. The feature's view hook sets the exploration projection and cutaway clipping plane. Its tick hooks keep walking aligned with the map, and its click adapter uses the existing pointer/interaction and walking modules. The shared HUD gains zoom/reset help through `HUD_ACTIONS` before mounting. No gameplay code lives in the entry or state store.
+
+`shared/view-selector.ts` retains the floor across full-page view switching and intentionally disconnects the old Net transport. The protected route remains `server/http/routes/game2d.ts`; Vite builds its HTML entry and rewrites `/2d` in development. 2D Game requires WebGL; Lite remains available without it.
+
+Verify with `npm run typecheck`, `npm test`, `npm run build`, then `node --import tsx scripts/e2e-game2d.mjs`. The browser harness runs an isolated real server with temporary Git floors and shell workers. It uses installed Chromium under `~/.cache/ms-playwright`, or `CHROMIUM_PATH`, and saves screenshots and `checks.json` to `/tmp/agent-office-game2d-evidence` (override with `GAME2D_ARTIFACTS`).

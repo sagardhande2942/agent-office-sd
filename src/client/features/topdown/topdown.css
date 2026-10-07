@@ -1,0 +1,4 @@
+/* The shared 3D HUD remains the complete office menu in the plan view. */
+.topdown #crosshair { display: none; }
+.topdown #scene { cursor: pointer; }
+.topdown .project-name::after { content: ' · 2D'; font-size: 11px; opacity: .7; }

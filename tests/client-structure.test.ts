@@ -76,3 +76,14 @@ test('the 2D view loads no three.js, and none of the 3D office: what it shares w
     assert.ok(graph(path.join(client, 'main.ts')).has(path.join(client, shared)), `the 3D office uses ${shared}`);
   }
 });
+
+test('2D Game uses the complete office composition and its own projection module', () => {
+  const entry = read(path.join(client, 'game2d.ts'));
+  assert.match(entry, /import '\.\/main'/);
+  const modules = graph(path.join(client, 'game2d.ts'));
+  for (const file of graph(path.join(client, 'main.ts'))) assert.ok(modules.has(file), `2D Game shares ${path.relative(client, file)}`);
+  assert.ok(modules.has(path.join(client, 'features/topdown/index.ts')));
+  assert.equal(read(path.join(client, 'game2d.html')), read(path.join(client, 'index.html'))
+    .replace('<title>Agent Office</title>', '<title>Agent Office · 2D Game</title>')
+    .replace('src="./main.ts"', 'src="./game2d.ts"'), '2D retains every shared HUD and dialog host');
+});

@@ -107,7 +107,7 @@ export function togglePalette(entries: () => PaletteEntry[]) {
     }
   });
 
-  const modal = openModal(el, { closeButton: false, onClose: () => (current = null) });
+  const modal = openModal(el, { closeButton: true, onClose: () => (current = null) });
   current = modal;
   render();
   input.focus();

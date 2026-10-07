@@ -1,0 +1,110 @@
+{
+  "checks": [
+    {
+      "name": "authentication and shared bootstrap",
+      "status": "passed",
+      "evidence": "Protected aliases return through login to /2d; complete office composition connects once on the requested floor."
+    },
+    {
+      "name": "physical elevator and floor management",
+      "status": "passed",
+      "evidence": "Approach/E opens the existing elevator with floor status, add/remove project actions, rooftop and garage; actual rides switch floors."
+    },
+    {
+      "name": "jump camera stability",
+      "status": "passed",
+      "evidence": "Real Space jump lifts the character while camera height and projection remain unchanged."
+    },
+    {
+      "name": "movement and shared collision physics",
+      "status": "passed",
+      "evidence": "Arrows/WASD, ground click-to-walk and collision against the original desk geometry work in the orthographic scene."
+    },
+    {
+      "name": "complete office dialogs",
+      "status": "passed",
+      "evidence": "Shared Issues/PR/Queue, Boss, Smartphone, Services, Whiteboard, Meeting, Search, Settings, view controls and Plan Comparison open from the same menu with close/Esc focus recovery."
+    },
+    {
+      "name": "real arcade interaction",
+      "status": "passed",
+      "evidence": "Boss Control Center launches playable Minesweeper with its original camera and canvas; closing restores the orthographic view and controls."
+    },
+    {
+      "name": "menu and palette recovery",
+      "status": "passed",
+      "evidence": "The full menu and command palette have top-right close buttons and restore controls immediately."
+    },
+    {
+      "name": "shared worker terminal",
+      "status": "passed",
+      "evidence": "Clicking the rendered worker opens the existing terminal and real shell input without a replacement worker/session."
+    },
+    {
+      "name": "office visual and zoom",
+      "status": "passed",
+      "evidence": "Two screenshots show the actual 3D office artwork in a flat cutaway projection, original HUD, elevator and fixtures; wheel zoom updates pointer projection."
+    },
+    {
+      "name": "rooftop game interaction",
+      "status": "passed",
+      "evidence": "The actual shared darts interaction starts its aiming activity on the roof and E returns to the top-down view."
+    },
+    {
+      "name": "real car interaction",
+      "status": "passed",
+      "evidence": "The original car interaction enters the driver, WASD emits real car.drive frames, and E exits back to the plan view."
+    },
+    {
+      "name": "rooftop and garage access",
+      "status": "passed",
+      "evidence": "Real elevator rides reach the full rooftop/bar/game fixtures and garage/car fixtures, then return to the selected office floor."
+    },
+    {
+      "name": "other maps",
+      "status": "passed",
+      "evidence": "Castle and Station load and stay playable through the existing map.set server API; returns to Office without changing worker/session IDs."
+    },
+    {
+      "name": "real golf interaction",
+      "status": "passed",
+      "evidence": "The shared tee interaction starts golf with its original aiming camera; E puts the club away and restores the plan view."
+    },
+    {
+      "name": "activity camera and registries",
+      "status": "passed",
+      "evidence": "Golf, cars, bar games, arcade and climbing use the original shared activity modules; camera ownership switches to perspective and back without another session."
+    },
+    {
+      "name": "multiplayer",
+      "status": "passed",
+      "evidence": "Two real top-down clients exchange existing peer movement and remove the old peer on disconnect."
+    },
+    {
+      "name": "3D/Lite handoff",
+      "status": "passed",
+      "evidence": "2D → Lite → 3D → 2D preserves non-default floor and worker/session IDs with no spawn/resume requests."
+    },
+    {
+      "name": "direct view toggle",
+      "status": "passed",
+      "evidence": "Visible HUD buttons switch 2D to 3D and back, preserving floor and worker sessions."
+    },
+    {
+      "name": "browser runtime",
+      "status": "passed",
+      "evidence": "No page errors across Office, rooftop, garage, alternate maps and view switching."
+    }
+  ],
+  "screenshots": [
+    "office-1440.png",
+    "office-1120.png",
+    "terminal.png",
+    "rooftop.png",
+    "garage.png",
+    "castle.png",
+    "station.png",
+    "plans.png",
+    "arcade.png"
+  ]
+}

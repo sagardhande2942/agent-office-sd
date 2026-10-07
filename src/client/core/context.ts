@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../features/topdown/camera';
 /**
  * What every part of the office gets to work with: the scene and everyone's shared objects, where you
  * are and what you're holding, and the registries to plug into (see registry.ts). Types only: a feature
@@ -70,7 +71,7 @@ export interface OfficeInteraction {
 
 export interface Ctx {
   readonly scene: THREE.Scene;
-  readonly camera: THREE.PerspectiveCamera;
+  readonly camera: SceneCamera;
   readonly renderer: THREE.WebGLRenderer;
   /** What the office is drawn on (the renderer's canvas), where the mouse aims and clicks. */
   readonly canvas: HTMLCanvasElement;

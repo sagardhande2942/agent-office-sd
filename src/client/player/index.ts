@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../features/topdown/camera';
 import * as THREE from 'three';
 import { FLOOR, STREET_Y, WALL_T, type SeatPlace } from '../../shared/layout';
 import type { ViewMode } from '../state';
@@ -71,7 +72,7 @@ export class PlayerController extends PlayerInput {
   riding = false;
 
   constructor(
-    private camera: THREE.PerspectiveCamera,
+    private camera: SceneCamera,
     dom: HTMLElement,
     /** What you bump into and stand on: the office's, or the roof's up there. */
     public colliders: Collider[],

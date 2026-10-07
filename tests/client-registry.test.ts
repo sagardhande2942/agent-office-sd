@@ -384,10 +384,10 @@ function interactKinds(): { kind: string; file: string }[] {
   return out;
 }
 
-/** Every `interactions.define('kind', …)` in the client, wherever it lives, with the file it's in. */
+/** Every 3D `interactions.define('kind', …)` in the client, wherever it lives, with the file it's in. */
 function definedKinds(): { kind: string; file: string }[] {
   const out: { kind: string; file: string }[] = [];
-  for (const { file, src } of clientSources()) for (const m of src.matchAll(/interactions\.define\(\s*'([a-z]+)'/g)) out.push({ kind: m[1], file });
+  for (const { file, src } of clientSources().filter(s => !s.file.startsWith('game2d/'))) for (const m of src.matchAll(/interactions\.define\(\s*'([a-z]+)'/g)) out.push({ kind: m[1], file });
   return out;
 }
 

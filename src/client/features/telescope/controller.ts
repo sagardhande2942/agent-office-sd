@@ -1,3 +1,4 @@
+import type { SceneCamera } from '../topdown/camera';
 import * as THREE from 'three';
 
 // Just beyond the objective lens and the loft's corner post: from the eyepiece both pieces of
@@ -27,7 +28,7 @@ export class TelescopeView {
   private readonly rotation = new THREE.Euler(0, 0, 0, 'YXZ');
 
   constructor(
-    private readonly camera: THREE.PerspectiveCamera,
+    private readonly camera: SceneCamera,
     private readonly overlay: ScopeElement,
     exitButton: EventTarget,
     pointer: EventTarget,
