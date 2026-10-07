@@ -1,3 +1,4 @@
+import { appearances } from './appearances';
 import { planReview } from './plan-review';
 import { smartphone } from './smartphone';
 import { helpers } from './helpers';
@@ -39,6 +40,7 @@ import { whiteboard } from './whiteboard';
 import { communications } from './communications';
 
 export const SLICES: readonly Slice[] = [
+  appearances,
   helpers,
   tv,
   presence,

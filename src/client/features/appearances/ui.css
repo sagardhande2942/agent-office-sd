@@ -1,0 +1,8 @@
+.appearance-categories{display:flex;gap:20px;margin:12px 0;font-weight:650}
+.appearance-categories label,.appearance-card span{display:flex;align-items:center;gap:7px;cursor:pointer}
+.appearance-roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:10px;margin:14px 0}
+.appearance-card{border:2px solid transparent;border-radius:12px;background:#e9edf2;overflow:hidden;color:#263448;cursor:pointer;transition:border-color .15s}
+.appearance-card.selected{border-color:#537be0}
+.appearance-card img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:contain}
+.appearance-card span{font-size:12px;padding:8px 5px;font-weight:650}
+.appearance-card:focus-within{outline:2px solid #537be0;outline-offset:2px}

@@ -72,6 +72,7 @@ import { installWaiting } from './features/waiting';
 import { installWalking } from './features/walking';
 import { installWhiteboard } from './features/whiteboard';
 import { installWorkerActions } from './features/workers/actions';
+import { installAppearances } from './features/appearances';
 import { installWorkerViews } from './features/workers/views';
 
 // The loading screen stays up until there's an office to see (see boot and whoami at the end).
@@ -151,6 +152,7 @@ parts.maps = installMaps(ctx, core, parts);
 parts.peers = installPeers(ctx, core, parts);
 parts.walking = installWalking(ctx, core, parts);
 parts.views = installWorkerViews(ctx, core, parts);
+installAppearances(ctx, parts.views.workerViews);
 parts.actions = installWorkerActions(ctx, core, parts);
 parts.waiting = installWaiting(ctx, core, parts);
 parts.needsYou = installNeedsYou(ctx, parts);

@@ -1,3 +1,5 @@
+import type { AppearanceClientMsg, AppearanceServerMsg } from './protocol/appearances.js';
+export * from './protocol/appearances.js';
 import type { PlanReviewClientMsg, PlanReviewServerMsg } from './protocol/plan-review.js';
 export * from './protocol/plan-review.js';
 import type { TvClientMsg } from './protocol/toys.js';
@@ -37,6 +39,7 @@ export * from './protocol/workers.js';
 export * from './protocol/communications.js';
 
 export type ClientMsg =
+  | AppearanceClientMsg
   | PlanReviewClientMsg
   | TvClientMsg
   | PresenceClientMsg
@@ -62,6 +65,7 @@ export type ClientMsg =
   | DogClientMsg;
 
 export type ServerMsg =
+  | AppearanceServerMsg
   | PlanReviewServerMsg
   | CommunicationsServerMsg
   | PresenceServerMsg

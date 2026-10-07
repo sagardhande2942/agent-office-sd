@@ -115,3 +115,5 @@ Worker breaks are visual downtime for idle or finished desk agents: Z starts a b
 The original HUD and **Tab** menu expose boards, Queue, Plan Comparison, Boss Control Center, Smartphone, meetings, messages, services, whiteboard, settings and team/account actions. The Manager retains its existing kiosk. Click workers to open existing terminals; click fixtures to approach and use them. Scroll to zoom. Camera-owning activities retain their existing aiming view and return to the top-down camera afterward.
 
 The shared **View** selector retains the selected floor and server-owned worker sessions across 3D, 2D Game and Lite. Closing shared dialogs immediately restores controls. 2D Game requires WebGL and desktop controls; Lite stays lightweight, mobile-friendly and non-spatial.
+
+- [Worker appearances](worker-appearances.md): select Original and/or 20 unique fictional characters across the building, with signature outfits and persistent assignments.

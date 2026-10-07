@@ -1,3 +1,6 @@
+import { originalBody } from './worker-body';
+import { WorkerAppearance } from './appearance';
+import type { WorkerAppearanceId } from '../../../shared/appearances';
 import * as cards from './worker-cards';
 import * as animation from './worker-fugdi';
 import { BEAT as FUGDI_BEAT, FUGDI, FUGDI_SECONDS, fugdiPose } from '../../../shared/fugdi';
@@ -26,11 +29,14 @@ export class Worker {
   readonly root = new THREE.Group();
   /* internal animation state */ body = new THREE.Group();
   /** Its moving parts, for what poses them from the other files here (a dance, a cell, a costume). */
-  private rig: WorkerRig;
-  /* internal animation state */ bulb: THREE.MeshToonMaterial;
-  /* internal animation state */ bulbMesh: THREE.Mesh;
-  /* internal animation state */ armL: THREE.Object3D;
-  /* internal animation state */ armR: THREE.Object3D;
+  private rig!: WorkerRig;
+  private appearance: WorkerAppearance;
+  private requestedTheme: Theme | null = null;
+  private requestedOutfit: 'peasant' | null = null;
+  /* internal animation state */ bulb!: THREE.MeshToonMaterial;
+  /* internal animation state */ bulbMesh!: THREE.Mesh;
+  /* internal animation state */ armL!: THREE.Object3D;
+  /* internal animation state */ armR!: THREE.Object3D;
   /* internal animation state */ bubble: THREE.Sprite | null = null;
   /* internal animation state */ bubbleKey = '';
   /** The bubble is a task card: it hangs from its tail instead of floating. */
@@ -53,7 +59,7 @@ export class Worker {
   /* internal animation state */ cheerT = 0;
   /** Up on its desk dancing (a pull request merged): where, and how many seconds in. */
   /* internal animation state */ dancing: Dancing | null = null;
-  /* internal animation state */ pupils: THREE.Mesh[] = [];
+  /* internal animation state */ pupils: THREE.Object3D[] = [];
   /* internal animation state */ feet: THREE.Mesh[] = [];
   /** Sent home: the box of its things in its arms, and how far into its waddle it is. */
   /* internal animation state */ leaving: Leaving | null = null;
@@ -73,11 +79,11 @@ export class Worker {
   /** Seconds into its finishing spin, or -1. */
   /* internal animation state */ twirlT = -1;
   private flipT = 0;
-  /* internal animation state */ papers: ReturnType<typeof papers>;
-  /* internal animation state */ globe: ReturnType<typeof globe>;
+  /* internal animation state */ papers!: ReturnType<typeof papers>;
+  /* internal animation state */ globe!: ReturnType<typeof globe>;
   /** Beside its laptop, where the globe floats (see setPropSpot). */
   private spot = new THREE.Vector3(-1, 1.1, 1.3);
-  private skin: THREE.MeshToonMaterial;
+  private skin!: THREE.MeshToonMaterial;
   /** Dressed up for a holiday (see setCostume), and what it's wearing. */
   private costume: Theme | null = null;
   private outfit: THREE.Object3D[] = [];
@@ -108,64 +114,22 @@ export class Worker {
     name: string,
     private color: string,
   ) {
-    const skin = (this.skin = toonUnique(color));
-    const white = toon('#ffffff');
-    const ink = toon('#1d1d1d');
-    this.root.add(this.body);
-    // Bean-shaped body
-    const bean = mesh(new THREE.CapsuleGeometry(0.28, 0.3, 8, 16), skin, 0, 0.55, 0);
-    this.body.add(bean);
-    // Big cartoon eyes
-    for (const sx of [-1, 1]) {
-      const eye = mesh(new THREE.SphereGeometry(0.09, 12, 10), white, sx * 0.11, 0.7, 0.23, false);
-      eye.scale.z = 0.6;
-      this.body.add(eye);
-      const pupil = mesh(new THREE.SphereGeometry(0.045, 10, 8), ink, sx * 0.11, 0.7, 0.29, false);
-      this.body.add(pupil);
-      this.eyes.push(eye, pupil);
-      this.pupils.push(pupil);
-    }
-    // Headset: band + mic
-    const band = mesh(new THREE.TorusGeometry(0.29, 0.025, 6, 20, Math.PI), toon('#2b2d42'), 0, 0.72, 0, false);
-    band.rotation.y = Math.PI / 2;
-    this.body.add(band);
-    this.headset.push(band);
-    for (const sx of [-1, 1]) {
-      const cup = mesh(new THREE.SphereGeometry(0.07, 10, 8), toon('#2b2d42'), sx * 0.29, 0.72, 0, false);
-      this.body.add(cup);
-      this.headset.push(cup);
-    }
-    // Antenna with status bulb
-    this.body.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), toon('#2b2d42'), 0, 1.07, 0, false));
-    this.bulb = toonUnique(STATUS_BULB.starting);
-    this.bulb.emissive = new THREE.Color(STATUS_BULB.starting).multiplyScalar(0.6);
-    this.bulbMesh = mesh(new THREE.SphereGeometry(0.075, 12, 10), this.bulb, 0, 1.2, 0, false);
-    this.body.add(this.bulbMesh);
-    const arm = (x: number) => {
-      const pivot = Object.assign(new THREE.Group(), { name: x < 0 ? 'armL' : 'armR' });
-      pivot.position.set(x, 0.55, 0.05);
-      pivot.add(mesh(new THREE.CapsuleGeometry(0.055, 0.16, 4, 8), skin, 0, -0.12, 0));
-      this.body.add(pivot);
-      return pivot;
-    };
-    this.armL = arm(-0.3);
-    this.armR = arm(0.3);
-    for (const sx of [-1, 1]) {
-      const foot = mesh(new THREE.CapsuleGeometry(0.06, 0.1, 4, 8), skin, sx * 0.12, 0.2, 0.05);
-      this.body.add(foot);
-      this.feet.push(foot);
-    }
-    // What it acts out with: papers in its hands, and a globe beside its laptop.
-    this.papers = papers();
-    this.papers.group.position.set(0, 0.86, 0.4);
-    this.papers.group.rotation.x = 0.35;
-    this.body.add(this.papers.group);
-    this.globe = globe();
-    for (const prop of [this.papers.group, this.globe.group]) prop.visible = false;
-    this.root.add(this.globe.group);
-    this.rig = { root: this.root, body: this.body, skin: this.skin, armL: this.armL, armR: this.armR, feet: this.feet, pupils: this.pupils, bulb: this.bulb, bulbMesh: this.bulbMesh, props: [this.papers.group, this.globe.group] };
+    Object.assign(this, originalBody(this.root, this.body, color));
+    this.appearance = new WorkerAppearance(this.rig, this.eyes);
     this.setName(name);
   }
+  setAppearance(id: WorkerAppearanceId) {
+    if (id === this.appearance.id || this.leaving) return;
+    const theme = this.requestedTheme, outfit = this.requestedOutfit;
+    if (this.appearance.id === 'original') { this.setCostume(null); this.setOutfit(null); }
+    this.appearance.set(id);
+    this.eyes = this.appearance.eyes;
+    this.pupils = this.rig.pupils;
+    this.requestedTheme = theme; this.requestedOutfit = outfit;
+    if (id === 'original') { this.setCostume(theme); this.setOutfit(outfit); }
+    this.setAge(this.age, true);
+  }
+  get appearanceId() { return this.appearance.id; }
   /** Where the globe floats, in its own space: beside its laptop, where the card over its head doesn't hide it. */
   setPropSpot(at: THREE.Vector3) {
     this.spot.copy(at);
@@ -182,6 +146,8 @@ export class Worker {
 
   /** Dresses it up for a holiday (a zombie for Halloween, an elf for Christmas), or back in its own skin (null). */
   setCostume(theme: Theme | null) {
+    this.requestedTheme = theme;
+    if (this.appearance.id !== 'original') return;
     if (theme === this.costume) return;
     this.costume = theme;
     undress(this.outfit);
@@ -195,6 +161,8 @@ export class Worker {
    * or back in just its own skin (null).
    */
   setOutfit(outfit: 'peasant' | null) {
+    this.requestedOutfit = outfit;
+    if (this.appearance.id !== 'original') return;
     if (!!this.garb === (outfit === 'peasant')) return;
     if (this.garb) {
       undress([this.garb.body, this.garb.cap]);
@@ -221,6 +189,12 @@ export class Worker {
     const age = Math.max(0, Math.min(1, k));
     if (!force && Math.abs(age - this.age) < 0.004) return;
     this.age = age;
+    if (this.appearance.id !== 'original') {
+      if (this.whiskers) this.whiskers.group.visible = false;
+      for (const d of this.dirt) d.part.visible = false;
+      return;
+    }
+    if (this.whiskers) this.whiskers.group.visible = true;
     if (age > 0.02 && !this.whiskers) {
       this.whiskers = beard();
       this.body.add(this.whiskers.group);
@@ -313,6 +287,7 @@ export class Worker {
   /** Sent home: its light goes out, its face falls, and its things pop into a box in its arms. `farewell` goes over its head. */
   leave(farewell: string) {
     if (this.leaving) return;
+    this.setAppearance('original');
     this.bouncing = false;
     this.cheerT = 0;
     this.bounceT = 0;
@@ -588,6 +563,7 @@ export class Worker {
   }
 
   dispose() {
+    this.appearance.dispose();
     if (this.bubble) disposeSprite(this.bubble);
     if (this.nameTag) disposeSprite(this.nameTag);
     undress(this.crosses);

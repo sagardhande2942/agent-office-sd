@@ -1,3 +1,4 @@
+import { appearanceHandlers, appearanceView } from './appearances.js';
 import { planReviewHandlers, planReviewView } from './plan-review.js';
 import { forkHandlers, tvView, helpersView } from './fork.js';
 // Every message a browser can send, by type, and the features that keep something per person on a
@@ -29,6 +30,7 @@ import { communicationsView } from './communications.js';
 
 /** Each domain's handlers put together, in alphabetical order. */
 export const handlers: HandlerMap<ClientMsg> = {
+  ...appearanceHandlers,
   ...forkHandlers,
   ...accountsHandlers,
   ...ballHandlers,
@@ -62,6 +64,7 @@ export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whi
 
 /** What someone arriving on a floor is sent (see office/views.ts): a piece from each feature, in the order it has always gone out. */
 export const views: ViewPieces = {
+  appearances: appearanceView,
   communications: communicationsView,
   tv: tvView,
   helpers: helpersView,
