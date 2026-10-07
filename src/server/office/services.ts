@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { Appearances } from '../appearances.js';
 import { childEnv, resolveCommand } from '../workers.js';
 import { SignIns } from '../signins.js';
 import { agentProviders, configuredProvider } from '../agents.js';
@@ -24,6 +25,10 @@ import type { Client } from './client.js';
 /** What the whole building shares, made before any floor opens: the sky, ⚙️ Settings, spend, sign-ins, limits. */
 export function createServices(ctx: Ctx): BuildingServices {
   const { cfg, accounts, clients, floors } = ctx;
+  const appearances = new Appearances(cfg.dataDir,
+    () => [...ctx.floors.values(), ...ctx.remoteFloors.values()].flatMap(f => f.workers.list().map(w => ({ id: w.id, createdAt: w.createdAt, floor: f.id }))),
+    state => ctx.broadcast({ t: 'appearance', state }),
+    w => { const remote = w.floor ? ctx.remoteFloors.get(w.floor) : undefined; return !!remote && (!remote.reachable || remote.workerIds().includes(w.id)); });
   // Day, night and the weather outside the windows, the same for everyone.
   const sky = new Sky({ city: cfg.city, weather: cfg.weather, realTime: cfg.realTimeSky, placeFile: path.join(cfg.dataDir, 'sky-place.json'), clockFile: path.join(cfg.dataDir, 'sky-clock.json') }, (state) => ctx.broadcast({ t: 'sky', state }));
   sky.start();
@@ -126,12 +131,13 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  return { appearances, sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */
 export function createLateServices(ctx: Ctx): LateServices {
   const { cfg, clients, floors } = ctx;
+  ctx.appearances.activate();
   const team = new Team(cfg.publicHost, cfg.port, cfg.tailnet);
   const tailnet = new Tailnet(cfg.tailnet);
 

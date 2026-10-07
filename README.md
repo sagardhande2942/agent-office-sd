@@ -515,3 +515,7 @@ PRs and deployment defaults target **`sagardhande2942/agent-office-sd`**. With p
 Antigravity CLI is selectable when hiring, configuring board agents and queue tasks, or choosing comparison candidates/reviewers. Install and sign in with `agy` on the office machine, then use `agent-office --agent agy` for the default. See [agent setup](docs/agents.md#antigravity-cli).
 
 Remote worker terminals provide **Local typing** for responsive editing over slow floor-host connections. Draft locally, then press Enter to send or use Insert to paste without submitting. Update both office and floor host to remove per-key acknowledgements and room-state refresh traffic. See [remote terminal typing](docs/floor-hosts.md#typing-in-remote-terminals).
+
+### Worker appearances
+
+Admins can choose Original and/or 20 code-built fictional characters in **Settings → Workers**. Select a roster and apply it immediately across all floors. Fictional characters never duplicate; extra workers use Original, and assignments survive restart. Each includes its signature outfit. See [worker appearances](docs/worker-appearances.md).

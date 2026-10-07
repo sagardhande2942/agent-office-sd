@@ -1,4 +1,5 @@
 import './settings.css';
+import { createSettingsExtensions } from './settings-extensions';
 import type { Net } from '../net';
 import type { OfficeSound } from '../sound';
 import { store, type NeedsYouSound, type Settings, type ViewMode } from '../state';
@@ -510,6 +511,9 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
     ],
   };
 
+  const extensions = createSettingsExtensions(net);
+  for (const extension of extensions) panes[extension.pane].push(extension.element);
+
   // The categories down the side, the one picked on the right.
   const nav = h('nav.settings-nav', { role: 'tablist', 'aria-orientation': 'vertical', 'aria-label': 'Settings' });
   const tabs = new Map<SettingsPane, HTMLButtonElement>();
@@ -555,6 +559,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   const modal = openModal(el, {
     doing: '⚙️ in settings',
     onClose: () => {
+      extensions.forEach(extension => extension.dispose());
       offNotify();
       offDog();
       offTheme();
