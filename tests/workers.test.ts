@@ -76,6 +76,10 @@ function isolateProviderEnvironment(f: Fixture, t: { after(fn: () => void): void
   process.env.OPENCODE_CONFIG_DIR = path.join(config, 'opencode');
   process.env.CODEX_HOME = path.join(config, 'codex');
   process.env.GROK_HOME = path.join(home, '.grok');
+  // A test run can itself be an office OpenCode worker: the office hands every worker its inline
+  // config, model included. Clearing it keeps the fixtures' launch assertions about their own
+  // model, not the runner's.
+  delete process.env.OPENCODE_CONFIG_CONTENT;
   // Delete by variable name only. Do not read or log any credential value.
   for (const key of Object.keys(process.env)) {
     // These are the office hook variables used by the in-process OpenCode
@@ -90,6 +94,17 @@ function isolateProviderEnvironment(f: Fixture, t: { after(fn: () => void): void
     }
   });
 }
+
+test('the worker fixture clears the OpenCode inline config a test runner may itself run under', (t) => {
+  // The office hands every OpenCode worker its own inline config (plugin, MCP and its model), so a
+  // suite run from a worker would otherwise inherit that model into these launches' assertions.
+  process.env.OPENCODE_CONFIG_CONTENT = '{"model":"runner/session"}';
+  t.after(() => delete process.env.OPENCODE_CONFIG_CONTENT);
+  const f = fixture();
+  t.after(() => f.close());
+  isolateProviderEnvironment(f, t);
+  assert.equal(process.env.OPENCODE_CONFIG_CONTENT, undefined);
+});
 
 const fakeAgent = `#!/usr/bin/env node
 const fs = require('node:fs');
