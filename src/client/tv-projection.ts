@@ -1,10 +1,4 @@
-import * as THREE from 'three';
-import { TV } from '../shared/layout';
-import { TV_OFF, classify, embedUrl, positionAt, youtubeId, type TvKind, type TvState } from '../shared/tv';
-import { DrunkPicture } from './drunkframe';
-import { roomMediaGain } from './spatial-audio';
-import { store } from './state';
-import { h, toast } from './ui/dom';
+import type * as THREE from 'three';
 import type { Collider } from './world/office';
 
 
@@ -39,24 +33,70 @@ export function homography(from: readonly (readonly [number, number])[], to: rea
 }
 
 
-/** Whether the way from `eye` to the TV runs through `c` (a wall, the loft's floor, a desk…). */
-export function blocks(eye: THREE.Vector3, to: THREE.Vector3, c: Collider): boolean {
-  const from = [eye.x, eye.y, eye.z];
-  const delta = [to.x - eye.x, to.y - eye.y, to.z - eye.z];
-  const low = [c.minX, c.bottom ?? 0, c.minZ];
-  const high = [c.maxX, c.top, c.maxZ];
+/**
+ * Whether the way from `eye` to `to` runs through `c` (a wall, the loft's floor, a desk, a person…).
+ * `grow` fattens the box by that many metres all round, which is how the picture asks whether
+ * something could be in the way without building a fatter copy of it (see cullBodies).
+ */
+export function blocks(eye: THREE.Vector3, to: THREE.Vector3, c: Collider, grow = 0): boolean {
+  const floor = (c.bottom ?? 0) - grow;
+  const top = c.top + grow;
+  const minX = c.minX - grow;
+  const maxX = c.maxX + grow;
+  const minZ = c.minZ - grow;
+  const maxZ = c.maxZ + grow;
+  // The slab test, the three axes written out rather than looped over an array of deltas: this is
+  // asked for every cell of the picture's occlusion mask against everything that could be in front of
+  // it (see fillMask), five thousand times a pass, and a handful of short-lived arrays a call is tens
+  // of thousands of throwaways a second for the collector to chase. The same walk, the same answer,
+  // nothing allocated: `t0` and `t1` are the stretch of the ray still inside the box.
+  const dx = to.x - eye.x;
+  const dy = to.y - eye.y;
+  const dz = to.z - eye.z;
   let t0 = 0;
   let t1 = 1;
-  for (let i = 0; i < 3; i++) {
-    if (Math.abs(delta[i]) < 1e-9) {
-      if (from[i] < low[i] || from[i] > high[i]) return false;
-      continue;
+  let a = 0;
+  let b = 1;
+  if (Math.abs(dx) < 1e-9) {
+    if (eye.x < minX || eye.x > maxX) return false;
+  } else {
+    a = (minX - eye.x) / dx;
+    b = (maxX - eye.x) / dx;
+    if (a > b) {
+      const t = a;
+      a = b;
+      b = t;
     }
-    let a = (low[i] - from[i]) / delta[i];
-    let b = (high[i] - from[i]) / delta[i];
-    if (a > b) [a, b] = [b, a];
-    t0 = Math.max(t0, a);
-    t1 = Math.min(t1, b);
+    if (a > t0) t0 = a;
+    if (b < t1) t1 = b;
+    if (t0 > t1) return false;
+  }
+  if (Math.abs(dy) < 1e-9) {
+    if (eye.y < floor || eye.y > top) return false;
+  } else {
+    a = (floor - eye.y) / dy;
+    b = (top - eye.y) / dy;
+    if (a > b) {
+      const t = a;
+      a = b;
+      b = t;
+    }
+    if (a > t0) t0 = a;
+    if (b < t1) t1 = b;
+    if (t0 > t1) return false;
+  }
+  if (Math.abs(dz) < 1e-9) {
+    if (eye.z < minZ || eye.z > maxZ) return false;
+  } else {
+    a = (minZ - eye.z) / dz;
+    b = (maxZ - eye.z) / dz;
+    if (a > b) {
+      const t = a;
+      a = b;
+      b = t;
+    }
+    if (a > t0) t0 = a;
+    if (b < t1) t1 = b;
     if (t0 > t1) return false;
   }
   return true;
