@@ -1,4 +1,4 @@
-import { Drop, WetGlass } from './sky-wetglass';
+import { WetGlass } from './sky-wetglass';
 export { type Drop, WetGlass } from './sky-wetglass';
 import { gradientDome, moonTexture, blobTexture } from './sky-pictures';
 export { gradientDome, moonTexture, blobTexture } from './sky-pictures';

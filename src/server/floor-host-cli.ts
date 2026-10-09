@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { WebSocket } from 'ws';
-import { FLOORHOST_PROTOCOL, isToOffice, type FromFloor, type ToOffice } from '../shared/floorhost.js';
+import { FLOORHOST_PROTOCOL, isToOffice, type FromFloor } from '../shared/floorhost.js';
 import { HostFloors, hostParts, startHooks } from './host-floor.js';
 
 

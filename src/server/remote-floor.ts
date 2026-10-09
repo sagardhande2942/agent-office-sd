@@ -1,14 +1,13 @@
-import type { AgentEffort, AgentProvider, ForgeKind, FloorInfo, GhComment, GhIssue, GhLabel, GhPull, GhState, JailState, MeetingRequest, MeetingState, ProjectInfo, QueueState, TerminalHit, WorkerInfo, WorkerKind, WorktreeCleanup, WorktreeState } from '../shared/protocol.js';
+import type { AgentEffort, AgentProvider, ForgeKind, FloorInfo, GhComment, GhIssue, GhLabel, GhPull, GhState, JailState, MeetingRequest, MeetingState, ProjectInfo, QueueState, TerminalHit, WorkerInfo, WorktreeCleanup, WorktreeState } from '../shared/protocol.js';
 import type { BallState } from '../shared/hoop.js';
-import type { CarPose, CarSeat, CarState } from '../shared/garage.js';
+import type { CarPose, CarState } from '../shared/garage.js';
 import type { Decoration } from '../shared/decor.js';
 import type { JukeboxSpot, JukeboxState } from '../shared/jukebox.js';
 import { tvTitle, TV_OFF, type TvState } from '../shared/tv.js';
 import type { DeskLabel, FloorPlan } from '../shared/floorplan.js';
 import { EMPTY_PLAN } from '../shared/floorplan.js';
 import type { Landed } from './leave-on-merge.js';
-import type { ForgeAs } from './signins.js';
-import type { OpenedPr, RepoSource } from './workers.js';
+import type { OpenedPr } from './workers.js';
 import type { FloorActions, FloorChanges, FloorCourt, FloorDecor, FloorForge, FloorGarage, FloorMeetings, FloorPlan as FloorPlanActions, FloorQueue, FloorRoom, FloorTv, FloorWorkers } from './floor-actions.js';
 import type { HostRegistry, HostSocket } from './floor-hosts.js';
 import type { FromFloor, ToOffice } from '../shared/floorhost.js';

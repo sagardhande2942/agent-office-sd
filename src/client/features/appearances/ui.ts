@@ -1,5 +1,5 @@
 import './ui.css';
-import { FICTIONAL_CHARACTERS, validAppearanceConfig, type AppearanceConfig } from '../../../shared/appearances';
+import { FICTIONAL_CHARACTERS, validAppearanceConfig } from '../../../shared/appearances';
 import { store } from '../../state';
 import type { Net } from '../../net';
 import { h } from '../../ui/dom';

@@ -1,9 +1,4 @@
-import { gradientDome, moonTexture, blobTexture } from './sky-pictures';
 import * as THREE from 'three';
-import { FLOOR, SLAB, STREET_Y, WALL_HEIGHT, WALL_T, WING, wingMinZ } from '../../shared/layout';
-import type { SkyState, Theme, Weather } from '../../shared/protocol';
-import { guessPlace, skyNow, sunPosition } from '../../shared/sun';
-import type { NightParts } from './outside';
 import { rand } from './sky';
 
 

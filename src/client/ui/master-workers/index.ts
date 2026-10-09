@@ -1,7 +1,7 @@
 import './style.css';
 import type { Net } from '../../net';
 import type { AgentChoice } from '../../../shared/protocol';
-import type { TeamConfig, TeamPreset, TeamRequest } from '../../../shared/master-workers';
+import type { TeamPreset, TeamRequest } from '../../../shared/master-workers';
 import { planProviders } from '../../../shared/plan-providers';
 import { fmtCost, tokensOf, fmtTokens } from '../../../shared/protocol';
 import { store } from '../../state';

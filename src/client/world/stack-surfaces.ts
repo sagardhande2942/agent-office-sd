@@ -1,8 +1,4 @@
 import * as THREE from 'three';
-import { FLOOR, LADDER, POLE, POLES, SLAB, WALL_HEIGHT, WALL_T, WINDOWS, type PoleSpot } from '../../shared/layout';
-import type { Collider, Interactable } from './types';
-import type { Fixture } from './office/fixture';
-import { mesh, textPlane, toon } from './toon';
 import { Rect, Hole } from './stack';
 
 

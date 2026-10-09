@@ -3,7 +3,6 @@ export type { ForgeAs } from './signin-types.js';
 import * as accountConfig from './signin-config.js';
 import { execFile, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import * as pty from '@lydell/node-pty';
 import type { ForgeKind, SignInKind, SignInState, SignInsState } from '../shared/protocol.js';
@@ -617,11 +616,6 @@ export class SignIns {
 
   private writeGitConfig(id: string, user?: { name: string; email: string }) { return accountConfig.writeGitConfig({base:this.base,home:this.home.bind(this),gh:this.gh,seed:this.seed.bind(this)},id, user); }
 
-}
-
-/** A value for a git config file, quoted. */
-function quote(v: string): string {
-  return `"${v.replace(/[\p{C}]/gu, '').replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 /** Terminal output as plain text: no colors, links or cursor moves. */

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AgentChoice, Usage, WorkerInfo } from '../../shared/protocol.js';
+import type { AgentChoice, WorkerInfo } from '../../shared/protocol.js';
 import type { TeamAction, TeamAttempt, TeamRequest, TeamRun, TeamState, TeamTask } from '../../shared/master-workers.js';
 import { load, modelKey, request, restored, save, text, TeamPresets } from './storage.js';
 import { masterPrompt, workerPrompt } from './prompts.js';

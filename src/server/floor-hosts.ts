@@ -1,7 +1,7 @@
 import type { Duplex } from 'node:stream';
 import type { IncomingMessage } from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { FLOORHOST_MAX_FRAME, FLOORHOST_PROTOCOL, isFromFloor, isToOffice, type FromFloor, type FloorReady, type ToOffice } from '../shared/floorhost.js';
+import { FLOORHOST_MAX_FRAME, FLOORHOST_PROTOCOL, isFromFloor, type FromFloor, type FloorReady, type ToOffice } from '../shared/floorhost.js';
 import { Hosts, type Host } from './hosts.js';
 
 /** One floor a connected machine is serving, with the roster it last announced. */

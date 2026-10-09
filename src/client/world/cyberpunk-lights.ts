@@ -1,17 +1,10 @@
 import * as THREE from 'three';
-import type { FloorPalette } from '../../shared/floors';
-import { KIOSK, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../shared/layout';
-import { BENCH_OUT, BOARD_KEYS, COUNCIL, THRONE_SIZE, type BoardKey, type MapPlan, type PropConfig } from '../../shared/maps';
-import { PROP_SIZE, boxFootprint, type PropKind } from '../../shared/maps/props';
-import { NavGrid, deskPoint, type Pt } from '../../shared/nav';
-import { Person } from './character';
+import { type MapPlan, type PropConfig } from '../../shared/maps';
+import { type Pt } from '../../shared/nav';
 import { glowTexture } from './costumes';
-import { buildGong, type Gong } from '../features/gong/world';
-import { vacancyMarker, type Collider, type DeskView, type Interactable } from './office';
 import { canvasTexture, seeded, shade } from './textures';
-import { mergeByMaterial, mesh, roundedBox, textPlane, toon, toonUnique } from './toon';
-import type { World } from './world';
-import { WALL, DOORWAY, asphalt, panels, neonSign, billboard, skyline, towerFace, box, toonMap, flatMap, flat, GLASS, tube, Kit, Holo, neonLight, placed, collide, shopfront } from './cyberpunk';
+import { mesh, toon } from './toon';
+import { WALL, DOORWAY, asphalt, panels, neonSign, billboard, skyline, towerFace, box, toonMap, flatMap, flat, GLASS, tube, Kit, neonLight, placed, collide } from './cyberpunk';
 
 
 /** A floor uplight: a can in the ground, throwing light up a wall. */

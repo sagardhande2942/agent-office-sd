@@ -1,9 +1,4 @@
 import * as THREE from 'three';
-import { FLOOR, SLAB, STREET_Y, WALL_HEIGHT, WALL_T, WING, wingMinZ } from '../../shared/layout';
-import type { SkyState, Theme, Weather } from '../../shared/protocol';
-import { guessPlace, skyNow, sunPosition } from '../../shared/sun';
-import type { NightParts } from './outside';
-import { uniforms } from './sky';
 
 
 /** A dome behind everything, shading from the horizon up to the zenith, with a glow low down and round the moon: Halloween's. */

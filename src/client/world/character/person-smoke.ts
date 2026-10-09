@@ -1,23 +1,5 @@
-import { sodaCan } from './props';
 import * as THREE from 'three';
-import { HAIR_COLORS, HAIR_STYLES, SKIN_TONES, type Look } from '../../../shared/avatar';
-import { EMOTE_BY_ID, type EmoteId } from '../../../shared/emotes';
-import type { CarriedIssue, Theme } from '../../../shared/protocol';
-import type { BarGame } from '../../../shared/bargames';
-import type { Drink } from '../../../shared/rooftop';
-import { HIPS, type PersonRig } from './rig';
-import { axeModel, dartModel } from '../../features/bargames/world';
-import { OpenBook } from '../../features/bookshelf/book';
-import { HeldCard } from '../../features/carrying/card';
-import { UNDEAD_SKIN } from '../costumes';
-import { HolidayOutfit } from './person-outfit';
-import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
-import { EXHALE_AT, REACH_TIME, SMOKE_CYCLE, dragCurve, reachCurve } from './curves';
-import { cigarette, coffeeMug, drinkGlass, putDownGlass } from './props';
-import { styleHair } from './person-hair';
-import { clubSwing, strike, swingStep, type Golf } from './person-golf';
-import { propPosition, throwStep, type Oche } from './person-throw';
-import { poseEmote, type Emoting } from './person-emote';
+import { EXHALE_AT, SMOKE_CYCLE, dragCurve } from './curves';
 import type { Person } from './person';
 const v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
 

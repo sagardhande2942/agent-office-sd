@@ -6,7 +6,7 @@ import type { Net } from '../net';
 import { store } from '../state';
 import { h, openModal, timeAgo, STATUS_LABEL } from './dom';
 import { confirmDialog } from './prompt';
-import { providerPicker, providerLabel, providerUsageState, providerWaitingLabel, resolvedProvider, modelBadge } from './provider';
+import { providerPicker, providerLabel, providerUsageState, providerWaitingLabel, modelBadge } from './provider';
 import { officeFull } from '../../shared/machine';
 import { dictateField } from './dictate';
 

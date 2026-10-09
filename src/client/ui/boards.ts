@@ -1,4 +1,4 @@
-import type { AgentEffort, AgentProvider, GhIssue, GhLabel, GhPull, WorkerInfo } from '../../shared/protocol';
+import type { GhIssue, GhLabel, GhPull, WorkerInfo } from '../../shared/protocol';
 import { FORGE_CLI, FORGE_LABEL } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store, workerForPull } from '../state';

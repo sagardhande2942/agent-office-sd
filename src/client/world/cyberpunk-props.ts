@@ -1,17 +1,11 @@
 import * as THREE from 'three';
-import type { FloorPalette } from '../../shared/floors';
-import { KIOSK, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../shared/layout';
-import { BENCH_OUT, BOARD_KEYS, COUNCIL, THRONE_SIZE, type BoardKey, type MapPlan, type PropConfig } from '../../shared/maps';
-import { PROP_SIZE, boxFootprint, type PropKind } from '../../shared/maps/props';
-import { NavGrid, deskPoint, type Pt } from '../../shared/nav';
-import { Person } from './character';
+import { type PropConfig } from '../../shared/maps';
+import { PROP_SIZE } from '../../shared/maps/props';
 import { glowTexture } from './costumes';
-import { buildGong, type Gong } from '../features/gong/world';
-import { vacancyMarker, type Collider, type DeskView, type Interactable } from './office';
-import { canvasTexture, seeded, shade } from './textures';
-import { mergeByMaterial, mesh, roundedBox, textPlane, toon, toonUnique } from './toon';
-import type { World } from './world';
-import { TABLE_TOP, billboard, towerFace, hazard, box, flatMap, flat, GLASS, rod, tube, Kit, FLAME_OUTER, FLAME_INNER, FLAME_OUT, FLAME_IN, neonLight, placed, collide, paintAd, floorGlow } from './cyberpunk';
+import { type Interactable } from './office';
+import { canvasTexture, shade } from './textures';
+import { mesh, roundedBox, textPlane, toon } from './toon';
+import { TABLE_TOP, billboard, towerFace, hazard, box, flatMap, flat, GLASS, tube, Kit, FLAME_OUTER, FLAME_INNER, FLAME_OUT, FLAME_IN, neonLight, placed, collide, paintAd, floorGlow } from './cyberpunk';
 
 
 /** A holographic billboard high on a wall: a scrolling picture, its frame, and its haze. */

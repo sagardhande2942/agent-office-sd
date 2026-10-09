@@ -1,17 +1,11 @@
 import * as THREE from 'three';
-import type { FloorPalette } from '../../shared/floors';
-import { KIOSK, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../shared/layout';
-import { BENCH_OUT, BOARD_KEYS, COUNCIL, THRONE_SIZE, type BoardKey, type MapPlan, type PropConfig } from '../../shared/maps';
-import { PROP_SIZE, boxFootprint, type PropKind } from '../../shared/maps/props';
-import { NavGrid, deskPoint, type Pt } from '../../shared/nav';
-import { Person } from './character';
+import { type PropConfig } from '../../shared/maps';
+import { PROP_SIZE, boxFootprint } from '../../shared/maps/props';
 import { glowTexture } from './costumes';
-import { buildGong, type Gong } from '../features/gong/world';
-import { vacancyMarker, type Collider, type DeskView, type Interactable } from './office';
+import { type Collider } from './office';
 import { canvasTexture, seeded, shade } from './textures';
-import { mergeByMaterial, mesh, roundedBox, textPlane, toon, toonUnique } from './toon';
-import type { World } from './world';
-import { MAX_LIGHTS, SHOP_W, box, flatMap, Kit, signText, hologram, barrier, floorGlow } from './cyberpunk';
+import { mesh, toon, toonUnique } from './toon';
+import { MAX_LIGHTS, SHOP_W, box, flatMap, Kit, signText, floorGlow } from './cyberpunk';
 
 
 // ---- Textures -------------------------------------------------------------------------------------

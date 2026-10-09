@@ -26,8 +26,6 @@ const STYLE_PROPS: Record<MapStyle, { kinds: Readonly<Record<string, string>>; f
   station: { kinds: STATION_PROP_KINDS, footprint: stationFootprint, top: stationTop },
 };
 
-/** The lecterns every map has to say where; the Manager's is optional (see MapConfig.stations). */
-const STATION_KINDS: readonly Exclude<StationKind, 'manager'>[] = ['issues', 'pulls', 'queue'];
 /** Which station kinds get a lectern when a map says nothing about them: the three that are always there. */
 const MAPPED_STATION_KINDS: readonly StationKind[] = ['issues', 'pulls', 'queue', 'manager'];
 /** How far in from a table's edge a seat's place setting is; the worker sits 0.85 out from it (see deskSeat), on the bench. */

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { FLOOR_PALETTES, MAX_FLOORS, normalizeRepo, sameRepo } from '../shared/floors.js';
 import type { ForgeKind, CloneProgress, ProjectsDirState, RepoChoice } from '../shared/protocol.js';
 import { CloneRun, dropLog, whyCloneFailed, type CloneEnd, type CloneRunOptions } from './clone.js';
-import { gh, bb } from './forge.js';
+import { gh } from './forge.js';
 import { askBb, listRepos } from './building-forges.js';
 
 /** A floor as floors.json keeps it. */

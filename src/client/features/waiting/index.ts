@@ -5,7 +5,6 @@ import { visitWorker } from '../../shared/worker-terminal';
  * (waking it if it's asleep) and its changes, the search over every terminal, and the task queue's window.
  */
 import * as THREE from 'three';
-import { isAsleep } from '../../../shared/status';
 import type { Ctx } from '../../core/context';
 import type { CoreState } from '../../core/ctx';
 import type { Parts } from '../../core/parts';

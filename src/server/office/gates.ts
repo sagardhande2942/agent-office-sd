@@ -2,7 +2,6 @@ import type { FloorActions } from '../floor-actions.js';
 import type { ForgeKind } from '../../shared/protocol.js';
 import type { ForgeAs } from '../signins.js';
 import { WebSocket } from 'ws';
-import type { GhAs } from '../signins.js';
 import type { Floor } from '../floor.js';
 import type { SignInKind } from '../../shared/protocol.js';
 import type { Ctx, Gates } from './context.js';
