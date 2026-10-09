@@ -214,8 +214,6 @@ export type FromFloor =
 
 // The frames the office sends that are not floor cases: the handshake and a goodbye.
 const OFFICE_FRAME_TYPES = new Set(['welcome', 'bye']);
-// The frames a machine sends that are not floor cases.
-const HOST_FRAME_TYPES = new Set(['hello', 'ping', 'pong']);
 const HOST_CASES = new Set<string>([...FLOOR_CASES, ...HOST_CALLS]);
 const MAX_FRAME_BYTES = 2 * 1024 * 1024;
 

@@ -1,13 +1,8 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BALCONY, DESKS, DESK_SIZE, EXIT_STAIRS, FLOOR, PLANTS, STREET_Y, WALL_HEIGHT, WINDOWS, type DeskDef } from '../../shared/layout';
-import type { Theme } from '../../shared/protocol';
-import { mulberry32 } from '../../shared/rng';
-import { batWingGeometry, glowTexture } from './costumes';
-import { buildDesk, plantLeaves, type Collider, type Office } from './office';
-import { SPOOKY_MOON } from './sky';
-import { mergeByMaterial, mesh, textPlane, toon, toonUnique } from './toon';
-import { FROST, RACK_GLASS, SCREEN_LEN, SCREEN_H, Holiday } from './holiday';
+import { DESKS, DESK_SIZE, FLOOR, WALL_HEIGHT, type DeskDef } from '../../shared/layout';
+import { buildDesk } from './office';
+import { mergeByMaterial, mesh, toon, toonUnique } from './toon';
+import { FROST, RACK_GLASS, SCREEN_LEN, SCREEN_H } from './holiday';
 
 
 // ---- The modern office -------------------------------------------------------------------------

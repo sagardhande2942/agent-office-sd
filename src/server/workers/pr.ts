@@ -6,8 +6,7 @@ import path from 'node:path';
 import type { WorkerInfo } from '../../shared/protocol.js';
 import { DESK_BY_ID } from '../../shared/layout.js';
 import { isBusy } from '../../shared/status.js';
-import { gh } from '../github.js';
-import type { ForgeAs, GhAs } from '../signins.js';
+import type { ForgeAs } from '../signins.js';
 import { Worktrees } from '../worktrees.js';
 import { run } from './process.js';
 import type { OpenedPr, Worker, WorkerContext } from './types.js';
@@ -34,21 +33,6 @@ export function ownPr(command: unknown, output: string): { repo: string; number:
   if (typeof command !== 'string' || !CREATES_PR.test(command)) return undefined;
   const last = [...output.matchAll(PR_URL)].pop();
   return last && { repo: last[1], number: Number(last[2]), url: last[0] };
-}
-
-async function findOpenPr(branch: string, cwd: string): Promise<{ number: number; url: string } | undefined> {
-  const out = await gh(['pr', 'list', '--head', branch, '--state', 'open', '--limit', '1', '--json', 'number,url'], cwd);
-  const found = (JSON.parse(out || '[]') as { number: number; url: string }[])[0];
-  return found ? { number: found.number, url: found.url } : undefined;
-}
-
-/** `gh pr create` for a pushed branch; resolves to the new pull request. */
-async function createPr(branch: string, base: string | undefined, title: string, body: string, cwd: string, as?: GhAs): Promise<{ number: number; url: string }> {
-  const out = await gh(['pr', 'create', '--head', branch, ...(base ? ['--base', base] : []), '--title', title, '--body', body], cwd, 60_000, as?.env);
-  const url = out.trim().split('\n').pop() ?? '';
-  const number = Number(/\/pull\/(\d+)/.exec(url)?.[1]);
-  if (!number) throw new Error(`gh did not return a pull request URL (${truncate(out, 120)})`);
-  return { number, url };
 }
 
 /** owner/name#12 for a pull request on GitHub (which links it with its title), else its URL. */

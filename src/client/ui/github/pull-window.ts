@@ -4,7 +4,6 @@ import type { GhPull, GhPullDetail, GhReviewComment } from '../../../shared/prot
 import type { Net } from '../../net';
 import { store, workerForPull } from '../../state';
 import { h, openModal, type Modal } from '../dom';
-import { officePrompt } from '../prompts';
 import { getJson, getText } from './api';
 import { openClose } from './close';
 import { commentBox } from './comment-box';
@@ -12,7 +11,7 @@ import { labelButton, labelChip } from './labels';
 import { checksList, conflicted, mergeStatus, openMerge } from './merge';
 import { avatar, commentCard, errorBox, nodes, REVIEW_BADGE, spinnerRow, stateOf } from './pieces';
 import { FILES_KEY, mergePref, pref, savePref, TAB_KEY } from './prefs';
-import { fixAndMergePrompt, fixConflictsPrompt, pullContext, pullVars, reviewPrompt, type BoardActions } from './prompts';
+import { fixAndMergePrompt, fixConflictsPrompt, pullContext, reviewPrompt, type BoardActions } from './prompts';
 import { buildTree, looksGenerated, parseDiff, renderFileDiff, renderThread, repliesOf, Reviewed, STATUS_WORD, treeOrder, type DiffFile, type TreeDir } from './pulldiff';
 
 // The window behind a card on the PR board. A PR opens on its conversation (description, comments,

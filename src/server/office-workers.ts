@@ -4,7 +4,7 @@
 
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import type { AgentEffort, AgentProvider, GhPull, QueueTask, WorkerInfo, WorktreeCleanup } from '../shared/protocol.js';
+import type { AgentEffort, AgentProvider, WorkerInfo, WorktreeCleanup } from '../shared/protocol.js';
 import { isAgentEffort, isAgentProvider } from '../shared/protocol.js';
 import { DESK_BY_ID, STATION_AGENT } from '../shared/layout.js';
 import { blockersOf } from '../shared/manager.js';

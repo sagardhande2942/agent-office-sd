@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { defaultAppearanceState, validAppearanceConfig, isFictionalCharacter, type AppearanceConfig, type AppearanceState } from '../shared/appearances.js';
+import { defaultAppearanceState, validAppearanceConfig, isFictionalCharacter, type AppearanceState } from '../shared/appearances.js';
 export interface AppearanceWorker { id: string; createdAt: number; floor?: string }
 /** One allocator for the building, including helpers, shells and remote floors. */
 export class Appearances {

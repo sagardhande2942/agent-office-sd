@@ -1,14 +1,14 @@
 import { pumpkinGeometry, pumpkinTextures } from './holiday-pumpkins';
 export { pumpkinGeometry, pumpkinTextures } from './holiday-pumpkins';
-import { ledMaterial, benchScreen, serverRack, waterCooler, ceilingCoves, rackGlow, modernFurniture } from './modern-furniture';
+import { ledMaterial, benchScreen, serverRack, waterCooler, ceilingCoves, rackGlow } from './modern-furniture';
 export { ledMaterial, benchScreen, serverRack, waterCooler, ceilingCoves, rackGlow, modernFurniture } from './modern-furniture';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { BALCONY, DESKS, DESK_SIZE, EXIT_STAIRS, FLOOR, PLANTS, STREET_Y, WALL_HEIGHT, WINDOWS, type DeskDef } from '../../shared/layout';
+import { BALCONY, DESKS, DESK_SIZE, EXIT_STAIRS, FLOOR, PLANTS, STREET_Y, WALL_HEIGHT, WINDOWS } from '../../shared/layout';
 import type { Theme } from '../../shared/protocol';
 import { mulberry32 } from '../../shared/rng';
 import { batWingGeometry, glowTexture } from './costumes';
-import { buildDesk, plantLeaves, type Collider, type Office } from './office';
+import { plantLeaves, type Collider, type Office } from './office';
 import { SPOOKY_MOON } from './sky';
 import { mergeByMaterial, mesh, textPlane, toon, toonUnique } from './toon';
 

@@ -1,15 +1,10 @@
 import * as THREE from 'three';
 import type { FloorPalette } from '../../shared/floors';
-import { KIOSK, STATION_AGENT, deskSeat, type DeskDef, type StationKind } from '../../shared/layout';
-import { BENCH_OUT, BOARD_KEYS, COUNCIL, THRONE_SIZE, type BoardKey, type MapPlan, type PropConfig } from '../../shared/maps';
-import { PROP_SIZE, boxFootprint, type PropKind } from '../../shared/maps/props';
-import { NavGrid, deskPoint, type Pt } from '../../shared/nav';
-import { Person } from './character';
-import { glowTexture } from './costumes';
-import { buildGong, type Gong } from '../features/gong/world';
-import { vacancyMarker, type Collider, type DeskView, type Interactable } from './office';
-import { canvasTexture, seeded, shade } from './textures';
-import { mergeByMaterial, mesh, roundedBox, textPlane, toon, toonUnique } from './toon';
+import { type MapPlan } from '../../shared/maps';
+import { type PropKind } from '../../shared/maps/props';
+import { NavGrid, type Pt } from '../../shared/nav';
+import { type Interactable } from './office';
+import { mergeByMaterial, toon } from './toon';
 import type { World } from './world';
 import { WALL, CyberMats, neonMat, Kit, Steam, paintAd, PROPS, buildShell, buildDais, buildTables, placeSetting, lectern, buildCouncil, buildBoards, buildHerald, buildEscort } from './cyberpunk';
 

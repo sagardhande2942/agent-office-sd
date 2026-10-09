@@ -1,20 +1,5 @@
-import * as animation from './worker-fugdi';
-import { BEAT as FUGDI_BEAT, FUGDI, FUGDI_SECONDS, fugdiPose } from '../../../shared/fugdi';
-import * as THREE from 'three';
-import type { Theme, WorkerAction, WorkerStatus, WorkerTask } from '../../../shared/protocol';
-import { isAsleep, type WorkerPr } from '../../../shared/status';
-import { beard, grime, peasantGarb, type Beard, type PeasantGarb } from '../costumes';
-import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
-import type { WorkerRig } from './rig';
-import { ease, popIn } from './curves';
-import { undress } from './props';
-import { ACT_MIN, DESPAIR_MIN, TWIRL_TIME, WAIT_CYCLE, WAIT_HOPS, blendStance, type Act, type Stance } from './worker-stance';
+import { disposeSprite } from '../toon';
 import { STATUS_BULB, bubbleFor } from './worker-badges';
-import { globe, papers } from './worker-props';
-import { DANCE, groove, type Dancing, type Stage } from './worker-dance';
-import { DEAD, STARVED, bones, crossedEyes, slump } from './worker-jail';
-import { packUp, waddle, type Leaving } from './worker-leave';
-import { dressUp, growBeard, wearGarb } from './worker-dress';
 import type { Worker } from './worker';
 
 export function drawBubble(ctx: Pick<Worker,'status'|'bouncing'|'task'|'pr'|'lost'|'leaving'|'bubbleKey'|'bubble'|'root'|'bubbleIsCard'>, ) {

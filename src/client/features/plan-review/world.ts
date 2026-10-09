@@ -1,10 +1,10 @@
 import { deskPoint } from '../../../shared/nav';
 import * as THREE from 'three';
-import { PLAN_REVIEW_TABLE, PLAN_REVIEW_SEATS, MEETING_TABLE, MEETING_LAPTOP, deskSeat, type DeskDef } from '../../../shared/layout';
+import { PLAN_REVIEW_TABLE, PLAN_REVIEW_SEATS, MEETING_TABLE, MEETING_LAPTOP, type DeskDef } from '../../../shared/layout';
 import { mesh, roundedBox, textPlane, toon } from '../../world/toon';
 import type { DeskView, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
-import { PALETTE, box } from '../../world/office/materials';
+import { box } from '../../world/office/materials';
 import { chair } from '../../world/office/seats';
 function buildMeetingSeat(def: DeskDef, index: number): DeskView {
   const group = new THREE.Group();

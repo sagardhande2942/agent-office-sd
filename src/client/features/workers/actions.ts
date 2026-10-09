@@ -24,7 +24,7 @@ import { STATUS_LABEL, clip, closeAllModals, h, toast } from '../../ui/dom';
 import { openDeskLabel } from '../../ui/floorplan';
 import type { MeetingPreset } from '../../ui/meeting';
 import { routeWorktreeMessage } from '../../ui/prompt';
-import { providerLabel, resolvedProvider } from '../../ui/provider';
+import { resolvedProvider } from '../../ui/provider';
 import { openPull } from '../../ui/pull';
 import { openRepoPulls, workerRepos } from '../../ui/repos';
 import { hiringPaused, usageLabel, usageTitle } from '../../ui/usage';

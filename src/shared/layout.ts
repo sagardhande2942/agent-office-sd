@@ -1,4 +1,3 @@
-import { plantByWing, plantsAt, greenPlantKind, streetBelow, roofDrop, seatPlace, seatAt, seatHere, elevatorSpot, inElevator } from './layout-places.js';
 export { plantByWing, plantsAt, greenPlantKind, streetBelow, roofDrop, seatPlace, seatAt, seatHere, elevatorSpot, inElevator } from './layout-places.js';
 // Static office layout shared by the server (validation) and client (rendering).
 // Units are meters; +y is up. The office floor spans FLOOR.minX..maxX / minZ..maxZ at y = 0,

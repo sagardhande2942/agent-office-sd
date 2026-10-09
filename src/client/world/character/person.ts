@@ -13,7 +13,7 @@ import { HeldCard } from '../../features/carrying/card';
 import { UNDEAD_SKIN } from '../costumes';
 import { HolidayOutfit } from './person-outfit';
 import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
-import { EXHALE_AT, REACH_TIME, SMOKE_CYCLE, dragCurve, reachCurve } from './curves';
+import { REACH_TIME, reachCurve } from './curves';
 import { cigarette, coffeeMug, drinkGlass, putDownGlass } from './props';
 import { styleHair } from './person-hair';
 import { clubSwing, strike, swingStep, type Golf } from './person-golf';

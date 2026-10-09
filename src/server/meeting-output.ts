@@ -1,15 +1,4 @@
-import { execFile } from 'node:child_process';
-import { randomBytes } from 'node:crypto';
-import { closeSync, cpSync, existsSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
-import { promisify } from 'node:util';
-import { MEETING_SEATS } from '../shared/layout.js';
-import { MEETING_NOTES_DIR, MEETING_PATTERNS, isMeetingPattern, meetingRecord, outputProblem, slugify } from '../shared/meetings.js';
-import { isAgentEffort, isAgentProvider, tokensOf, type AgentChoice, type AgentEffort, type AgentProvider, type Meeting, type MeetingRecord, type MeetingRequest, type MeetingState, type MeetingTurn, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
-import { validateWorkerEffort, validateWorkerModel } from './agents.js';
-import { providerMeta, takesEffort, takesModel } from '../shared/providers.js';
-import { gitError, type WorktreeRef, type WorktreeState } from './worktrees.js';
-import { PROMPTS, fillPrompt, type PromptId, type PromptVars } from '../shared/prompts.js';
+import { closeSync, openSync, readSync } from 'node:fs';
 import { execFileP } from './meetings.js';
 
 

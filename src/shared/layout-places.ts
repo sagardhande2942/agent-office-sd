@@ -1,5 +1,5 @@
 
-import { FLOOR, WING, PLANTS, GreenKind, GREEN_KINDS, GREEN_PLANTS, STREET_Y, STOREY, SeatDef, SEATING_BY_ID, SeatPlace, ELEVATOR, ELEVATOR_CAR } from './layout.js';
+import { FLOOR, WING, PLANTS, GreenKind, GREEN_KINDS, STREET_Y, STOREY, SeatDef, SEATING_BY_ID, SeatPlace, ELEVATOR, ELEVATOR_CAR } from './layout.js';
 
 
 /** A plant by the north wall east of the gong, in the way into the back office: put away once it's built. */

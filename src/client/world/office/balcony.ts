@@ -1,4 +1,4 @@
-import { greenPlant, windowBox, hangingPothos, tablePlant } from '../plants';
+import { greenPlant, windowBox, hangingPothos } from '../plants';
 import * as THREE from 'three';
 import { ASHTRAY, BALCONY, EXIT_STAIRS, SLAB, STREET_Y } from '../../../shared/layout';
 import { bulb, type NightParts } from '../outside';

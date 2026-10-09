@@ -1,4 +1,4 @@
-import { greenPlant, windowBox, hangingPothos, tablePlant } from '../plants';
+import { hangingPothos, tablePlant } from '../plants';
 import * as THREE from 'three';
 import { LOFT, STAIRS, WALL_T } from '../../../shared/layout';
 import { mesh, roundedBox, textPlane, toon } from '../toon';

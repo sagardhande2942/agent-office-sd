@@ -27,7 +27,6 @@ import type {
   AgentChoice,
   AgentEffort,
   AgentProvider,
-  ChangesState,
   ForgeKind,
   GhCloseReason,
   GhComment,

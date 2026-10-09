@@ -2,16 +2,14 @@ import { teamPromptError } from '../master-workers/role.js';
 import { planningSeat, planningVersion, planningPrompt, promotePlanWorker } from './plan-review.js';
 import type { PlanReviewWorker } from '../../shared/plan-review.js';
 import { submitCompletion } from './completion.js';
-import {holdOffline} from './offline.js';
 import { workerHandle } from './handle.js';
 import * as helperOps from './helpers.js';
-import { isAsleep, isBusy } from '../../shared/status.js';
-import { helperDesk, helperId, isHelperId, plainText } from '../../shared/helper.js';
+import { isHelperId } from '../../shared/helper.js';
 import type { DeskDef } from '../../shared/layout.js';
 import type { ForgeKind } from '../../shared/protocol.js';
 import { takeBreak, breakOver } from './breaks.js';
 import { validBossPrompt, validBossGuard, type BossGuard } from '../../shared/boss.js';
-import { officePrompt, WORKER_COORDINATION } from '../prompts.js';
+import { WORKER_COORDINATION } from '../prompts.js';
 const FINDING_LINES = 180;
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -374,7 +372,6 @@ export class WorkerManager {
     const w = this.workers.get(id);
     return (w?.pty || w?.dsh) && token && safeEq(token, w.hookToken) ? w.info : undefined;
   }
-  private holdOffline(w:Worker,why:string,term:HeadlessTerminal) { holdOffline({events:this.events,emit:w=>this.emitUpdate(w),persist:()=>this.persist()},w,why,term); }
 
   /** Starts every worker that isn't running: nobody should be found asleep at their desk. */
   wakeAll() {
