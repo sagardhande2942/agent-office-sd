@@ -13,8 +13,6 @@
 
 Full-screen agents retain up to 3,000 lines in the office's searchable, saved terminal scrollback. See [how it works](docs/how-it-works.md) for persistence and search behavior.
 
-OpenCode model selections use per-process configuration, including models set in the default worker or `--agent-args`; no `--model` flag is sent to its interactive CLI. OpenCode 2 workers start private servers so each receives its own settings. Leave Model on **Default** to retain your OpenCode settings. See [agents](docs/agents.md) for model and resume behavior.
-
 Sit **Claude Code**, **Codex**, **OpenCode**, **Grok**, **Muse**, **DeepSeek Harness** and **Cursor** workers at desks, watch each one's terminal on the laptop in front of it,
 and jump into any of them together. Every GitHub repo is a floor of the building.
 
@@ -24,9 +22,7 @@ and jump into any of them together. Every GitHub repo is a floor of the building
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square)](#run-locally)
 [![Built with TypeScript](https://img.shields.io/badge/built%20with-TypeScript-3178c6?style=flat-square)](https://www.typescriptlang.org)
 
-[**Run locally**](#run-locally) · [**Deploy to AWS**](#deploy-to-aws-ec2) · [**Azure**](#deploy-to-azure) · [**Railway**](#deploy-to-railway) · [**Fly.io**](#deploy-to-flyio) · [**Dokploy**](#deploy-to-dokploy) · [**Coolify**](#deploy-to-coolify) · [**Any server**](#deploy-to-any-ubuntu-or-debian-server) · [**Add users**](#add-users) · [**Controls**](#controls) · [**Features**](docs/features.md) · [**How it works**](docs/how-it-works.md)
-
-[**Run locally**](#run-locally) · [**Deploy to AWS**](#deploy-to-aws-ec2) · [**Azure**](#deploy-to-azure) · [**Railway**](#deploy-to-railway) · [**Fly.io**](#deploy-to-flyio) · [**Dokploy**](#deploy-to-dokploy) · [**Any server**](#deploy-to-any-ubuntu-or-debian-server) · [**Add users**](#add-users) · [**Controls**](#controls) · [**Features**](docs/features.md) · [**How it works**](docs/how-it-works.md) · [**Ideas**](docs/ideas.md)
+[**Run locally**](#run-locally) · [**Deploy to AWS**](#deploy-to-aws-ec2) · [**Azure**](#deploy-to-azure) · [**Railway**](#deploy-to-railway) · [**Fly.io**](#deploy-to-flyio) · [**Dokploy**](#deploy-to-dokploy) · [**Coolify**](#deploy-to-coolify) · [**Any server**](#deploy-to-any-ubuntu-or-debian-server) · [**Add users**](#add-users) · [**Controls**](#controls) · [**Features**](docs/features.md) · [**How it works**](docs/how-it-works.md) · [**Ideas**](docs/ideas.md)
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/main/install.sh | bash
@@ -41,29 +37,18 @@ curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/mai
 - **A floor per project.** Ride the elevator, pick one of your GitHub repos, and the office clones it (showing how far along it is) and opens a floor for it. Every worker, board and queue on that floor works in that checkout.
 - **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse, DeepSeek Harness, Pi, Cursor or Antigravity, each with its model and reasoning effort. The agent's live terminal shows on its laptop, and anyone can open it and type.
 - **Talk instead of typing.** Hold **Ctrl+Space** (or the **🎤**) in a worker's terminal or a prompt box and say what you want: it's typed in for you to send. Your browser does the listening, so there's nothing to install.
-- **You can't miss who needs you.** A worker that stops to ask you something lights a red beacon over its desk, puts a banner on your screen saying who and what for, and sounds an alarm. One that has finished jumps up and down and dings. Press **N** to go straight to whoever is waiting.
-- **From your phone, too.** `/lite` is the Lite dashboard: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
-- **GitHub on the walls.** Issues and pull requests hang on cork boards. Hand an issue to a worker, queue tasks, give a worker its own git worktree and open its PR with one key (if one gets deleted behind the office's back, the worker waits at its desk until you rebuild it). One task can span several projects: the worker gets a worktree of each, and a PR in each that links the others.
+- **You can't miss who needs you.** A worker that stops to ask you something lights a red beacon over its desk, puts a banner on your screen saying who and what for, and sounds an alarm. One that has finished jumps up and down and dings. Press **N** to go straight to the worker that has waited longest.
 - **Agents that manage agents.** Every worker can list, hire, message and send home the others, through an `agent-office` MCP server (Claude Code, Codex, OpenCode) or the `office-workers` command. Ask one to "send everyone whose PR merged home" and it does, deleting their worktrees and branches unless they hold unpushed work. A worker that opens its pull request itself (`gh pr create`) shows it at its desk, and one the office missed can be told which is its own (`office-workers pr`).
-- **Together.** Voice, chat, screen sharing on the lounge TV and a shared whiteboard.
-
-- **Other maps.** Turn the whole building into a castle: sit on a throne of iron blades while your workers line up before you when they're done, send new ones off through the Hand of the King, and watch their beards grow long and grey as they toil. Send one home and the Kingsguard runs up from the dungeon, marches it down the stairs and throws it in a cell, where it starves, dies and rots down to a skeleton. Or into a space station in orbit, the Earth turning outside its windows: you run it from the captain's chair on the bridge, and a worker sent home is marched to the airlock and blown out into space, to drift off past the observation windows with everyone who went before it. Or make a map of your own, with its own way of seeing workers off in JSON ([docs/maps.md](docs/maps.md)).
-
-- **A floor per project.** Ride the elevator, pick one of your GitHub repos, and the office clones it and opens a floor for it. Every worker, board and queue on that floor works in that checkout.
-- **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse, DeepSeek Harness, Pi, Cursor or Antigravity. The agent's live terminal shows on its laptop, and anyone can open it and type.
-- **You can see who needs you.** A worker that needs input or has finished jumps up and down and dings. Press **N** to go straight to the one that has waited longest.
 - **A helper, when one is stuck.** Press **U** at a worker that's going in circles and a second agent walks over, stands at the desk with a laptop, re-reads the failure the first one can't see past, tells the worker what it found, and goes home. It works in that worker's own checkout and cannot edit, commit or open a pull request: the work never moves off the worker you're helping. The same shared walk starts when another agent requests help through `office-workers helper`, and refreshing a local floor restores its active helpers.
 - **From your phone, too.** `/lite` is the Lite dashboard: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
 - **GitHub or Bitbucket on the walls.** Issues and pull requests hang on cork boards, for the repository the checkout's `origin` points at (your own, for a fork). Hand an issue to a worker, queue tasks, give a worker its own git worktree and open its PR with one key (if one gets deleted behind the office's back, the worker waits at its desk until you rebuild it). One task can span several projects: the worker gets a worktree of each, and a PR in each that links the others.
 - **Tracked worker communication.** Agents can queue requests, reply with branch/commit/file context, and acknowledge responses through persistent inboxes. Watch the exchanges in the CLI messages panel, `/lite` Messages, or the 3D menu. Workers read their inboxes between tasks; messages do not interrupt terminals. See [docs/communications.md](docs/communications.md).
 - **Meeting messages:** review round-linked requests inside the meeting room, resolve outstanding handoffs before completion, or finish anyway with a recorded override. Communication snapshots stay with the saved meeting notes.
-- **Agents that manage agents.** Every worker can list, hire, message and send home the others, through an `agent-office` MCP server (Claude Code, Codex, OpenCode) or the `office-workers` command. Ask one to "send everyone whose PR merged home" and it does, deleting their worktrees and branches unless they hold unpushed work.
 - **A manager that keeps an eye on the floor.** A **🧭 Manager agent** stands by the boards where the other board agents are, and reads the floor for itself: every worker with its task, status, pull request and what is blocking it (waiting on an answer, stalled, failed, out of desks), every queued task with the agent and model it runs on and whether its pull request and its checks verify it. It queues work with an agent and model you choose, holds a task back until another finishes, requeues what didn't land, and never calls anything done on a worker's say-so. Merging a pull request, deleting unfinished work and stopping anything in flight stay your decision: it asks. `office-workers status` prints the same report for you. Pick the agent it runs on in its kiosk window, like any other hire.
 - **Together.** Voice, chat, a lounge TV that plays whatever video you paste a link to (or shows whoever's screen sharing) for everyone on the floor at once, a dance floor with disco lights in front of it that each person can put out from the TV window, and a shared whiteboard. There's a switch on the wall by that TV: throw it and the office's lights go down for the film.
 - **A green, cosy office.** Plants everywhere you look: floor palms and a fiddle-leaf fig, peace lilies, pothos trailing off the desks and out of baskets hung from the ceiling, little pots on every window sill, herbs in the kitchen and window boxes along the balcony rail — with wood, wicker, terracotta and a warm floor lamp by the lounge.
 - **You need looking after too.** Your energy and stress meters under the project name run down over ten minutes and a quarter of an hour: your legs get heavy as the energy goes and your hands shake when you're wound up. A cup from the coffee machine in the kitchen puts the energy back, and so does a can of Diet Coke off the fridge's shelf (**C**, with the fridge open); a drink from the rooftop bar takes the stress off. Run either right out and you keel over on the floor and come round outside the building with both meters full. Bang the office gong and every bot on the floor gathers to dance a **🪕 Fugdi** together: rings of clapping, whirling dancers, and a turn together to finish.
-
-- **Other maps.** Turn the whole building into a castle: sit on a throne of iron blades while your workers line up before you when they're done, send new ones off through the Hand of the King, and watch their beards grow long and grey as they toil. Send one home and the Kingsguard runs up from the dungeon, marches it down the stairs and throws it in a cell, where it starves, dies and rots down to a skeleton. Or turn it into **🌃 Night City**: a rain-slick neon concourse of holographic billboards, vending machines and LED strips, console benches under a steel gantry, the city towers and rain beyond the glass, and a terrace over the street you can walk out onto. Or make a map of your own, with its own way of seeing workers off in JSON ([docs/maps.md](docs/maps.md)).
+- **Other maps.** Turn the whole building into a castle: sit on a throne of iron blades while your workers line up before you when they're done, send new ones off through the Hand of the King, and watch their beards grow long and grey as they toil. Send one home and the Kingsguard runs up from the dungeon, marches it down the stairs and throws it in a cell, where it starves, dies and rots down to a skeleton. Or into a space station in orbit, the Earth turning outside its windows: you run it from the captain’s chair on the bridge, and a worker sent home is marched to the airlock and blown out into space, to drift off past the observation windows with everyone who went before it. Or turn it into **🌃 Night City**: a rain-slick neon concourse of holographic billboards, vending machines and LED strips, console benches under a steel gantry, the city towers and rain beyond the glass, and a terrace over the street you can walk out onto. Or make a map of your own, with its own way of seeing workers off in JSON ([docs/maps.md](docs/maps.md)).
 
 There's a lot more (a rooftop bar, an office dog, an arcade, a fridge stocked with Diet Coke and ice creams, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach): see [docs/features.md](docs/features.md).
 
@@ -73,9 +58,6 @@ On the machine that runs the office:
 
 - **Node.js 20+**
 - At least one agent CLI, signed in as the user that runs the office: **Claude Code** (`claude`), **Codex** (`codex`), **OpenCode** (`opencode`), **Grok** (`grok`), **Muse** (`muse`), **DeepSeek Harness** (`dsh`), **Pi** (`pi`, 0.87.1+), the **Cursor** CLI (`cursor-agent`) or **Antigravity CLI** (`agy`). With [accounts](#add-users), everyone can sign in to their own Claude from the office instead.
-- **git**, and the **GitHub CLI** (`gh auth login`) for cloning repos and the issue and PR boards
-
-- At least one agent CLI, signed in as the user that runs the office: **Claude Code** (`claude`), **Codex** (`codex`), **OpenCode** (`opencode`), **Grok** (`grok`), **Muse** (`muse`), **DeepSeek Harness** (`dsh`), **Pi** (`pi`), **Cursor** (`cursor-agent`) or **Antigravity CLI** (`agy`). With [accounts](#add-users), everyone can sign in to their own Claude from the office instead.
 - **git**, and a forge CLI for cloning repos and the issue and PR boards: the **GitHub CLI** (`gh auth login`) for GitHub projects, or the [Bitbucket CLI](https://bitbucket-cli.paulvanderlei.com) (`bb`, `npm install -g @pilatos/bitbucket-cli`) for Bitbucket ones. Each floor works out which one from its own remote, so you can use GitHub, Bitbucket or both. Two different tools answer to `bb`: if the one on your machine is [Atlassian's own Bitbucket CLI](https://bitbucket.org/atlassianls/bitbucket-cli) rather than the one above, the office says so by name instead of failing with `unknown flag: --json`.
 
 ## Run locally
@@ -388,6 +370,69 @@ deploy/coolify.sh ssh 'node /opt/agent-office/bin/agent-office.js accounts invit
 
 **Removing someone.** Revoke their account in **🔑 Accounts** (or `agent-office accounts revoke <name>`), and on a server also remove them in **👥 Invite teammates** (on AWS, `deploy/aws.sh uninvite <name>`; on Railway, `deploy/railway.sh uninvite <name>`; on Fly.io, `deploy/fly.sh uninvite <name>`; on Dokploy, `deploy/dokploy.sh uninvite <name>`; on Coolify, `deploy/coolify.sh uninvite <name>`) to take away their SSH keys and drop open tunnels (other teammates just reconnect). If the shared password is still on, change it with `deploy/aws.sh reset-password` (or `deploy/railway.sh reset-password`, `deploy/fly.sh reset-password`, `deploy/dokploy.sh reset-password` or `deploy/coolify.sh reset-password`).
 
+## Additional office features
+
+### Helpers
+
+Helpers can assist agent and shell workers, in their own worktree or the shared project checkout. Shell workers receive the findings in office chat; reports are never typed into bash as commands.
+
+Helpers display their current status and activity above their heads, including when their agent needs input or is offline. Open the helper’s terminal to inspect its actual output.
+
+Helper findings appear both in the host worker’s inbox and in its terminal window. The worker can read and acknowledge the inbox report at a tool checkpoint during its current task; acknowledgment clears the manual delivery card. You can also choose **Interrupt and deliver report** (or **Deliver report** when idle). Successful terminal delivery completes the inbox report and clears the card, preventing duplicate delivery through the other path. If stopping fails, the report remains available. Handling a report does not confirm that its findings were fixed. Shell reports remain in office chat.
+
+At a regular worker’s desk, press U or click **U — Bring a helper** to open the helper dialog. This works for shell and agent workers with or without a separate worktree.
+
+Helpers carry a laptop showing their own terminal. Aim at the helper or its laptop and press **E**, or click **Open helper terminal** in the hint. You can also open the helper by name in the Workers list. **Needs you** means its agent is waiting: answer the question or approve/reject the permission request inside that helper’s terminal. Close it with Esc or ✕ to return to the office.
+
+Sending a worker home also stops and removes its helper before cleaning up the worker’s checkout. Sending only the helper home leaves the host worker and its worktree intact.
+
+### Planning and completion
+
+Use **Compare plans** to seat up to five independent models and one reviewer at a separate table. Candidates submit detailed plans against the same requirements and fixed rubric. The reviewer explains acceptance and rejection, the server selects the highest-rated eligible plan, cleans up the rejected workers, and starts the winner in a fresh implementation conversation. Available in 3D, lite and the terminal dashboard; candidates and reviewers can use Claude Code, OpenCode 1.x, Codex, Grok, Muse Code, DeepSeek Harness, Pi, Cursor or Antigravity on local Git floors using the Office map. OpenCode planning uses its built-in Plan agent with the office read/plan-tool guard for Zen compatibility; provider-side free-model errors may still require another authorized model. Codex planning tools are preapproved for each role while its checkout stays read-only. See [plan comparison](docs/plan-comparison.md).
+
+Use **Master / Workers** for one intelligent master and up to five workers selected from your eligible model pool. The master plans, delegates, contributes, reviews isolated worker branches, verifies integration and delivers one ready-for-review PR. Save and edit office-wide team presets, follow task results, or pause/resume the activity from Lite, the game menu or the terminal dashboard. Failed assignments get one retry with a different eligible model before master takeover. Use **Replay** on a current or retained activity to inspect its chronological events, filter by participant/task/type, and expand recorded evidence without running agents. Reported checks remain distinct from office-verified facts; missing history is explicit. See [Master / Workers](docs/master-workers.md).
+
+Workers can record a **completion checklist** with actual check results, changed files and a PR link (or reasons they do not apply). Inspect it in worker terminals, lite cards, CLI worker details and finished queue tasks. Failed checks remain visible as needing attention; a ready terminal alone is not proof of success. See [completion checklists](docs/completion-checklist.md) for CLI/MCP submission and lifecycle.
+See [the upstream integration notes](docs/upstream-integration.md) for the imported features and preserved fork behavior.
+
+### Office tools and activities
+
+Press **J** or choose **Smartphone** in the menu to find workers and helpers, open their terminals, send a prompt or review a helper report. Messages may queue while a worker is busy; replies and approvals are handled in the terminal. Phone history lasts for this browser session.
+
+The garage uses Blender-built Lambo and Ferrari models with wheel arches, detailed wheels and roof-off cockpits. Drive them with the existing E/WASD controls. If the model asset fails to load, the original cars remain available. The build includes the models; Blender is only needed to regenerate them (see [Blender models](blender/README.md)).
+
+Open **Boss Control Center** from the menu or the Workers panel’s **Boss** button, or sit in the boss chair and press E. It shows live worker status and reported spend, opens terminals/helper reports, reviews agent broadcast or auto-assign prompts, and exports a local floor report. Send-home uses the existing worktree choices. **Play Minesweeper** remains available. See [features](docs/features.md) and the [PR295 security review](docs/security/pr-295.md).
+
+TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
+
+At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
+
+### Agent setup and remote terminals
+
+OpenCode model selections use per-process configuration, including models set in the default worker or `--agent-args`; no `--model` flag is sent to its interactive CLI. OpenCode 2 workers start private servers so each receives its own settings. Leave Model on **Default** to retain your OpenCode settings. See [agents](docs/agents.md) for model and resume behavior.
+
+Codex input alerts require a visible sign-in/trust prompt or a permission hook; missing startup hooks alone do not mean the worker needs you. See [agent status tracking](docs/agents.md).
+
+Antigravity CLI is selectable when hiring, configuring board agents and queue tasks, or choosing comparison candidates/reviewers. Install and sign in with `agy` on the office machine, then use `agent-office --agent agy` for the default. See [agent setup](docs/agents.md#antigravity-cli).
+
+Remote worker terminals provide **Local typing** for responsive editing over slow floor-host connections. Draft locally, then press Enter to send or use Insert to paste without submitting. Update both office and floor host to remove per-key acknowledgements and room-state refresh traffic. See [remote terminal typing](docs/floor-hosts.md#typing-in-remote-terminals).
+
+### Playable 2D Game
+
+Open **`/2d`** for the complete office in a desktop, top-down view. It uses the same artwork, rooms, furniture, characters, collisions and feature modules as 3D. **Tab** opens the same menu: boards, Queue, Plan Comparison, Boss Control Center, Smartphone, meetings, messages, services, whiteboard, settings and the other office actions.
+
+Walk with **WASD / arrows**, click the floor to walk there, click a worker to open its existing terminal, and use **E** beside a fixture. Scroll to zoom; the Manager uses its existing kiosk. The physical **elevator** and its menu provide all floors, project management, the rooftop bar and the garage. Castle, Station and custom maps work too. Golf, cars, arcade and the other activities keep their existing controls and aiming cameras, returning to the flat office view when finished.
+
+The **View** selector switches 3D, 2D Game and Lite in the same tab while retaining the floor and running workers. Close dialogs with **✕** or **Esc** to resume controls immediately. 2D Game uses WebGL like 3D; **Lite** remains the lightweight, phone-friendly option. See [controls](docs/controls.md#2d-game-desktop), [architecture](docs/code-layout.md#playable-2d-client), and [screenshots and verification](docs/game2d-verification.md).
+
+Press **Y** or use the top-bar **2D / 3D** toggle to switch views instantly in the same scene, without a page reload or reconnect. Your position, selected floor, workers and session stay intact; returning to 3D restores your previous view and facing. The shortcut is inactive while typing or a dialog is open. Finish camera-controlled activities before switching; Lite still opens a separate page. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.
+
+In **2D Game**, open **Tab → 2D graphics settings** to choose **Reduced (current)** or **Enhanced**. Reduced is the default and preserves the existing quality. Enhanced increases rendering resolution (2–3× pixel ratio) and enables real-time shadows. Changes apply immediately, persist in this browser, and affect only 2D exploration; activities retain their original rendering. Choose Reduced on slower hardware.
+
+### Worker appearances
+
+Admins can choose Original and/or 20 code-built fictional characters in **Settings → Workers**. Select a roster and apply it immediately across all floors. Fictional characters never duplicate; extra workers use Original, and assignments survive restart. Each includes its signature outfit. See [worker appearances](docs/worker-appearances.md).
+
 ## Office interiors
 
 Keep the original warm office or switch to the futuristic graphite-and-blue design from
@@ -427,6 +472,8 @@ Drag to orbit and scroll to zoom. See [Maps](docs/maps.md#office-interiors) for 
 The full list is in [docs/controls.md](docs/controls.md).
 
 ## Development
+
+PRs and deployment defaults target **`sagardhande2942/agent-office-sd`**. With push access, push a feature branch directly and create a PR with `gh pr create --repo sagardhande2942/agent-office-sd --base main`. Without push access, fork this repository, push your branch to your fork, and create the PR with `gh pr create --repo sagardhande2942/agent-office-sd --base main --head <your-github-user>:<branch>`. Release installers download this repository’s published release artifacts; if no release is available, use the source installation instructions above.
 
 ```bash
 npm install
@@ -468,57 +515,3 @@ Every change to the app that lands on `main` is published as a GitHub release by
 ## License
 
 [MIT](LICENSE)
-
-Helpers can assist agent and shell workers, in their own worktree or the shared project checkout. Shell workers receive the findings in office chat; reports are never typed into bash as commands.
-
-Helpers display their current status and activity above their heads, including when their agent needs input or is offline. Open the helper’s terminal to inspect its actual output.
-
-Helper findings appear both in the host worker’s inbox and in its terminal window. The worker can read and acknowledge the inbox report at a tool checkpoint during its current task; acknowledgment clears the manual delivery card. You can also choose **Interrupt and deliver report** (or **Deliver report** when idle). Successful terminal delivery completes the inbox report and clears the card, preventing duplicate delivery through the other path. If stopping fails, the report remains available. Handling a report does not confirm that its findings were fixed. Shell reports remain in office chat.
-
-At a regular worker’s desk, press U or click **U — Bring a helper** to open the helper dialog. This works for shell and agent workers with or without a separate worktree.
-
-Helpers carry a laptop showing their own terminal. Aim at the helper or its laptop and press **E**, or click **Open helper terminal** in the hint. You can also open the helper by name in the Workers list. **Needs you** means its agent is waiting: answer the question or approve/reject the permission request inside that helper’s terminal. Close it with Esc or ✕ to return to the office.
-
-Sending a worker home also stops and removes its helper before cleaning up the worker’s checkout. Sending only the helper home leaves the host worker and its worktree intact.
-
-Use **Compare plans** to seat up to five independent models and one reviewer at a separate table. Candidates submit detailed plans against the same requirements and fixed rubric. The reviewer explains acceptance and rejection, the server selects the highest-rated eligible plan, cleans up the rejected workers, and starts the winner in a fresh implementation conversation. Available in 3D, lite and the terminal dashboard; candidates and reviewers can use Claude Code, OpenCode 1.x, Codex, Grok, Muse Code, DeepSeek Harness, Pi, Cursor or Antigravity on local Git floors using the Office map. OpenCode planning uses its built-in Plan agent with the office read/plan-tool guard for Zen compatibility; provider-side free-model errors may still require another authorized model. Codex planning tools are preapproved for each role while its checkout stays read-only. See [plan comparison](docs/plan-comparison.md).
-
-Use **Master / Workers** for one intelligent master and up to five workers selected from your eligible model pool. The master plans, delegates, contributes, reviews isolated worker branches, verifies integration and delivers one ready-for-review PR. Save and edit office-wide team presets, follow task results, or pause/resume the activity from Lite, the game menu or the terminal dashboard. Failed assignments get one retry with a different eligible model before master takeover. Use **Replay** on a current or retained activity to inspect its chronological events, filter by participant/task/type, and expand recorded evidence without running agents. Reported checks remain distinct from office-verified facts; missing history is explicit. See [Master / Workers](docs/master-workers.md).
-
-Workers can record a **completion checklist** with actual check results, changed files and a PR link (or reasons they do not apply). Inspect it in worker terminals, lite cards, CLI worker details and finished queue tasks. Failed checks remain visible as needing attention; a ready terminal alone is not proof of success. See [completion checklists](docs/completion-checklist.md) for CLI/MCP submission and lifecycle.
-See [the upstream integration notes](docs/upstream-integration.md) for the imported features and preserved fork behavior.
-
-Press **J** or choose **Smartphone** in the menu to find workers and helpers, open their terminals, send a prompt or review a helper report. Messages may queue while a worker is busy; replies and approvals are handled in the terminal. Phone history lasts for this browser session.
-
-The garage uses Blender-built Lambo and Ferrari models with wheel arches, detailed wheels and roof-off cockpits. Drive them with the existing E/WASD controls. If the model asset fails to load, the original cars remain available. The build includes the models; Blender is only needed to regenerate them (see [Blender models](blender/README.md)).
-
-Open **Boss Control Center** from the menu or the Workers panel’s **Boss** button, or sit in the boss chair and press E. It shows live worker status and reported spend, opens terminals/helper reports, reviews agent broadcast or auto-assign prompts, and exports a local floor report. Send-home uses the existing worktree choices. **Play Minesweeper** remains available. See [features](docs/features.md) and the [PR295 security review](docs/security/pr-295.md).
-
-TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
-
-At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
-
-
-Codex input alerts require a visible sign-in/trust prompt or a permission hook; missing startup hooks alone do not mean the worker needs you. See [agent status tracking](docs/agents.md).
-
-### Playable 2D Game
-
-Open **`/2d`** for the complete office in a desktop, top-down view. It uses the same artwork, rooms, furniture, characters, collisions and feature modules as 3D. **Tab** opens the same menu: boards, Queue, Plan Comparison, Boss Control Center, Smartphone, meetings, messages, services, whiteboard, settings and the other office actions.
-
-Walk with **WASD / arrows**, click the floor to walk there, click a worker to open its existing terminal, and use **E** beside a fixture. Scroll to zoom; the Manager uses its existing kiosk. The physical **elevator** and its menu provide all floors, project management, the rooftop bar and the garage. Castle, Station and custom maps work too. Golf, cars, arcade and the other activities keep their existing controls and aiming cameras, returning to the flat office view when finished.
-
-The **View** selector switches 3D, 2D Game and Lite in the same tab while retaining the floor and running workers. Close dialogs with **✕** or **Esc** to resume controls immediately. 2D Game uses WebGL like 3D; **Lite** remains the lightweight, phone-friendly option. See [controls](docs/controls.md#2d-game-desktop), [architecture](docs/code-layout.md#playable-2d-client), and [screenshots and verification](docs/game2d-verification.md).
-
-Press **Y** or use the top-bar **2D / 3D** toggle to switch views instantly in the same scene, without a page reload or reconnect. Your position, selected floor, workers and session stay intact; returning to 3D restores your previous view and facing. The shortcut is inactive while typing or a dialog is open. Finish camera-controlled activities before switching; Lite still opens a separate page. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.
-
-In **2D Game**, open **Tab → 2D graphics settings** to choose **Reduced (current)** or **Enhanced**. Reduced is the default and preserves the existing quality. Enhanced increases rendering resolution (2–3× pixel ratio) and enables real-time shadows. Changes apply immediately, persist in this browser, and affect only 2D exploration; activities retain their original rendering. Choose Reduced on slower hardware.
-
-PRs and deployment defaults target **`sagardhande2942/agent-office-sd`**. With push access, push a feature branch directly and create a PR with `gh pr create --repo sagardhande2942/agent-office-sd --base main`. Without push access, fork this repository, push your branch to your fork, and create the PR with `gh pr create --repo sagardhande2942/agent-office-sd --base main --head <your-github-user>:<branch>`. Release installers download this repository’s published release artifacts; if no release is available, use the source installation instructions above.
-
-Antigravity CLI is selectable when hiring, configuring board agents and queue tasks, or choosing comparison candidates/reviewers. Install and sign in with `agy` on the office machine, then use `agent-office --agent agy` for the default. See [agent setup](docs/agents.md#antigravity-cli).
-
-Remote worker terminals provide **Local typing** for responsive editing over slow floor-host connections. Draft locally, then press Enter to send or use Insert to paste without submitting. Update both office and floor host to remove per-key acknowledgements and room-state refresh traffic. See [remote terminal typing](docs/floor-hosts.md#typing-in-remote-terminals).
-
-### Worker appearances
-
-Admins can choose Original and/or 20 code-built fictional characters in **Settings → Workers**. Select a roster and apply it immediately across all floors. Fictional characters never duplicate; extra workers use Original, and assignments survive restart. Each includes its signature outfit. See [worker appearances](docs/worker-appearances.md).
