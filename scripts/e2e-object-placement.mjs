@@ -8,8 +8,6 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { loadConfig } from '../src/server/config.ts';
 import { startServer } from '../src/server/server.ts';
-import { DESKS, DESK_BY_ID, BOARDS, PLAN_REVIEW_TABLE, STATIONS } from '../src/shared/layout.ts';
-import { deskPoint } from '../src/shared/nav.ts';
 
 const output = path.resolve(process.env.PLACEMENT_ARTIFACTS ?? path.join(os.tmpdir(), 'agent-office-placement-evidence'));
 mkdirSync(output, { recursive: true });
@@ -28,8 +26,8 @@ const office = await startServer(cfg, { publicDir: path.resolve('dist/public') }
 const base = `http://127.0.0.1:${office.server.address().port}`;
 const cache = path.join(os.homedir(), '.cache/ms-playwright');
 const executable = process.env.CHROMIUM_PATH ?? (process.platform === 'win32' ? 'C:/Program Files/Google/Chrome/Application/chrome.exe' : path.join(cache, readdirSync(cache).find(x => x.startsWith('chromium-')), 'chrome-linux64/chrome'));
-let browser, page;
-const checks = [], errors = [], sent = [];
+let browser, page, observer;
+const checks = [], errors = [];
 const check = (name, evidence) => { checks.push({ name, status: 'passed', evidence }); console.log(`PASS ${name}: ${evidence}`); };
 try {
   browser = await chromium.launch({ executablePath: executable, headless: true, args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
@@ -40,7 +38,6 @@ try {
   page = await context.newPage();
   page.setDefaultTimeout(30000);
   page.on('pageerror', e => errors.push(e.message));
-  page.on('websocket', ws => ws.on('framesent', frame => { try { sent.push(JSON.parse(String(frame.payload))); } catch {} }));
   await page.goto(base + '/2d');
   await page.waitForURL('**/login?next=/2d');
   const response = await context.request.post(base + '/api/login', { data: { password: 'game2d-test' } }); assert.ok(response.ok());
@@ -59,17 +56,44 @@ try {
       return {x:(v.x+1)*innerWidth/2,y:(1-v.y)*innerHeight/2};
     },id);
   }
+  const observerContext = await browser.newContext({viewport:{width:1440,height:900}});
+  await observerContext.addInitScript(() => localStorage.setItem('agent-office.profile',JSON.stringify({name:'Observer',color:'#06d6a0',look:{skin:0,hair:0,style:0}})));
+  assert.ok((await observerContext.request.post(base+'/api/login',{data:{password:'game2d-test'}})).ok());
+  observer=await observerContext.newPage(); observer.on('pageerror',e=>errors.push(e.message));
+  await observer.goto(base+'/?floor=f2');
+  await observer.waitForFunction(()=>window.__office?.store.floor==='f2' && window.__office.player.enabled);
+  const observerTable=()=>observer.evaluate(()=>{
+    let t; window.__office.office.group.traverse(o=>{if(o.userData.editable?.id==='lounge-coffee-table') t={position:o.position.toArray(),rotation:[o.rotation.x,o.rotation.y,o.rotation.z],scale:o.scale.toArray()};});return t;
+  });
   await openEditor();
   assert.equal(await page.evaluate(()=>window.__office.player.enabled),false,'2D retains stationary editing');
   const target = await objectPixel('lounge-coffee-table');
   await page.mouse.move(target.x,target.y); await page.mouse.down();
-  await page.mouse.move(target.x-50,target.y+20,{steps:10}); await page.mouse.up();
+  await page.mouse.move(target.x-50,target.y+20,{steps:10});
+  await observer.waitForFunction(()=>{let moved=false;window.__office.office.group.traverse(o=>{if(o.userData.editable?.id==='lounge-coffee-table') moved=Math.abs(o.position.x-13)>.2;});return moved;});
+  await page.mouse.up();
   await page.waitForFunction(() => document.querySelector('.object-placement p').textContent.includes('Coffee table'));
   await page.getByLabel('Rotation degrees').fill('37.5'); await page.getByLabel('Rotation degrees').press('Tab');
   await page.getByLabel('Scale multiplier').fill('1.2'); await page.getByLabel('Scale multiplier').press('Tab');
   const saved = await page.evaluate(() => { const keys=Object.keys(localStorage).filter(k=>k.startsWith('agent-office.placement.v1:')); return Object.fromEntries(keys.map(k=>[k,JSON.parse(localStorage[k])])); });
   assert.equal(Object.keys(saved).length,1);
   assert.ok(Math.abs(Object.values(saved)[0].rotation[1] - 37.5*Math.PI/180)<1e-9);
+  await observer.waitForFunction(()=>{let matches=false;window.__office.office.group.traverse(o=>{if(o.userData.editable?.id==='lounge-coffee-table') matches=Math.abs(o.rotation.y-37.5*Math.PI/180)<1e-9 && Math.abs(o.scale.x-1.2)<1e-9;});return matches;});
+  await page.waitForFunction(()=>document.querySelector('.object-placement p').textContent.includes('saved to shared office'));
+  assert.deepEqual(await observerTable(),Object.values(saved)[0]);
+  await observer.evaluate(()=>{const p=window.__office.player;p.pos.set(15,0,5);p.camYaw=.38;p.lookPitch=-.2;p.updateCamera(true);});
+  await observer.screenshot({path:path.join(output,'object-placement-observer-3d.png')});
+  const lateContext=await browser.newContext();
+  await lateContext.addInitScript(()=>localStorage.setItem('agent-office.profile',JSON.stringify({name:'Late joiner',color:'#ffd166',look:{skin:0,hair:0,style:0}})));
+  assert.ok((await lateContext.request.post(base+'/api/login',{data:{password:'game2d-test'}})).ok());
+  const late=await lateContext.newPage();await late.goto(base+'/2d?floor=f2');
+  await late.waitForFunction(()=>window.__office?.store.floor==='f2' && window.__office.store.placements.items['lounge-coffee-table']?.scale[0]===1.2);
+  assert.deepEqual(await late.evaluate(()=>window.__office.store.placements.items['lounge-coffee-table']),Object.values(saved)[0]);
+  await lateContext.close();
+  await observer.goto(base+'/2d?floor=f1');await observer.waitForFunction(()=>window.__office?.store.floor==='f1');
+  await observer.waitForFunction(()=>{let defaults=false;window.__office.office.group.traverse(o=>{if(o.userData.editable?.id==='lounge-coffee-table') defaults=o.position.x===13&&o.scale.x===1;});return defaults;});
+  await observer.goto(base+'/?floor=f2');await observer.waitForFunction(()=>window.__office?.store.floor==='f2'&&window.__office.store.placements.items['lounge-coffee-table']?.scale[0]===1.2);
+  check('shared placement','Observer sees live dragging before release, rotation/scale match exactly, fresh browser receives snapshot, other floors stay independent');
   await page.screenshot({path:path.join(output,'object-editor.png')});
   await page.keyboard.press('Escape'); await page.waitForFunction(()=>window.__office.player.enabled);
   await page.reload(); await page.waitForFunction(()=>window.__office?.store.floor==='f2' && window.__office.player.enabled);
@@ -152,6 +176,20 @@ try {
   await openEditor(); await page.keyboard.press('Escape');
   await page.waitForFunction(()=>window.__office.player.enabled && window.__office.player.canLock && !!document.pointerLockElement);
   check('3D editor navigation','WASD walking, first-person right-drag, third-person orbit, walking during object drag, input/menu guards and mouse-look restoration');
+  const expectedRestart=await observerTable();
+  await new Promise(resolve=>{office.server.once('close',resolve);office.shutdown();});
+  const restored=await startServer(cfg,{publicDir:path.resolve('dist/public')});
+  try {
+    const restoredBase=`http://127.0.0.1:${restored.server.address().port}`;
+    const clean=await browser.newContext();
+    await clean.addInitScript(()=>localStorage.setItem('agent-office.profile',JSON.stringify({name:'Restart verifier',color:'#ef476f',look:{skin:0,hair:0,style:0}})));
+    assert.ok((await clean.request.post(restoredBase+'/api/login',{data:{password:'game2d-test'}})).ok());
+    const restarted=await clean.newPage();await restarted.goto(restoredBase+'/2d?floor=f2');
+    await restarted.waitForFunction(()=>window.__office?.store.floor==='f2'&&window.__office.player.enabled);
+    const restoredTable=await restarted.evaluate(()=>window.__office.store.placements.items['lounge-coffee-table']);
+    assert.deepEqual(restoredTable,expectedRestart);
+    await clean.close();check('server restart','A fresh browser on a new office server instance receives the exact persisted transform');
+  } finally { restored.shutdown(); }
   assert.deepEqual(errors,[]);
   writeFileSync(path.join(output,'checks.json'),JSON.stringify({passed:['mouse dragging','precise rotation and uniform scaling','immediate auto-save','Escape restores controls','exact reload','touch dragging','snapping and reset','independent objects','close restores controls',...checks.map(c=>c.name)],saved},null,2));
 } catch(error) { console.log('errors',errors); console.log(await page.evaluate(()=>({text:document.querySelector('.object-placement')?.textContent, enabled:window.__office.player.enabled}))); await page.screenshot({path:path.join(output,'failure.png')}); throw error; } finally { await browser?.close(); office.shutdown(); }

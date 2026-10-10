@@ -6,6 +6,9 @@ import { HUD_ACTIONS } from '../../ui/menu';
 import { FLOOR } from '../../../shared/layout';
 import { apply, snapshot, type Editable } from './model';
 import { PlacementSave } from './persistence';
+import { LivePlacements } from './live';
+import type { PlacementServerMsg } from '../../../shared/protocol/object-placement';
+import { validPlacement } from '../../../shared/object-placement';
 import './ui.css';
 import { isTopdownRoute } from '../topdown/camera';
 
@@ -25,10 +28,14 @@ export function installObjectPlacement(ctx: Ctx) {
     box.setFromObject(e.object);
     return box.min.x >= FLOOR.minX + .15 && box.max.x <= FLOOR.maxX - .15 && box.min.z >= FLOOR.minZ + .15 && box.max.z <= FLOOR.maxZ - .15 && box.min.y >= -.05 && box.max.y <= 6.7;
   };
-  const save = new PlacementSave(localStorage, () => { status.textContent = 'Saving failed. Browser storage may be full or blocked; changes will be retried.'; });
+  const save = new PlacementSave(localStorage, () => { status.textContent = 'Browser cache unavailable; shared saving continues through the office.'; });
+  const live = new LivePlacements(msg => ctx.net.send(msg), () => ctx.net.up);
+  let needsSnapshot = false;
+  function sceneKey(): [string | null, string] { return scope ? JSON.parse(scope) : [null, 'office']; }
+  function flush() { const [floor, map] = sceneKey(); save.flush(); live.flush(floor, map); }
   const visible = (o: THREE.Object3D) => { for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return false; return true; };
   function select(e: Editable | null) {
-    save.flush(); selected = e; outline.visible = !!e; controls.hidden = !e;
+    flush(); selected = e; outline.visible = !!e; controls.hidden = !e;
     status.textContent = e ? `${e.label} · drag to ${mode}. Auto-save enabled.` : 'Select a plant, rug or coffee table. Changes save automatically.';
     if (e) { angle.value = String(e.object.rotation.y * 180 / Math.PI); size.value = String(e.object.scale.x / e.initial.scale[0]); box.setFromObject(e.object); }
   }
@@ -42,7 +49,8 @@ export function installObjectPlacement(ctx: Ctx) {
     }
     (outline.material as THREE.LineBasicMaterial).color.set(0xffd166);
     save.queue(scope, selected.id, snapshot(selected.object));
-    status.textContent = `${selected.label} · auto-saving`;
+    const [floor, map] = sceneKey(); if (floor) live.queue(floor, map, selected.id, snapshot(selected.object));
+    status.textContent = `${selected.label} · syncing with office`;
     angle.value = String(selected.object.rotation.y * 180 / Math.PI);
     size.value = String(selected.object.scale.x / selected.initial.scale[0]);
   }
@@ -59,24 +67,24 @@ export function installObjectPlacement(ctx: Ctx) {
   }
   angle.addEventListener('input', () => rotate(angle.valueAsNumber));
   size.addEventListener('input', () => scale(size.valueAsNumber));
-  for (const input of [angle, size]) input.addEventListener('change', () => save.flush());
+  for (const input of [angle, size]) input.addEventListener('change', flush);
   const snapInput = h('input', { type: 'checkbox' }); snapInput.onchange = () => { snap = snapInput.checked; };
   controls.append(
     ...(['move', 'rotate', 'scale'] as const).map(m => button(m[0].toUpperCase() + m.slice(1), () => { mode = m; select(selected); })),
     h('label', {}, 'Angle ° ', angle), h('label', {}, snapInput, ' Snap 15°'),
-    button('Reset rotation', () => { if (selected) { const t = snapshot(selected.object); t.rotation = [...selected.initial.rotation]; change(t); save.flush(); } }),
-    h('label', {}, 'Size × ', size), button('Original size', () => { scale(1); save.flush(); }),
-    button('Reset Transform', () => { if (selected) change(structuredClone(selected.initial)); save.flush(); }),
+    button('Reset rotation', () => { if (selected) { const t = snapshot(selected.object); t.rotation = [...selected.initial.rotation]; change(t); flush(); } }),
+    h('label', {}, 'Size × ', size), button('Original size', () => { scale(1); flush(); }),
+    button('Reset Transform', () => { if (selected) change(structuredClone(selected.initial)); flush(); }),
     button('Confirm / Deselect', () => select(null)),
   );
   function end() {
     const previous = pointer;
     pointer = null;
     if (previous !== null && ctx.canvas.hasPointerCapture(previous)) ctx.canvas.releasePointerCapture(previous);
-    if (save.flush() && selected) status.textContent = `${selected.label} · saved in this browser`;
+    flush();
   }
   function open() {
-    if (modal || modalOpen() || !ctx.inOffice() || ctx.upTop() || ctx.trip()) return;
+    if (modal || modalOpen() || !ctx.inOffice() || ctx.upTop() || ctx.trip() || !ctx.net.up || !store.floor) return;
     ctx.activities.stopAll('start');
     const touchAction = ctx.canvas.style.touchAction; ctx.canvas.style.touchAction = 'none';
     const navigation = !isTopdownRoute();
@@ -87,7 +95,7 @@ export function installObjectPlacement(ctx: Ctx) {
     modal.backdrop.classList.add('placement-backdrop'); select(null);
   }
   HUD_ACTIONS.push({ id: 'object-placement', icon: '↔', label: 'Customize objects', section: 'Office', run: open,
-    blocked: () => !ctx.inOffice() || ctx.upTop() ? 'Available on office floors' : undefined });
+    blocked: () => !ctx.net.up ? 'Reconnect to customize the shared office' : !ctx.inOffice() || ctx.upTop() ? 'Available on office floors' : undefined });
   function aim(x: number, y: number) {
     const r = ctx.canvas.getBoundingClientRect(); ndc.set((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1);
     ray.setFromCamera(ndc, ctx.camera);
@@ -133,23 +141,45 @@ export function installObjectPlacement(ctx: Ctx) {
     else { cursorX = e.clientX; cursorY = e.clientY; moveObject(); }
   }, true);
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) ctx.canvas.addEventListener(event, () => { if (pointer !== null) end(); });
-  window.addEventListener('pagehide', () => save.flush());
+  window.addEventListener('pagehide', flush);
   window.addEventListener('blur', end);
   document.addEventListener('visibilitychange', () => { if (document.hidden) end(); });
+  store.on('placements', () => { needsSnapshot = true; live.welcome(store.floor, store.placements.map); });
+  ctx.net.onStatus(up => { if (!up) { live.disconnected(); end(); modal?.close(); } });
+  function receive(msg: PlacementServerMsg) {
+    const [floor, map] = sceneKey();
+    if (msg.floor !== floor || msg.map !== map || !live.receive(msg, store.you)) return;
+    const entry = entries.find(e => e.id === msg.id); if (!entry || !validPlacement(entry.id, msg.transform)) return;
+    apply(entry, msg.transform);
+    save.queue(scope, entry.id, msg.transform);
+    if (selected === entry) {
+      box.setFromObject(entry.object); angle.value = String(entry.object.rotation.y * 180 / Math.PI); size.value = String(entry.object.scale.x / entry.initial.scale[0]);
+      status.textContent = msg.t === 'placement.rejected' ? msg.reason : `${entry.label} · ${msg.saved ? 'saved to shared office' : 'live update'}`;
+    }
+  }
+  ctx.messages.on('placement.changed', receive);
+  ctx.messages.on('placement.rejected', receive);
   ctx.ticks.add('world', () => {
     const next = JSON.stringify([store.floor, ctx.plan().id]);
-    if (scope !== next || root !== ctx.world().group) {
+    if (scope !== next || root !== ctx.world().group || needsSnapshot) {
       end(); modal?.close(); scope = next; root = ctx.world().group; entries = [];
+      needsSnapshot = false;
       root.traverse(o => { if (o.userData.editable) entries.push(o.userData.editable); });
       for (const e of entries) {
-        apply(e, e.initial); const t = save.load(scope, e.id);
+        apply(e, e.initial);
+        const pending = store.floor && live.load(store.floor, ctx.plan().id, e.id);
+        const shared = ctx.plan().id === store.placements.map ? store.placements.items[e.id] : undefined;
+        const legacy = store.floor && ctx.net.up && !shared ? save.load(scope, e.id) : null;
+        const t = pending || shared || legacy;
         if (t) {
           const factor = t.scale[0] / e.initial.scale[0];
           if (factor < .25 || factor > 3 || !t.scale.every((n, i) => Math.abs(n / e.initial.scale[i] - factor) < 1e-6)) continue;
           apply(e, t); if (!validBounds(e)) apply(e, e.initial);
+          else if (legacy && !pending && !shared && store.floor && validPlacement(e.id, t)) live.queue(store.floor, ctx.plan().id, e.id, t, true);
         }
       }
       outline.visible = false;
+      if (store.floor) live.flush(store.floor, ctx.plan().id);
     }
     if (modal && (ctx.trip() || ctx.upTop() || !ctx.inOffice())) modal.close();
     if (selected && !visible(selected.object)) { end(); select(null); }

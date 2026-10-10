@@ -1,4 +1,5 @@
 import { masterWorkers } from './master-workers';
+import { objectPlacement } from './object-placement';
 
 import { appearances } from './appearances';
 import { planReview } from './plan-review';
@@ -76,4 +77,5 @@ export const SLICES: readonly Slice[] = [
   signins,
   smartphone,
   communications, planReview, masterWorkers,
+  objectPlacement,
 ];

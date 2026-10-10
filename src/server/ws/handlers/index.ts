@@ -1,4 +1,5 @@
 import { worldsHandlers } from './parallel-worlds.js';
+import { placementHandlers, placementHooks, placementView } from './object-placement.js';
 import { masterWorkersHandlers, masterWorkersView } from './master-workers.js';
 
 import { appearanceHandlers, appearanceView } from './appearances.js';
@@ -34,6 +35,7 @@ import { communicationsView } from './communications.js';
 
 /** Each domain's handlers put together, in alphabetical order. */
 export const handlers: HandlerMap<ClientMsg> = {
+  ...placementHandlers,
   ...worldsHandlers,
   ...appearanceHandlers,
   ...forkHandlers,
@@ -67,10 +69,11 @@ export const handlers: HandlerMap<ClientMsg> = {
  * The features that keep something per person on a floor, in the order they let go of it when
  * someone leaves the floor or the office (see FeatureHooks): the order the office has always done it in.
  */
-export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whiteboardHooks, ballHooks, carHooks, cabinetHooks];
+export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whiteboardHooks, ballHooks, carHooks, cabinetHooks, placementHooks];
 
 /** What someone arriving on a floor is sent (see office/views.ts): a piece from each feature, in the order it has always gone out. */
 export const views: ViewPieces = {
+  placements: placementView,
   appearances: appearanceView,
   communications: communicationsView,
   tv: tvView,
