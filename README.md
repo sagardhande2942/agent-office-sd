@@ -435,6 +435,8 @@ Admins can remove a remote floor with the trash button in **Elevator**, includin
 
 If reconnect says the repository already has a floor after your saved token was lost or replaced, stop the machine's floor host. The office admin opens **Connect your floor**, finds the original offline machine under **Paired machines**, and clicks **Reconnect this machine**. Enter the joiner's original checkout path and share the generated command with them. It includes `--recover` to replace the incorrect saved credential while preserving the original machine and floors. Future reconnects use `node bin/agent-office.js floor-host` without a code.
 
+The joiner's `floor-host` command automatically retries network disconnects and server shutdowns for 10 minutes per outage, with a delay capped at 15 seconds. It reuses the saved token; no new pairing code or command is needed. Ctrl+C stops immediately, and pairing refusals stop with their error.
+
 Remote floor reconnects retain the saved machine identity even when the original pairing command is reused. For a changed URL of the same office, use `--same-office`. Agent CLIs must be available on the joiner's PATH; restart the floor host after installing one. See [floor-host setup](docs/floor-hosts.md#quick-connect-from-the-ui).
 
 ### Playable 2D Game
