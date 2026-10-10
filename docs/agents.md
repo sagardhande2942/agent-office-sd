@@ -129,3 +129,5 @@ Launch flags verified against Antigravity CLI **1.3.1** (`--help`); hook schema 
 ![Antigravity model and effort in the shared hire dialog](antigravity-cli.png)
 
 Reproduce the browser check with `npm run build && node --import tsx scripts/e2e-antigravity.mjs`; it uses an isolated Git floor and saves a screenshot under `/tmp/agent-office-antigravity-evidence`. Provider tests exercise launch, token validation, root conversation isolation, hook cleanup and restart/resume with a fake CLI.
+
+On native Windows, Codex lifecycle hooks use an encoded PowerShell command to launch the office helper with literal paths. This works through both cmd.exe and PowerShell, including paths with spaces or apostrophes. Restart the office or floor host and restart existing Codex workers after updating so they receive the corrected hook overrides. WSL keeps the Unix hook command. See the [official hook configuration](https://learn.chatgpt.com/docs/hooks).

@@ -87,13 +87,21 @@ function shellQuote(value: string): string {
 }
 
 /**
- * Build the CLI config overrides for all lifecycle hooks. The command is encoded as a TOML basic
- * string so paths containing spaces remain valid; the command itself is shell-quoted.
+ * Build a literal-path hook command for the host OS, independent of the worker's project shell.
  */
+export function codexHookCommand(hookPath: string, event: CodexHookEventName, platform = process.platform, executable = process.execPath): string {
+  if (platform !== 'win32') return [executable, hookPath, event].map(shellQuote).join(' ');
+  const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
+  const script = `$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); & ${[executable, hookPath, event].map(quote).join(' ')}; exit $LASTEXITCODE`;
+  // No embedded command-line quotes: Codex's Windows command runner may use cmd.exe or PowerShell.
+  return `powershell.exe -NoProfile -NonInteractive -EncodedCommand ${Buffer.from(script, 'utf16le').toString('base64')}`;
+}
+
+/** Encode each lifecycle command as a TOML string in its CLI config override. */
 export function codexHookArgs(hookPath: string): string[] {
   const args: string[] = [];
   for (const event of CODEX_HOOK_EVENTS) {
-    const command = [process.execPath, hookPath, event].map(shellQuote).join(' ');
+    const command = codexHookCommand(hookPath, event);
     const config = `hooks.${event}=[{hooks=[{type="command",command=${JSON.stringify(command)},timeout=3}]}]`;
     args.push('-c', config);
   }
