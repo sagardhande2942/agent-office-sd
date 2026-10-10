@@ -108,7 +108,7 @@ agent-office setup                          # the first-start walkthrough again 
 
 For a terminal-only client, start the office with `agent-office --no-open`, then run `agent-office tui` in another terminal. Its live desk grid shares floors, workers and terminals with the 3D and lite views: use arrows to select a desk, Enter to open it, and Tab for boards. See [docs/cli.md](docs/cli.md) for commands and remote connections, or [cmd.txt](cmd.txt) for a copyable command and flag reference.
 
-The plant beside the basketball uses `src/client/models/basketball-plant.glb`. Replace that file and rebuild to change this single plant; see [custom plant models](docs/features.md#custom-plant-model).
+The plant beside the basketball uses the optimized 278 KB `src/client/models/basketball-plant.glb`. Replace that file and rebuild to change this single plant; Draco-compressed GLBs use a locally bundled decoder. See [custom plant models](docs/features.md#custom-plant-model).
 
 Every option is in [docs/configuration.md](docs/configuration.md). Choosing models and providers per worker is in [docs/agents.md](docs/agents.md).
 
