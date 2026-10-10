@@ -15,7 +15,7 @@ export function validJoinProject(value: unknown): value is FloorJoinProject {
 
 export function floorJoinCommand(input: { office: string; code: string; checkout: string; repo?: string; name?: string }, shell: 'powershell' | 'bash') {
   const quote = (s: string) => shell === 'powershell' ? `'${s.replace(/'/g, "''")}'` : `'${s.replace(/'/g, "'\\''")}'`;
-  const args = ['npm start -- floor-host', '--office', quote(input.office), '--code', quote(input.code), '--checkout', quote(input.checkout)];
+  const args = ['node bin/agent-office.js floor-host', '--office', quote(input.office), '--code', quote(input.code), '--checkout', quote(input.checkout)];
   if (input.repo?.trim()) args.push('--repo', quote(input.repo.trim()));
   if (input.name?.trim()) args.push('--name', quote(input.name.trim()));
   return args.join(' ');

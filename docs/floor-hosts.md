@@ -44,7 +44,7 @@ office you trust. No extra ngrok tunnel or inbound port is needed on the joiner'
 The equivalent joiner command is:
 
 ```powershell
-npm start -- floor-host --office "https://YOUR-NGROK-URL" --code "PAIRING-CODE" --checkout "C:\my-project"
+node bin/agent-office.js floor-host --office "https://YOUR-NGROK-URL" --code "PAIRING-CODE" --checkout "C:\my-project"
 ```
 
 `--checkout` is the exact existing project folder on the joiner's computer. Its repository name is
@@ -57,10 +57,10 @@ is refused rather than moved. Reconnecting the same machine and path reuses its 
 The office address, token, and project are saved locally. To reconnect later:
 
 ```powershell
-npm start -- floor-host
+node bin/agent-office.js floor-host
 ```
 
-If this same office's ngrok URL changes, reconnect with `npm start -- floor-host --office "https://NEW-URL" --same-office`.
+If this same office's ngrok URL changes, reconnect with `node bin/agent-office.js floor-host --office "https://NEW-URL" --same-office`.
 This explicitly sends the saved token to that new address; use it only for the same trusted office.
 For a different office, use a fresh `--code` and `--checkout`. Credentials otherwise stay scoped to
 the saved office address. Use `--config` for separate office connections.
