@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { CINEMA_OFF, REELS_KEPT, SHOT_MS, cinemaTitle, frameAt, reelMs, showing, type ReelSummary } from '../src/shared/cinema.js';
@@ -156,6 +156,24 @@ test('a restart brings back what was on, and a reel whose pictures went is forgo
   // A file that isn't a reel at all is an empty room, not a crash.
   writeFileSync(path.join(dir, 'cinema.json'), 'not json at all');
   assert.deepEqual(new Cinema(dir).state(), CINEMA_OFF);
+});
+
+test('pictures with no reel behind them are not served', async (t) => {
+  const fs = await import('node:fs');
+  const dir = mkdtempSync(path.join(tmpdir(), 'cinema-orphan-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  // What is left behind when a reel is taken off the floor but its pictures have not been swept: a
+  // folder of PNGs the office no longer lists. Serving those would be serving a reel nobody can remove.
+  const orphan = path.join(dir, 'cinema', 'aaaaaaaaaaaa');
+  mkdirSync(orphan, { recursive: true });
+  writeFileSync(path.join(orphan, '0.png'), png());
+  const cinema = new Cinema(dir);
+  assert.equal(cinema.state().reels.length, 0, 'the room lists nothing');
+  assert.equal(cinema.frame('aaaaaaaaaaaa', 0), undefined, 'and serves none of its pictures');
+  // A reel that is listed is served, so the check is not simply refusing everything.
+  const live = cinema.add({ title: 'Live', shots: [{ caption: 'a', width: 2, height: 2 }] }, [png()]);
+  assert.deepEqual(cinema.frame(live.id, 0), png());
+  assert.ok(fs.existsSync(path.join(dir, 'cinema.json')));
 });
 
 test('a floor keeps the newest reels, and the pictures of the ones it dropped go with them', (t) => {
