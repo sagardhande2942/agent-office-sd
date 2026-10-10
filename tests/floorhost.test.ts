@@ -15,12 +15,12 @@ import {
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-test('the protocol has 61 floor messages', () => {
+test('the protocol has 63 floor messages', () => {
   // handleSignIns, 6 in handleAccounts); only these act on a Floor and need to travel. If this drifts,
   // a case started or stopped touching a floor and nobody decided where it should run.
-  assert.equal(FLOOR_CASES.length, 61);
-  assert.equal(new Set(FLOOR_CASES).size, 61, 'no duplicates');
-  for (const c of FLOOR_CASES) assert.match(c, /^[a-z]+\.[a-zA-Z]+$/, `${c} is not a namespaced case`);
+  assert.equal(FLOOR_CASES.length, 63);
+  assert.equal(new Set(FLOOR_CASES).size, 63, 'no duplicates');
+  for (const c of FLOOR_CASES) assert.match(c, /^[a-z-]+\.[a-zA-Z]+$/, `${c} is not a namespaced case`);
 });
 
 /**
@@ -29,6 +29,7 @@ test('the protocol has 61 floor messages', () => {
  * "acts on one", and these are where that distinction is paid for. See the plan's finding 9.
  */
 const LOOKUP_ONLY = [
+  'master-workers.preset',
   'cabinet.play',
   'floor.repos', 'floor.add', 'floor.cancel', 'floor.projectsDir', 'term.typing', 'jukebox.move',
   'dog.name',
@@ -57,7 +58,7 @@ const NO_MESSAGE_CASE = new Set(['ball.left', 'jukebox.place']);
 function floorHandlers() {
   const dir = path.join(root, 'src/server/ws/handlers');
   const source = readdirSync(dir).filter(f => f.endsWith('.ts')).map(f => readFileSync(path.join(dir, f), 'utf8')).join('\n');
-  return new Set([...source.matchAll(/'([a-z]+\.[a-zA-Z]+)'\s*(?:\(|:)/g)].map(m => m[1]));
+  return new Set([...source.matchAll(/'([a-z-]+\.[a-zA-Z]+)'\s*(?:\(|:)/g)].map(m => m[1]));
 }
 test('every shipped floor case has a registered handler', () => {
   const names = floorHandlers();

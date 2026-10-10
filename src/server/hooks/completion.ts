@@ -26,6 +26,10 @@ export function completionCheckpoint(ctx: Ctx, id: string, token: string, route:
 export async function workerCompletion(ctx: Ctx, req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
   const id = url.searchParams.get('worker') ?? '';
   const floor = ctx.workerFloor(id);
+  return floorCompletion(floor, req, res, url);
+}
+export async function floorCompletion(floor: import('../floor.js').Floor | undefined, req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
+  const id = url.searchParams.get('worker') ?? '';
   const actor = floor?.workers.authenticate(id, (req.headers.authorization ?? '').replace(/^Bearer\s+/i, ''));
   if (!floor || !actor) return send(res, 401, { error: 'Send your own worker ID and hook token' });
   if (req.method === 'GET' && url.pathname.endsWith('/completion')) return send(res, 200, { revision: actor.completionRevision ?? 0, report: actor.completion ?? null });

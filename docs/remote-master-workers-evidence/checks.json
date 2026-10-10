@@ -1,0 +1,33 @@
+{
+  "checks": [
+    {
+      "name": "Preset editing persists on the server without losing the task draft",
+      "status": "passed"
+    },
+    {
+      "name": "Preset duplicate/delete and loaded explicit model settings",
+      "status": "passed"
+    },
+    {
+      "name": "Mobile layout stays within the viewport",
+      "status": "passed"
+    },
+    {
+      "name": "Real team setup, task graph, worker result and pause/resume render correctly",
+      "status": "passed"
+    },
+    {
+      "name": "Shared game menu exposes the mode; Esc and close restore player controls without another click",
+      "status": "passed"
+    },
+    {
+      "name": "No browser runtime errors",
+      "status": "passed"
+    }
+  ],
+  "screenshots": [
+    "setup-desktop.png",
+    "setup-mobile.png",
+    "activity-desktop.png"
+  ]
+}

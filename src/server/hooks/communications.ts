@@ -11,9 +11,15 @@ export async function workerCommunications(ctx: Ctx, req: http.IncomingMessage, 
   const floor = ctx.workerFloor(workerId);
   const me = floor?.workers.authenticate(workerId, token);
   if (!floor || !me) return send(res, 401, { error: 'Send your own worker ID and bearer hook token' });
+  return floorCommunications(floor, communications(ctx, floor), req, res, url);
+}
+export async function floorCommunications(floor: import('../floor.js').Floor, ledger: import('../communications.js').Communications, req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
+  const id = url.searchParams.get('worker') ?? '';
+  const me = floor.workers.authenticate(id, (req.headers.authorization ?? '').replace(/^Bearer\s+/i, ''));
+  if (!me) return send(res, 401, { error: 'Send your own worker ID and bearer hook token' });
   const action = url.pathname.slice('/office/workers'.length);
   try {
-    const ledger = communications(ctx, floor), actor = { id: me.id, name: me.name };
+    const actor = { id: me.id, name: me.name };
     if (req.method === 'GET' && action === '/inbox') return send(res, 200, ledger.inbox(actor));
     if (req.method !== 'POST' || !['/request', '/reply', '/ack'].includes(action)) return send(res, 405, { error: 'GET /inbox or POST /request, /reply, /ack' });
     const body: unknown = JSON.parse((await readBody(req)) || '{}');

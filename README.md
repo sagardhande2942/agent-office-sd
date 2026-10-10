@@ -551,3 +551,5 @@ Every change to the app that lands on `main` is published as a GitHub release by
 [MIT](LICENSE)
 
 Customize office scenery from **Menu → Customize objects**. Drag a plant, rug or coffee table to move it; choose Rotate or Scale for drag adjustments, or enter precise values. In 3D, WASD/arrows keep walking active and right-drag changes your view while left-drag edits objects. Everyone on the floor sees edits live; transforms save automatically on the office server and return for all players after reload or restart. See [Object placement](docs/object-placement.md).
+
+Remote Git floors also support **Master / Workers**. Update and rebuild both the office and floor host, reconnect, then open the activity from the remote floor’s menu. Agents run with the host’s installed, signed-in CLIs. See [Master / Workers](docs/master-workers.md#remote-floors).

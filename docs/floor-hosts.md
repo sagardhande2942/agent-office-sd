@@ -270,3 +270,7 @@ The same browser harness checks that both Esc and ✕ restore actual game mouse-
 ### Remote screening room
 
 The meeting-room cinema works over the paired floor connection. Update both ends and reconnect, then press **E** at the screen and use **On the screen**. Workers record and upload with the same `office-workers cinema add/list/remove` commands using their local hook environment. Reels stay on the host; viewers fetch bounded PNGs through the office. An offline host reports an error, and its saved reels return on reconnect. See [the screening room](cinema.md#remote-floors).
+
+## Master / Workers on a remote floor
+
+Update and rebuild both ends, reconnect the floor host, and enter its Git floor. Open **Master / Workers** from the menu or Lite header. The host runs the team with its installed, signed-in coding CLIs and preserves its activity, branches and worktrees. Start, pause, resume and stop are available from the office UI. Both office capacity and host seat limits apply. See [the team guide](master-workers.md#remote-floors).
