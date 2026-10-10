@@ -30,6 +30,7 @@ class Preview {
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = true;
     this.effect = new OutlineEffect(this.renderer, { defaultThickness: 0.0045, defaultColor: [0.17, 0.18, 0.26] });
+    this.effect.enabled = false;
 
     this.scene.add(new THREE.HemisphereLight('#fff5e6', '#c9a27a', 1.5));
     this.scene.add(new THREE.AmbientLight('#ffffff', 0.5));

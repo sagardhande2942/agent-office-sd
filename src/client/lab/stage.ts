@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import { toon } from '../world/toon';
 
-// What every lab page shows its models on: lit and outlined like the office (see main.ts), on a floor
+// What every lab page shows its models on: lit like the office, without outlines, on a floor
 // with a half-meter grid, to judge sizes and whether feet slide.
 
 export interface Stage {
@@ -25,6 +25,7 @@ export function stage(canvas: HTMLCanvasElement, showFloor = true): Stage {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const effect = new OutlineEffect(renderer, { defaultThickness: 0.0032, defaultColor: [0.17, 0.18, 0.26] });
+  effect.enabled = false;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#bfe3ff');
