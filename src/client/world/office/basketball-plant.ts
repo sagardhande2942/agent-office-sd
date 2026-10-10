@@ -5,8 +5,9 @@ import type { Fixture } from './fixture';
 /** Replace only the west-wall plant beside the basketball; keep its existing collider. */
 export const basketballPlant: Fixture = (site) => {
   const pot = site.get('plants').find((p) => p.position.x === -17.2 && p.position.z === 8.5);
-  const custom = model('basketball-plant')?.scene;
-  if (!pot || !custom) return {};
+  const loaded = model('basketball-plant');
+  if (!pot || !loaded) return {};
+  const custom = loaded.scene;
 
   const bounds = new THREE.Box3().setFromObject(custom);
   const size = bounds.getSize(new THREE.Vector3());
@@ -28,5 +29,9 @@ export const basketballPlant: Fixture = (site) => {
   });
   pot.clear();
   pot.add(fitted);
-  return {};
+  const mixer = new THREE.AnimationMixer(custom);
+  for (const clip of loaded.clips) {
+    mixer.clipAction(clip).setLoop(THREE.LoopRepeat, Infinity).play();
+  }
+  return { update: (_t, dt) => { if (fitted.visible) mixer.update(dt); } };
 };
