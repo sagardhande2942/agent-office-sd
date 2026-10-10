@@ -25,6 +25,44 @@ to reconnect with its saved token; the floor becomes reachable when the host ann
 
 ## Pairing
 
+### Quick connect from the UI
+
+1. Keep the office running (including `npm run dev`). For ngrok, run `ngrok http 4600` in another terminal.
+2. Open **☰ → Connect your floor**. As an admin, click **Generate pairing code** and give the code and public office URL to the joiner. Codes expire after 30 minutes and are single use.
+3. The joiner opens that same UI, enters the code, public URL, and **their own local project folder**, then clicks **Copy join command**. The UI offers PowerShell and Bash quoting. The host never needs to know the folder layout.
+4. The joiner runs the command from their agent-office folder after `npm install` and `npm run build`. Keep it running; the project appears in the elevator immediately. Workers run on the joiner's machine, using its agent and forge sign-ins.
+
+The browser helps prepare the command; a process on the joiner's machine is still required to read
+the project and run agents. Everyone in the office can control those terminals. Only pair with an
+office you trust. No extra ngrok tunnel or inbound port is needed on the joiner's machine.
+
+The equivalent joiner command is:
+
+```powershell
+npm start -- floor-host --office "https://YOUR-NGROK-URL" --code "PAIRING-CODE" --checkout "C:\my-project"
+```
+
+`--checkout` is the exact existing project folder on the joiner's computer. Its repository name is
+read from its Git `origin` remote; add `--repo OWNER/REPO` if it cannot be detected (for example a
+private Git service or a folder without a remote). `--floor "Display name"` optionally names the
+floor. The office registers it during authenticated pairing and saves it in the building; no office
+restart or `hosts add-floor` is required. A repository already assigned to another machine or path
+is refused rather than moved. Reconnecting the same machine and path reuses its floor.
+
+The office address, token, and project are saved locally. To reconnect later:
+
+```powershell
+npm start -- floor-host
+```
+
+If this same office's ngrok URL changes, reconnect with `npm start -- floor-host --office "https://NEW-URL" --same-office`.
+This explicitly sends the saved token to that new address; use it only for the same trusted office.
+For a different office, use a fresh `--code` and `--checkout`. Credentials otherwise stay scoped to
+the saved office address. Use `--config` for separate office connections.
+Update both the office and joiner to use this flow; older offices cannot register `--checkout`.
+
+### Manual pairing
+
 On the **office**:
 
 ```bash
@@ -107,6 +145,7 @@ agent-office hosts rm-floor owner/repo
 
 Stop the office before changing the building with these commands, then start it again and reconnect
 the floor host. These commands edit the saved building; they do not update an already running office.
+The quick-connect flow above adds the floor live instead; these manual commands remain available.
 The checkout stays on the host when its floor is removed. No repository is cloned by `add-floor`.
 Use `--floor "Display name"` to name the floor. If `--checkout` is omitted, the path defaults to
 `<host projects folder>/owner/repo`. Hosts report that folder on connection, including when they

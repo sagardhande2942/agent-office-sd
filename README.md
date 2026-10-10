@@ -417,6 +417,8 @@ Antigravity CLI is selectable when hiring, configuring board agents and queue ta
 
 Remote worker terminals provide **Local typing** for responsive editing over slow floor-host connections. Draft locally, then press Enter to send or use Insert to paste without submitting. Update both office and floor host to remove per-key acknowledgements and room-state refresh traffic. See [remote terminal typing](docs/floor-hosts.md#typing-in-remote-terminals).
 
+**Bring your own project from another computer.** Open **☰ → Connect your floor**. The office host generates a pairing code; the joiner enters the office's public URL, that code, and their own project folder, then copies and runs the join command from their agent-office checkout. The floor appears in the elevator immediately: no host-side path entry, `hosts add-floor`, or office restart. The joiner needs an installed, built copy of this version (`npm install`, then `npm run build`) even if the office runs with `npm run dev`. With ngrok, forward **4600** and use its HTTPS URL. Everyone in the office can control the joiner's terminals, so connect only to a trusted office. See [floor-host setup](docs/floor-hosts.md#quick-connect-from-the-ui).
+
 ### Playable 2D Game
 
 Open **`/2d`** for the complete office in a desktop, top-down view. It uses the same artwork, rooms, furniture, characters, collisions and feature modules as 3D. **Tab** opens the same menu: boards, Queue, Plan Comparison, Boss Control Center, Smartphone, meetings, messages, services, whiteboard, settings and the other office actions.

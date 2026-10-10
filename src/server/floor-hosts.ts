@@ -51,6 +51,8 @@ export class HostRegistry {
    * anything — the office holds it to identify the floor and never reads it.
    */
   floorsFor: (hostId: string) => { id: string; dir: string; name: string }[] = () => [];
+  /** Feature hook after authentication, before selecting the welcome's floors. */
+  onAuthenticated: (host: Host, hello: Extract<FromFloor, { t: 'hello' }>) => string | void = () => {};
 
   constructor(private hosts: Hosts) {}
 
@@ -165,6 +167,14 @@ export class HostRegistry {
     // "which socket owns these floors" must never be ambiguous — that ambiguity is what makes
     // revocation unclear, which is why decision 6 keeps the socket the unit of trust.
     if (this.byHost.has(host.id)) return undefined;
+    let joinError: string | void;
+    try { joinError = this.onAuthenticated(host, msg); }
+    catch { joinError = 'Could not register this project; retry after checking the office logs'; }
+    if (joinError) {
+      // Deliver a freshly claimed token even on registration failure, so retrying needs no new code.
+      ws.send(JSON.stringify({ t: 'welcome', hostId: host.id, token: fresh ?? '', floors: [], joinError } satisfies ToOffice));
+      return undefined;
+    }
     const entry = new HostSocket(host, ws, fresh, this.floorsFor(host.id));
     this.byHost.set(host.id, entry);
     this.hosts.seen(host.id);

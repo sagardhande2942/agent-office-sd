@@ -1,5 +1,6 @@
 import { OFFICE_MAP } from '../../shared/maps/index.js';
 import { communications } from './communications.js';
+import { installFloorJoin } from '../floor-join/index.js';
 import type { FloorActions } from '../floor-actions.js';
 import { RemoteFloor } from '../remote-floor.js';
 import { existsSync } from 'node:fs';
@@ -239,6 +240,7 @@ export async function openFloors(ctx: Ctx, hookPort: number): Promise<FloorsOpen
     floorsChanged();
   };
   registry.onFloorUp = () => floorsChanged();
+  installFloorJoin(ctx, openFloor);
   // Workers still running from the last office are back at their desks before anyone walks in.
   await Promise.all([...floors.values()].map((f) => f.ready));
   return { openFloor };

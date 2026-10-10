@@ -1,9 +1,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { homedir, hostname } from 'node:os';
 import path from 'node:path';
 import { WebSocket } from 'ws';
 import { FLOORHOST_PROTOCOL, isToOffice, type FromFloor } from '../shared/floorhost.js';
 import { HostFloors, hostParts, startHooks } from './host-floor.js';
+import { JOIN_HELP, joinOptions, joinProject, savedJoinToken } from './floor-join/cli.js';
+import type { FloorJoinProject } from '../shared/floor-join.js';
 
 
 /**
@@ -19,9 +21,8 @@ import { HostFloors, hostParts, startHooks } from './host-floor.js';
  *   # after that
  *   agent-office floor-host --office wss://bob.ngrok.app
  *
- * Where each floor lives is *the office's* list, not this one's: it is sent in `welcome`, from the
- * `FloorDef.host` and `FloorDef.dir` the office already holds. So the office decides what runs here,
- * and this command decides only whether to answer — which is the asymmetry the design rests on.
+ * Floors arrive in `welcome` from the office's saved building. With --checkout, this authenticated
+ * machine also registers its own project before that list is sent, so onboarding needs no restart.
  *
  * The token it keeps is written at 0600 in the host's own home. A machine that has never paired gets
  * its token in `welcome`, so nobody has to carry one between machines.
@@ -34,11 +35,12 @@ connection; nothing here listens for anything.
 
   --office <url>       the office's address, e.g. wss://bob.ngrok.app or ws://localhost:4600
   --code <code>        pair for the first time, with the code from \`agent-office hosts pair\`
-  --name <name>        what the office calls this machine, e.g. "Alice's laptop" (first pairing only)
+  --name <name>        what the office calls this machine (defaults to its hostname; first pairing only)
   --seats <n>          how many workers this machine will seat across its floors (default 0)
   --projects <dir>     where this machine keeps its checkouts (default ~/work, env AGENT_OFFICE_PROJECTS).
                        Told to the office so it can suggest a path when pointing a floor here
   --config <path>      where to keep the token (default ~/.agent-office-floor-host.json)
+${JOIN_HELP}
   -h, --help           this
 
 Once paired, the token is kept at 0600 and reused. The office sends the floors to serve; this machine
@@ -49,6 +51,7 @@ interface HostConfig {
   office: string;
   token: string;
   hostId?: string;
+  project?: FloorJoinProject;
 }
 
 function loadConfig(file: string): HostConfig | undefined {
@@ -56,7 +59,7 @@ function loadConfig(file: string): HostConfig | undefined {
   try {
     const saved = JSON.parse(readFileSync(file, 'utf8')) as Partial<HostConfig>;
     if (typeof saved.office !== 'string' || typeof saved.token !== 'string') return undefined;
-    return { office: saved.office, token: saved.token, hostId: typeof saved.hostId === 'string' ? saved.hostId : undefined };
+    return { office: saved.office, token: saved.token, hostId: typeof saved.hostId === 'string' ? saved.hostId : undefined, project: saved.project };
   } catch {
     console.error(`agent-office floor-host: ${file} couldn't be read — pairing again`);
     return undefined;
@@ -70,9 +73,11 @@ function saveConfig(file: string, cfg: HostConfig) {
 }
 
 export async function floorHostCommand(argv: string[]): Promise<number> {
+  let join: ReturnType<typeof joinOptions>;
+  try { join = joinOptions(argv); argv = join.rest; } catch (err) { return fatal((err as Error).message); }
   let office = '';
   let code: string | undefined;
-  let name: string | undefined;
+  let name: string | undefined = hostname();
   let configFile = path.join(homedir(), '.agent-office-floor-host.json');
   let seats = 0;
   // Where this machine keeps its checkouts. Reported to the office as a hint so that `hosts add-floor`
@@ -109,11 +114,14 @@ export async function floorHostCommand(argv: string[]): Promise<number> {
   const saved = loadConfig(configFile);
   if (!office) office = saved?.office ?? '';
   if (!office) return fatal('--office is needed the first time, e.g. --office wss://bob.ngrok.app');
-  const token = saved?.token;
+  const token = savedJoinToken(saved, office, code, join.sameOffice);
   if (!token && !code) return fatal('no token kept yet — pair first with --code, from `agent-office hosts pair` on the office');
+  let project: FloorJoinProject | undefined;
+  try { project = join.checkout ? joinProject(join.checkout, join.repo, join.name) : token && saved?.project ? joinProject(saved.project.dir, saved.project.repo, saved.project.name) : undefined; }
+  catch (err) { return fatal((err as Error).message); }
 
   const url = office.replace(/^http/, 'ws').replace(/\/+$/, '') + '/floor-host';
-  return connect(url, { token, code, name, configFile, seats, projects, owner: process.env.USER || process.env.USERNAME });
+  return connect(url, { token, code, name, configFile, seats, projects, project, owner: process.env.USER || process.env.USERNAME });
 }
 
 function fatal(msg: string): number {
@@ -123,7 +131,7 @@ function fatal(msg: string): number {
 
 async function connect(
   url: string,
-  opts: { token?: string; code?: string; name?: string; owner?: string; configFile: string; seats: number; projects: string },
+  opts: { token?: string; code?: string; name?: string; owner?: string; configFile: string; seats: number; projects: string; project?: FloorJoinProject },
 ): Promise<number> {
   return new Promise<number>((resolve) => {
     const ws = new WebSocket(url);
@@ -155,6 +163,7 @@ async function connect(
         name: opts.name,
         owner: opts.owner,
         projectsDir: opts.projects,
+        project: opts.project,
       });
     });
 
@@ -168,9 +177,14 @@ async function connect(
       if (!isToOffice(msg)) return;
 
       if (msg.t === 'welcome') {
-        if (msg.token) {
-          saveConfig(opts.configFile, { office: url.replace(/\/floor-host$/, ''), token: msg.token, hostId: msg.hostId });
+        if (msg.token || opts.token) {
+          saveConfig(opts.configFile, { office: url.replace(/\/floor-host$/, ''), token: msg.token || opts.token!, hostId: msg.hostId, project: opts.project });
           console.log(`floor-host: paired. Token kept in ${opts.configFile} (0600).`);
+        }
+        if (msg.joinError) { console.error(`floor-host: ${msg.joinError}`); return done(1); }
+        if (opts.project && !msg.floors.some(f => f.dir === opts.project!.dir)) {
+          console.error('floor-host: this office did not register the checkout. Update the office to support --checkout.');
+          return done(1);
         }
         console.log(`floor-host: the office asks for ${msg.floors.length} floor(s) on this machine`);
         serve(msg.floors).catch((err: Error) => {

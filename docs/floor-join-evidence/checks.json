@@ -1,0 +1,9 @@
+{
+  "checks": [
+    "UI pairing, command generation, real joiner process and live floor arrival without office restart",
+    "Close and Escape restore mouse-look with no extra click",
+    "Reconnect with saved office, token and checkout without duplicating the floor",
+    "390px layout has no horizontal overflow"
+  ],
+  "errors": []
+}

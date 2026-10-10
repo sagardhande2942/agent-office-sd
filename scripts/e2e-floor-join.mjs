@@ -1,0 +1,100 @@
+// npm run build && node --import tsx scripts/e2e-floor-join.mjs
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawn } from 'node:child_process';
+import { chromium } from 'playwright-core';
+import { loadConfig } from '../src/server/config.ts';
+import { startServer } from '../src/server/server.ts';
+
+const output = path.resolve(process.env.FLOOR_JOIN_ARTIFACTS ?? 'docs/floor-join-evidence');
+mkdirSync(output, { recursive: true });
+const dir = mkdtempSync(path.join(os.tmpdir(), 'office-floor-join-'));
+const project = name => {
+  const checkout = path.join(dir, name); mkdirSync(checkout);
+  execFileSync('git', ['init', '-b', 'main'], { cwd: checkout, stdio: 'ignore' });
+  execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '--allow-empty', '-m', 'fixture'], { cwd: checkout, stdio: 'ignore' });
+  return checkout;
+};
+const local = project('office'), remote = project('joiner');
+execFileSync('git', ['remote', 'add', 'origin', 'https://github.com/joiner/sample-app.git'], { cwd: remote });
+const data = path.join(dir, '.agent-office'); mkdirSync(data);
+writeFileSync(path.join(data, 'floors.json'), JSON.stringify([{ id: 'local', name: 'Office', dir: local, palette: 0, addedBy: 'test', addedAt: Date.now() }]));
+const cfg = loadConfig(['--home', dir, '--port', '4600', '--password', 'floor-join-test', '--no-open']);
+cfg.port = 0;
+cfg.agentCmd = 'floor-join-test-agent-unavailable';
+const office = await startServer(cfg, { publicDir: path.resolve('dist/public') });
+const base = `http://127.0.0.1:${office.server.address().port}`;
+const tokenFile = path.join(dir, 'joiner.json');
+let browser, page, child;
+let hostLog = '';
+const errors = [], checks = [];
+const waitFor = async test => { const until = Date.now() + 20000; while (!await test()) { if (Date.now() > until) throw Error(`Timed out. Host output: ${hostLog}`); await new Promise(r => setTimeout(r, 100)); } };
+const launchHost = args => {
+  child = spawn(process.execPath, ['--import', 'tsx', 'src/server/cli.ts', 'floor-host', '--config', tokenFile, ...args], { cwd: process.cwd(), env: { ...process.env, AGENT_OFFICE_AGENT: cfg.agentCmd } });
+  child.stdout.on('data', d => { hostLog += String(d); }); child.stderr.on('data', d => { hostLog += String(d); });
+};
+const stopHost = async () => { if (!child || child.exitCode !== null) return; const stopped = new Promise(r => child.once('exit', r)); child.kill(); await stopped; child = undefined; };
+try {
+  const executable = process.env.CHROMIUM_PATH ?? (process.platform === 'win32' ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' : undefined);
+  browser = await chromium.launch({ executablePath: executable, headless: true, args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await context.addInitScript(() => {
+    localStorage.setItem('agent-office.profile', JSON.stringify({ name: 'Floor tester', color: '#ef476f', look: { skin: 0, hair: 0, style: 0 } }));
+    localStorage.setItem('agent-office.lite-declined', '1');
+  });
+  page = await context.newPage(); page.setDefaultTimeout(30000);
+  page.on('pageerror', error => errors.push(error.message));
+  assert.ok((await context.request.post(base + '/api/login', { data: { password: 'floor-join-test' } })).ok());
+  await page.goto(base + '/');
+  await page.waitForFunction(() => window.__office?.net.up && window.__office.player.enabled);
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  const open = async () => { await page.keyboard.press('Tab'); await page.getByRole('menuitem', { name: 'Connect your floor' }).click(); await page.getByRole('dialog', { name: 'Connect your floor' }).waitFor(); };
+  await open();
+  await page.getByRole('button', { name: 'Generate pairing code' }).click();
+  await page.waitForFunction(() => /^[0-9A-Z]{4}-[0-9A-Z]{4}$/.test(document.querySelector('[aria-label="Pairing code"]').value));
+  const code = await page.getByLabel('Pairing code', { exact: true }).inputValue();
+  await page.getByLabel('Your project folder', { exact: true }).fill(remote);
+  await page.getByText('Optional settings', { exact: true }).click();
+  await page.getByLabel('Machine name (optional)', { exact: true }).fill('Joiner laptop');
+  await page.getByText('Optional settings', { exact: true }).click();
+  const command = await page.getByLabel('Join command', { exact: true }).inputValue();
+  assert.ok(command.includes('--checkout')); assert.ok(command.includes(base));
+  launchHost(['--office', base, '--code', code, '--checkout', remote, '--name', 'Joiner laptop']);
+  await waitFor(async () => { const r = await context.request.get(base + '/api/floor-join/status'); return (await r.json()).machines.some(m => m.floors.some(f => f.online)); });
+  await page.waitForFunction(() => window.__office.store.floors.some(f => f.repo === 'joiner/sample-app' && f.host?.reachable));
+  await page.getByText('Connected', { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(output, 'connected-1440.png') });
+  checks.push('UI pairing, command generation, real joiner process and live floor arrival without office restart');
+  await page.getByRole('dialog', { name: 'Connect your floor' }).getByRole('button', { name: 'Close', exact: true }).click();
+  await page.waitForFunction(() => window.__office.player.enabled && window.__office.player.hasMouse);
+  await open(); await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__office.player.enabled && window.__office.player.hasMouse);
+  checks.push('Close and Escape restore mouse-look with no extra click');
+  await stopHost();
+  await waitFor(async () => { const r = await context.request.get(base + '/api/floor-join/status'); return (await r.json()).machines.every(m => !m.connected); });
+  assert.ok(existsSync(tokenFile));
+  const saved = JSON.parse(readFileSync(tokenFile, 'utf8'));
+  assert.equal(saved.project.dir, remote);
+  launchHost([]);
+  await waitFor(async () => { const r = await context.request.get(base + '/api/floor-join/status'); return (await r.json()).machines.some(m => m.floors.some(f => f.online)); });
+  const defs = JSON.parse(readFileSync(path.join(data, 'floors.json'), 'utf8'));
+  assert.equal(defs.filter(f => f.repo === 'joiner/sample-app').length, 1);
+  checks.push('Reconnect with saved office, token and checkout without duplicating the floor');
+  await open();
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.getByRole('dialog', { name: 'Connect your floor' }).evaluate(el => el.scrollWidth <= el.clientWidth));
+  await page.screenshot({ path: path.join(output, 'connect-390.png') });
+  checks.push('390px layout has no horizontal overflow');
+  assert.deepEqual(errors, []);
+  writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks, errors }, null, 2));
+  console.log(JSON.stringify({ checks, output }, null, 2));
+} catch (error) {
+  console.error(hostLog); console.error(errors);
+  await page?.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {});
+  throw error;
+} finally {
+  await stopHost(); await browser?.close(); office.shutdown();
+}
+process.exit(0);

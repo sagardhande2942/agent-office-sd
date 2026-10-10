@@ -10,6 +10,7 @@ import { githubRoutes } from './github.js';
 import { pageRoutes } from './pages.js';
 import { searchRoutes } from './search.js';
 import { serviceRoutes } from './services.js';
+import { floorJoinRoutes } from '../../floor-join/routes.js';
 
 export const routes: readonly Route[] = [
   // Anyone.
@@ -28,6 +29,7 @@ export const routes: readonly Route[] = [
   pageRoutes.favicon,
   // Signed in.
   authRoutes.whoami,
+  ...Object.values(floorJoinRoutes),
   agentRoutes.models,
   fileRoutes.image,
   fileRoutes.whiteboardFile,
