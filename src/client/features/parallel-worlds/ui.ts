@@ -88,24 +88,24 @@ export function openWorlds(ui: WorldsUI, picked?: number): Modal {
           h('p.note', {}, world.error ?? worker?.activity ?? 'Open this world to inspect its result.'),
           h('code.worlds-branch', {}, worker?.worktree?.branch ?? world.branch ?? 'No branch'),
           h('div.worlds-actions', {},
-            h('button.btn.primary', { onclick: () => { room = openRoom(ui, current, world, index, send); } }, 'Enter world'),
+            h('button.btn.primary', { onclick: () => { room = openRoom(ui, current, world, index, send, () => modal.close()); } }, 'Enter world'),
             h('button.btn', { disabled: !ready, onclick: () => send(current.id, 'select', world.id) }, selected ? 'Selected ✓' : 'Select winner'),
             selected && h('button.btn', { disabled: !ready || !!worker?.pr, onclick: () => send(current.id, 'pr', world.id) }, 'Open PR')),
           worker?.pr && h('a.btn', { href: worker.pr.url, target: '_blank', rel: 'noopener' }, `PR #${worker.pr.number} ↗`));
         cards.append(card);
       });
-      results.append(cards, h('button.btn', { onclick: () => { room = openComparison(current); } }, 'Compare previews side by side'),
+      results.append(cards, h('button.btn', { onclick: () => { room = openComparison(current, () => modal.close()); } }, 'Compare previews side by side'),
         h('p.note', {}, 'Selecting records your choice. Open PR pushes the selected branch for review. Other worlds keep their workers and branches.'));
       if (picked !== undefined) {
         const index = picked; picked = undefined;
         const world = current.worlds[index];
-        if (world) room = openRoom(ui, current, world, index, send);
+        if (world) room = openRoom(ui, current, world, index, send, () => modal.close());
       }
     }
     const past = state.experiments.filter(e => e.archived).reverse();
     if (past.length) results.append(h('details.worlds-history', {}, h('summary', {}, `Archived experiments (${past.length})`), ...past.map(e => h('div', {},
       h('strong', {}, e.task), h('p.note', {}, `${e.base.slice(0, 10)} · ${e.winner ? `Selected ${e.worlds.find(w => w.id === e.winner)?.name}` : 'No winner selected'}`),
-      ...e.worlds.map((w, i) => h('button.btn', { onclick: () => { room = openRoom(ui, e, w, i, send); } }, w.name))))));
+      ...e.worlds.map((w, i) => h('button.btn', { onclick: () => { room = openRoom(ui, e, w, i, send, () => modal.close()); } }, w.name))))));
   }
   const tick = async () => { try { await ui.refresh(); render(); } catch (err) { if (active) status.textContent = (err as Error).message; } };
   const timer = setInterval(() => void tick(), 2500);
@@ -114,8 +114,8 @@ export function openWorlds(ui: WorldsUI, picked?: number): Modal {
 }
 
 type Send = (experiment: string, action: 'select' | 'archive' | 'feedback' | 'pr', world?: string, text?: string) => void;
-function openRoom(ui: WorldsUI, experiment: WorldsView, world: WorldView, index: number, send: Send): Modal {
-  const screen = previewScreen(world);
+function openRoom(ui: WorldsUI, experiment: WorldsView, world: WorldView, index: number, send: Send, closeParent: () => void): Modal {
+  const screen = previewScreen(world, closeParent);
   const feedback = h('textarea', { rows: 3, maxlength: 12000, required: true, 'aria-label': `Feedback for ${world.name}`, placeholder: 'Keep the map, but make blocked workers easier to spot…' });
   const form = h('form.worlds-feedback', {}, feedback, h('button.btn.primary', { type: 'submit', disabled: experiment.archived || !world.workerId || !world.worker }, 'Send feedback'));
   form.addEventListener('submit', event => { event.preventDefault(); send(experiment.id, 'feedback', world.id, feedback.value); feedback.value = ''; });
@@ -129,12 +129,12 @@ function openRoom(ui: WorldsUI, experiment: WorldsView, world: WorldView, index:
         worker?.completion && h('details', {}, h('summary', {}, `Worker-reported checks: ${worker.completion.status}`),
           h('p', {}, worker.completion.summary),
           ...worker.completion.checks.map(check => h('p.note', {}, `${check.status.toUpperCase()} · ${check.name}: ${check.evidence}`))),
-        h('button.btn', { disabled: !world.workerId || !worker, onclick: () => ui.terminal(world.workerId!) }, 'Open agent terminal')),
+        h('button.btn', { disabled: !world.workerId || !worker, onclick: () => { closeParent(); ui.terminal(world.workerId!); } }, 'Open agent terminal')),
       h('div', {}, h('h3', {}, 'Direct this universe'), form))));
-  return openModal(panel, { doing: `exploring ${world.name} universe` });
+  return openModal(panel, { doing: `exploring ${world.name} universe`, onClose: closeParent });
 }
 
-function previewScreen(world: WorldView): HTMLElement {
+function previewScreen(world: WorldView, closeParent: () => void): HTMLElement {
   const services = store.services.items.filter(s => s.workerId === world.workerId);
   const display = h('div.worlds-screen');
   if (!services.length) {
@@ -152,12 +152,12 @@ function previewScreen(world: WorldView): HTMLElement {
     frame.src = url; link.href = url;
   };
   select.addEventListener('change', load); load();
-  display.append(h('div.worlds-preview-toolbar', {}, select, link, h('button.btn', { onclick: load }, 'Reload'), h('button.btn', { onclick: openServices }, 'Services / tunnels')), frame,
+  display.append(h('div.worlds-preview-toolbar', {}, select, link, h('button.btn', { onclick: load }, 'Reload'), h('button.btn', { onclick: () => { closeParent(); openServices(); } }, 'Services / tunnels')), frame,
     h('p.note', {}, `If the office runs remotely, start ${autoTunnel()} on your computer. If embedding is blocked, use Open full screen.`));
   return display;
 }
-function openComparison(experiment: WorldsView): Modal {
+function openComparison(experiment: WorldsView, closeParent: () => void): Modal {
   return openModal(h('section.modal.worlds-compare', { role: 'dialog', 'aria-label': 'Compare universes' },
     h('header', {}, h('h2', {}, 'Compare universes')),
-    h('div.body.worlds-grid', {}, ...experiment.worlds.map((w, i) => h('article', { style: `--world-color:${WORLD_APPROACHES[i].color}` }, h('h3', {}, w.name), previewScreen(w))))), { doing: 'comparing universes' });
+    h('div.body.worlds-grid', {}, ...experiment.worlds.map((w, i) => h('article', { style: `--world-color:${WORLD_APPROACHES[i].color}` }, h('h3', {}, w.name), previewScreen(w, closeParent))))), { doing: 'comparing universes', onClose: closeParent });
 }

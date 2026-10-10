@@ -87,7 +87,7 @@ try {
   await frame.getByRole('button', { name: 'Interaction verified' }).waitFor();
   await page.screenshot({ animations: 'disabled', path: path.join(output, 'room.png') });
   check('world room loads a real discovered server and its interactive preview');
-  await room.locator('button.close').click();
+  await close(); await menu();
   await page.getByRole('button', { name: 'Select winner', exact: true }).first().click();
   await page.getByText('★ Selected universe').waitFor();
   await page.getByRole('button', { name: 'Open PR', exact: true }).waitFor();
@@ -95,14 +95,13 @@ try {
   await page.getByRole('button', { name: 'Enter world', exact: true }).first().click();
   await page.getByLabel('Feedback for Minimal').fill('Improve keyboard navigation');
   await page.getByRole('button', { name: 'Send feedback', exact: true }).click();
-  await room.locator('button.close').click();
+  await close(); await menu();
   await page.waitForFunction(() => !document.querySelector('.worlds-card.selected'));
   assert.equal(floor.workers.list().filter(w => w.activity === 'Improve keyboard navigation').length, 1);
   check('feedback targets one worker and invalidates its winner selection');
   await page.getByRole('button', { name: 'Compare previews side by side' }).click();
   assert.equal(await page.getByRole('dialog', { name: 'Compare universes' }).locator('iframe').count(), 3);
   await page.screenshot({ animations: 'disabled', path: path.join(output, 'compare.png') });
-  await page.getByRole('dialog', { name: 'Compare universes' }).locator('button.close').click();
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.backdrop') && window.__game2d.ctx.player.enabled && document.activeElement.id === 'scene');
   check('comparison and Escape restore office controls');
@@ -111,14 +110,15 @@ try {
   await page.screenshot({ animations: 'disabled', path: path.join(output, 'portals.png') });
   await page.evaluate(() => { const g = window.__game2d; const it = g.ctx.usables.lists().flat().find(it => it.kind === 'worldportal' && it.deskId === '1'); if (!it) throw Error('No portal'); g.ctx.interactions.use(it, 'E', null); });
   await page.getByRole('dialog', { name: 'Visual universe', exact: true }).waitFor();
-  await page.getByRole('dialog', { name: 'Visual universe', exact: true }).locator('button.close').click(); await close();
+  await close();
   check('physical portal interaction opens its own world; close restores focus');
   await page.keyboard.press('KeyY');
   await page.waitForFunction(() => window.__game2d.camera.isPerspectiveCamera);
   await page.evaluate(() => window.__game2d.parts.place.placeAt({ x: -1, y: 0, z: 5.5, rotY: Math.PI }));
   await page.waitForTimeout(300); await page.evaluate(() => {
     const g = window.__game2d;
-    g.camera.position.set(-1, 1.4, 5.5); g.camera.lookAt(-1, 1.3, 8.5); g.camera.updateMatrixWorld();
+    g.ctx.me.root.visible = false; // The normal first-person render hides the player's head before drawing.
+    g.camera.position.set(-1, 1.4, 3.5); g.camera.lookAt(-1, 1.3, 8.5); g.camera.updateMatrixWorld();
     window.__worldsDraw();
   });
   await page.screenshot({ animations: 'disabled', path: path.join(output, 'portals-3d.png') });
@@ -127,6 +127,15 @@ try {
   check('3D close restores mouse-look without another click');
   await page.keyboard.press('KeyY');
   await page.waitForFunction(() => window.__game2d.camera.isOrthographicCamera);
+  await menu(); await page.getByRole('button', { name: 'Enter world', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Open agent terminal', exact: true }).click();
+  await page.waitForSelector('.term'); assert.equal(await page.locator('.worlds-modal,.worlds-room').count(), 0);
+  await close();
+  await menu(); await page.getByRole('button', { name: 'Enter world', exact: true }).first().click();
+  await page.getByRole('button', { name: 'Services / tunnels', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Services', exact: true }).waitFor();
+  assert.equal(await page.locator('.worlds-modal,.worlds-room').count(), 0); await close();
+  check('terminal and Services navigation leave no hidden experiment windows');
   await menu(); await page.getByRole('button', { name: 'Archive experiment' }).click();
   await page.getByRole('button', { name: 'Split into three worlds' }).waitFor();
   assert.equal(await page.getByRole('button', { name: 'Split into three worlds' }).isEnabled(), true);
