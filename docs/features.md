@@ -128,4 +128,4 @@ The shared **View** selector retains the selected floor and server-owned worker 
 
 The west-wall plant beside the basketball, at (-17.2, 8.5), uses src/client/models/basketball-plant.glb. Replace this GLB and run npm run build to update that plant on each office floor. Other plants keep their existing models. The dedicated world/office/basketball-plant.ts fixture preserves imported materials, centers the model, places its base on the floor, and fits it within the original plant footprint. Its existing collision area stays in place. At Christmas the combined pot-and-foliage model is hidden for the seasonal tree.
 
-The supplied model is about 62 MB and is preloaded with the office assets; keep future replacements small to reduce the initial download.
+The optimized model is about 278 KB and is preloaded with the office assets. Draco-compressed GLBs are supported through a locally bundled decoder from Three.js; its worker and WebAssembly assets load only when a compressed model needs them. Keep future replacements small to reduce the initial download.

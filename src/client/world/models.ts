@@ -14,6 +14,7 @@ import loungeUrl from '../models/lounge.glb?url';
 import plantsUrl from '../models/plants.glb?url';
 import basketballPlantUrl from '../models/basketball-plant.glb?url';
 import { toon } from './toon';
+import { dracoDecoder } from './draco';
 
 // The things in the world modelled in Blender rather than built in code. Each .glb is exported by a
 // script in blender/scripts/ (blender/README.md has the conventions they keep); add it here by name.
@@ -79,7 +80,7 @@ function fetchModel(name: ModelName): Promise<GLTF> {
   let p = loading.get(name);
   if (!p) {
     // Each chunk that comes in tells the watchers too, though the counts are still by file.
-    p = new GLTFLoader().loadAsync(MODELS[name].url, () => tell()).then((gltf) => {
+    p = new GLTFLoader().setDRACOLoader(dracoDecoder).loadAsync(MODELS[name].url, () => tell()).then((gltf) => {
       loaded.set(name, gltf);
       return gltf;
     });
