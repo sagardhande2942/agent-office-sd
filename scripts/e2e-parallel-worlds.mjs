@@ -122,7 +122,7 @@ try {
     window.__worldsDraw();
   });
   await page.screenshot({ animations: 'disabled', path: path.join(output, 'portals-3d.png') });
-  await menu(); await close();
+  await menu(); await page.getByRole('button', { name: 'Enter world', exact: true }).first().click(); await close();
   await page.waitForFunction(() => window.__game2d.ctx.player.mouseLook && window.__game2d.ctx.player.hasMouse);
   check('3D close restores mouse-look without another click');
   await page.keyboard.press('KeyY');
