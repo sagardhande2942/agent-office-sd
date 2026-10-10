@@ -35,7 +35,7 @@ import { childEnv } from './env.js';
 import { midTurn } from './lifecycle.js';
 import { restoreWorkers, saveWorkers } from './persist.js';
 import { WorkerPrs } from './pr.js';
-import { WIN, binScript, defaultShell, resolveCommand, shellRun, shq, writeOfficeCommands } from './process.js';
+import { WIN, binScript, defaultShell, missingAgentCommand, resolveCommand, shellRun, shq, writeOfficeCommands } from './process.js';
 import { CARRY_ON_PROMPT, WorkerTasks } from './tasks.js';
 import { flushScreens, fullScreens, newTerm, observed, offlineBanner, screenText, type HeadlessTerminal } from './terminal.js';
 import type { HookEnv, OpenedPr, RepoSource, RunAs, Worker, WorkerContext, WorkerEvents, WorkerHandle } from './types.js';
@@ -694,7 +694,7 @@ export class WorkerManager {
     const command = this.command(info);
     const commandPath = isShell ? undefined : configured ? this.agentPath : resolveCommand(command);
     const base = isShell ? (WIN && !process.env.SHELL ? [] : ['-l']) : configured && !info.planReview?.locked ? [...this.agentArgs] : [];
-    const planLaunchError = planningVersion(info, commandPath ?? command);
+    const planLaunchError = (!isShell && missingAgentCommand(command, commandPath)) || planningVersion(info, commandPath ?? command);
     if (planLaunchError) { this.startFailed(w, planLaunchError); return; }
     // Its provider's command line, and anything it sets for this run (see ProviderAdapter.launch).
     const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), command: commandPath ?? command, args: base, prompt, resumeSessionId, station: DESK_BY_ID.get(info.deskId)?.station, cwd, setup: this.setups[adapter.id] }) : { args: base };

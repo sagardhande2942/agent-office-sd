@@ -32,9 +32,11 @@ test('joiner reads their own checkout and origin, with explicit repo for other r
 test('saved credentials are scoped to the office, with explicit reuse when the same office moves', () => {
   const saved = { office: 'wss://office.test', token: 'saved-token' };
   assert.equal(savedJoinToken(saved, 'https://office.test/', undefined, false), 'saved-token');
+  assert.equal(savedJoinToken(saved, 'https://office.test', 'NEW-CODE', false), 'saved-token');
+  assert.equal(savedJoinToken(saved, 'https://other.test', 'NEW-CODE', false), undefined);
   assert.equal(savedJoinToken(saved, 'https://other.test', undefined, false), undefined);
   assert.equal(savedJoinToken(saved, 'https://new-ngrok.test', undefined, true), 'saved-token');
-  assert.equal(savedJoinToken(saved, 'https://other.test', 'NEW-CODE', true), undefined);
+  assert.equal(savedJoinToken(saved, 'https://other.test', 'NEW-CODE', true), 'saved-token');
   assert.equal(joinOptions(['--same-office']).sameOffice, true);
 });
 
