@@ -107,3 +107,8 @@ export function writeOfficeCommands(dataDir: string): string | undefined {
   }
   return wrote ? dir : undefined;
 }
+
+/** Windows has no login-shell fallback for a missing agent executable. */
+export function missingAgentCommand(command: string, resolved: string | null | undefined, platform = process.platform, shell = process.env.SHELL): string | undefined {
+  if (platform === 'win32' && !shell && !resolved) return `${command} is not on this machine's PATH. Install its CLI, verify it runs in this terminal, then restart the office or floor-host.`;
+}

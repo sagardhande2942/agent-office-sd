@@ -62,8 +62,11 @@ node bin/agent-office.js floor-host
 
 If this same office's ngrok URL changes, reconnect with `node bin/agent-office.js floor-host --office "https://NEW-URL" --same-office`.
 
-
 If reconnect says the repository already has a floor after your saved token was lost or replaced, stop the machine's floor host. The office admin opens **Connect your floor**, finds the original offline machine under **Paired machines**, and clicks **Reconnect this machine**. Enter the joiner's original checkout path and share the generated command with them. It includes `--recover` to replace the incorrect saved credential while preserving the original machine and floors. Future reconnects use `node bin/agent-office.js floor-host` without a code.
+
+Reconnect uses the saved machine token, even if you paste the original command with a pairing code again. For a changed URL belonging to the same office, add `--same-office` to retain that identity. Use the same Windows user and `--config` file; a different profile has no saved token. A genuinely different machine or checkout cannot take over an existing floor.
+
+On Windows, run `claude --version` (or your chosen agent's command) in the floor-host terminal before connecting. If the worker reports that its CLI is missing from PATH, install it on the joiner's machine and restart the floor host after verifying the command works.
 
 This explicitly sends the saved token to that new address; use it only for the same trusted office.
 For a different office, use a fresh `--code` and `--checkout`. Credentials otherwise stay scoped to
