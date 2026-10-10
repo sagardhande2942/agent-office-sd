@@ -1,13 +1,14 @@
 /**
- * Windows and the game taking turns with the keyboard and the mouse: a window opening lets go of both
- * (and tells everyone what you have open), and closing the last one puts you straight back into
+ * Windows and the game taking turns with input: ordinary windows pause movement, scene editors may
+ * retain it, and all windows release the cursor. Closing the last window restores normal controls
+ * (and tells everyone what you have open), putting you straight back into
  * mouse-look, with no extra click (see backToGame).
  */
 import type { Ctx } from '../core/context';
 import type { CoreState } from '../core/ctx';
 import type { Parts } from '../core/parts';
 import { isTyping } from '../player';
-import { $, doingNow, modalOpen, onDoingChange, onModalChange, readingNow } from '../ui/dom';
+import { $, doingNow, modalOpen, modalBlocksMovement, onDoingChange, onModalChange, readingNow } from '../ui/dom';
 
 /** Listens for windows opening and closing, what they say you're doing, the mouse and keys (captured) and pointer lock. */
 export function installFocus(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'telescope' | 'walking'>) {
@@ -53,7 +54,7 @@ export function installFocus(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'tele
   window.addEventListener('keydown', () => (pressedMouse = false), true);
   onModalChange((open) => {
     if (open) parts.telescope.exit();
-    player.enabled = !open;
+    player.enabled = !modalBlocksMovement();
     player.clearKeys();
     sendDoing();
     // Reading off the bookshelf: an open book in your hands, and your character's.
@@ -73,6 +74,9 @@ export function installFocus(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'tele
       // A tick later, so closing one window to open the next (Settings → character) doesn't grab the mouse in between.
       setTimeout(backToGame, 0);
     }
+    // yieldMouse can briefly capture a free cursor to preserve automatic relock on close.
+    // Once yielded, a scene editor must not recapture it while walking remains enabled.
+    player.pointerLockEnabled = !open;
     ctx.hint.invalidate();
   });
 
