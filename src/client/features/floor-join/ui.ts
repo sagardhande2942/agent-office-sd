@@ -8,6 +8,8 @@ interface Machine { id: string; name: string; connected: boolean; floors: { name
 export function openFloorJoin() {
   let disposed = false;
   let expiresAt = 0;
+  let recover = false;
+  let lastMachines = '';
   const office = h('input', { type: 'url', 'aria-label': 'Office URL', placeholder: 'https://your-office.ngrok.app' });
   office.value = location.origin;
   if (location.port === '5173' && ['localhost', '127.0.0.1'].includes(location.hostname)) office.value = `${location.protocol}//${location.hostname}:4600`;
@@ -30,25 +32,27 @@ export function openFloorJoin() {
     const expired = expiresAt > 0 && Date.now() >= expiresAt;
     const ready = validUrl && /^[0-9A-Z]{4}-[0-9A-Z]{4}$/i.test(code.value.trim()) && !!checkout.value.trim() && !expired;
     copy.disabled = !ready;
-    command.value = ready ? floorJoinCommand({ office: office.value.trim(), code: code.value.trim().toUpperCase(), checkout: checkout.value.trim(), repo: repo.value, name: name.value }, shell.value as 'powershell' | 'bash') : '';
+    command.value = ready ? floorJoinCommand({ office: office.value.trim(), code: code.value.trim().toUpperCase(), checkout: checkout.value.trim(), repo: repo.value, name: name.value, recover }, shell.value as 'powershell' | 'bash') : '';
     expiry.textContent = expiresAt ? expired ? 'Code expired. Generate a new one.' : `Single use. Expires at ${new Date(expiresAt).toLocaleTimeString()}.` : 'Get a code from the office host, or generate one here as an admin.';
   };
   for (const input of [office, code, checkout, repo, name, shell]) input.addEventListener('input', () => { if (input === code) expiresAt = 0; refreshCommand(); });
   create.disabled = !store.me.admin;
-  create.addEventListener('click', async () => {
+  const pair = async (host?: string) => {
     create.disabled = true;
     error.textContent = '';
     try {
-      const response = await fetch('/api/floor-join/pair', { method: 'POST' });
+      const response = await fetch('/api/floor-join/pair' + (host ? `?host=${encodeURIComponent(host)}` : ''), { method: 'POST' });
       const result = await response.json();
       if (!response.ok) throw Error(result.error || 'Could not pair a machine');
       if (disposed) return;
       code.value = result.code;
+      recover = !!host;
       expiresAt = result.expiresAt;
       refreshCommand();
     } catch (err) { if (!disposed) error.textContent = (err as Error).message; }
     finally { if (!disposed) create.disabled = !store.me.admin; }
-  });
+  };
+  create.addEventListener('click', () => { void pair(); });
   copy.addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(command.value); copy.textContent = 'Copied'; }
     catch { command.focus(); command.select(); error.textContent = 'Select and copy the command above.'; }
@@ -61,9 +65,13 @@ export function openFloorJoin() {
       if (!response.ok) throw Error('Could not refresh connection status');
       const result = await response.json() as { machines: Machine[] };
       if (disposed) return;
+      const signature = JSON.stringify(result.machines);
+      if (signature === lastMachines) return;
+      lastMachines = signature;
       list.replaceChildren(...result.machines.map(m => h('div.floor-join-machine', {},
         h('strong', {}, m.name), h('span', { class: m.connected ? 'online' : '' }, m.connected ? 'Connected' : 'Offline'),
         h('p.setting-note', {}, m.floors.length ? m.floors.map(f => `${f.name} · ${f.online ? 'ready' : 'offline'}`).join(', ') : 'Waiting for a project'),
+        ...(!m.connected && m.floors.length ? [h('button.btn', { type: 'button', onclick: () => { void pair(m.id); } }, 'Reconnect this machine')] : []),
       )));
       if (!result.machines.length) list.textContent = 'No machines connected yet.';
     } catch (err) { if (!disposed) list.textContent = (err as Error).message; }
@@ -79,7 +87,7 @@ export function openFloorJoin() {
     h('details', {}, h('summary', {}, 'Optional settings'), field('Repository (optional)', repo), field('Machine name (optional)', name), field('Terminal shell', shell)),
     h('p.setting-note', {}, 'Run from your agent-office folder after installing and building it. The project stays on your computer. Everyone in the office can control its terminals; connect only to an office you trust.'),
     command, copy, error,
-    h('p.setting-note', {}, 'Keep the command running. Your floor appears in the elevator automatically. Next time, run npm start -- floor-host from the same agent-office folder.'),
+    h('p.setting-note', {}, 'Keep the command running. Next time, run node bin/agent-office.js floor-host. Lost your saved connection? The host can use Reconnect this machine below to restore the existing floor without deleting it.'),
     store.me.admin && h('h3', {}, 'Paired machines'), store.me.admin && list,
     ),
   );

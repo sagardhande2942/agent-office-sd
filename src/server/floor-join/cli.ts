@@ -8,16 +8,19 @@ export const JOIN_HELP = `
   --checkout <dir>     share this existing local project as a floor immediately; saved for reconnects
   --repo <owner/repo>  repository name (otherwise read from the checkout's origin remote)
   --floor <name>       display name for the shared floor
-  --same-office        reuse the saved token when this same office moves to a different URL`;
+  --same-office        reuse the saved token when this same office moves to a different URL
+  --recover            use an admin recovery code to restore the existing machine identity`;
 
 /** Keep the new onboarding options out of the transport's CLI parser. */
 export function joinOptions(argv: string[]) {
   const rest: string[] = [];
   let checkout: string | undefined, repo: string | undefined, name: string | undefined;
   let sameOffice = false;
+  let recover = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--same-office') { sameOffice = true; continue; }
+    if (a === '--recover') { recover = true; continue; }
     if (!['--checkout', '--repo', '--floor'].includes(a)) { rest.push(a); continue; }
     const value = argv[++i];
     if (!value || value.startsWith('--')) throw Error(`${a} needs a value`);
@@ -26,12 +29,12 @@ export function joinOptions(argv: string[]) {
     else name = value;
   }
   if (!checkout && (repo || name)) throw Error('--repo and --floor need --checkout');
-  return { rest, checkout, repo, name, sameOffice };
+  return { rest, checkout, repo, name, sameOffice, recover };
 }
 
-export function savedJoinToken(saved: { office: string; token: string } | undefined, office: string, code: string | undefined, sameOffice: boolean) {
+export function savedJoinToken(saved: { office: string; token: string } | undefined, office: string, code: string | undefined, sameOffice: boolean, recover = false) {
   const address = (url: string) => url.replace(/^http/, 'ws').replace(/\/+$/, '');
-  return !code && saved && (sameOffice || address(saved.office) === address(office)) ? saved.token : undefined;
+  return !recover && saved && (sameOffice || address(saved.office) === address(office)) ? saved.token : undefined;
 }
 
 export function joinProject(checkout: string, repo?: string, name?: string): FloorJoinProject {

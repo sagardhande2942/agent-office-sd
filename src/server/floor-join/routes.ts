@@ -8,7 +8,9 @@ export const floorJoinRoutes = {
       if (session.account && session.account.role !== 'admin') return send(res, 403, { error: 'Only admins can pair a machine' });
       if (!sameOrigin(req, ctx.cfg)) return send(res, 403, { error: 'Open this from the office page' });
       if (ctx.hosts.unreadableFile) return send(res, 503, { error: 'The hosts file could not be read; fix it before pairing' });
-      const result = ctx.hosts.pair(session.account?.name ?? 'the office UI');
+      const host = new URL(req.url ?? '/', 'http://office').searchParams.get('host') || undefined;
+      if (host && ctx.registry.counts().has(host)) return send(res, 409, { error: 'Stop this machine’s floor-host before recovering its connection' });
+      const result = ctx.hosts.pair(session.account?.name ?? 'the office UI', host);
       return typeof result === 'string' ? send(res, 400, { error: result }) : send(res, 200, result);
     },
   },

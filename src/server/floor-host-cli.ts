@@ -114,7 +114,8 @@ export async function floorHostCommand(argv: string[]): Promise<number> {
   const saved = loadConfig(configFile);
   if (!office) office = saved?.office ?? '';
   if (!office) return fatal('--office is needed the first time, e.g. --office wss://bob.ngrok.app');
-  const token = savedJoinToken(saved, office, code, join.sameOffice);
+  if (join.recover && !code) return fatal('--recover needs the recovery code from Connect your floor');
+  const token = savedJoinToken(saved, office, code, join.sameOffice, join.recover);
   if (!token && !code) return fatal('no token kept yet — pair first with --code, from `agent-office hosts pair` on the office');
   let project: FloorJoinProject | undefined;
   try { project = join.checkout ? joinProject(join.checkout, join.repo, join.name) : token && saved?.project ? joinProject(saved.project.dir, saved.project.repo, saved.project.name) : undefined; }

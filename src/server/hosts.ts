@@ -58,7 +58,7 @@ export interface Host {
 
 interface Saved {
   hosts: Host[];
-  codes: PairingCode[];
+  codes: (PairingCode & { reconnectHost?: string })[];
 }
 
 /** Constant-time compare, lifted from the two file-local copies in workers.ts and ptyhost.ts. */
@@ -178,16 +178,22 @@ export class Hosts {
   }
 
   /** Makes a pairing code. Returns it once: the office shows it and the person types it on the host. */
-  pair(by: string): { code: string; expiresAt: number } | string {
+  pair(by: string, reconnectHost?: string): { code: string; expiresAt: number } | string {
     this.sync();
     this.dropExpired();
-    if (this.data.hosts.filter((h) => !h.revokedAt).length >= MAX_HOSTS) return `Already ${MAX_HOSTS} machines host floors here`;
+    if (reconnectHost && !this.data.hosts.some(h => h.id === reconnectHost && !h.revokedAt)) return 'No such active machine';
+    if (!reconnectHost && this.data.hosts.filter((h) => !h.revokedAt).length >= MAX_HOSTS) return `Already ${MAX_HOSTS} machines host floors here`;
     if (this.data.codes.length >= MAX_CODES) return 'Too many pairing codes are open — cancel some first';
     const code = newCode();
     const expiresAt = Date.now() + PAIRING_TTL_MS;
-    this.data.codes.push({ code, expiresAt, createdAt: Date.now(), createdBy: by });
+    this.data.codes.push({ code, expiresAt, createdAt: Date.now(), createdBy: by, ...(reconnectHost ? { reconnectHost } : {}) });
     this.save();
     return { code, expiresAt };
+  }
+
+  reconnectTarget(raw: unknown): string | undefined {
+    this.sync();
+    return this.data.codes.find(c => c.code === String(raw).trim().toUpperCase() && c.expiresAt > Date.now())?.reconnectHost;
   }
 
   /**
@@ -208,6 +214,15 @@ export class Hosts {
     const found = this.data.codes.find((c) => c.code === code);
     if (!found) return 'That pairing code is not one of ours';
     if (found.expiresAt <= Date.now()) return 'That pairing code has expired';
+    if (found.reconnectHost) {
+      const host = this.data.hosts.find(h => h.id === found.reconnectHost && !h.revokedAt);
+      if (!host) return 'That machine was removed or revoked';
+      const token = randomBytes(32).toString('hex');
+      host.hash = hashToken(token);
+      this.data.codes = this.data.codes.filter(c => c.code !== code);
+      this.save();
+      return { host, token };
+    }
     const label = cleanHostName(name);
     if (!label) return 'That machine needs a name, so refusals can name it';
     if (this.data.hosts.filter((h) => !h.revokedAt).length >= MAX_HOSTS) return `Already ${MAX_HOSTS} machines host floors here`;
