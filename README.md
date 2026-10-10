@@ -450,6 +450,7 @@ In **2D Game**, open **Tab → 2D graphics settings** to choose **Reduced (curre
 ### Worker appearances
 
 Models in the office, character previews and model lab render without the blue-grey cartoon outlines. See [rendering](docs/features.md#model-rendering).
+First-person hands render over the office without clearing it, so switching from 2D to 3D keeps the world visible.
 
 Admins can choose Original and/or 20 code-built fictional characters in **Settings → Workers**. Select a roster and apply it immediately across all floors. Fictional characters never duplicate; extra workers use Original, and assignments survive restart. Each includes its signature outfit. See [worker appearances](docs/worker-appearances.md).
 
