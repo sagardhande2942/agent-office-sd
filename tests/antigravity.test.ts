@@ -72,3 +72,26 @@ test('hooks discard tool content and reject foreign conversations and malformed 
     assert.equal(execFileSync(process.execPath, [helper, 'Stop', 'one'], { input: '{bad', env: { ...process.env, AGENT_OFFICE_WORKER_ID: 'one' }, encoding: 'utf8' }), '{}');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+
+test('pre-tool telemetry preserves native approvals even when reporting is skipped or fails', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'office-agy-decision-'));
+  try {
+    const helper = writeAntigravityHook(dir);
+    const cases = [
+      { input: '{bad', worker: 'one' },
+      { input: JSON.stringify({ conversationId: 'root' }), worker: 'other' },
+      { input: JSON.stringify({ conversationId: 'child', parentConversationId: 'root' }), worker: 'one' },
+      { input: JSON.stringify({ conversationId: 'child', subagentId: 'child' }), worker: 'one' },
+      { input: 'x'.repeat(1048577), worker: 'one' },
+      ...['run_command', 'view_file'].map(name => ({ input: JSON.stringify({ conversationId: 'root', toolCall: { name } }), worker: 'one' })),
+    ];
+    for (const fixture of cases) {
+      const output = execFileSync(process.execPath, [helper, 'PreToolUse', 'one'], {
+        input: fixture.input, encoding: 'utf8', timeout: 5000,
+        env: { ...process.env, AGENT_OFFICE_WORKER_ID: fixture.worker, AGENT_OFFICE_HOOK_URL: 'http://127.0.0.1:0', AGENT_OFFICE_HOOK_TOKEN: 'test' },
+      });
+      assert.deepEqual(JSON.parse(output), { decision: 'ask' });
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

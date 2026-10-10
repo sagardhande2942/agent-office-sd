@@ -75,7 +75,7 @@ export function writeAntigravityHook(dataDir: string): string {
   const file = path.join(dataDir, 'antigravity-hook.cjs');
   writeFileSync(file, HOOK_SOURCE, { mode: 0o600 }); chmodSync(file, 0o600); return file;
 }
-// Bound input, forward metadata only, return no permission decision or injected steps.
+// Bound input and forward metadata only; defer pre-tool gating to native approvals.
 export const HOOK_SOURCE = String.raw`
 const event = process.argv[2], worker = process.argv[3];
 let bytes = 0, chunks = [], overflow = false;
@@ -90,6 +90,6 @@ process.stdin.on('end', async () => {
     const url = new URL('/hooks/antigravity', process.env.AGENT_OFFICE_HOOK_URL);
     url.searchParams.set('worker', worker); url.searchParams.set('event', event);
     await fetch(url, { method: 'POST', headers: { authorization: 'Bearer ' + process.env.AGENT_OFFICE_HOOK_TOKEN, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(2000) });
-  } catch {} finally { process.stdout.write('{}'); }
+  } catch {} finally { process.stdout.write(event === 'PreToolUse' ? '{"decision":"ask"}' : '{}'); }
 });
 `;
