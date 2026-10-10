@@ -1,0 +1,10 @@
+.task-brief-tool { margin: 10px 0; }
+.task-brief-editor { margin-top: 12px; padding: 14px; border: 2px solid var(--ink); border-radius: 12px; background: var(--paper); }
+.task-brief-editor h3 { margin: 0 0 8px; }
+.task-brief-editor p { line-height: 1.45; }
+.task-brief-editor pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.task-brief-field { display: block; margin-top: 12px; font-weight: 700; }
+.task-brief-field textarea { display: block; width: 100%; margin-top: 6px; box-sizing: border-box; }
+.task-brief-status { font-size: 13px; color: var(--muted); }
+.task-brief-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.task-brief-review { margin-top: 12px; }

@@ -4,6 +4,7 @@ import { h, openModal } from './dom';
 import { store } from '../state';
 import { providerPicker, type ProviderPicker } from './provider';
 import { dictateField } from './dictate';
+import { promptTools } from './prompt-tools';
 
 export interface PromptOptions {
   title: string;
@@ -59,6 +60,7 @@ export function repoPicker(options: { id: string; name: string }[] | undefined, 
 export function openPrompt(opts: PromptOptions) {
   const ta = h('textarea', { rows: 7, placeholder: opts.placeholder ?? 'What should the worker work on?', 'aria-label': 'Prompt' }) as HTMLTextAreaElement;
   ta.value = opts.initial ?? '';
+  const tools = promptTools(ta);
   const wtBox = h('input', { type: 'checkbox', id: 'wt-toggle' }) as HTMLInputElement;
   wtBox.checked = worktreePref();
   const wtRow = opts.worktreeOption
@@ -77,7 +79,7 @@ export function openPrompt(opts: PromptOptions) {
     'form.modal',
     { role: 'dialog', 'aria-label': opts.title },
     h('header', {}, h('h2', {}, opts.title)),
-    h('div.body', {}, opts.warning ? h('p.setting-note.bad', { style: 'margin:0 0 10px', role: 'alert' }, opts.warning) : null, opts.subtitle ? h('p', { style: 'margin:0 0 10px;font-weight:700;color:var(--muted)' }, opts.subtitle) : null, dictateField(ta), provider?.element ?? null, wtRow, repos.element),
+    h('div.body', {}, opts.warning ? h('p.setting-note.bad', { style: 'margin:0 0 10px', role: 'alert' }, opts.warning) : null, opts.subtitle ? h('p', { style: 'margin:0 0 10px;font-weight:700;color:var(--muted)' }, opts.subtitle) : null, dictateField(ta), tools.element, provider?.element ?? null, wtRow, repos.element),
     h('footer', {}, h('span.grow', {}, 'Enter to send · Shift+Enter for a new line'), cancel, submit),
   ) as HTMLFormElement;
   form.noValidate = true;
@@ -85,6 +87,7 @@ export function openPrompt(opts: PromptOptions) {
   const modal = openModal(form);
   cancel.addEventListener('click', () => modal.close());
   const send = () => {
+    if (!tools.valid()) return;
     const text = ta.value.trim();
     if (!text && !opts.allowEmpty) {
       ta.focus();

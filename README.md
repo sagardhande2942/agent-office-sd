@@ -11,6 +11,11 @@
 
 **A 3D office your team shares with its coding agents.**
 
+Before starting a worker, use **Build task brief** beside the prompt to organize a rough request
+into a goal, examples, constraints and acceptance criteria. Review the editable preview and click
+**Use brief**, then hire/send as usual. This optional guided editor works in 3D and Lite, preserves
+the original request, and starts no worker while drafting. See [task briefs](docs/task-briefs.md).
+
 Full-screen agents retain up to 3,000 lines in the office's searchable, saved terminal scrollback. See [how it works](docs/how-it-works.md) for persistence and search behavior.
 
 Sit **Claude Code**, **Codex**, **OpenCode**, **Grok**, **Muse**, **DeepSeek Harness** and **Cursor** workers at desks, watch each one's terminal on the laptop in front of it,

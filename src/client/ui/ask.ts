@@ -5,6 +5,7 @@ import { store } from '../state';
 import { providerPicker, type ProviderPicker } from './provider';
 import { repoPicker } from './prompt';
 import { dictateField } from './dictate';
+import { promptTools } from './prompt-tools';
 
 // Send a prompt about an issue or PR to a worker: a new one at a free desk, or one already sitting
 // at a desk (it lands in their input box, queued if they're busy).
@@ -43,6 +44,7 @@ export function openAsk(opts: AskOptions) {
   let to: string | null = opts.newDesk ? null : (opts.workers[0]?.id ?? null);
   const ta = h('textarea', { rows: opts.initial ? 9 : 5, placeholder: opts.placeholder ?? 'What should the worker do?', 'aria-label': 'Prompt' }) as HTMLTextAreaElement;
   ta.value = opts.initial ?? '';
+  const tools = promptTools(ta, Math.max(0, 20_000 - (opts.context ? opts.context.length + 2 : 0)));
   const wtBox = h('input', { type: 'checkbox', id: 'ask-wt' }) as HTMLInputElement;
   try {
     wtBox.checked = localStorage.getItem(WT_KEY) === '1';
@@ -81,6 +83,7 @@ export function openAsk(opts: AskOptions) {
       opts.context ? h('details.ask-context', {}, h('summary', {}, 'The worker is told first…'), h('pre', {}, opts.context)) : null,
       h('label', { style: 'margin-top:14px' }, 'Prompt'),
       dictateField(ta),
+      tools.element,
       provider?.element ?? null,
       wtRow,
       repos.element,
@@ -93,6 +96,7 @@ export function openAsk(opts: AskOptions) {
   const modal = openModal(form);
   cancel.addEventListener('click', () => modal.close());
   const send = () => {
+    if (!tools.valid()) return;
     const text = ta.value.trim();
     if (!text) {
       ta.focus();
