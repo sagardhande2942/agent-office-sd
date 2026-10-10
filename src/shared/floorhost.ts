@@ -53,6 +53,8 @@ export interface FloorReady {
   /** Host checks Boss prompt snapshots immediately before terminal input. */
   bossGuard?: boolean;
   workerBreaks?: boolean;
+  /** Supports shared screening-room controls and bounded screenshot fetching. */
+  cinema?: boolean;
   /**
    * The branch this host's checkout is on, and the agent CLIs it has installed.
    *
@@ -81,7 +83,7 @@ export interface FloorReady {
  * `/api/search` over HTTP, and two it calls itself while handling another message. A hosted floor has
  * to round-trip them like the rest, so they travel, and nothing else about them changes.
  */
-export const HOST_CALLS = ['worker.search', 'queue.dropIssue', 'gh.claim'] as const;
+export const HOST_CALLS = ['worker.search', 'queue.dropIssue', 'gh.claim', 'cinema.shot'] as const;
 
 export const FLOOR_CASES = [
   'ball.left',
@@ -91,6 +93,7 @@ export const FLOOR_CASES = [
   'car.leave',
   'car.drive',
   'car.honk',
+  'cinema.play', 'cinema.pause', 'cinema.stop', 'cinema.remove',
   'changes.commit',
   'changes.diff',
   'changes.discard',

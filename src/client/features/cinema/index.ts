@@ -58,7 +58,8 @@ export function installCinema(ctx: Ctx, deps: CinemaDeps) {
   // The room changing, and the shot moving on while a reel plays, are the two things to redraw for.
   store.on('cinema', () => {
     paint.forget(store.cinema.reels.map((r) => r.id));
-    window.redraw();
+    shown = '';
+    window.refresh();
   });
   ctx.ticks.add('world', paintScreen);
 

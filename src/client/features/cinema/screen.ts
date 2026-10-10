@@ -70,7 +70,8 @@ export class ScreenPainter {
     const wanted = ++this.asked;
     const picture = await this.cache.get(floor, reel, n);
     // Something newer was asked for while this was being fetched: that one is the wall's now.
-    if (wanted !== this.asked || !picture) return;
+    if (wanted !== this.asked) return;
+    if (!picture) { this.idle('Shot unavailable · reconnect the floor host'); this.say(caption); return; }
     const g = this.shot.getContext('2d')!;
     const { width: w, height: h } = picture;
     // Cover the screen, cropping the overflow the way CSS object-fit does.

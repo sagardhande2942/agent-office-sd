@@ -1,0 +1,61 @@
+{
+  "checks": [
+    {
+      "name": "browser login Host viewer",
+      "passed": true
+    },
+    {
+      "name": "browser login Friend viewer",
+      "passed": true
+    },
+    {
+      "name": "remote worker CLI adds and lists a reel",
+      "passed": true
+    },
+    {
+      "name": "both viewers open with E and load the remote PNG",
+      "passed": true
+    },
+    {
+      "name": "pause and timeline are shared by both viewers",
+      "passed": true
+    },
+    {
+      "name": "stepping a shot updates both viewers",
+      "passed": true
+    },
+    {
+      "name": "unknown shot refused",
+      "passed": true
+    },
+    {
+      "name": "worker upload rejects invalid credentials",
+      "passed": true
+    },
+    {
+      "name": "disconnected host returns an explicit 503",
+      "passed": true
+    },
+    {
+      "name": "reconnecting restores saved reels and their PNGs",
+      "passed": true
+    },
+    {
+      "name": "stop works after reconnect for both viewers",
+      "passed": true
+    },
+    {
+      "name": "removed remote reel cannot be fetched",
+      "passed": true
+    },
+    {
+      "name": "Esc restores mouse look",
+      "passed": true
+    },
+    {
+      "name": "no browser runtime errors",
+      "passed": true
+    }
+  ],
+  "errors": []
+}

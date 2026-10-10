@@ -144,7 +144,10 @@ export async function connectOnce(
       // The hook listener first: `launch` puts its URL in a worker's environment, so it must exist
       // before any worker starts. It looks workers up through this closure, which is why it can start
       // before the floors are open. Loopback only, and nothing is forwarded (see startHooks).
-      const hooks = await startHooks((workerId) => host?.floorOf(workerId)?.workers);
+      const hooks = await startHooks((workerId) => host?.floorOf(workerId)?.workers, {
+        floorOf: id => host?.floorOf(id),
+        changed: floor => host?.reportCinema(floor.id, floor),
+      });
       stopHooks = hooks.close;
       if (settled) return;
 

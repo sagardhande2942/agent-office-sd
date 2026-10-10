@@ -292,6 +292,7 @@ export interface FloorActions {
   readonly garage: FloorGarage;
   readonly meetings: FloorMeetings;
   readonly tv: FloorTv;
+  readonly cinema?: import('./cinema/surface.js').FloorCinema;
   /** Workers sent home and locked up, on a map that has one. */
   readonly jail: { state(): JailState };
 

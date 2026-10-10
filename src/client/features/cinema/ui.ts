@@ -76,6 +76,9 @@ export class Screening {
     this.modal = openModal(box, { onClose: () => (this.modal = null) });
   }
 
+  /** A host reconnect may restore the same paused frame after its earlier image request failed. */
+  refresh() { this.drawn = ''; this.redraw(); }
+
   private stage!: HTMLElement;
 
   /** The shot the wall is showing now, so the window can follow it; -1 for nothing on. */
