@@ -10,6 +10,7 @@ import { githubRoutes } from './github.js';
 import { pageRoutes } from './pages.js';
 import { searchRoutes } from './search.js';
 import { serviceRoutes } from './services.js';
+import { worldsRoute } from './parallel-worlds.js';
 import { floorJoinRoutes } from '../../floor-join/routes.js';
 import { taskBriefRoutes } from '../../task-brief/routes.js';
 
@@ -40,6 +41,7 @@ export const routes: readonly Route[] = [
   fileRoutes.docs,
   searchRoutes.search,
   serviceRoutes.forwards,
+  worldsRoute,
   githubRoutes.github,
   pageRoutes.office,
   pageRoutes.lite,

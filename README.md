@@ -40,6 +40,8 @@ curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/mai
 
 ## What it is
 
+- **Parallel worlds.** Explore three implementations of one task: **🌀 Parallel worlds** launches isolated agents from the same commit, with distinct approaches and branches. Enter a glowing portal in the Office map's south aisle to inspect its working preview, compare all three, give feedback and select a winner for a PR. See [docs/parallel-worlds.md](docs/parallel-worlds.md) for preview tunnels, requirements and preservation behavior.
+
 - **A floor per project.** Ride the elevator, pick one of your GitHub repos, and the office clones it (showing how far along it is) and opens a floor for it. Every worker, board and queue on that floor works in that checkout.
 - **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse, DeepSeek Harness, Pi, Cursor or Antigravity, each with its model and reasoning effort. The agent's live terminal shows on its laptop, and anyone can open it and type.
 - **Talk instead of typing.** Hold **Ctrl+Space** (or the **🎤**) in a worker's terminal or a prompt box and say what you want: it's typed in for you to send. Your browser does the listening, so there's nothing to install.
@@ -425,7 +427,7 @@ Remote worker terminals provide **Local typing** for responsive editing over slo
 
 Admins can remove a remote floor with the trash button in **Elevator**, including when its machine is offline. It disappears for everyone immediately; the joiner's checkout stays on their machine. If an older office left a stale row after deletion, delete it again after updating.
 
-**Bring your own project from another computer.** Open **☰ → Connect your floor**. The office host generates a pairing code; the joiner enters the office's public URL, that code, and their own project folder, then copies and runs the join command from their agent-office checkout. The floor appears in the elevator immediately: no host-side path entry, `hosts add-floor`, or office restart. The joiner needs an installed, built copy of this version (`npm install`, then `npm run build`) even if the office runs with `npm run dev`. With ngrok, forward **4600** and use its HTTPS URL. Everyone in the office can control the joiner's terminals, so connect only to a trusted office. See [floor-host setup](docs/floor-hosts.md#quick-connect-from-the-ui).
+**Bring your own project from another computer.** Open **☰ → Connect your floor**. The office host generates a pairing code; the joiner enters the office's public URL, that code, and their own project folder, then copies and runs the join command from their agent-office checkout. The command calls Node directly so PowerShell preserves all CLI flags. The floor appears in the elevator immediately: no host-side path entry, `hosts add-floor`, or office restart. The joiner needs an installed, built copy of this version (`npm install`, then `npm run build`) even if the office runs with `npm run dev`. With ngrok, forward **4600** and use its HTTPS URL. Everyone in the office can control the joiner's terminals, so connect only to a trusted office. See [floor-host setup](docs/floor-hosts.md#quick-connect-from-the-ui).
 
 
 
