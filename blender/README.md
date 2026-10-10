@@ -75,3 +75,7 @@ These are what the office's code counts on. A model that breaks one looks wrong 
 
 Commit the script and the `.glb` together. Two runs of a script make the same model but not the same
 bytes (the exporter's triangle order varies), so commit a `.glb` only when the model changed.
+
+### Samsung-style fridge
+
+Run Blender in background with `--python blender/scripts/build_samsung_fridge.py -- --out <directory>`. Copy the generated GLB to `src/client/models/samsung-fridge.glb`. The model faces +Z in glTF and exports separate `fridge_left_hinge`, `fridge_right_hinge` and five `fridge_can_0` through `fridge_can_4` nodes. The fixture keeps the existing kitchen collider and interaction controls, and falls back to the original fridge if loading fails. The energy sticker is decorative, not a product certification. Keep the GLB under 2 MB and 35,000 triangles.

@@ -17,6 +17,8 @@ into a goal, examples, constraints and acceptance criteria. Review the editable 
 on the office server). Both modes work in 3D and Lite, preserve the original request, and start no
 task worker while drafting. See [task briefs](docs/task-briefs.md).
 
+The kitchen has a silver Samsung-style side-by-side fridge: **E** opens or closes both doors, and **C** takes a front-row Diet Coke while open. See [fridge controls](docs/features.md).
+
 Full-screen agents retain up to 3,000 lines in the office's searchable, saved terminal scrollback. See [how it works](docs/how-it-works.md) for persistence and search behavior.
 
 Sit **Claude Code**, **Codex**, **OpenCode**, **Grok**, **Muse**, **DeepSeek Harness** and **Cursor** workers at desks, watch each one's terminal on the laptop in front of it,

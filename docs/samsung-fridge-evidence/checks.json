@@ -1,0 +1,10 @@
+{
+  "checks": [
+    "Samsung fixture installed in real office",
+    "E opens both hinged doors",
+    "C removes visible drink and decrements stock",
+    "E closes doors",
+    "Closed fridge does not dispense"
+  ],
+  "errors": []
+}
