@@ -547,3 +547,5 @@ Every change to the app that lands on `main` is published as a GitHub release by
 ## License
 
 [MIT](LICENSE)
+
+Customize office scenery from **Menu → Customize objects**. Drag a plant, rug or coffee table to move it; choose Rotate or Scale for drag adjustments, or enter precise values. Transforms save automatically per floor/map in this browser and return after reload. See [Object placement](docs/object-placement.md).

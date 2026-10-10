@@ -1,3 +1,4 @@
+import { installObjectPlacement } from './features/object-placement';
 import { installTopdown, isTopdownRoute } from './features/topdown';
 import { installViewSelector } from './features/view-selector';
 import { installMasterWorkers } from './features/master-workers';
@@ -206,6 +207,7 @@ installMasterWorkers(ctx, parts);
 installParallelWorlds(ctx, parts);
 installViewSelector(ctx);
 installTopdown(ctx, core, parts);
+installObjectPlacement(ctx);
 parts.hud = installHud(ctx, core, parts);
 
 // ---- Main loop ---------------------------------------------------------------------------------------

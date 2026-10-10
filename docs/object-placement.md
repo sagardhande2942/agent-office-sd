@@ -1,0 +1,11 @@
+# Object placement
+
+Open **Menu → Customize objects** on an office floor. Click or tap a plant, rug or coffee table; its gold outline marks the selection. Drag to move it across its horizontal plane. Rotate and Scale turn horizontal drags into smooth adjustments; numeric fields provide precision, with optional 15° rotation snapping. Uniform size ranges from 0.25× to 3×. Reset rotation, Original size and Reset Transform restore defaults. Confirm / Deselect keeps changes and releases the selection. Close with ✕ or Esc to resume gameplay.
+
+Complete object bounds stay inside the office and below the ceiling; red feedback means the attempted change was rejected. Objects may overlap intentionally. Movement preserves original height and grab offset. Mouse and touch use the same pointer controls. Other windows block scene selection.
+
+Each opted-in object has a stable ID, position, Euler rotation and scale. Browser localStorage keys include the floor and map with one key per object. Continuous edits write at most once every 300 ms; gesture completion, scene changes, closing, blur and page hiding flush immediately. Invalid records are ignored; missing objects leave other records intact and new objects start at defaults. Storage failures appear in the editor and pending writes retry on the next flush. This is a personal layout on this browser/origin, not a shared multiplayer or cross-device layout; clearing site data removes it.
+
+Gameplay fixtures, seats, desks, doors, boards, lamps, vehicles, animated props and plants managed by wing expansion remain protected. Existing interactions work normally outside customization mode. The editable set covers ordinary office plants, rugs and the coffee table. Other world builders can explicitly opt in safe scenery with `editable(object, stableId, label, collider?)` from `features/object-placement/model.ts`; objects with externally managed anchors or simulations need an adapter first. Collider bounds follow transforms. The feature installs through the client composition and uses the existing modal/focus system.
+
+Verify with `npm run typecheck`, `npm test`, `npm run build` and `node --import tsx scripts/e2e-object-placement.mjs`.
