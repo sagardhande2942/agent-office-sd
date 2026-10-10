@@ -1,12 +1,18 @@
 # Master / Workers
 
-Open **Master / Workers** in the Lite header, the 3D/2D game menu, or the command palette. This is a separate activity from plan comparison: one master completes your task with a team rather than competing against other planners. It requires a local Git floor and installed, signed-in coding agent CLIs.
+Open **Master / Workers** in the Lite header, the 3D/2D game menu, or the command palette. This is a separate activity from plan comparison: one master completes your task with a team rather than competing against other planners. It requires a Git floor and installed, signed-in coding agent CLIs on the machine hosting that floor. Local and remote floors use the same controls.
 
 Choose an explicit provider/model/effort for the master, add the models it may hire, and choose a worker limit of 1–5 (default 5). The master is additional to that limit, and everyone counts toward existing office capacity. Eligible models may be reused across workers. The master infers suitability from the task and model identities and records its reasoning; model names do not guarantee capability. All eight built-in providers are supported. Custom shell agents are excluded.
 
 Give the activity a task brief, requirements, and constraints. It starts automatically: the master inspects the repository, publishes its plan and task graph, delegates suitable independent tasks, contributes its own work, reviews results, integrates changes, verifies the final branch, and creates one ready-for-review PR. No plan approval step is required. Repository instructions and provider permission prompts still apply.
 
 ![Master-led team with task assignments and submitted worker results](master-workers.png)
+
+## Remote floors
+
+Update and rebuild both the office and the floor host, then reconnect the host. Enter the remote floor and open **Master / Workers** from the menu or Lite header. Start, pause, resume, stop and replay work through the existing window. Older hosts report that an update is required.
+
+The host creates the master and worker worktrees, runs its own signed-in providers, and saves activity state in its checkout. Office presets remain shared across browsers. Team participants use authenticated host endpoints for coordination, inboxes and completion reports. Existing office capacity and host seat limits apply. After a host restart, inspect the paused activity and choose **Resume**; existing branches and worktrees are preserved.
 
 ## Presets
 

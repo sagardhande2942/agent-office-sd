@@ -55,6 +55,7 @@ export interface FloorReady {
   workerBreaks?: boolean;
   /** Supports shared screening-room controls and bounded screenshot fetching. */
   cinema?: boolean;
+  masterWorkers?: boolean;
   /**
    * The branch this host's checkout is on, and the agent CLIs it has installed.
    *
@@ -83,9 +84,10 @@ export interface FloorReady {
  * `/api/search` over HTTP, and two it calls itself while handling another message. A hosted floor has
  * to round-trip them like the rest, so they travel, and nothing else about them changes.
  */
-export const HOST_CALLS = ['worker.search', 'queue.dropIssue', 'gh.claim', 'cinema.shot'] as const;
+export const HOST_CALLS = ['worker.search', 'queue.dropIssue', 'gh.claim', 'cinema.shot', 'master-workers.capacity'] as const;
 
 export const FLOOR_CASES = [
+  'master-workers.start', 'master-workers.control',
   'ball.left',
   'ball.take',
   'ball.throw',

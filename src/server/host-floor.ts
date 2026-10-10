@@ -1,3 +1,4 @@
+import { HostTeams, TEAM_HOST_CALLS } from './master-workers/host.js';
 import { cinemaHostCalls, cinemaHostState } from './cinema/host.js';
 import { HOST_CINEMA_PATHS, hostCinemaHook } from './cinema/host-hooks.js';
 import type { BossGuard } from '../shared/boss.js';
@@ -70,6 +71,10 @@ export class HostFloors {
   /** Which floor each worker is on, kept as they change (see floorOf). */
   private byWorker = new Map<string, Floor>();
 
+  readonly teams = new HostTeams(() => this.parts.dataDir, this.floors, msg => this.parts.send(msg), () => {
+    const max = this.parts.seats;
+    if (max > 0 && [...this.floors.values()].reduce((n, f) => n + f.workers.list().length, 0) >= max) throw Error('The floor host is at its configured seat limit');
+  });
   constructor(private parts: HostParts) {}
 
   /**
@@ -103,6 +108,7 @@ export class HostFloors {
   async open(wanted: { id: string; dir: string; name: string }[]) {
     // In parallel: a machine serving k floors would otherwise come online in the sum of their open
     // times, and none of them depends on another.
+    this.teams.startClock();
     await Promise.allSettled(
       wanted.map(async (want) => {
         this.names.set(want.id, want.name);
@@ -144,6 +150,7 @@ export class HostFloors {
     state('tv', { state: floor.tv.state() });
     this.reportCinema(floorId, floor);
     state('helper', { helpers: floor.helpers.states() });
+    this.teams.report(floor);
     // The two boards and the dungeon joined them when riding onto a hosted floor became a thing: the
     // office builds the view someone walks into out of exactly these, so a board or a jail that is
     // read but never reported is a room that arrives empty for no reason anyone can see.
@@ -187,6 +194,7 @@ export class HostFloors {
         bossGuard: true,
         workerBreaks: true,
         cinema: true,
+        masterWorkers: true,
         projectsDir: this.projectsDir,
         workers: floor.workers.list().map((w) => ({ id: w.id, status: w.status, deskId: w.deskId })),
       },
@@ -264,7 +272,9 @@ export class HostFloors {
       else this.parts.send({ t: 'result', floorId, seq, value: value ?? null });
       // Some calls change a room, and the office has no event to hear it by — its own Floor reads
       // those states directly. A hosted floor must say so, or the office's copy goes stale forever.
-      if (Object.hasOwn(cinemaHostCalls, msg.t)) {
+      if (TEAM_HOST_CALLS.has(msg.t)) {
+        // The team module emits its own changes; capacity updates need no room snapshots.
+      } else if (Object.hasOwn(cinemaHostCalls, msg.t)) {
         if (msg.t !== 'cinema.shot') this.reportCinema(floorId, floor);
       } else if (!terminal) this.reportRooms(floorId, floor);
     } catch (err) {
@@ -275,6 +285,7 @@ export class HostFloors {
   /** The floor cases, each against this machine's own floor. */
   private async apply(floor: Floor, msg: ToOffice): Promise<unknown> {
     const m = msg as unknown as Record<string, unknown>;
+    if (TEAM_HOST_CALLS.has(msg.t)) return this.teams.call(floor, m);
     if (Object.hasOwn(cinemaHostCalls, msg.t)) return cinemaHostCalls[msg.t](floor, m);
     const s = (k: string) => (typeof m[k] === 'string' ? (m[k] as string) : '');
     const num = (k: string) => (Number.isFinite(Number(m[k])) ? Number(m[k]) : 0);
@@ -432,6 +443,7 @@ export class HostFloors {
   }
 
   shutdown() {
+    this.teams.close();
     for (const floor of this.floors.values()) floor.shutdown();
     this.floors.clear();
   }
@@ -452,9 +464,8 @@ export class HostFloors {
  * that started it. Nothing is forwarded, so there is nothing to attribute across the socket — which is
  * why decision 7's question about whose token a forwarded hook carries has no subject.
  *
- * A path this does not serve answers 404 rather than pretending. That includes the office's own
- * Other `/office/*` endpoints still live beside the office. The cinema module alone registers its
- * authenticated loopback routes here, because its reel files belong to this machine.
+ * Unsupported paths answer 404. Cinema and Master / Workers register authenticated loopback
+ * worker tools here; the remaining office endpoints stay beside the office.
  */
 /** The paths a worker's status reports arrive on. One constant, not a fresh array per request. */
 const HOOK_PATHS = new Set(['/hooks/claude', '/hooks/opencode', '/hooks/codex', '/hooks/grok', '/hooks/muse']);
@@ -465,6 +476,7 @@ export function startHooks(
    *  needs its URL before any worker starts. */
   workersOf: (workerId: string) => import('./workers.js').WorkerManager | undefined,
   cinema?: { floorOf(id: string): Floor | undefined; changed(floor: Floor): void },
+  workerTools?: (req: http.IncomingMessage, res: http.ServerResponse, url: URL) => Promise<boolean>,
 ): Promise<{ url: string; close: () => void }> {
   const server = http.createServer(async (req, res) => {
     const done = (code: number) => {
@@ -477,6 +489,7 @@ export function startHooks(
     } catch {
       return done(400);
     }
+    if (workerTools && await workerTools(req, res, url)) return;
     if (HOST_CINEMA_PATHS.has(url.pathname)) {
       const id = url.searchParams.get('worker') ?? '';
       const floor = cinema?.floorOf(id);

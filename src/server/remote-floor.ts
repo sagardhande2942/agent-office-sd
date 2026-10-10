@@ -1,3 +1,4 @@
+import { RemoteTeams } from './master-workers/remote.js';
 import { RemoteCinema } from './cinema/remote.js';
 import type { AgentEffort, AgentProvider, ForgeKind, FloorInfo, GhComment, GhIssue, GhLabel, GhPull, GhState, JailState, MeetingRequest, MeetingState, ProjectInfo, QueueState, TerminalHit, WorkerInfo, WorktreeCleanup, WorktreeState } from '../shared/protocol.js';
 import type { BallState } from '../shared/hoop.js';
@@ -65,6 +66,7 @@ interface Pending {
  */
 export class RemoteFloor implements FloorActions {
   readonly dir: string;
+  readonly masterWorkers = new RemoteTeams((t, body) => this.call(t, body), () => this.announced.masterWorkers === true);
   readonly cinema = new RemoteCinema((t, body) => this.call(t, body), () => this.reachable, () => this.announced.cinema === true);
   readonly helpers = { states: () => (this.mirror.get('helper') ?? []) as import('../shared/helper.js').HelperState[] };
   private seq = 0;
@@ -94,7 +96,7 @@ export class RemoteFloor implements FloorActions {
     /** The floor's identity, as the host announced it. Named so refusals and the elevator can use it. */
     readonly def: { id: string; name: string; dir: string; repo?: string; palette: number; addedBy: string; addedAt: number },
     /** What the host's `ready` frame said, kept here so the office can describe the floor it is in. */
-    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean; cinema?: boolean } = { providers: [], forge: 'github' },
+    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean; cinema?: boolean; masterWorkers?: boolean } = { providers: [], forge: 'github' },
   ) {
     // The office keeps this for identity, and must never use it: it is a path on the host.
     this.dir = '';
@@ -185,7 +187,7 @@ export class RemoteFloor implements FloorActions {
       // The same frame is where the host says which branch it is on and which agents it has, which is
       // what `project` and `officeDefault` answer from. Recorded here rather than in the constructor,
       // because the office registers a hosted floor from the building long before its machine pairs.
-      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true, cinema: msg.floor.cinema === true };
+      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true, cinema: msg.floor.cinema === true, masterWorkers: msg.floor.masterWorkers === true };
       return;
     }
     // An unaddressed refusal (no floor) is about the connection, not a call, so it never settles one.
@@ -213,6 +215,7 @@ export class RemoteFloor implements FloorActions {
     // than a floor's furniture, and the office asks for them by id.
     const payload = msg.msg as { t?: string; worker?: WorkerInfo; workerId?: string; state?: unknown; items?: unknown; plan?: unknown; ball?: unknown; cars?: unknown; helpers?: unknown } | undefined;
     if (!payload?.t) return;
+    if (payload.t === 'master-workers') this.masterWorkers.receive(payload as { state: import('../shared/master-workers.js').TeamState });
     if (payload.t === 'cinema') this.cinema.receive(payload as { state: import('../shared/cinema.js').CinemaState; hostNow?: number });
     if (payload.t === 'worker.update' && payload.worker) {
       this.known.set(payload.worker.id, payload.worker);

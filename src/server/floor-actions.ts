@@ -267,6 +267,7 @@ export interface FloorMeetings {
  * checks that claim at the assignment in floor.ts.
  */
 export interface FloorActions {
+  masterWorkers?: import('./master-workers/remote.js').RemoteTeamSurface;
   helpers?: { states(): import('../shared/helper.js').HelperState[] };
   readonly id: string;
   readonly def: { id: string; name: string; dir: string; repo?: string };
