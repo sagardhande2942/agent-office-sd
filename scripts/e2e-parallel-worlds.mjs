@@ -113,7 +113,11 @@ try {
   await page.keyboard.press('KeyY');
   await page.waitForFunction(() => window.__game2d.camera.isPerspectiveCamera);
   await page.evaluate(() => window.__game2d.parts.place.placeAt({ x: -1, y: 0, z: 5.5, rotY: Math.PI }));
-  await page.waitForTimeout(300); await page.evaluate(() => window.__worldsDraw());
+  await page.waitForTimeout(300); await page.evaluate(() => {
+    const g = window.__game2d;
+    g.camera.position.set(-1, 1.4, 5.5); g.camera.lookAt(-1, 1.3, 8.5); g.camera.updateMatrixWorld();
+    window.__worldsDraw();
+  });
   await page.screenshot({ animations: 'disabled', path: path.join(output, 'portals-3d.png') });
   await menu(); await close();
   await page.waitForFunction(() => window.__game2d.ctx.player.mouseLook && window.__game2d.ctx.player.hasMouse);

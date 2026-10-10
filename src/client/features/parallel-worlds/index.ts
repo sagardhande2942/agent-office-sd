@@ -2,6 +2,7 @@ import { WORLD_APPROACHES, type WorldsResponse } from '../../../shared/parallel-
 import type { Ctx } from '../../core/context';
 import type { Parts } from '../../core/parts';
 import { aside, hintTitle, key, onE } from '../../core/hint';
+import { noOutline } from '../../core/outline';
 import { store } from '../../state';
 import { HUD_ACTIONS } from '../../ui/menu';
 import type { Modal } from '../../ui/dom';
@@ -38,6 +39,7 @@ export function installParallelWorlds(ctx: Ctx, parts: Pick<Parts, 'waiting'>) {
   HUD_ACTIONS.push({ id: 'parallel-worlds', icon: '🌀', label: 'Parallel worlds', section: 'Open', run: () => open() });
   PALETTE_ENTRIES.push(() => [{ icon: '🌀', kind: 'Action', title: 'Parallel worlds', keywords: ['universe', 'experiment', 'variants', 'portals'], open: () => open() }]);
   const portals = buildWorldPortals();
+  noOutline(portals.root);
   ctx.scene.add(portals.root);
   portals.root.visible = false;
   ctx.usables.add({ usable: () => portals.root.visible ? portals.interactables : [], pickable: () => portals.root });
