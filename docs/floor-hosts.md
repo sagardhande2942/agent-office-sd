@@ -54,7 +54,7 @@ floor. The office registers it during authenticated pairing and saves it in the 
 restart or `hosts add-floor` is required. A repository already assigned to another machine or path
 is refused rather than moved. Reconnecting the same machine and path reuses its floor.
 
-The office address, token, and project are saved locally. To reconnect later:
+The office address, token, and project are saved locally. Keep the floor-host command running: network failures, dropped connections and normal office shutdowns automatically retry for **10 minutes per outage**. Attempts back off from 1 second to a maximum of 15 seconds, and the terminal shows the remaining retry time. A successful authenticated connection resets the window for a later outage. The same saved token and checkout are reused; no pairing code needs to be regenerated. Ctrl+C cancels the connection or retry delay immediately. Invalid/revoked credentials, protocol mismatches and checkout-registration errors stop immediately so you can fix them. After the retry window expires, or after deliberately stopping the command, reconnect with:
 
 ```powershell
 node bin/agent-office.js floor-host
