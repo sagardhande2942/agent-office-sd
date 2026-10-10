@@ -4,7 +4,7 @@
 import { IS_MAC } from './termkeys';
 
 export const HELP_ROWS: readonly (readonly [string, string])[] = [
-  ['↔', 'Menu → Customize objects: select and drag office plants, rugs and the coffee table. In 3D, WASD/arrows walk and right-drag looks around while left-drag edits. Rotate and Scale support dragging or precise values; changes save automatically per floor in this browser. Close with ✕ or Esc to return to gameplay.'],
+  ['↔', 'Menu → Customize objects: select and drag office plants, rugs and the coffee table. In 3D, WASD/arrows walk and right-drag looks around while left-drag edits. Rotate and Scale support dragging or precise values; everyone on the floor sees changes live and the office saves them automatically. Close with ✕ or Esc to return to gameplay.'],
   ['🌀', 'Parallel worlds in the menu: launch three independent variants of one task, enter a glowing portal in the south aisle to inspect previews, compare results, and select a winner for a PR.'],
   ['👑', 'Master / Workers in the menu: choose a master and eligible models, save reusable presets, and let the team deliver one PR. Open its activity to follow assignments or pause/resume.'],
   ['W A S D', 'Walk (hold Shift to run)'],

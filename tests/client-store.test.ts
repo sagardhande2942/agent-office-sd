@@ -227,7 +227,7 @@ test('what the browser remembers keeps its keys and shapes', () => {
 
 test("the store's keys are its state, as window.__office shows them", () => {
   // As the office had them before its store was split into slices: methods and the slices aren't among them.
-  assert.deepEqual(Object.keys(store).sort(), ['appearances', 'accounts', 'ball', 'cabinet', 'cabinetFrame', 'cars', 'carsAt', 'chat', 'cinema', 'clock', 'communications', 'decor', 'dog', 'dogStart', 'helperStart', 'helpers', 'tv', 'drawing', 'floor', 'floorPlan', 'floors', 'ice', 'invites', 'issues', 'jail', 'jukebox', 'leaveOnMerge', 'limits', 'machine', 'map', 'masterWorkers', 'me', 'meeting', 'notify', 'peers', 'planReview', 'profile', 'project', 'projectsDir', 'prompts', 'pulls', 'queue', 'repos', 'screens', 'services', 'signins', 'smartphone', 'sky', 'subs', 'team', 'theme', 'upgrade', 'usage', 'whiteboard', 'workers', 'you'].sort());
+  assert.deepEqual(Object.keys(store).sort(), ['appearances', 'accounts', 'ball', 'cabinet', 'cabinetFrame', 'cars', 'carsAt', 'chat', 'cinema', 'clock', 'communications', 'decor', 'dog', 'dogStart', 'helperStart', 'helpers', 'tv', 'drawing', 'floor', 'floorPlan', 'floors', 'ice', 'invites', 'issues', 'jail', 'jukebox', 'leaveOnMerge', 'limits', 'machine', 'map', 'masterWorkers', 'me', 'meeting', 'notify', 'peers', 'placements', 'planReview', 'profile', 'project', 'projectsDir', 'prompts', 'pulls', 'queue', 'repos', 'screens', 'services', 'signins', 'smartphone', 'sky', 'subs', 'team', 'theme', 'upgrade', 'usage', 'whiteboard', 'workers', 'you'].sort());
 });
 
 test('a new store starts every field where it always has', async () => {
@@ -240,6 +240,7 @@ test('a new store starts every field where it always has', async () => {
   assert.deepEqual(
     JSON.parse(JSON.stringify(rest, (_k, v) => (v instanceof Map ? [...v] : v === undefined ? '<undefined>' : v))),
     {
+      placements: { map: 'office', items: {} },
       you: '', peers: [], workers: [], screens: [], project: null, floors: [], floor: null, projectsDir: { dir: '', custom: false },
       repos: { list: [], loading: false, at: 0 }, issues: { items: [], fetchedAt: 0, loading: true }, pulls: { items: [], fetchedAt: 0, loading: true },
       ice: [], chat: [], invites: false, communications: { messages: [] }, queue: { tasks: [], maxWorkers: 0 }, me: { admin: false },
@@ -269,6 +270,20 @@ test('every slice in state/slices is registered, once', async () => {
   }
   for (const s of slices) assert.equal(SLICES.filter((x) => x === s).length, 1, `a slice of ${Object.keys(s as object).join('/')} is registered once`);
   assert.equal(SLICES.length, slices.length);
+});
+
+test('shared placement snapshots reset per floor and updates cannot leak across floors or maps', async () => {
+  const { Store } = await import('../src/client/state/store.js');
+  const { SLICES } = await import('../src/client/state/slices/index.js');
+  const s = new Store(SLICES);
+  s.apply(welcome());
+  const transform = { position: [3, 0, 4], rotation: [0, .5, 0], scale: [1, 1, 1] };
+  const update = { t: 'placement.changed', floor: 'f1', map: 'office', id: 'plant-5', transform, by: 'p-b', request: 1, saved: false };
+  s.apply(msg({ ...update, floor: 'f2' })); assert.deepEqual(s.placements.items, {});
+  s.apply(msg({ ...update, map: 'castle' })); assert.deepEqual(s.placements.items, {});
+  s.apply(msg(update)); assert.deepEqual(s.placements.items['plant-5'], transform);
+  s.apply(msg({ t: 'floor.enter', peers: [], ...floorView('f2'), placements: { map: 'office', items: {} } }));
+  assert.deepEqual(s.placements.items, {});
 });
 
 test("a slice's topics fire in its place in the list; a floor's after the message's own, bar the ones the floor hangs on", async () => {
