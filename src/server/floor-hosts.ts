@@ -154,6 +154,11 @@ export class HostRegistry {
     let host = msg.token ? this.hosts.authenticate(msg.token) : undefined;
     let fresh: string | undefined;
     if (!host && msg.code) {
+      const recovering = this.hosts.reconnectTarget(msg.code);
+      if (recovering && this.byHost.has(recovering)) {
+        ws.send(JSON.stringify({ t: 'bye', why: 'Stop the existing floor-host before recovering this machine' } satisfies ToOffice));
+        return undefined;
+      }
       const claimed = this.hosts.claim(msg.code, msg.name, msg.owner);
       if (typeof claimed === 'string') {
         ws.send(JSON.stringify({ t: 'bye', why: claimed } satisfies ToOffice));

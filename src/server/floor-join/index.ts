@@ -9,7 +9,7 @@ export function registerJoinProject(ctx: Pick<Ctx, 'building'>, host: Host, valu
   if (!validJoinProject(value)) return 'Invalid project: provide an absolute checkout path and repository as OWNER/REPO';
   const existing = ctx.building.list().find(d => sameRepo(d.repo, value.repo));
   if (existing) {
-    if (existing.host !== host.id || existing.dir !== value.dir) return `${value.repo} already has a floor with a different machine or checkout`;
+    if (existing.host !== host.id || existing.dir !== value.dir) return `${value.repo} already has a floor with a different machine or checkout. For a lost connection, ask the office admin to use Reconnect this machine on the original offline machine in Connect your floor, and use its original checkout path.`;
     return existing;
   }
   return ctx.building.addHosted({ ...value, host: host.id }, host.name);

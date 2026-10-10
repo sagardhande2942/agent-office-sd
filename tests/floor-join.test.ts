@@ -26,7 +26,7 @@ test('joiner reads their own checkout and origin, with explicit repo for other r
   assert.throws(() => joinProject(dir, '--evil'), /OWNER\/REPO/);
   assert.throws(() => joinOptions(['--checkout']), /needs a value/);
   assert.throws(() => joinOptions(['--repo', 'alice/app']), /need --checkout/);
-  assert.deepEqual(joinOptions(['--office', 'https://office.test', '--checkout', dir]), { rest: ['--office', 'https://office.test'], checkout: dir, repo: undefined, name: undefined, sameOffice: false });
+  assert.deepEqual(joinOptions(['--office', 'https://office.test', '--checkout', dir]), { rest: ['--office', 'https://office.test'], checkout: dir, repo: undefined, name: undefined, sameOffice: false, recover: false });
 });
 
 test('saved credentials are scoped to the office, with explicit reuse when the same office moves', () => {
@@ -38,6 +38,32 @@ test('saved credentials are scoped to the office, with explicit reuse when the s
   assert.equal(savedJoinToken(saved, 'https://new-ngrok.test', undefined, true), 'saved-token');
   assert.equal(savedJoinToken(saved, 'https://other.test', 'NEW-CODE', true), 'saved-token');
   assert.equal(joinOptions(['--same-office']).sameOffice, true);
+  assert.equal(joinOptions(['--recover']).recover, true);
+  assert.equal(savedJoinToken(saved, 'https://office.test', 'RECOVERY', false, true), undefined);
+  assert.equal(savedJoinToken(saved, 'https://office.test', 'NEW-CODE', false), 'saved-token');
+});
+
+test('admin recovery rotates credentials for the existing machine without changing its floor', t => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'floor-recover-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const hosts = new Hosts(dir);
+  const pair = hosts.pair('admin'); assert.ok(typeof pair !== 'string');
+  const first = hosts.claim(pair.code, 'Friend'); assert.ok(typeof first !== 'string');
+  const recovery = hosts.pair('admin', first.host.id); assert.ok(typeof recovery !== 'string');
+  assert.equal(new Hosts(dir).reconnectTarget(recovery.code), first.host.id);
+  const repaired = hosts.claim(recovery.code, 'Other name'); assert.ok(typeof repaired !== 'string');
+  assert.equal(repaired.host.id, first.host.id);
+  assert.equal(repaired.host.name, 'Friend');
+  assert.equal(hosts.list().length, 1);
+  assert.equal(hosts.authenticate(first.token), undefined);
+  assert.equal(hosts.authenticate(repaired.token)?.id, first.host.id);
+  assert.equal(typeof hosts.claim(recovery.code, 'Friend'), 'string');
+  assert.equal(typeof hosts.pair('admin', 'unknown'), 'string');
+  assert.ok(floorJoinCommand({ office: 'https://office.test', code: recovery.code, checkout: '/project', recover: true }, 'powershell').endsWith('--recover'));
+  const revokedRecovery = hosts.pair('admin', first.host.id); assert.ok(typeof revokedRecovery !== 'string');
+  hosts.revoke(first.host.id);
+  assert.equal(typeof hosts.claim(revokedRecovery.code, 'Friend'), 'string');
+  assert.equal(typeof hosts.pair('admin', first.host.id), 'string');
 });
 
 test('project registration is idempotent, persists, and cannot move another machine’s floor', t => {
@@ -101,6 +127,12 @@ test('a checkout enters the welcome during authenticated pairing, not before aut
   assert.ok(welcome.token);
   assert.equal(welcome.floors[0].dir, '/joiner/app');
   assert.equal(registrations, 1);
+  const recovery = hosts.pair('admin', welcome.hostId); assert.ok(typeof recovery !== 'string');
+  const busy = await dial({ code: recovery.code, name: 'Joiner', project: { dir: '/joiner/app', repo: 'me/app' } });
+  assert.match(busy.why, /Stop the existing floor-host/);
+  assert.equal(hosts.authenticate(welcome.token)?.id, welcome.hostId);
+  assert.equal(hosts.reconnectTarget(recovery.code), welcome.hostId);
+  assert.equal(registrations, 1);
   const second = hosts.pair('admin'); assert.ok(typeof second !== 'string');
   const rejected = await dial({ code: second.code, name: 'Second joiner', project: { dir: '/joiner/app', repo: 'me/app' } });
   assert.match(rejected.joinError, /different machine/);
@@ -108,16 +140,19 @@ test('a checkout enters the welcome during authenticated pairing, not before aut
 });
 
 test('pairing API requires an admin session and same origin; status never leaks credentials', () => {
-  const call = (route: any, account: unknown, origin = 'https://office.test') => {
+  const call = (route: any, account: unknown, origin = 'https://office.test', url = '/') => {
     let status = 0, body: any;
     const res = { writeHead(n: number) { status = n; }, end(data: string) { body = JSON.parse(data); } };
-    const ctx = { cfg: { trustProxy: false }, hosts: { pair: () => ({ code: 'ABCD-1234', expiresAt: 1 }), list: () => [{ id: 'a', name: 'Alice', hash: 'secret' }] }, registry: { counts: () => new Map(), isReachable: () => false }, building: { list: () => [] } };
-    route.handle(ctx, { session: { account }, req: { headers: { origin, host: 'office.test' } }, res });
+    const ctx = { cfg: { trustProxy: false }, hosts: { pair: () => ({ code: 'ABCD-1234', expiresAt: 1 }), list: () => [{ id: 'a', name: 'Alice', hash: 'secret' }] }, registry: { counts: () => new Map([['online', 1]]), isReachable: () => false }, building: { list: () => [] } };
+    route.handle(ctx, { session: { account }, req: { url, headers: { origin, host: 'office.test' } }, res });
     return { status, body };
   };
   assert.equal(call(floorJoinRoutes.pair, { role: 'member' }).status, 403);
   assert.equal(call(floorJoinRoutes.pair, { role: 'admin' }, 'https://evil.test').status, 403);
   assert.equal(call(floorJoinRoutes.pair, undefined).status, 200);
+  assert.equal(call(floorJoinRoutes.pair, { role: 'member' }, 'https://office.test', '/?host=a').status, 403);
+  assert.equal(call(floorJoinRoutes.pair, { role: 'admin' }, 'https://evil.test', '/?host=a').status, 403);
+  assert.equal(call(floorJoinRoutes.pair, { role: 'admin' }, 'https://office.test', '/?host=online').status, 409);
   assert.equal(call(floorJoinRoutes.status, { role: 'member' }).status, 403);
   assert.deepEqual(call(floorJoinRoutes.status, undefined).body.machines[0], { id: 'a', name: 'Alice', connected: false, floors: [] });
 });
