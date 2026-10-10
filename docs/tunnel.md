@@ -23,6 +23,8 @@ That's the SSH address **👥 Invite teammates** shows (on Railway, Fly.io and D
   - localhost:5173 closed: Byte stopped the server
 ```
 
+Stopping the tunnel with Ctrl-C closes active forwarded connections too, including WebSockets used for hot reload. When a worker server disappears from the list, its connections close after the brief restart grace period.
+
 Already have the office open in a browser? Give it that address instead, and it leaves the way you get there alone:
 
 ```bash

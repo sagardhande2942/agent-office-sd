@@ -69,6 +69,7 @@ export class Forwarder {
   /** Ports that can't be opened on this computer, already said so. */
   private busy = new Set<number>();
   private closed = false;
+  private sockets = new WeakMap<http.Server, Set<Duplex>>();
 
   constructor(
     private office: Office,
@@ -85,6 +86,7 @@ export class Forwarder {
 
   /** Listens on exactly these servers' ports: opens the new ones, closes the ones that stopped a while ago. */
   async sync(items: Forward[], now = Date.now()) {
+    if (this.closed) return;
     const wanted = new Map(items.filter((f) => !this.skip.has(f.port)).map((f) => [f.port, f]));
     for (const [port, o] of this.open) {
       if (wanted.has(port)) {
@@ -130,6 +132,8 @@ export class Forwarder {
     for (const s of o.servers) {
       s.close();
       s.closeAllConnections();
+      // Node leaves upgraded connections out of closeAllConnections (e.g. hot reload).
+      for (const socket of this.sockets.get(s) ?? []) socket.destroy();
     }
   }
 
@@ -141,6 +145,12 @@ export class Forwarder {
     const servers: http.Server[] = [];
     for (const host of ADDRESSES) {
       const server = http.createServer((req, res) => this.relay(port, req, res));
+      const sockets = new Set<Duplex>();
+      this.sockets.set(server, sockets);
+      server.on('connection', (socket) => {
+        sockets.add(socket);
+        socket.once('close', () => sockets.delete(socket));
+      });
       // A long upload or a stream is the worker's server's business, as it would be without the tunnel.
       server.requestTimeout = 0;
       server.on('upgrade', (req, socket, head) => this.upgrade(port, req, socket, head));
