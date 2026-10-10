@@ -7,6 +7,7 @@ import { FLOOR } from '../../../shared/layout';
 import { apply, snapshot, type Editable } from './model';
 import { PlacementSave } from './persistence';
 import './ui.css';
+import { isTopdownRoute } from '../topdown/camera';
 
 export function installObjectPlacement(ctx: Ctx) {
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), point = new THREE.Vector3();
@@ -17,6 +18,7 @@ export function installObjectPlacement(ctx: Ctx) {
   let scope = '', root: THREE.Object3D | null = null, pointer: number | null = null;
   let mode: 'move' | 'rotate' | 'scale' = 'move', startX = 0, startAngle = 0, startScale = 1;
   let snap = false;
+  let cursorX = 0, cursorY = 0;
   const status = h('p', {}, 'Select a plant, rug or coffee table. Changes save automatically.');
   const controls = h('div.placement-controls');
   const validBounds = (e: Editable) => {
@@ -77,19 +79,27 @@ export function installObjectPlacement(ctx: Ctx) {
     if (modal || modalOpen() || !ctx.inOffice() || ctx.upTop() || ctx.trip()) return;
     ctx.activities.stopAll('start');
     const touchAction = ctx.canvas.style.touchAction; ctx.canvas.style.touchAction = 'none';
-    const panel = h('section.object-placement', { 'aria-label': 'Customize objects' }, h('header', {}, h('h2', {}, 'Customize objects')), status, controls);
-    modal = openModal(panel, { backdropCloses: false, doing: 'customizing objects', onClose: () => { end(); select(null); modal = null; ctx.canvas.style.touchAction = touchAction; } });
+    const navigation = !isTopdownRoute();
+    const panel = h('section.object-placement', { 'aria-label': 'Customize objects' }, h('header', {}, h('h2', {}, 'Customize objects')), status,
+      navigation ? h('p', {}, 'WASD / arrows to walk · right-drag to look · left-drag to edit') : null, controls);
+    panel.addEventListener('focusin', () => ctx.player.clearKeys());
+    modal = openModal(panel, { allowMovement: navigation, backdropCloses: false, doing: 'customizing objects', onClose: () => { end(); select(null); modal = null; ctx.canvas.style.touchAction = touchAction; } });
     modal.backdrop.classList.add('placement-backdrop'); select(null);
   }
   HUD_ACTIONS.push({ id: 'object-placement', icon: '↔', label: 'Customize objects', section: 'Office', run: open,
     blocked: () => !ctx.inOffice() || ctx.upTop() ? 'Available on office floors' : undefined });
-  function aim(e: PointerEvent) {
-    const r = ctx.canvas.getBoundingClientRect(); ndc.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+  function aim(x: number, y: number) {
+    const r = ctx.canvas.getBoundingClientRect(); ndc.set((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1);
     ray.setFromCamera(ndc, ctx.camera);
   }
+  const editing = () => !!modal && modal.el.parentElement === document.getElementById('modal-root')?.lastElementChild;
+  ctx.canvas.addEventListener('contextmenu', e => { if (editing()) e.preventDefault(); });
   ctx.canvas.addEventListener('pointerdown', e => {
-    if (!modal || e.button !== 0 || pointer !== null || modal.el.parentElement !== document.getElementById('modal-root')?.lastElementChild) return;
-    e.preventDefault(); e.stopImmediatePropagation(); aim(e);
+    if (!editing()) return;
+    if (pointer !== null) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopImmediatePropagation(); aim(e.clientX, e.clientY);
+    ctx.canvas.focus({ preventScroll: true });
     const hit = ray.intersectObject(ctx.world().group, true).find(hit => {
       if (!visible(hit.object)) return false;
       const material = (hit.object as THREE.Mesh).material;
@@ -104,18 +114,23 @@ export function installObjectPlacement(ctx: Ctx) {
     if (!ray.ray.intersectPlane(plane, point)) return;
     offset.copy(selected.object.position).sub(selected.object.parent!.worldToLocal(point));
     pointer = e.pointerId; startX = e.clientX; startAngle = selected.object.rotation.y; startScale = selected.object.scale.x / selected.initial.scale[0];
+    cursorX = e.clientX; cursorY = e.clientY;
     ctx.canvas.setPointerCapture(pointer);
   }, true);
+  function moveObject() {
+    if (!selected) return;
+    aim(cursorX, cursorY); if (!ray.ray.intersectPlane(plane, point)) return;
+    selected.object.parent!.worldToLocal(point).add(offset);
+    if (Math.abs(selected.object.position.x - point.x) + Math.abs(selected.object.position.z - point.z) < 1e-8) return;
+    const t = snapshot(selected.object); t.position[0] = point.x; t.position[2] = point.z; change(t);
+  }
   ctx.canvas.addEventListener('pointermove', e => {
     if (e.pointerId !== pointer || !selected) return;
+    if (!editing()) { end(); return; }
     e.preventDefault(); e.stopImmediatePropagation();
     if (mode === 'rotate') rotate((startAngle + (e.clientX - startX) * .01) * 180 / Math.PI);
     else if (mode === 'scale') scale(startScale * Math.exp((e.clientX - startX) * .005));
-    else {
-      aim(e); if (!ray.ray.intersectPlane(plane, point)) return;
-      selected.object.parent!.worldToLocal(point).add(offset);
-      const t = snapshot(selected.object); t.position[0] = point.x; t.position[2] = point.z; change(t);
-    }
+    else { cursorX = e.clientX; cursorY = e.clientY; moveObject(); }
   }, true);
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) ctx.canvas.addEventListener(event, () => { if (pointer !== null) end(); });
   window.addEventListener('pagehide', () => save.flush());
@@ -138,5 +153,8 @@ export function installObjectPlacement(ctx: Ctx) {
     }
     if (modal && (ctx.trip() || ctx.upTop() || !ctx.inOffice())) modal.close();
     if (selected && !visible(selected.object)) { end(); select(null); }
+    if (pointer !== null && !editing()) end();
+    // Camera/player movement changes the world point even when the cursor stays still.
+    if (pointer !== null && mode === 'move') moveObject();
   });
 }

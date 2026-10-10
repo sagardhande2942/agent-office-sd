@@ -33,6 +33,8 @@ export interface Modal {
   doing?: string;
   /** You're reading while it's open: your character holds an open book (see PeerInfo.reading). */
   reading?: boolean;
+  /** A scene editor may keep walking active; ordinary windows still pause it. */
+  allowMovement?: boolean;
   close(): void;
 }
 
@@ -46,6 +48,11 @@ export function onModalChange(fn: (open: boolean) => void) {
 
 export function modalOpen(): boolean {
   return stack.length > 0;
+}
+
+/** Any ordinary window in the stack takes precedence over a scene editor. */
+export function modalBlocksMovement(): boolean {
+  return stack.some(m => !m.allowMovement);
 }
 
 /** What the open windows say you're doing: the topmost one that says anything (a merge dialog over a PR is still "reading PR #12"). */
@@ -77,7 +84,7 @@ export function setDoing(modal: Modal, doing: string | undefined) {
  * is what teammates see under your name tag while it's open, like "reading PR #12", and `reading`
  * puts an open book in your character's hands. `onClose` hears whether it was the Esc key.
  */
-export function openModal(content: HTMLElement, opts: { escCloses?: boolean; onClose?: (byEsc: boolean) => void; backdropCloses?: boolean; closeButton?: boolean; doing?: string; reading?: boolean } = {}): Modal {
+export function openModal(content: HTMLElement, opts: { escCloses?: boolean; onClose?: (byEsc: boolean) => void; backdropCloses?: boolean; closeButton?: boolean; doing?: string; reading?: boolean; allowMovement?: boolean } = {}): Modal {
   const backdrop = h('div.backdrop', {}, content);
   const root = document.getElementById('modal-root')!;
   root.append(backdrop);
@@ -98,6 +105,7 @@ export function openModal(content: HTMLElement, opts: { escCloses?: boolean; onC
     backdrop,
     doing: opts.doing,
     reading: opts.reading,
+    allowMovement: opts.allowMovement,
     close() {
       if (closed) return;
       closed = true;
