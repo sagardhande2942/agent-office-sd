@@ -3,6 +3,7 @@
 export async function load(url, context, next) {
   const path = new URL(url).pathname;
   if (path.endsWith('.css')) return { format: 'module', source: '', shortCircuit: true };
-  if (path.endsWith('.glb')) return { format: 'module', source: 'export default "";', shortCircuit: true };
+  // Vite's ?url imports are asset URLs, including decoder JavaScript and WASM.
+  if (new URL(url).searchParams.has('url') || path.endsWith('.glb')) return { format: 'module', source: 'export default "";', shortCircuit: true };
   return next(url, context);
 }

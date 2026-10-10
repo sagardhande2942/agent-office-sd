@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { dietCokeBottle } from './samsung-fridge/bottle';
 import { mergeByColor, mesh, toon } from './toon';
 import type { Interactable } from './office';
 
@@ -7,9 +8,9 @@ import type { Interactable } from './office';
 // that part out of the .glb and puts this in its place, at the same spot and footprint, so the
 // office's collider, its hum and the wall's fixture stay as they are.
 //
-// It's the stock that does the selling: shelves of Diet Coke (cans and bottles) and a variety of ice
+// It's the stock that does the selling: shelves of glass Diet Coke bottles and a variety of ice
 // creams. E opens the door in front of you, and the freezer over it; both swing on eased hinges, or
-// snap in one go when the system asks for less motion. With the door open, takeCan hands a can off
+// snap in one go when the system asks for less motion. With the door open, takeCan hands a bottle off
 // the front row (see main.ts: drinking one does for your energy what the coffee machine does), and
 // the shelf is that much shorter for as long as the office is up.
 
@@ -86,11 +87,11 @@ export function buildFridge(at: { x: number; z: number; rotY?: number }): Fridge
   for (const y of SHELVES) still.add(...shelf(y));
   still.add(divider());
   iceCreams(still);
-  // The Diet Coke's labels are painted canvases, so their own meshes are kept out of the merge.
+  // The labeled bottle meshes stay out of the shell merge so their textures and glass survive.
   const painted = new THREE.Group();
-  // The front row of cans, one to a group, so a can can be taken off the shelf and left off it.
+  // The front row of bottles, one to a group, so a drink can be taken off the shelf and left off it.
   const row = new THREE.Group();
-  drinks(still, painted, row);
+  drinks(painted, row);
   group.add(mergeByColor(still), painted, row);
 
   // The doors on their hinges: E opens them, and they stay as you left them.
@@ -263,64 +264,16 @@ function door({ y0, y1, notes = false, badge = false }: { y0: number; y1: number
 
 // ---- What's in it ---------------------------------------------------------------------------------
 
-/** The can's own size: how tall it stands and how round it is, as the shelf holds it and the hands do. */
-const CAN_H = 0.115;
-const CAN_R = 0.033;
-
-/** Every drink: two rows of cans on the bottom shelf, the bottles standing on the one over it. */
-function drinks(still: THREE.Group, painted: THREE.Group, front: THREE.Group) {
-  const canSide = new THREE.CylinderGeometry(CAN_R, CAN_R, CAN_H, 18, 1, true);
-  const canEnd = new THREE.CylinderGeometry(CAN_R * 1.015, CAN_R * 1.015, 0.009, 18);
-  const canMat = labelMaterial(paintCan, 256, 128);
-  /** One can at `x`, standing on the bottom shelf at `z` and turned `turn`; the bare aluminium ends
-   *  are separate cylinders, so the can's turn never shows on them. */
-  const can = (x: number, z: number, turn: number) => {
-    const g = new THREE.Group();
-    const base = SHELVES[0] + 0.012;
-    const side = mesh(canSide, canMat, 0, CAN_H / 2, 0);
-    side.rotation.y = turn;
-    g.add(side);
-    const ends = new THREE.Group();
-    for (const at of [CAN_H + 0.004, -0.004]) ends.add(mesh(canEnd, toon(CHROME), 0, at, 0, false));
-    g.add(mergeByColor(ends));
-    g.position.set(x, base, z);
-    return g;
+/** Every drink: two rows of bottles on the bottom shelf, the bottles standing on the one over it. */
+function drinks(painted: THREE.Group, front: THREE.Group) {
+  const bottle = (x: number, z: number, y: number) => {
+    const drink = dietCokeBottle();
+    drink.position.set(x, y, z);
+    return drink;
   };
-  // The front row, nearest the door, one can to a group so one can can be taken off the shelf.
-  for (const [i, x] of [-0.19, -0.095, 0, 0.095, 0.19].entries()) front.add(can(x, 0.02, (i * 1.7) % Math.PI));
-  // The back row behind it, and the bottles on the shelf over.
-  for (const [i, x] of [-0.1425, -0.0475, 0.0475, 0.1425].entries()) painted.add(can(x, -0.14, (i * 1.7 + 1) % Math.PI));
-  const bottleMat = labelMaterial(paintBottle, 256, 64);
-  for (const [i, x] of [-0.24, 0, 0.24].entries()) {
-    const b = bottleBody();
-    b.position.set(x, SHELVES[1] + 0.012, -0.02);
-    b.rotation.y = i * 1.1;
-    still.add(b);
-    const band = mesh(new THREE.CylinderGeometry(0.0385, 0.0385, 0.1, 20, 1, true), bottleMat, x, SHELVES[1] + 0.092, -0.02, false);
-    band.rotation.y = i * 1.1;
-    painted.add(band);
-  }
-}
-
-/** A bottle's unlabelled self: a dark body under a black cap. Its origin is its base. */
-function bottleBody(): THREE.Group {
-  const g = new THREE.Group();
-  const profile = [
-    [0, 0],
-    [0.035, 0],
-    [0.038, 0.02],
-    [0.038, 0.14],
-    [0.033, 0.175],
-    [0.023, 0.2],
-    [0.016, 0.22],
-    [0.016, 0.255],
-    [0.02, 0.26],
-    [0.02, 0.272],
-    [0, 0.272],
-  ].map(([r, y]) => new THREE.Vector2(r, y));
-  g.add(mesh(new THREE.LatheGeometry(profile, 20), toon(COLA)));
-  g.add(mesh(new THREE.CylinderGeometry(0.021, 0.021, 0.016, 12), toon(DARK), 0, 0.28, 0, false));
-  return g;
+  for (const x of [-0.19, -0.095, 0, 0.095, 0.19]) front.add(bottle(x, 0.02, SHELVES[0] + 0.012));
+  for (const x of [-0.1425, -0.0475, 0.0475, 0.1425]) painted.add(bottle(x, -0.14, SHELVES[0] + 0.012));
+  for (const x of [-0.24, 0, 0.24]) painted.add(bottle(x, -0.02, SHELVES[1] + 0.012));
 }
 
 /** The ice creams: tubs, cones and a sandwich on the top shelf, lollies and more lying in the freezer. */
@@ -387,67 +340,4 @@ function lolly(color: string): THREE.Group {
   g.add(mesh(box(0.014, 0.075, 0.008), toon('#d9c7a3'), 0, 0.038, 0, false));
   g.add(mesh(slab(rounded(-0.031, 0.031, 0, 0.13, 0.03, 0.03), 0.03, 0), toon(color), 0, 0.065, 0));
   return g;
-}
-
-// ---- Painting the Diet Coke -----------------------------------------------------------------------
-
-/** A material with a canvas painted on it, toon-lit like everything else. The canvas is the code's. */
-function labelMaterial(paint: (g: CanvasRenderingContext2D, w: number, h: number) => void, w: number, h: number): THREE.MeshToonMaterial {
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  paint(canvas.getContext('2d')!, w, h);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  const mat = toon('#ffffff').clone();
-  mat.map = tex;
-  mat.needsUpdate = true;
-  return mat;
-}
-
-/** The office's script, for the names on the labels; Nunito until it has loaded, which is close. */
-const SCRIPT = 'italic 900 {size}px Nunito, ui-rounded, system-ui, sans-serif';
-
-/** The two places a can's design shows: the front (u 1/4) and the back (u 3/4). */
-const SIDES = [0.25, 0.75];
-
-/** A Diet Coke can's sleeve: red, the white wave, and the name, over aluminium ends. */
-function paintCan(g: CanvasRenderingContext2D, w: number, h: number) {
-  g.fillStyle = '#c8102e';
-  g.fillRect(0, 0, w, h);
-  g.fillStyle = '#c9ccd1';
-  g.fillRect(0, 0, w, h * 0.075);
-  g.fillRect(0, h * 0.925, w, h * 0.075);
-  for (const u of SIDES) {
-    const x = u * w;
-    g.strokeStyle = '#ffffff';
-    g.lineWidth = h * 0.07;
-    g.lineCap = 'round';
-    g.beginPath();
-    g.moveTo(x - w * 0.16, h * 0.7);
-    g.bezierCurveTo(x - w * 0.05, h * 0.54, x + w * 0.05, h * 0.54, x + w * 0.16, h * 0.7);
-    g.stroke();
-    g.fillStyle = '#ffffff';
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.font = SCRIPT.replace('{size}', String(Math.round(h * 0.23)));
-    g.fillText('Diet', x, h * 0.28);
-    g.font = SCRIPT.replace('{size}', String(Math.round(h * 0.3)));
-    g.fillText('Coke', x, h * 0.5);
-  }
-}
-
-/** A Diet Coke bottle's label: the same red sleeve and name, on a band round the middle of the bottle. */
-function paintBottle(g: CanvasRenderingContext2D, w: number, h: number) {
-  g.fillStyle = '#c8102e';
-  g.fillRect(0, 0, w, h);
-  g.fillStyle = '#ffffff';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  for (const u of SIDES) {
-    g.font = SCRIPT.replace('{size}', String(Math.round(h * 0.32)));
-    g.fillText('Diet', u * w, h * 0.3);
-    g.fillText('Coke', u * w, h * 0.64);
-  }
 }

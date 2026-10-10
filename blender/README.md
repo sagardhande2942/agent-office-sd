@@ -75,3 +75,11 @@ These are what the office's code counts on. A model that breaks one looks wrong 
 
 Commit the script and the `.glb` together. Two runs of a script make the same model but not the same
 bytes (the exporter's triangle order varies), so commit a `.glb` only when the model changed.
+
+### Samsung-style fridge
+
+Run Blender in background with `--python blender/scripts/build_samsung_fridge.py -- --out <directory>`. Copy the generated GLB to `src/client/models/samsung-fridge.glb`. The model faces +Z in glTF and exports separate `fridge_left_hinge`, `fridge_right_hinge` and five `fridge_can_0` through `fridge_can_4` nodes. The fixture keeps the existing kitchen collider and interaction controls, and falls back to the original fridge if loading fails. The energy sticker is decorative, not a product certification. Keep the GLB under 2 MB and 35,000 triangles.
+
+### Glass Diet Coke bottle
+
+`build_diet_coke_bottle.py` builds the same contoured bottle used on the Samsung fridge shelves, in the fallback fridge and in first/third-person hands. Run Blender with `--background --python blender/scripts/build_diet_coke_bottle.py -- --out <directory>` and copy its GLB to `src/client/models/diet-coke-bottle.glb`. The fridge build imports this factory and uses linked meshes for its stock. The small label is painted from text and shapes by `python blender/scripts/paint_diet_coke_label.py` (Pillow required); it uses Windows Arial/Times or Linux Liberation fonts. Keep the standalone asset below 250 KB and 1,600 triangles. The reference is an approximation; no photograph is embedded. The existing C shortcut, energy and caffeine behavior remain the same.
