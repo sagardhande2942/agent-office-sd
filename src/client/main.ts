@@ -1,3 +1,4 @@
+import { installPerformance } from './features/performance';
 import { installObjectPlacement } from './features/object-placement';
 import { installTopdown, isTopdownRoute } from './features/topdown';
 import { installViewSelector } from './features/view-selector';
@@ -207,6 +208,7 @@ installMasterWorkers(ctx, parts);
 installParallelWorlds(ctx, parts);
 installViewSelector(ctx);
 installTopdown(ctx, core, parts);
+installPerformance(ctx);
 installObjectPlacement(ctx);
 parts.hud = installHud(ctx, core, parts);
 

@@ -1,3 +1,4 @@
+import { FrameClock } from './frame-clock';
 import { holdingCan } from '../features/fridge';
 /**
  * The frame loop, and the office's own parts of each frame: moving you, what you hear, telling the
@@ -52,6 +53,8 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
 
   /** Frames coming too slowly for the 3D to be any fun: the 2D view is offered. */
   function watchFrameRate({ now, delta }: Frame) {
+    const rate = ctx.ticks.frameRate();
+    if (rate !== null && rate > 0 && rate <= 20) { slowFrames.frame(now, 1000); return; }
     if (slowFrames.frame(now, delta * 1000)) deps.offer2d('slow');
   }
 
@@ -150,6 +153,9 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     }
   }
 
+  const positions: THREE.Vector3[] = [];
+  const occupants: { x: number; y: number; z: number; grip: ReturnType<Ctx['view']['grip']> }[] = [];
+
   /** The building and what's in it: its doors, its floors, the jukebox's lights, the smoke and the confetti. */
   function updateWorld({ dt, t }: Frame) {
     const { player, office, camera, sound } = ctx;
@@ -157,9 +163,22 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     const { departures, sendoffs, arrivals } = parts.views;
     const court = parts.worlds.court();
     if (!core.upTop) {
-      ctx.world().update(t, dt, [player.pos, ...[...remotes.values()].map((r) => r.person.root.position), ...departures.positions(), ...sendoffs.positions(), ...arrivals.positions(), ...(court?.positions() ?? [])]);
+      positions.length = 0;
+      positions.push(player.pos);
+      for (const r of remotes.values()) positions.push(r.person.root.position);
+      positions.push(...departures.positions(), ...sendoffs.positions(), ...arrivals.positions(), ...(court?.positions() ?? []));
+      ctx.world().update(t, dt, positions);
       if (ctx.inOffice()) {
-        office.stack.update(dt, [{ x: player.pos.x, y: player.pos.y, z: player.pos.z, grip: ctx.view.grip() }, ...[...remotes.values()].map((r) => ({ x: r.person.root.position.x, y: r.person.root.position.y, z: r.person.root.position.z, grip: r.grip }))], camera.position);
+        let count = 0;
+        const add = (pos: THREE.Vector3, grip: ReturnType<Ctx['view']['grip']>) => {
+          const entry = occupants[count] ?? (occupants[count] = { x: 0, y: 0, z: 0, grip: null });
+          entry.x = pos.x; entry.y = pos.y; entry.z = pos.z; entry.grip = grip;
+          count++;
+        };
+        add(player.pos, ctx.view.grip());
+        for (const r of remotes.values()) add(r.person.root.position, r.grip);
+        occupants.length = count;
+        office.stack.update(dt, occupants, camera.position);
         office.jukebox.update(t, dt, sound.beat());
       }
     }
@@ -219,13 +238,14 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
  * clock starts now; hand what it returns to requestAnimationFrame to start it.
  */
 export function frameLoop(ctx: Ctx, loading: { drew(): void }): (ts?: number) => void {
-  const timer = new THREE.Timer();
+  const clock = new FrameClock();
   function frame(ts?: number) {
-    timer.update(ts);
-    const delta = timer.getDelta();
-    ctx.ticks.run({ delta, dt: Math.min(delta, 0.1), t: timer.getElapsed(), now: performance.now() });
-    loading.drew();
     requestAnimationFrame(frame);
+    const now = ts ?? performance.now();
+    const delta = clock.frame(now, ctx.ticks.frameRate());
+    if (delta === null) return;
+    ctx.ticks.run({ delta, dt: Math.min(delta, 0.1), t: clock.elapsed, now });
+    loading.drew();
   }
   return frame;
 }

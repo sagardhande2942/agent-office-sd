@@ -111,3 +111,7 @@ When it fails, split the file along the registries: a feature's code goes in its
 Verify with `npm run typecheck`, `npm test`, `npm run build`, then `node --import tsx scripts/e2e-game2d.mjs`. The browser harness runs an isolated real server with temporary Git floors and shell workers. It uses installed Chromium under `~/.cache/ms-playwright`, or `CHROMIUM_PATH`, and saves screenshots and `checks.json` to `/tmp/agent-office-game2d-evidence` (override with `GAME2D_ARTIFACTS`).
 
 Worker appearance factories register through `client/world/character/appearance.ts`; the Fictional module lives in `client/features/appearances/`. Settings sections register through `client/ui/settings-extensions.ts`. Building allocation and persistence live in `server/appearances.ts`, with their own protocol, handler and state slice.
+
+### Frame pacing
+
+`features/performance` registers browser-local FPS preferences through Settings extensions and `ctx.ticks.limit`. Frame policies return a positive FPS cap, `0` for display pacing, or `null` to suspend scene ticks. The core `FrameClock` admits display callbacks and resets elapsed movement time after suspension. Ordinary movement-blocking windows use 15 FPS; scene editors retain the selected cap. Network message dispatch runs independently.
