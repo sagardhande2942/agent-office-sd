@@ -417,6 +417,8 @@ Antigravity CLI is selectable when hiring, configuring board agents and queue ta
 
 Remote worker terminals provide **Local typing** for responsive editing over slow floor-host connections. Draft locally, then press Enter to send or use Insert to paste without submitting. Update both office and floor host to remove per-key acknowledgements and room-state refresh traffic. See [remote terminal typing](docs/floor-hosts.md#typing-in-remote-terminals).
 
+Admins can remove a remote floor with the trash button in **Elevator**, including when its machine is offline. It disappears for everyone immediately; the joiner's checkout stays on their machine. If an older office left a stale row after deletion, delete it again after updating.
+
 **Bring your own project from another computer.** Open **☰ → Connect your floor**. The office host generates a pairing code; the joiner enters the office's public URL, that code, and their own project folder, then copies and runs the join command from their agent-office checkout. The floor appears in the elevator immediately: no host-side path entry, `hosts add-floor`, or office restart. The joiner needs an installed, built copy of this version (`npm install`, then `npm run build`) even if the office runs with `npm run dev`. With ngrok, forward **4600** and use its HTTPS URL. Everyone in the office can control the joiner's terminals, so connect only to a trusted office. See [floor-host setup](docs/floor-hosts.md#quick-connect-from-the-ui).
 
 ### Playable 2D Game

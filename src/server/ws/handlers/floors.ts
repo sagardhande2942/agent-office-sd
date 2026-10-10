@@ -62,10 +62,14 @@ export const floorHandlers = {
     // Everyone's workers on it stop: admins do it.
     if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can take a floor off the building');
     const id = str(msg.floor, 64);
+    const floor = ctx.anyFloor(id);
     const r = ctx.building.remove(id, who);
-    if (typeof r === 'string') return ctx.warn(c, r);
+    if (typeof r === 'string') {
+      // Older offices removed the saved definition but left the remote proxy in the elevator.
+      if (r === 'No such floor' && ctx.remoteFloors.has(id) && floor) return ctx.closeFloor(floor, who);
+      return ctx.warn(c, r);
+    }
     console.log(`  ${who} took the ${r.name} floor off the building (${r.dir} stays where it is)`);
-    const floor = ctx.floors.get(id);
     if (floor) ctx.closeFloor(floor, who);
     else ctx.floorsChanged();
   },
