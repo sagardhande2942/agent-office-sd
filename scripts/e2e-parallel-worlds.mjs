@@ -59,6 +59,8 @@ try {
     // First-person hand passes clear the drawing buffer even when their render is frozen.
     g.ctx.renderer.clearDepth = () => {};
   });
+  await page.waitForFunction(() => !window.__game2d.ctx.usables.lists().flat().some(it => it.kind === 'worldportal'));
+  check('no gates before an experiment starts');
   async function menu() { await page.keyboard.press('Tab'); await page.getByRole('menuitem', { name: /Parallel worlds/ }).click(); }
   async function close() {
     await page.locator('.backdrop').last().locator('button.close').click();
@@ -105,6 +107,16 @@ try {
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.backdrop') && window.__game2d.ctx.player.enabled && document.activeElement.id === 'scene');
   check('comparison and Escape restore office controls');
+  // Exercise live worker status transitions without depending on a fake provider's idle detector.
+  await page.evaluate(() => { for (const worker of window.__game2d.store.workers.values()) worker.status = 'working'; });
+  await page.waitForFunction(() => window.__game2d.ctx.usables.lists().flat().filter(it => it.kind === 'worldportal').length === 3);
+  await page.evaluate(() => { for (const worker of window.__game2d.store.workers.values()) worker.status = 'done'; });
+  await page.waitForFunction(() => !window.__game2d.ctx.usables.lists().flat().some(it => it.kind === 'worldportal'));
+  await page.evaluate(() => window.__worldsDraw());
+  await page.screenshot({ animations: 'disabled', path: path.join(output, 'gates-finished.png') });
+  await page.evaluate(() => { for (const worker of window.__game2d.store.workers.values()) worker.status = 'working'; });
+  await page.waitForFunction(() => window.__game2d.ctx.usables.lists().flat().filter(it => it.kind === 'worldportal').length === 3);
+  check('gates appear for running work, disappear on completion, and return on new work');
   await page.evaluate(() => { const g = window.__game2d; g.parts.place.placeAt({ x: 0, y: 0, z: 6.8, rotY: Math.PI }); });
   await page.waitForTimeout(300); await page.evaluate(() => window.__worldsDraw());
   await page.screenshot({ animations: 'disabled', path: path.join(output, 'portals.png') });
@@ -141,11 +153,12 @@ try {
   assert.equal(await page.getByRole('button', { name: 'Split into three worlds' }).isEnabled(), true);
   assert.equal(floor.workers.list().length, 3);
   for (const worker of floor.workers.list()) assert.ok(existsSync(path.join(checkout, worker.worktree.path)));
-  check('archive preserves workers and worktrees');
+  await page.waitForFunction(() => !window.__game2d.ctx.usables.lists().flat().some(it => it.kind === 'worldportal'));
+  check('archive hides gates and preserves workers and worktrees');
   await page.setViewportSize({ width: 700, height: 900 }); await page.screenshot({ animations: 'disabled', path: path.join(output, 'narrow.png') });
   await close();
   assert.deepEqual(errors, []); check('no browser runtime errors');
-  writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks, screenshots: ['create.png', 'room.png', 'compare.png', 'portals.png', 'portals-3d.png', 'narrow.png'] }, null, 2));
+  writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks, screenshots: ['create.png', 'room.png', 'compare.png', 'portals.png', 'portals-3d.png', 'narrow.png', 'gates-finished.png'] }, null, 2));
 } catch (err) { console.error('Verification failed:', err, 'Browser errors:', errors); if (page) await page.screenshot({ animations: 'disabled', path: path.join(output, 'failure.png'), timeout: 5000 }).catch(() => {}); throw err; }
 finally {
   await browser?.close();
