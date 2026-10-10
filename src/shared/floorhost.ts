@@ -19,6 +19,7 @@
  */
 
 import type { AgentProvider } from './protocol.js';
+import type { FloorJoinHello } from './floor-join.js';
 
 /** Bumped when a frame's shape changes incompatibly. Sent in `hello`, refused on a mismatch. */
 export const FLOORHOST_PROTOCOL = 1;
@@ -161,7 +162,7 @@ export type ToOffice =
    * the floors it wants this machine to serve, with the path on *this* machine for each. The office
    * holds those paths to identify the floors and never reads them.
    */
-  | { t: 'welcome'; hostId: string; token: string; floors: { id: string; dir: string; name: string }[] }
+  | { t: 'welcome'; hostId: string; token: string; floors: { id: string; dir: string; name: string }[]; joinError?: string }
   | { t: 'bye'; floorId?: string; why?: string };
 
 /**
@@ -191,7 +192,7 @@ export type FromFloor =
    * for the first time presents the `code` from the office instead, so nobody has to carry a token
    * between machines. The office answers with `welcome`.
    */
-  | { t: 'hello'; hostId: FloorHostId; protocol: number; token?: string; code?: string; name?: string; owner?: string; projectsDir?: string }
+  | ({ t: 'hello'; hostId: FloorHostId; protocol: number; token?: string; code?: string; name?: string; owner?: string; projectsDir?: string } & FloorJoinHello)
   | { t: 'ready'; floor: FloorReady }
   | { t: 'leave'; floorId: string; why?: string }
   /** Whatever `ctx.emit` would have sent. `droppable` says what the office may shed under pressure. */
