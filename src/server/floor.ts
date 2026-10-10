@@ -26,6 +26,7 @@ import { Court } from './court.js';
 import { Jail } from './jail.js';
 import { Garage } from './garage.js';
 import { Jukebox } from './jukebox.js';
+import { LoreStore } from './lore.js';
 import { Cinema } from './cinema.js';
 import { Tv } from './tv.js';
 import { Whiteboard } from './whiteboard.js';
@@ -146,6 +147,7 @@ export class Floor {
   readonly helpers: Helpers;
   /** The bookshelf: the project's Markdown files (see docs.ts). */
   readonly docs: Docs;
+  readonly lore: LoreStore;
   /** Settles once the workers whose terminals outlived the last office are picked back up, and the rest woken. */
   readonly ready: Promise<void>;
   readonly dog: Dog;
@@ -174,6 +176,7 @@ export class Floor {
     excludeFromGit(def.dir);
     this.project = projectInfo(def.dir, def.name, ctx.agentCmd, ctx.agentArgs);
     this.docs = new Docs(def.dir);
+    this.lore = new LoreStore(dataDir);
     // Before the workers and the dog: the back office's desks are only there once it's built.
     this.plan = new FloorPlanStore(dataDir);
     this.jail = new Jail(dataDir);

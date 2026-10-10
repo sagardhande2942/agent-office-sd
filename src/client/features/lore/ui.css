@@ -1,0 +1,183 @@
+.modal.lore-shelf {
+  width: 90vw;
+  max-width: 820px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.lore-shelf-search-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.lore-shelf-search-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.lore-shelf-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.lore-tag-chip {
+  padding: 3px 8px;
+  font-size: 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #ccc;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.lore-tag-chip:hover,
+.lore-tag-chip.active {
+  background: #f4a261;
+  color: #1a1a1a;
+  font-weight: 600;
+}
+
+.lore-shelf-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 52vh;
+  padding-right: 4px;
+}
+
+.lore-shelf-empty {
+  padding: 30px;
+  text-align: center;
+  color: #aaa;
+  font-style: italic;
+  grid-column: 1 / -1;
+}
+
+.lore-card {
+  background: #252321;
+  border: 1px solid #3d3835;
+  border-left: 4px solid #f4a261;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.lore-card:hover {
+  border-color: #f4a261;
+}
+
+.lore-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.lore-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f3efe6;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.lore-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: #aaa;
+  align-items: center;
+}
+
+.lore-badge {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #e0dcd3;
+}
+
+.lore-badge.pr {
+  background: rgba(76, 201, 240, 0.2);
+  color: #4cc9f0;
+}
+
+.lore-badge.author {
+  background: rgba(244, 162, 97, 0.2);
+  color: #f4a261;
+}
+
+.lore-card-content {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #ccc;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 110px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 10px;
+  border-radius: 6px;
+}
+
+.lore-card-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.lore-card-actions button {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+/* Note Editor Modal */
+.modal.lore-editor {
+  width: 90vw;
+  max-width: 580px;
+}
+
+.lore-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.lore-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #bbb;
+}
+
+.lore-field input,
+.lore-field textarea {
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 14px;
+}
+
+.lore-field textarea {
+  resize: vertical;
+  min-height: 120px;
+  font-family: inherit;
+}

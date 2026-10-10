@@ -210,6 +210,21 @@ export interface FloorDecor {
   remove(id: string): Awaitable<Decoration | undefined>;
 }
 
+export interface FloorLore {
+  list(): import('../shared/protocol/lore.js').LoreNote[];
+  save(draft: {
+    id?: string;
+    title: string;
+    content: string;
+    author: string;
+    workerId?: string;
+    desk?: string;
+    pr?: { number: number; url?: string };
+    tags?: string[];
+  }): import('../shared/protocol/lore.js').LoreNote;
+  delete(id: string): boolean;
+}
+
 /** The room's music, the ball game, the cars, and the meeting room. */
 export interface FloorRoom {
   play(input: { track?: unknown; url?: unknown }, by: string): Awaitable<{ changed: boolean } | { error: string }>;
@@ -294,6 +309,7 @@ export interface FloorActions {
   readonly meetings: FloorMeetings;
   readonly tv: FloorTv;
   readonly cinema?: import('./cinema/surface.js').FloorCinema;
+  readonly lore?: FloorLore;
   /** Workers sent home and locked up, on a map that has one. */
   readonly jail: { state(): JailState };
 
