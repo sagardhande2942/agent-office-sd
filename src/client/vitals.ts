@@ -31,8 +31,8 @@ export const CAN: Remedy = { energy: 0.35, calm: 0.05 };
 /** How long a can stays in your hand, from the fridge, before there's nothing left in it. */
 export const CAN_SECONDS = 30;
 
-/** How long a full bar of energy lasts if you never touch coffee: ten minutes. */
-export const ENERGY_SECONDS = 10 * 60;
+/** How long a full bar of energy lasts if you never touch coffee: fifty minutes. */
+export const ENERGY_SECONDS = 50 * 60;
 export const ENERGY_DRAIN = 1 / ENERGY_SECONDS;
 /** And how long it takes, doing nothing in particular, to wind right up: an hour and a quarter. */
 export const STRESS_SECONDS = 75 * 60;

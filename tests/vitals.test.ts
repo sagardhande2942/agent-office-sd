@@ -28,7 +28,7 @@ test('a meter that has run out stays out, and the drain keeps its rate either wa
   v.strain(0);
   assert.equal(v.energyLeft(ENERGY_SECONDS * 3), 0);
   assert.equal(v.strain(STRESS_SECONDS * 3), 1);
-  // Ten minutes on top of the last hour and a half: no running past the end of the bar.
+  // Ten minutes more on top of the last hour and a quarter: no running past the end of the bar.
   assert.equal(v.energyLeft(STRESS_SECONDS * 3 + 600), 0);
   assert.equal(v.strain(STRESS_SECONDS * 3 + 600), 1);
 });
@@ -119,10 +119,10 @@ test('the drinks say what they are for: coffee has the energy, the alcohol has t
   assert.ok(beer.calm > 0);
 });
 
-test('the drain rates are the times the office promises: ten minutes of energy, an hour and a quarter of calm', () => {
-  assert.equal(ENERGY_SECONDS, 600);
+test('the drain rates are the times the office promises: fifty minutes of energy, an hour and a quarter of calm', () => {
+  assert.equal(ENERGY_SECONDS, 3000);
   assert.equal(STRESS_SECONDS, 4500);
-  assert.equal(ENERGY_DRAIN, 1 / 600);
+  assert.equal(ENERGY_DRAIN, 1 / 3000);
   assert.equal(STRESS_DRAIN, 1 / 4500);
 });
 
@@ -131,8 +131,10 @@ test('the meters are only spent once they are right out: empty of energy, or wou
   v.energyLeft(0);
   v.strain(0);
   assert.equal(v.spent(0), false, 'full and calm is not spent');
-  assert.equal(v.spent(ENERGY_SECONDS - 1), false);
-  assert.equal(v.spent(ENERGY_SECONDS), true, 'the energy running out is what does it');
+  assert.equal(v.spent(ENERGY_SECONDS - 1), false, 'energy to spare is not spent');
+  // A second past the bar's course, not the exact second of it: 1/3000 is no exact binary fraction,
+  // so the last drop can land a hair either side of zero.
+  assert.equal(v.spent(ENERGY_SECONDS + 1), true, 'the energy running out is what does it');
   const w = new Vitals();
   w.energyLeft(0);
   w.strain(0);
