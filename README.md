@@ -34,6 +34,8 @@ curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/mai
 
 ## What it is
 
+- **Parallel worlds.** Explore three implementations of one task: **🌀 Parallel worlds** launches isolated agents from the same commit, with distinct approaches and branches. Enter a glowing portal in the Office map's south aisle to inspect its working preview, compare all three, give feedback and select a winner for a PR. See [docs/parallel-worlds.md](docs/parallel-worlds.md) for preview tunnels, requirements and preservation behavior.
+
 - **A floor per project.** Ride the elevator, pick one of your GitHub repos, and the office clones it (showing how far along it is) and opens a floor for it. Every worker, board and queue on that floor works in that checkout.
 - **Workers at desks.** Walk up to an empty desk, press **E**, and pick Claude Code, Codex, OpenCode, Grok, Muse, DeepSeek Harness, Pi, Cursor or Antigravity, each with its model and reasoning effort. The agent's live terminal shows on its laptop, and anyone can open it and type.
 - **Talk instead of typing.** Hold **Ctrl+Space** (or the **🎤**) in a worker's terminal or a prompt box and say what you want: it's typed in for you to send. Your browser does the listening, so there's nothing to install.
