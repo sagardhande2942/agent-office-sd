@@ -1,0 +1,118 @@
+// npm run build && node --import tsx scripts/e2e-task-brief.mjs
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { chromium } from 'playwright-core';
+import { loadConfig } from '../src/server/config.ts';
+import { startServer } from '../src/server/server.ts';
+
+const output = path.resolve(process.env.TASK_BRIEF_ARTIFACTS ?? 'docs/task-brief-evidence');
+mkdirSync(output, { recursive: true });
+const dir = mkdtempSync(path.join(os.tmpdir(), 'office-task-brief-'));
+const local = path.join(dir, 'project'); mkdirSync(local);
+execFileSync('git', ['init', '-b', 'main'], { cwd: local, stdio: 'ignore' });
+execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '--allow-empty', '-m', 'fixture'], { cwd: local, stdio: 'ignore' });
+const data = path.join(dir, '.agent-office'); mkdirSync(data);
+writeFileSync(path.join(data, 'floors.json'), JSON.stringify([{ id: 'local', name: 'Office', dir: local, palette: 0, addedBy: 'test', addedAt: Date.now() }]));
+const cfg = loadConfig(['--home', dir, '--port', '4600', '--password', 'brief-test', '--no-open']);
+cfg.port = 0; cfg.agentCmd = 'brief-test-agent-unavailable';
+const office = await startServer(cfg, { publicDir: path.resolve('dist/public') });
+const base = `http://127.0.0.1:${office.server.address().port}`;
+let browser;
+const checks = [];
+try {
+  browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH, headless: true, args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await context.addInitScript(() => {
+    localStorage.setItem('agent-office.profile', JSON.stringify({ name: 'Brief tester', color: '#ef476f', look: { skin: 0, hair: 0, style: 0 } }));
+    localStorage.setItem('agent-office.lite-declined', '1');
+    // Record the final hire request without launching a paid agent in this UI test.
+    window.__hires = [];
+    const send = WebSocket.prototype.send;
+    WebSocket.prototype.send = function(data) {
+      const msg = JSON.parse(data);
+      if (msg.t === 'worker.spawn') { window.__hires.push(msg); return; }
+      return send.call(this, data);
+    };
+  });
+  assert.ok((await context.request.post(base + '/api/login', { data: { password: 'brief-test' } })).ok());
+  const page = await context.newPage(), errors = [];
+  page.setDefaultTimeout(30000);
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(base + '/lite');
+  await page.getByRole('button', { name: '✨ New task', exact: true }).click();
+  const prompt = page.getByRole('textbox', { name: 'Prompt', exact: true });
+  await prompt.fill('Fix offline floor deletion');
+  await page.getByRole('button', { name: 'Build task brief', exact: true }).click();
+  await page.getByRole('button', { name: 'Preview brief', exact: true }).click();
+  await page.getByText('Add at least one observable acceptance criterion.', { exact: true }).waitFor();
+  assert.ok(await page.getByRole('button', { name: 'Use brief', exact: true }).isDisabled());
+  await page.getByRole('textbox', { name: 'Examples', exact: true }).fill('An offline mock_server floor can be deleted.');
+  await page.getByRole('textbox', { name: 'Constraints', exact: true }).fill('Keep the joiner checkout.');
+  await page.getByRole('textbox', { name: 'Acceptance criteria', exact: true }).fill('The deleted floor disappears immediately for every viewer.');
+  await page.getByRole('textbox', { name: 'Assumptions', exact: true }).fill('The viewer is an admin.');
+  await page.getByRole('button', { name: 'Preview brief', exact: true }).click();
+  const preview = page.getByRole('textbox', { name: 'Brief preview', exact: true });
+  assert.ok((await preview.inputValue()).includes('## Original request\nFix offline floor deletion'));
+  await preview.fill((await preview.inputValue()) + '\n\nVerify with a browser test.');
+  await page.getByRole('button', { name: 'Hire & start', exact: true }).click();
+  await page.getByText('Use or discard the draft before sending the prompt.', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.__hires.length), 0);
+  await page.screenshot({ path: path.join(output, 'brief-desktop.png') });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await page.getByRole('dialog').evaluate(el => el.scrollWidth <= el.clientWidth));
+  await preview.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: path.join(output, 'brief-mobile.png') });
+  await page.getByRole('button', { name: 'Use brief', exact: true }).click();
+  const applied = await prompt.inputValue();
+  assert.ok(applied.includes('Verify with a browser test.'));
+  assert.equal(await page.evaluate(() => window.__hires.length), 0);
+  await page.getByRole('button', { name: 'Hire & start', exact: true }).click();
+  await page.waitForFunction(() => window.__hires.length === 1);
+  console.log('Lite hire captured');
+  assert.equal(await page.evaluate(() => window.__hires[0].prompt), applied);
+  checks.push('Lite: required acceptance, editable preview, explicit use then hire, desktop/mobile layout');
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(base + '/');
+  console.log('3D page loaded');
+  await page.waitForFunction(() => window.__office?.net.up && window.__office.player.enabled);
+  await page.waitForSelector('#loading', { state: 'hidden' });
+  console.log('3D office ready');
+  const openHire = async () => {
+    await page.keyboard.press('Control+k');
+    await page.getByRole('combobox', { name: 'Find anything in the office' }).fill('Hire a worker');
+    await page.keyboard.press('Enter');
+    await page.getByRole('textbox', { name: 'Prompt', exact: true }).waitFor();
+  };
+  await openHire();
+  await prompt.fill('Small task');
+  await page.getByRole('button', { name: 'Build task brief', exact: true }).click();
+  await page.getByRole('button', { name: 'Discard brief', exact: true }).click();
+  assert.equal(await prompt.inputValue(), 'Small task');
+  await page.getByRole('button', { name: 'Build task brief', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Acceptance criteria', exact: true }).fill('An observable result');
+  await page.getByRole('button', { name: 'Preview brief', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Goal', exact: true }).fill('Refined goal');
+  assert.ok(await page.getByRole('button', { name: 'Use brief', exact: true }).isDisabled());
+  await page.getByRole('button', { name: 'Preview brief', exact: true }).click();
+  await prompt.fill('A newer request');
+  await page.getByRole('button', { name: 'Use brief', exact: true }).click();
+  assert.equal(await prompt.inputValue(), 'A newer request');
+  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
+  await page.waitForFunction(() => window.__office.player.enabled && window.__office.player.hasMouse);
+  await openHire();
+  await prompt.fill('Another task');
+  await page.getByRole('button', { name: 'Build task brief', exact: true }).click();
+  await page.screenshot({ path: path.join(output, 'brief-office.png') });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => window.__office.player.enabled && window.__office.player.hasMouse);
+  checks.push('3D: discard preserves request, stale drafts and changed prompt guarded, Close/Esc restore mouse-look');
+  assert.deepEqual(errors, []);
+  writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks, errors }, null, 2));
+  console.log(JSON.stringify({ checks, output }, null, 2));
+} finally {
+  await browser?.close(); office.shutdown();
+}
+process.exit(0);

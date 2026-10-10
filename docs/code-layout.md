@@ -42,6 +42,13 @@ They're in `core/registry.ts`, and each is a field of `ctx`. Every registration 
 - **`sound/`** is the office's sound. `OfficeSound` (`sound/index.ts`, the `ctx.sound` every part uses) is a facade over `AudioCore` (`sound/core.ts`: the audio context, its buses, where your ears are) and the recipes, each in a file of its own, here (`weather.ts`, `steps.ts`) or in its feature's folder (`features/gong/sound.ts`).
 - **`shared/`** (`src/client/shared/`) is what the 3D office and the Lite dashboard at `/lite` both use: the tab title and hiring. Lite loads no three.js and nothing from `core/`, `features/`, `input/`, `world/` or `player/`; `tests/client-structure.test.ts` follows `lite.ts`'s imports to check.
 
+### Prompt tools
+
+Optional editors beside task prompts register in `ui/prompt-tools.ts` (`PROMPT_TOOLS`). Each returns
+its element and a `valid()` guard, so both `openPrompt` and `openAsk` can prevent submission of an
+unfinished draft. Shared modules such as `shared/task-brief/` keep these tools available in Lite
+without loading the 3D office.
+
 ### Stylesheets
 
 Features can add a menu action to `HUD_ACTIONS` in `ui/menu.ts` during installation, before the HUD mounts. The communications feature uses this list, its state slice, and its own install function to supply the Messages action without adding feature logic to the HUD.
