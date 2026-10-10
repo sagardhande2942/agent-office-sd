@@ -5,6 +5,7 @@ import type { Route } from '../router.js';
 import { game2dRoute } from './game2d.js';
 import { agentRoutes } from './agents.js';
 import { authRoutes } from './auth.js';
+import { cinemaRoutes } from './cinema.js';
 import { fileRoutes } from './files.js';
 import { githubRoutes } from './github.js';
 import { pageRoutes } from './pages.js';
@@ -34,6 +35,7 @@ export const routes: readonly Route[] = [
   ...Object.values(taskBriefRoutes),
   agentRoutes.models,
   fileRoutes.image,
+  cinemaRoutes.shot,
   fileRoutes.whiteboardFile,
   fileRoutes.termDrop,
   fileRoutes.changedFile,

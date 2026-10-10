@@ -1,5 +1,6 @@
 import type { ForgeKind } from './github.js';
 import type { TvState } from '../tv.js';
+import type { CinemaState } from '../cinema.js';
 import type { HelperState } from '../helper.js';
 // The building: its floors, going between them, and what each floor holds.
 
@@ -122,6 +123,8 @@ export interface FloorView {
   jukebox: JukeboxState;
   /** What's on the big TV, and how far into it everyone is (see shared/tv.ts). */
   tv: TvState;
+  /** The screening room: the reels recorded on this floor, and what's on its screen. */
+  cinema: CinemaState;
   /** Who's at the arcade cabinet, what's on its screen, and the building's high scores. */
   cabinet: CabinetView;
   /** What's drawn on this floor's whiteboard, and who's drawing. */

@@ -1,7 +1,7 @@
 import { teamTargetError } from '../master-workers/role.js';
 import type http from 'node:http';
 import { notLeaving } from '../leave-on-merge.js';
-import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow, type PullsView } from '../office-workers.js';
+import { findWorker, readHireRequest, readHomeRequest, readPrRequest, readReelRequest, workerRow, type PullsView } from '../office-workers.js';
 import { gh } from '../github.js';
 import type { Floor } from '../floor.js';
 import { DESK_BY_ID, nextFreeSeat } from '../../shared/layout.js';
@@ -9,6 +9,7 @@ import type { WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
+import { cinemaChanged } from '../ws/handlers/cinema.js';
 
 /**
  * Pull request `n` on a floor, for a worker to have as its own: one that's open, or merged and still
@@ -67,7 +68,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
       workers: list.map((w) => workerRow(w, view, me.id)),
     });
   }
-  if (req.method !== 'POST' || !['', '/home', '/tell', '/pr'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home, /office/workers/tell or /office/workers/pr' });
+  if (req.method !== 'POST' || !['', '/home', '/tell', '/pr', '/cinema'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home, /office/workers/tell, /office/workers/pr or /office/workers/cinema' });
   let body: unknown;
   try {
     body = JSON.parse((await readBody(req)) || '{}');
@@ -146,6 +147,24 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     const whose = w.id === me.id ? 'its own' : `${w.name}'s`;
     ctx.toastFloor(floor, pr ? `${who} said PR #${pr.number} is ${whose}` : `${who} said ${w.id === me.id ? 'it has' : `${w.name} has`} no pull request`);
     return send(res, 200, { ok: true, worker: row(w.id) });
+  }
+
+  if (action === '/cinema') {
+    // A worker recording a demonstration of what it shipped: the shots are pictures of the build, so
+    // this is the screening room's own directory and only a floor in this process has one.
+    const local = ctx.asLocal(floor);
+    if (!local) return send(res, 403, { error: floor.refuses('the screening room') });
+    const ask = readReelRequest(body);
+    if (typeof ask === 'string') return send(res, 400, { error: ask });
+    let reel;
+    try {
+      reel = local.cinema.add({ title: ask.title, ...(ask.pr ? { pr: ask.pr } : {}), by: who, shots: ask.shots.map(({ caption, width, height }) => ({ caption, width, height })) }, ask.shots.map((s) => s.png));
+    } catch (err) {
+      return send(res, 500, { error: (err as Error).message });
+    }
+    cinemaChanged(ctx, local);
+    ctx.toastFloor(local, `🎬 ${who} put “${reel.title}” on the screening room (${reel.shots.length} shot${reel.shots.length === 1 ? '' : 's'})`);
+    return send(res, 200, { ok: true, reel });
   }
 
   const ask = readHireRequest(body, floor.project.agentProviders);

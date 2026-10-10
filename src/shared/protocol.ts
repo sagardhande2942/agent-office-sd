@@ -6,6 +6,7 @@ export * from './protocol/appearances.js';
 import type { PlanReviewClientMsg, PlanReviewServerMsg } from './protocol/plan-review.js';
 export * from './protocol/plan-review.js';
 import type { TvClientMsg } from './protocol/toys.js';
+import type { CinemaClientMsg, CinemaServerMsg } from './protocol/cinema.js';
 // Wire protocol between browser and server. Every WebSocket frame is one JSON object.
 //
 // Each part of the office keeps its state types and its messages in ./protocol/<domain>.ts; this
@@ -40,6 +41,7 @@ export * from './protocol/toys.js';
 export * from './protocol/usage.js';
 export * from './protocol/workers.js';
 export * from './protocol/communications.js';
+export * from './protocol/cinema.js';
 
 export type ClientMsg =
   | MasterWorkersClientMsg
@@ -47,6 +49,7 @@ export type ClientMsg =
   | AppearanceClientMsg
   | PlanReviewClientMsg
   | TvClientMsg
+  | CinemaClientMsg
   | PresenceClientMsg
   | RooftopClientMsg
   | WorkerClientMsg
@@ -86,4 +89,5 @@ export type ServerMsg =
   | AccountsServerMsg
   | SettingsServerMsg
   | UsageServerMsg
-  | ToysServerMsg;
+  | ToysServerMsg
+  | CinemaServerMsg;

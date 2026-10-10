@@ -10,6 +10,7 @@
 import { TEAM_TOOLS, callTeam } from './office-team-tools.js';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +47,12 @@ const USAGE = `Usage:
   office-workers report --kind question <<'EOF'  it's shown to everyone in the office and kept in the
   …the report…                                  floor's manager.jsonl
   EOF
+  office-workers cinema add < reel.json         put a short captioned demonstration of the build in
+                                                the floor's screening room; the reel on stdin is
+                                                {title, pr?, shots:[{caption, image}]} where each
+                                                image is a PNG file of the build as it behaved
+  office-workers cinema list [--json]           the screening room's reels and what's on its screen
+  office-workers cinema remove <id>            take a reel off the floor
   office-workers mcp                            serve these as MCP tools on stdio`;
 
 /** A mistake in how the command was called: the usage is shown with it. */
@@ -58,7 +65,7 @@ export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 const RETRY_MS = 6000;
 /** Sending several workers home waits on git for each; hiring may fetch from GitHub first. */
 // A helper is a hire, so it takes as long as one: the walk is the office's, not this call's.
-const TIMEOUT_MS = { list: 15_000, tell: 15_000, pr: 15_000, hire: 90_000, helper: 90_000, home: 300_000, inbox: 15_000, request: 15_000, reply: 15_000, ack: 15_000, completion: 15_000, complete: 15_000 };
+const TIMEOUT_MS = { 'cinema.add': 120_000, 'cinema.list': 15_000, 'cinema.remove': 15_000, list: 15_000, tell: 15_000, pr: 15_000, hire: 90_000, helper: 90_000, home: 300_000, inbox: 15_000, request: 15_000, reply: 15_000, ack: 15_000, completion: 15_000, complete: 15_000 };
 
 
 /**
@@ -171,6 +178,25 @@ export function parseArgs(argv) {
     if (none ? words.length : words.length !== 1) throw new UsageError('pr takes one pull request, its number or URL, or --none to take it off (with --worker <name|id> when the worker isn\'t you)');
     return { cmd: 'pr', ...(none ? { unlink: true } : { pr: words[0] }), ...(opts['--worker'] !== undefined ? { worker: String(opts['--worker']).trim() } : {}), json: opts['--json'] === true };
   }
+  if (cmd === 'cinema') {
+    const [sub, ...args] = rest;
+    if (sub === 'add') {
+      const { opts, words } = options(args, [], ['--json']);
+      if (words.length) throw new UsageError(`Unexpected argument: ${words[0]} (give the reel on stdin)`);
+      return { cmd: 'cinema.add', json: opts['--json'] === true };
+    }
+    if (sub === 'list') {
+      const { opts, words } = options(args, [], ['--json']);
+      if (words.length) throw new UsageError('cinema list takes no arguments');
+      return { cmd: 'cinema.list', json: opts['--json'] === true };
+    }
+    if (sub === 'remove') {
+      const { opts, words } = options(args, [], ['--json']);
+      if (words.length !== 1) throw new UsageError('cinema remove takes one reel id');
+      return { cmd: 'cinema.remove', reel: words[0], json: opts['--json'] === true };
+    }
+    throw new UsageError(`cinema takes add, list or remove (got ${[sub, ...args].join(' ').trim()})`);
+  }
   if (cmd === 'hire') {
     const { opts, words } = options(rest, ['--prompt', '--provider', '--model', '--effort', '--desk', '--issue'], ['--no-worktree', '--json']);
     if (words.length) throw new UsageError(`Unexpected argument: ${words[0]} (give the task on stdin or with --prompt)`);
@@ -219,12 +245,12 @@ export function officeEnv(env) {
  * @returns {{ method: string, url: string, headers: Record<string, string>, body?: string, timeout: number }}
  */
 export function buildRequest(what, office, body) {
-  const url = new URL(`${office.url}/office/workers${what.startsWith('plan') ? '/' + what : what === 'home' ? '/home' : what === 'tell' ? '/tell' : ['report', 'pr', 'helper', 'inbox', 'request', 'reply', 'ack', 'completion', 'complete'].includes(what) ? '/' + what : ''}`);
+  const url = new URL(`${office.url}/office/workers${what.startsWith('cinema') ? '/cinema' : what.startsWith('plan') ? '/' + what : what === 'home' ? '/home' : what === 'tell' ? '/tell' : ['report', 'pr', 'helper', 'inbox', 'request', 'reply', 'ack', 'completion', 'complete'].includes(what) ? '/' + what : ''}`);
 
   if (what === 'status') url.pathname = '/office/report';
   url.searchParams.set('worker', office.worker);
   const headers = { authorization: `Bearer ${office.token}` };
-  if (what === 'status' || what === 'list' || what === 'inbox' || what === 'completion' || what === 'plan-review') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] ?? 15_000 };
+  if (what === 'status' || what === 'list' || what === 'inbox' || what === 'completion' || what === 'plan-review' || what === 'cinema.list') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] ?? 15_000 };
   return { method: 'POST', url: url.href, headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}), timeout: TIMEOUT_MS[what] ?? 15_000 };
 }
 
@@ -366,6 +392,67 @@ export function formatHome(answer, merged) {
     .join('\n');
 }
 
+/**
+ * A reel for the screening room, read from its JSON on stdin: `{title, pr?, shots:[{caption, image}]}`,
+ * with each `image` a path to a PNG the agent captured of the build (or an already-inline data URL).
+ * The pictures are read here and sent as the data URLs the browser produced them as, so the whole
+ * reel is one JSON body and the office never reads the agent's disk.
+ *
+ * @param {string} text
+ * @returns {Promise<{title: string, pr?: number, shots: {caption: string, image: string}[]}>}
+ */
+export async function readReel(text) {
+  /** @type {{title?: unknown, pr?: unknown, shots?: unknown}} */
+  let reel;
+  try {
+    reel = JSON.parse(text);
+  } catch {
+    throw new UsageError('The reel is not JSON: {title, shots:[{caption, image}]}');
+  }
+  if (!reel || typeof reel !== 'object' || Array.isArray(reel)) throw new UsageError('The reel is not a JSON object');
+  const title = typeof reel.title === 'string' ? reel.title.trim() : '';
+  if (!title) throw new UsageError('Say what the reel shows: "title"');
+  if (!Array.isArray(reel.shots) || !reel.shots.length) throw new UsageError('A reel needs at least one shot');
+  if (reel.shots.length > 12) throw new UsageError('A reel is at most 12 shots: keep the demonstration short');
+  const shots = [];
+  for (const raw of reel.shots) {
+    const shot = raw && typeof raw === 'object' ? /** @type {{caption?: unknown, image?: unknown}} */ (raw) : {};
+    const caption = typeof shot.caption === 'string' ? shot.caption.trim() : '';
+    if (!caption) throw new UsageError('Every shot needs a caption saying what the behaviour shown is');
+    shots.push({ caption, image: await readShot(shot.image) });
+  }
+  return { title, ...(reel.pr !== undefined ? { pr: Number(reel.pr) } : {}), shots };
+}
+
+/** One shot's picture: a data URL as the browser wrote it, or a PNG on disk read and inlined. */
+async function readShot(image) {
+  const text = typeof image === 'string' ? image.trim() : '';
+  if (!text) throw new UsageError('A shot has no picture: "image" is a PNG file of the build');
+  if (text.startsWith('data:')) return text;
+  let png;
+  try {
+    png = await readFile(text);
+  } catch (err) {
+    throw new UsageError(`Couldn't read the shot's picture ${text}: ${err.message}`);
+  }
+  if (png.length < 33 || png[0] !== 0x89 || png.subarray(1, 4).toString('latin1') !== 'PNG') {
+    throw new UsageError(`${text} isn't a PNG: capture the build as a .png`);
+  }
+  return `data:image/png;base64,${png.toString('base64')}`;
+}
+
+/** The screening room, as `cinema list` shows it: a line per reel, and what's on the screen. */
+export function formatCinema(view) {
+  const reels = view?.reels ?? [];
+  const showing = reels.find((/** @type {{id: string}} */ r) => r.id === view?.reel);
+  const lines = reels.map((r) => {
+    const marks = [view?.on && r.id === view.reel ? `▶️ shot ${view.frame + 1}/${r.shots.length}` : '', r.pr ? `PR #${r.pr}` : '', r.by ?? ''].filter(Boolean);
+    return `– ${r.title} · ${r.shots.length} shot${r.shots.length === 1 ? '' : 's'}${marks.length ? ` · ${marks.join(' · ')}` : ''}`;
+  });
+  if (!lines.length) return 'The screening room is empty: record a reel with `office-workers cinema add`.';
+  return `${lines.join('\n')}\nOn the screen: ${showing && view.on ? `“${showing.title}”` : 'nothing'}`;
+}
+
 /** Whose pull request is whose now, after `pr` said so. */
 export function formatLinked(answer) {
   const w = answer?.worker ?? {};
@@ -465,6 +552,36 @@ export const TOOLS = [
       additionalProperties: false,
     },
     annotations: { destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  },
+  {
+    name: 'cinema_add',
+    title: 'Add a demonstration to the screening room',
+    description:
+      'Puts a short browser demonstration of a shipped feature in the floor\'s screening room, as a reel of PNG screenshots of the actual build with a caption on each shot saying what the behaviour shown is. ' +
+      'Capture the shots against the real build (a headless browser driving the office), then send them here; the office keeps the pictures and shows the reel on the screening room screen for everyone on the floor.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'What the demonstration shows, in a few words.' },
+        pr: { type: 'integer', minimum: 1, description: 'The pull request whose feature this demonstrates.' },
+        shots: {
+          type: 'array',
+          description: 'The shots, in order. Keep it short: at most 12, and each one a behaviour worth watching.',
+          items: {
+            type: 'object',
+            properties: {
+              caption: { type: 'string', description: 'What the behaviour in this picture is, in a sentence.' },
+              image: { type: 'string', description: 'The shot: a PNG file of the build on disk, or a data URL.' },
+            },
+            required: ['caption', 'image'],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ['title', 'shots'],
+      additionalProperties: false,
+    },
+    annotations: { destructiveHint: false, openWorldHint: false },
   },
   {
     name: 'tell_worker',
@@ -600,6 +717,12 @@ async function runTool(name, args, io) {
     return { text: `Told ${answer.worker?.name ?? a.worker}.` };
   }
   if (name === 'link_pr') return { text: formatLinked(await call('pr', a, io)) };
+  if (name === 'cinema_add') {
+    const reel = await readReel(JSON.stringify({ title: a.title, ...(a.pr !== undefined ? { pr: a.pr } : {}), shots: a.shots }));
+    const answer = await call('cinema.add', reel, io);
+    const r = answer.reel ?? {};
+    return { text: `“${r.title}” is on the screening room: ${r.shots?.length ?? 0} captioned shot(s) of the build, reel id ${r.id}.` };
+  }
   if (name === 'get_helper') {
     const answer = await call('helper', a, io);
     const w = answer.worker ?? {};
@@ -735,6 +858,25 @@ export async function main(argv, io = {}) {
         const messages = answer.messages ?? (answer.message ? [answer.message] : []);
         out(formatMessages(messages));
       }
+      return 0;
+    }
+    if (cmd.cmd.startsWith('cinema.')) {
+      const action = cmd.cmd.slice('cinema.'.length);
+      if (action === 'add') {
+        if (stdin.isTTY) throw new UsageError('Give the reel on stdin: office-workers cinema add < reel.json');
+        const reel = await readReel(readStdin(stdin));
+        const answer = await call('cinema.add', reel, ctx);
+        if (cmd.json) out(JSON.stringify(answer, null, 2));
+        else err(`🎬 “${answer.reel.title}” is on the screening room: ${answer.reel.shots.length} shot${answer.reel.shots.length === 1 ? '' : 's'}, each captioned.`);
+        return 0;
+      }
+      if (action === 'list') {
+        const view = await call('cinema.list', undefined, ctx);
+        out(cmd.json ? JSON.stringify(view, null, 2) : formatCinema(view));
+        return 0;
+      }
+      const answer = await call('cinema.remove', { reel: cmd.reel }, ctx);
+      out(cmd.json ? JSON.stringify(answer, null, 2) : `🗑️ Took ${cmd.reel} off the screening room.`);
       return 0;
     }
     if (cmd.cmd === 'list') {

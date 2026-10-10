@@ -218,7 +218,7 @@ test('answers MCP: the handshake, its tools, and a call', async () => {
   assert.equal((await handleMcp({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '1999-01-01' } }, io))?.result.protocolVersion, '2025-11-25');
   assert.equal(await handleMcp({ jsonrpc: '2.0', method: 'notifications/initialized' }, io), undefined);
   const tools = await handleMcp({ jsonrpc: '2.0', id: 3, method: 'tools/list' }, io);
-  assert.deepEqual(tools?.result.tools.map((t: { name: string }) => t.name), ['list_workers', 'floor_status', 'report_floor', 'hire_worker', 'send_home', 'tell_worker', 'link_pr', 'get_helper', 'worker_completion', 'submit_worker_completion', 'worker_inbox', 'request_worker', 'reply_worker', 'ack_worker_message', 'plan_review_state', 'submit_candidate_plan', 'request_plan_clarification', 'submit_plan_review', 'team_state', 'team_action']);
+  assert.deepEqual(tools?.result.tools.map((t: { name: string }) => t.name), ['list_workers', 'floor_status', 'report_floor', 'hire_worker', 'send_home', 'cinema_add', 'tell_worker', 'link_pr', 'get_helper', 'worker_completion', 'submit_worker_completion', 'worker_inbox', 'request_worker', 'reply_worker', 'ack_worker_message', 'plan_review_state', 'submit_candidate_plan', 'request_plan_clarification', 'submit_plan_review', 'team_state', 'team_action']);
 
   // A helper goes to a worker, so the call needs only who it is for and, at most, which agent it is.
   const helped = await handleMcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'get_helper', arguments: { worker: 'Byte' } } }, io);
