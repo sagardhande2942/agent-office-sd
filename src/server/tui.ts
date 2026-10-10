@@ -1,3 +1,4 @@
+import { TuiTerminal, MOUSE_OFF } from './tui-terminal.js';
 import { teamCommand } from './master-workers/tui.js';
 import { readFileSync } from 'node:fs';
 import readline from 'node:readline';
@@ -13,6 +14,7 @@ Use --name for an account login; omit it for the shared office password.
 
 Live dashboard: arrows select desks, Enter opens a worker, Tab changes panels.
 Press : for the command prompt; Ctrl+] leaves an attached terminal.
+While attached, use the mouse wheel or Page Up/Page Down to scroll history.
 
 Commands:
   workers / floors / go <floor ID or name>
@@ -91,6 +93,8 @@ function session(ws: WebSocket): Promise<number> {
   return new Promise((resolve) => {
     let view: FloorView | undefined, floors: FloorInfo[] = [], attached: string | undefined;
     let finished = false, active = false;
+    let terminal: TuiTerminal | undefined;
+    let inputFlush: ReturnType<typeof setTimeout> | undefined;
     const dashboard: Dashboard = { floors, selected: 0, panel: 'office', offset: 0, notice: 'Connecting to the office...' };
     const send = (message: ClientMsg) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
     const draw = () => {
@@ -107,18 +111,34 @@ function session(ws: WebSocket): Promise<number> {
       if (matches.length !== 1) throw new Error('Use a unique worker ID or name from workers');
       return matches[0];
     };
-    const resize = () => { if (attached) send({ t: 'term.resize', workerId: attached, cols: process.stdout.columns || 80, rows: process.stdout.rows || 24 }); else draw(); };
+    const resize = () => {
+      const cols = process.stdout.columns || 80, rows = process.stdout.rows || 24;
+      if (attached) { terminal?.resize(cols, rows); send({ t: 'term.resize', workerId: attached, cols, rows }); }
+      else draw();
+    };
     const detach = () => {
       if (!attached) return;
       send({ t: 'worker.detach', workerId: attached }); attached = undefined;
+      clearTimeout(inputFlush);
+      terminal?.dispose(); terminal = undefined;
       process.stdout.write('\x1b[0m\x1b[?25l');
       draw();
     };
     const input = (chunk: Buffer) => {
       if (!attached) return;
       const data = chunk.toString(), escape = data.indexOf('\x1d');
-      if (escape >= 0) { if (escape > 0) send({ t: 'term.input', workerId: attached, data: data.slice(0, escape) }); detach(); }
-      else send({ t: 'term.input', workerId: attached, data });
+      const forward = (text: string) => {
+        const input = terminal?.input(text) ?? text;
+        if (input) send({ t: 'term.input', workerId: attached!, data: input });
+      };
+      if (escape >= 0) { if (escape > 0) forward(data.slice(0, escape)); detach(); }
+      else {
+        forward(data); clearTimeout(inputFlush);
+        inputFlush = setTimeout(() => {
+          const pending = terminal?.flushInput();
+          if (attached && pending) send({ t: 'term.input', workerId: attached, data: pending });
+        }, 30);
+      }
     };
     const done = (code: number) => {
       if (finished) return;
@@ -126,7 +146,7 @@ function session(ws: WebSocket): Promise<number> {
       process.stdin.off('data', input); process.stdin.off('keypress', keypress);
       if (process.stdin.isTTY) process.stdin.setRawMode(false);
       process.stdin.pause();
-      if (active) process.stdout.write('\x1b[0m\x1b[?25h\x1b[?1049l');
+      if (active) process.stdout.write(MOUSE_OFF + '\x1b[0m\x1b[?25h\x1b[?1049l');
       process.stdout.off('resize', resize); process.off('SIGTERM', stop); process.off('SIGINT', stop);
       ws.close(); const timer = setTimeout(() => ws.terminate(), 1000); timer.unref(); resolve(code);
     };
@@ -159,7 +179,9 @@ function session(ws: WebSocket): Promise<number> {
         if (attached === msg.workerId) detach();
         if (dashboard.home?.worker.id === msg.workerId) dashboard.home = undefined;
         view.workers = view.workers.filter((w) => w.id !== msg.workerId);
-      } else if ((msg.t === 'term.snapshot' || msg.t === 'term.data') && attached === msg.workerId) process.stdout.write(msg.data);
+      } else if ((msg.t === 'term.snapshot' || msg.t === 'term.data') && attached === msg.workerId) {
+        void terminal?.write(msg.data, msg.t === 'term.snapshot', msg.t === 'term.snapshot' ? msg.cols : undefined, msg.t === 'term.snapshot' ? msg.rows : undefined);
+      }
       else if (msg.t === 'gh.issues' && view) view.issues = msg.state;
       else if (msg.t === 'gh.pulls' && view) view.pulls = msg.state;
       else if (msg.t === 'communications' && view) view.communications = msg.state;
@@ -289,6 +311,7 @@ function session(ws: WebSocket): Promise<number> {
         const w = worker(key);
         if (cmd === 'attach') {
           attached = w.id;
+          terminal = new TuiTerminal(process.stdout.columns || 80, process.stdout.rows || 24, data => process.stdout.write(data), data => { if (attached) send({ t: 'term.input', workerId: attached, data }); });
           process.stdout.write('\x1b[0m\x1b[?25h\x1b[2J\x1b[H');
           send({ t: 'worker.attach', workerId: w.id }); resize(); return;
         }

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import http from 'node:http';
+import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { WebSocketServer } from 'ws';
 import { spawn } from '@lydell/node-pty';
@@ -28,7 +29,7 @@ test('dashboard navigation, terminal input, floor switching and cleanup over a P
     ws.send(JSON.stringify({ t: 'welcome', ...view, floors: [{ id: 'test', name: 'Office' }, { id: 'api', name: 'API' }] }));
     ws.on('message', (raw) => {
       const msg = JSON.parse(String(raw)); messages.push(msg);
-      if (msg.t === 'worker.attach') ws.send(JSON.stringify({ t: 'term.snapshot', workerId: 'w1', data: 'TERMINAL_READY\r\n' }));
+      if (msg.t === 'worker.attach') ws.send(JSON.stringify({ t: 'term.snapshot', workerId: 'w1', cols: 120, rows: 30, data: '\x1b[?1049h' + Array.from({ length: 80 }, (_, i) => `HISTORY_ROW_${i}\r\n`).join('') + 'TERMINAL_READY\r\n' }));
       if (msg.t === 'term.input') ws.send(JSON.stringify({ t: 'term.data', workerId: 'w1', data: 'INPUT_RECEIVED\r\n' }));
       if (msg.t === 'floor.go') ws.send(JSON.stringify({ t: 'floor.enter', ...view, floor: msg.floor }));
     });
@@ -42,10 +43,15 @@ test('dashboard navigation, terminal input, floor switching and cleanup over a P
   const expect = async (text: string) => {
     const deadline = Date.now() + 5000;
     while (!output.includes(text) && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 10));
-    assert.ok(output.includes(text), `Missing terminal output: ${text}`); output = '';
+    assert.ok(output.includes(text), `Missing terminal output: ${text}`);
+    const seen = output; output = ''; return seen;
   };
   try {
     await expect('Ada'); child.write('\r'); await expect('TERMINAL_READY');
+    child.write('\x1b[5~'); await expect('HISTORY_ROW_23');
+    child.write('\x1b[<64;2;3M'); const scrolled = await expect('HISTORY_ROW_20');
+    if (process.env.TUI_SCROLL_EVIDENCE) writeFileSync(process.env.TUI_SCROLL_EVIDENCE, scrolled);
+    child.write('\x1b[6~\x1b[6~'); await expect('TERMINAL_READY');
     child.write('hello\x03'); await expect('INPUT_RECEIVED');
     child.write('\x1d'); await expect('AGENT OFFICE');
     child.write('i'); await expect('Fix login');

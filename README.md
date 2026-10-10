@@ -561,3 +561,7 @@ Remote Git floors also support **Master / Workers**. Update and rebuild both the
 Open **Settings → You → Performance** to select **30, 60, 90, 120 FPS**, or **Match display** for 3D and 2D Game. The default is 60 FPS. This is a maximum: your display and device may run slower. Choose 30 FPS to reduce rendering power use; Match display can use more power on high-refresh screens. Changes apply immediately and persist in this browser.
 
 Scene updates pause while the tab is hidden and run at up to 15 FPS while an ordinary window blocks movement. Scene editors retain the selected frame rate. Workers and network updates continue; returning to the tab resumes without advancing movement through the hidden interval. Lite (`/lite`) remains the lowest-cost view.
+
+### Scrolling worker terminals in the CLI
+
+While attached in `agent-office tui`, use the **mouse wheel** or **Page Up / Page Down** to review up to 5,000 lines of worker history. These gestures stay local rather than being typed into the worker. Page Down or scrolling down returns to live output; typing also returns to live output and sends your input normally. Ctrl+] returns to the dashboard. History is kept only for the attached worker and released on detach; full-screen workers are mirrored into a buffer that retains scrollback.
