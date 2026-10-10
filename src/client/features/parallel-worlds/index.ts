@@ -9,6 +9,7 @@ import type { Modal } from '../../ui/dom';
 import { PALETTE_ENTRIES } from '../palette';
 import { openWorlds, type WorldsUI } from './ui';
 import { buildWorldPortals } from './world';
+import { runningWorlds } from './visibility';
 
 declare module '../../world/types' { interface InteractKinds { worldportal: true; } }
 
@@ -53,7 +54,7 @@ export function installParallelWorlds(ctx: Ctx, parts: Pick<Parts, 'waiting'>) {
     use: onE(it => open(Number(it.deskId))),
   });
   ctx.ticks.add('world', ({ t }) => {
-    portals.root.visible = !!store.floor && ctx.inOffice() && !ctx.upTop() && ctx.player.pos.y > -1 && !ctx.trip();
+    portals.root.visible = runningWorlds(state.experiments, store.workers) && !!store.floor && ctx.inOffice() && !ctx.upTop() && ctx.player.pos.y > -1 && !ctx.trip();
     if (portals.root.visible) portals.update(t, ctx.reduceMotion.matches);
   });
   store.on('floor', () => {
