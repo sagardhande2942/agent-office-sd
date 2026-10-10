@@ -67,7 +67,14 @@ npm run reel:record -- --reel reel.json --start http://127.0.0.1:4600 --login "$
 
 `office-workers cinema add` is the other half: it reads the reel on stdin, reads each picture off disk
 and sends the bytes with it, so the office never reads the agent's disk and the whole reel is one JSON
-body. An agent with MCP has the same thing as the `cinema_add` tool.
+body. Its local checks are for saying something useful at the point of the mistake — the office checks
+every one of them again before it keeps a byte, and its answer is the one that counts. An agent with
+MCP has the same thing as the `cinema_add` tool.
+
+`office-workers cinema list` reads the room back over the same loopback port, and
+`office-workers cinema remove <id>` takes a reel off the floor (with its pictures). Each command has its
+own endpoint, and `buildRequest` refuses a command that has none rather than letting it answer as
+something else.
 
 ## The screening room
 
@@ -109,6 +116,14 @@ listing shots with nothing behind them, and the pictures of a reel the floor has
 with it (`Cinema.forget`). The reels are files on the floor's own disk, like the whiteboard's, so a
 floor hosted on someone else's machine refuses the room by name rather than pretending to have it.
 
+**What is kept, and what is refused.** A shot has to be a PNG (by its magic bytes and its header), under
+`SHOT_BYTES_MAX` on disk *and* under `SHOT_PIXELS_MAX` when decoded — a few kilobytes of one-colour PNG
+can decode to gigabytes, and every browser on the floor would decode it. `GET /api/cinema/shot` serves
+one shot of a reel the floor **still lists**, at an index that reel has: an id of the right shape is not
+enough, so a removed reel's pictures stop being served the moment it is removed. A reel arrives within
+`REEL_BODY_BYTES`, which is what the route actually reads, and over it the answer is a **413 with a
+reason** rather than a cut-off connection.
+
 ## What each file does
 
 | File | Piece |
@@ -128,8 +143,12 @@ floor hosted on someone else's machine refuses the room by name rather than pret
 | `src/server/cinema/record.ts` | The recorder itself: reads the reel file, and walks it in a real browser over the real build, one screenshot per step |
 | `scripts/record-reel.mjs` | The command over it: `npm run reel:record` |
 | `scripts/record-cinema-reel.mjs` | How this page's own pictures were made: films this feature against an office already showing it |
-| `tests/cinema.test.ts` | The limits, the reader, `class Cinema` across a restart, and the CLI |
-| `scripts/e2e-cinema.mjs` | The whole thing in a browser: record a reel against the build, and watch it land |
+| `tests/cinema.test.ts` | The limits, the reader, `class Cinema` across a restart, the CLI, and the recorder's reel file |
+| `tests/office-workers.test.ts` | Each cinema command's own endpoint, and that an unknown command is refused |
+| `scripts/e2e-cinema.mjs` | The whole thing, in a browser and over the loopback hook port: record against the build, hand it over with the real command, watch it land, take it off again |
+
+Run it with `npm run build && npm run e2e:cinema` (artifacts in `/tmp/agent-office-cinema-evidence`, or
+`CINEMA_ARTIFACTS`). Every check in it can fail — one that cannot is not a check.
 
 ## This page's own reel
 
@@ -165,6 +184,9 @@ beside it. Re-run it with `npm run build && node --import tsx scripts/record-cin
   reel is sent, so a worker should watch its own reel first.
 - **No re-recording.** A reel's pictures never change, which is why the shot route is `immutable`; to
   put a fixed demonstration up again, record it again and add it as a new reel.
+- **Anyone on the floor may put a reel up or take one down.** There is no ownership: the screening room
+  is a shared floor like the whiteboard and the TV, where whoever is in the room decides what is on the
+  wall. A floor that wants a demonstration to be its recorder's alone needs a rule this doesn't have.
 - **A hosted floor has no screening room.** Its reels would be pictures on someone else's disk, which
   the office must never read, so the room refuses by name there — exactly as the whiteboard does. The
   obvious next step is letting the host serve its own shots over the floor socket, which is the

@@ -8,7 +8,7 @@ import type { AgentEffort, AgentProvider, WorkerInfo, WorktreeCleanup } from '..
 import { isAgentEffort, isAgentProvider } from '../shared/protocol.js';
 import { DESK_BY_ID, STATION_AGENT } from '../shared/layout.js';
 import { blockersOf } from '../shared/manager.js';
-import { REEL_SHOTS_MAX, REEL_TITLE_MAX, SHOT_BYTES_MAX, SHOT_CAPTION_MAX } from '../shared/cinema.js';
+import { REEL_SHOTS_MAX, REEL_TITLE_MAX, SHOT_BYTES_MAX, SHOT_CAPTION_MAX, SHOT_PIXELS_MAX, SHOT_SIDE_MAX } from '../shared/cinema.js';
 import { workerPr, type PullsView, type WorkerRow } from '../shared/status.js';
 import { landedWork, notLeaving } from './leave-on-merge.js';
 
@@ -185,7 +185,7 @@ export function readReelRequest(body: unknown): ReelRequest | string {
     const png = checkPng(s.image);
     if (typeof png === 'string') return png;
     bytes += png.length;
-    if (bytes > SHOT_BYTES_MAX * REEL_SHOTS_MAX) return 'That reel is too big to keep: fewer or smaller shots';
+    if (bytes > SHOT_BYTES_MAX * REEL_SHOTS_MAX) return 'That reel is too big to send: record fewer or smaller shots';
     shots.push({ caption, png, ...pngSize(png)! });
   }
   return { title, ...(b.pr !== undefined ? { pr: b.pr as number } : {}), shots };
@@ -201,7 +201,12 @@ export function checkPng(raw: unknown): Buffer | string {
   const png = Buffer.from(b64, 'base64');
   if (png.length < 33 || png[0] !== 0x89 || png.toString('latin1', 1, 4) !== 'PNG') return 'A shot has to be a PNG (a screenshot of the build, not something else)';
   if (png.length > SHOT_BYTES_MAX) return 'A shot is too big: capture a smaller window';
-  if (!pngSize(png)) return 'That PNG is truncated: capture the shot again';
+  const size = pngSize(png);
+  if (!size) return 'That PNG is truncated: capture the shot again';
+  // The bytes are small; what every browser would decode is not, unless it is a screenshot's size.
+  if (size.width > SHOT_SIDE_MAX || size.height > SHOT_SIDE_MAX || size.width * size.height > SHOT_PIXELS_MAX) {
+    return `A shot is ${size.width}×${size.height}: capture a window, not a poster`;
+  }
   return png;
 }
 
@@ -210,7 +215,8 @@ export function pngSize(png: Buffer): { width: number; height: number } | null {
   if (png.length < 24 || png.toString('latin1', 12, 16) !== 'IHDR') return null;
   const width = png.readUInt32BE(16);
   const height = png.readUInt32BE(20);
-  return width > 0 && height > 0 && width <= 20_000 && height <= 20_000 ? { width, height } : null;
+  // Bounds wide enough to name what arrived in the refusal, and no wider: 2^32 is what a header claims.
+  return width > 0 && height > 0 && width <= 0xffff && height <= 0xffff ? { width, height } : null;
 }
 
 // --- The MCP server -------------------------------------------------------------------------------

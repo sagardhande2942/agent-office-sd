@@ -109,6 +109,7 @@ const RUN: [ServerMsg, string[]][] = [
   [msg({ t: 'jukebox', state: { on: false, track: 'lofi', startedAt: 0, elapsed: 0 } }), ['jukebox']],
   [msg({ t: 'cabinet', state: { player: { id: 'p-b' }, scores: [] } }), ['cabinet']],
   [msg({ t: 'cabinet.frame', frame: { board: [] } }), ['cabinetFrame']],
+  [msg({ t: 'cinema', state: { reels: [{ id: 'aaaaaaaaaaaa', title: 'Reel', at: 1, shots: [] }], on: true, reel: 'aaaaaaaaaaaa', frame: 1, playing: true, at: 2 } }), ['cinema']],
   [msg({ t: 'wb.update', elements: [el('e2', 1)] }), ['whiteboard']],
   [msg({ t: 'wb.update', elements: [el('e2', 0)] }), []],
   [msg({ t: 'wb.people', people: ['p-a'] }), ['drawing']],

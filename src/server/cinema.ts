@@ -93,12 +93,16 @@ export class Cinema {
     return true;
   }
 
-  /** One shot's picture, for the browser to draw. */
+  /**
+   * One shot's picture, for the browser to draw. Only ever a shot of a reel this floor still lists, at
+   * an index that reel has: an id that matches the shape is not enough, or a removed reel's pictures
+   * would go on being served until `forget` swept them.
+   */
   frame(id: string, n: number): Buffer | undefined {
-    if (!/^[a-z0-9]{12}$/.test(id) || !Number.isInteger(n) || n < 0) return undefined;
-    const file = path.join(this.dir, id, `${n}.png`);
+    const reel = this.reels.find((r) => r.id === id);
+    if (!reel || !Number.isInteger(n) || n < 0 || n >= reel.shots.length) return undefined;
     try {
-      return readFileSync(file);
+      return readFileSync(path.join(this.dir, id, `${n}.png`));
     } catch {
       return undefined;
     }

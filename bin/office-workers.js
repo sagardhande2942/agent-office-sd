@@ -245,9 +245,32 @@ export function officeEnv(env) {
  * @returns {{ method: string, url: string, headers: Record<string, string>, body?: string, timeout: number }}
  */
 export function buildRequest(what, office, body) {
-  const url = new URL(`${office.url}/office/workers${what.startsWith('cinema') ? '/cinema' : what.startsWith('plan') ? '/' + what : what === 'home' ? '/home' : what === 'tell' ? '/tell' : ['report', 'pr', 'helper', 'inbox', 'request', 'reply', 'ack', 'completion', 'complete'].includes(what) ? '/' + what : ''}`);
-
-  if (what === 'status') url.pathname = '/office/report';
+  // Which path each command is read from or POSTed to. A command missing from here would quietly
+  // become the endpoint itself — the roster — and answer with somebody else's answer, which is how
+  // `cinema list` used to read as an empty room; so one that isn't here is refused instead.
+  const ACTIONS = {
+    'cinema.list': '/cinema',
+    'cinema.add': '/cinema',
+    'cinema.remove': '/cinema/remove',
+    home: '/home',
+    tell: '/tell',
+    report: '/report',
+    pr: '/pr',
+    helper: '/helper',
+    inbox: '/inbox',
+    request: '/request',
+    reply: '/reply',
+    ack: '/ack',
+    completion: '/completion',
+    complete: '/complete',
+  };
+  // The plan tools each have their own path under the endpoint, by their own name.
+  const action = ACTIONS[what] ?? (what.startsWith('plan') ? `/${what}` : undefined);
+  // The roster itself, which hiring POSTs to and `list` reads, and the floor report, which is not
+  // under /office/workers at all.
+  if (action === undefined && !['list', 'hire', '', 'status'].includes(what)) throw new Error(`office-workers: ${what} has no endpoint (add it to ACTIONS in buildRequest)`);
+  // `status` is the one that isn't under /office/workers: it is the floor report the manager sees.
+  const url = new URL(what === 'status' ? `${office.url}/office/report` : `${office.url}/office/workers${action ?? ''}`);
   url.searchParams.set('worker', office.worker);
   const headers = { authorization: `Bearer ${office.token}` };
   if (what === 'status' || what === 'list' || what === 'inbox' || what === 'completion' || what === 'plan-review' || what === 'cinema.list') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] ?? 15_000 };
@@ -283,7 +306,15 @@ async function send(req, fetchImpl) {
         await new Promise((r) => setTimeout(r, 1000));
         continue;
       }
-      throw new Error(`Couldn't reach the office at ${new URL(req.url).origin} (${code ?? err?.message ?? err}). Is it running?`);
+      const where = new URL(req.url).origin;
+      // A timeout is not a refusal, and saying "is it running?" about one sends you looking in the
+      // wrong place: that is a slow or busy office, or a big request, not an office that is not there.
+      const slow = err?.name === 'TimeoutError' || err?.name === 'AbortError' || code === 'UND_ERR_HEADERS_TIMEOUT' || code === 23;
+      throw new Error(
+        slow
+          ? `The office at ${where} didn't answer within ${Math.round(req.timeout / 1000)}s. It may be busy, or this may be more than it can take at once.`
+          : `Couldn't reach the office at ${where} (${code ?? err?.message ?? err}). Is it running?`,
+      );
     }
   }
 }
@@ -428,7 +459,12 @@ export async function readReel(text) {
 async function readShot(image) {
   const text = typeof image === 'string' ? image.trim() : '';
   if (!text) throw new UsageError('A shot has no picture: "image" is a PNG file of the build');
-  if (text.startsWith('data:')) return text;
+  // These checks are for saying something useful here; the office checks every one of them again
+  // before it keeps a byte, and it is the office's answer that counts.
+  if (text.startsWith('data:')) {
+    if (!/^data:image\/png;base64,/i.test(text)) throw new UsageError('A shot has to be a PNG (a screenshot of the build, not something else)');
+    return text;
+  }
   let png;
   try {
     png = await readFile(text);
@@ -864,7 +900,7 @@ export async function main(argv, io = {}) {
       const action = cmd.cmd.slice('cinema.'.length);
       if (action === 'add') {
         if (stdin.isTTY) throw new UsageError('Give the reel on stdin: office-workers cinema add < reel.json');
-        const reel = await readReel(readStdin(stdin));
+        const reel = await readReel(await readStdin(stdin));
         const answer = await call('cinema.add', reel, ctx);
         if (cmd.json) out(JSON.stringify(answer, null, 2));
         else err(`🎬 “${answer.reel.title}” is on the screening room: ${answer.reel.shots.length} shot${answer.reel.shots.length === 1 ? '' : 's'}, each captioned.`);

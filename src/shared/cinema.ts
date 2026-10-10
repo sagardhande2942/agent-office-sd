@@ -17,8 +17,26 @@ export const REEL_SHOTS_MAX = 12;
 export const SHOT_MS = 3200;
 /** How many reels a floor keeps; the oldest go when a new one arrives. */
 export const REELS_KEPT = 10;
-/** A shot's PNG, decoded, before the office says no. */
-export const SHOT_BYTES_MAX = 900_000;
+
+/**
+ * A shot's picture, decoded, before the office says no. Small on purpose: a shot is a screenshot of a
+ * window, and a whole reel has to fit in one request body as base64 (see REEL_BODY_BYTES).
+ */
+export const SHOT_BYTES_MAX = 600_000;
+/**
+ * A shot's picture in *pixels*, which is the limit that actually matters: a PNG of one colour a few
+ * kilobytes on disk can decode to gigabytes, and every browser on the floor would decode this one. A
+ * screenshot of a window is nowhere near this.
+ */
+export const SHOT_PIXELS_MAX = 8_000_000;
+/** How big one picture may be on each side, for the same reason. */
+export const SHOT_SIDE_MAX = 4096;
+/**
+ * The whole reel as it arrives: every shot base64'd into one JSON body, plus room for the captions and
+ * the base64's own overhead. The office reads a reel's request with exactly this limit, so what the
+ * reel's own limits allow is what can actually be sent.
+ */
+export const REEL_BODY_BYTES = Math.ceil((SHOT_BYTES_MAX * REEL_SHOTS_MAX * 4) / 3) + 256 * 1024;
 
 /** One shot of a reel: what the build looked like, and what that shows. */
 export interface ReelShot {

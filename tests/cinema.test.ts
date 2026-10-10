@@ -16,6 +16,16 @@ function png(): Buffer {
   );
 }
 
+/** A PNG header claiming `w`×`h`, with enough bytes to be one. */
+function hugePng(w: number, h: number): string {
+  const png = Buffer.alloc(64);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(png, 0);
+  png.write('IHDR', 12, 'latin1');
+  png.writeUInt32BE(w, 16);
+  png.writeUInt32BE(h, 20);
+  return `data:image/png;base64,${png.toString('base64')}`;
+}
+
 const reel = (id: string, shots = 3): ReelSummary => ({
   id,
   title: `Reel ${id}`,
@@ -67,6 +77,11 @@ test('a reel an agent sent has a title, short captioned shots, and real PNGs', (
   assert.match(String(readReelRequest({ title: 'x', shots: [{ caption: '  ', image: `data:image/png;base64,${data}` }] })), /caption/);
   assert.match(String(readReelRequest({ title: 'x', shots: [{ caption: 'c', image: 'data:text/html;base64,PGI+hi' }] })), /PNG/);
   assert.match(String(readReelRequest({ title: 'x', shots: [{ caption: 'c', image: 'not base64 at all!' }] })), /PNG/);
+  // A picture small on disk can be enormous decoded, which is what every browser on the floor would
+  // have to decode: the size is read off the header and refused there, not only by byte count.
+  assert.match(String(readReelRequest({ title: 'x', shots: [{ caption: 'c', image: hugePng(9000, 9000) }] })), /not a poster/);
+  assert.match(String(readReelRequest({ title: 'x', shots: [{ caption: 'c', image: hugePng(5000, 5000) }] })), /not a poster/);
+  assert.ok(typeof readReelRequest({ title: 'x', shots: [{ caption: 'c', image: hugePng(640, 480) }] }) !== 'string', 'a window-sized picture is fine');
   const many = Array.from({ length: 13 }, () => ({ caption: 'c', image: `data:image/png;base64,${data}` }));
   assert.match(String(readReelRequest({ title: 'x', shots: many })), /at most 12 shots/);
   assert.deepEqual(pngSize(Buffer.from('too short')), null);
@@ -92,9 +107,14 @@ test('the screening room keeps a reel, shows it, and keeps the pictures beside i
   assert.equal(cinema.title(), 'Instant product cinema');
   // The office keeps the picture, not the data URL it arrived in.
   assert.deepEqual(cinema.frame(added.id, 1), png());
-  assert.equal(cinema.frame(added.id, 9), undefined);
+  // Only a shot this reel has, of a reel this floor still lists: an id that merely looks right, or one
+  // that has been taken off, is nothing.
+  assert.equal(cinema.frame(added.id, 3), undefined, 'a shot past the end');
+  assert.equal(cinema.frame(added.id, -1), undefined);
+  assert.equal(cinema.frame(added.id, 1.5), undefined);
   assert.equal(cinema.frame('../escape', 0), undefined);
   assert.equal(cinema.frame('AAAAAAAAAAAA', 0), undefined);
+  assert.equal(cinema.frame('aaaaaaaaaaaa', 0), undefined, 'an id of the right shape, but no such reel');
 
   // Playing something that isn't there is refused, by name.
   assert.match(String(cinema.play('nosuchreel12', 0)?.error), /No such reel/);
@@ -173,8 +193,6 @@ test('office-workers cinema takes add, list and remove, and nothing else', () =>
   assert.throws(() => parseArgs(['cinema', 'shout']), /cinema takes add, list or remove/);
   assert.throws(() => parseArgs(['cinema', 'remove']), /one reel id/);
   assert.throws(() => parseArgs(['cinema', 'add', 'extra']), /Unexpected argument/);
-  // The office has to know the route, or every recording is answered with a 405.
-  assert.equal(new URL('http://o/office/workers/cinema').pathname, '/office/workers/cinema');
 });
 
 test('a reel on stdin becomes the request the office reads, with its pictures inlined', async () => {
@@ -235,6 +253,9 @@ test('a reel file the recorder walks needs a title and a caption on every shot',
   assert.match(String(readReelFile(JSON.stringify({ title: 'x', shots: [] }))), /at least one shot/);
   assert.match(String(readReelFile(JSON.stringify({ title: 'x', shots: [{ caption: ' ' }] }))), /caption/);
   assert.match(String(readReelFile(JSON.stringify({ title: 'x', shots: Array.from({ length: 13 }, () => ({ caption: 'c' })) }))), /at most 12 shots/);
+  // A pull request is a positive whole number or nothing: `Number(null)` and `Number('')` are 0.
+  assert.equal(typeof readReelFile(JSON.stringify({ title: 'x', pr: null, shots: [{ caption: 'c' }] })) !== 'string' && readReelFile(JSON.stringify({ title: 'x', pr: null, shots: [{ caption: 'c' }] })).pr, undefined);
+  assert.equal(typeof readReelFile(JSON.stringify({ title: 'x', pr: '', shots: [{ caption: 'c' }] })) !== 'string' && readReelFile(JSON.stringify({ title: 'x', pr: '', shots: [{ caption: 'c' }] })).pr, undefined);
   // A caption longer than the office keeps is cut, not refused.
   const long = readReelFile(JSON.stringify({ title: 'x', shots: [{ caption: 'c'.repeat(300) }] }));
   assert.equal(typeof long !== 'string' && long.shots[0].caption.length, 160);
@@ -242,4 +263,29 @@ test('a reel file the recorder walks needs a title and a caption on every shot',
   assert.equal(flag(['--start=http://x'], 'start', undefined), 'http://x');
   assert.equal(flag(['--keep'], 'start', undefined), undefined, 'a bare flag takes no value');
   assert.equal(flag([], 'reel', 'reel.json'), 'reel.json');
+});
+
+test('a body over the limit is answered with 413, not a dead socket', async (t) => {
+  // The reel's pictures are big, so this is the path a too-big reel takes; the answer has to arrive, or
+  // the agent is told the connection failed rather than that its reel was too big.
+  const http = await import('node:http');
+  const { readBody } = await import('../src/server/http/util.js');
+  const server = http.createServer(async (req, res) => {
+    try {
+      await readBody(req, 8);
+      res.writeHead(200).end('ok');
+    } catch (err) {
+      const over = (err as Error).message === 'too large';
+      res.writeHead(over ? 413 : 500, { 'content-type': 'application/json' }).end(JSON.stringify({ error: over ? 'too large' : 'no' }));
+    }
+  });
+  await new Promise<void>((r) => server.listen(0, '127.0.0.1', () => r()));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+  const tooBig = await fetch(base, { method: 'POST', body: 'a'.repeat(64) });
+  assert.equal(tooBig.status, 413);
+  assert.deepEqual(await tooBig.json(), { error: 'too large' });
+  // A body within the limit is still read, and the connection stays usable afterwards.
+  const fine = await fetch(base, { method: 'POST', body: '12345678' });
+  assert.equal(fine.status, 200);
 });

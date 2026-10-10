@@ -43,6 +43,19 @@ test('parses status and report, and says what is wrong with them', () => {
   for (const [argv, message] of bad) assert.throws(() => parseArgs(argv), (e: Error) => e instanceof UsageError && message.test(e.message), argv.join(' '));
 });
 
+test('each cinema command reaches its own endpoint, not the roster', () => {
+  const path = (what: string) => new URL(buildRequest(what, OFFICE, {}).url).pathname;
+  const method = (what: string) => buildRequest(what, OFFICE, {}).method;
+  assert.deepEqual([path('cinema.list'), method('cinema.list')], ['/office/workers/cinema', 'GET']);
+  assert.deepEqual([path('cinema.add'), method('cinema.add')], ['/office/workers/cinema', 'POST']);
+  assert.deepEqual([path('cinema.remove'), method('cinema.remove')], ['/office/workers/cinema/remove', 'POST']);
+  // A command with no endpoint is refused rather than answered by the roster.
+  assert.throws(() => buildRequest('cinema.teleport', OFFICE, {}), /has no endpoint/);
+  assert.equal(path('list'), '/office/workers');
+  assert.equal(path('hire'), '/office/workers');
+  assert.equal(path('plan-review'), '/office/workers/plan-review');
+});
+
 test('builds the report and standup requests', () => {
   const auth = { authorization: 'Bearer tok' };
   assert.deepEqual(buildRequest('status', OFFICE), { method: 'GET', url: 'http://127.0.0.1:4455/office/report?worker=w1', headers: auth, timeout: 15_000 });

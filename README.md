@@ -419,6 +419,8 @@ The meeting room has a screening room: a screen on its far wall, a projector bes
 
 Press **E** at the screen for the window: the floor's reels down the side, the shot you are watching with its caption, and **▶️ On the screen**, **⏸️**, **⏹️** and **◀ ▶** to step along. A new reel goes up as it arrives, `office-workers cinema list` says what is showing, and `office-workers cinema remove <id>` takes one off the floor.
 
+Anyone on the floor can put a reel up or take one down: the screening room is shared, like the whiteboard and the TV.
+
 ### Agent setup and remote terminals
 
 OpenCode model selections use per-process configuration, including models set in the default worker or `--agent-args`; no `--model` flag is sent to its interactive CLI. OpenCode 2 workers start private servers so each receives its own settings. Leave Model on **Default** to retain your OpenCode settings. See [agents](docs/agents.md) for model and resume behavior.

@@ -28,6 +28,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { homedir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { REEL_SHOTS_MAX, REEL_TITLE_MAX, SHOT_CAPTION_MAX } from '../../shared/cinema.js';
 
 /** Reads `--flag value` and `--flag=value`, and returns the first one asked for. */
 export function flag(args: readonly string[], name: string, fallback?: string): string | undefined {
@@ -67,15 +68,18 @@ export function readReelFile(text: string): Reel | string {
   const title = typeof r.title === 'string' ? r.title.trim() : '';
   if (!title) return 'Say what the reel shows: "title".';
   if (!Array.isArray(r.shots) || !r.shots.length) return 'A reel needs at least one shot.';
-  if (r.shots.length > 12) return 'A reel is at most 12 shots: keep the demonstration short.';
+  if (r.shots.length > REEL_SHOTS_MAX) return `A reel is at most ${REEL_SHOTS_MAX} shots: keep the demonstration short.`;
   const shots: ReelStep[] = [];
   for (const raw of r.shots) {
     const s = (raw ?? {}) as { caption?: unknown };
     const caption = typeof s.caption === 'string' ? s.caption.trim() : '';
     if (!caption) return 'Every shot needs a caption saying what the behaviour shown is.';
-    shots.push({ ...(s as ReelStep), caption: caption.slice(0, 160) });
+    shots.push({ ...(s as ReelStep), caption: caption.slice(0, SHOT_CAPTION_MAX) });
   }
-  return { title, ...(Number.isFinite(Number(r.pr)) && r.pr !== undefined && r.pr !== '' ? { pr: Number(r.pr) } : {}), shots };
+  // A pull request is a positive whole number, or nothing: `Number(null)` and `Number('')` are 0.
+  const pr = Number(r.pr);
+  const hasPr = r.pr !== undefined && r.pr !== null && r.pr !== '' && Number.isSafeInteger(pr) && pr > 0;
+  return { title: title.slice(0, REEL_TITLE_MAX), ...(hasPr ? { pr } : {}), shots };
 }
 
 /** Where Chromium is: playwright-core's download, unless the caller says otherwise. */

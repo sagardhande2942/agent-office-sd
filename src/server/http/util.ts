@@ -19,18 +19,32 @@ export function readBody(req: http.IncomingMessage, limit = 1024 * 1024): Promis
   return readBytes(req, limit).then((b) => b.toString('utf8'));
 }
 
+/**
+ * The request's body, at most `limit` bytes; a string saying `too large` when it is over.
+ *
+ * Over the limit the rest of the body is drained rather than the socket destroyed, because the caller
+ * still has an answer to send — a 413 saying so, which is what every caller does with `too large`. A
+ * destroyed socket takes that answer with it and the client sees a connection error instead, which says
+ * nothing about what was wrong with it.
+ */
 export function readBytes(req: http.IncomingMessage, limit: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     let size = 0;
+    let over = false;
     const chunks: Buffer[] = [];
     req.on('data', (c: Buffer) => {
       size += c.length;
       if (size > limit) {
-        reject(new Error('too large'));
-        req.destroy();
-      } else chunks.push(c);
+        if (!over) {
+          over = true;
+          chunks.length = 0;
+          reject(new Error('too large'));
+        }
+        return; // drained, and thrown away: what is left of the body is nobody's business
+      }
+      chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('end', () => (over ? undefined : resolve(Buffer.concat(chunks))));
     req.on('error', reject);
   });
 }

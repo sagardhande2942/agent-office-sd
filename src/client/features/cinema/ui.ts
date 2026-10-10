@@ -2,6 +2,7 @@ import { reelMs, showing, type ReelSummary, type ReelShot } from '../../../share
 import { clip, h, openModal, setDoing, timeAgo, type Modal } from '../../ui/dom';
 import { store } from '../../state';
 import type { Net } from '../../net';
+import { shotUrl } from './shots';
 import './ui.css';
 
 // The screening room window: the floor's reels down the side, and the one you're watching beside them
@@ -191,10 +192,10 @@ export class Screening {
     return store.cinema.reels.find((r) => r.id === this.picked) ?? store.cinema.reels[0];
   }
 
-  /** Where the office's copy of the shot is: a PNG on this floor (see http/routes/cinema.ts). */
+  /** Where the office's copy of the shot is: a PNG on this floor (see shots.ts). */
   private shotUrl(reel: ReelSummary): string {
     const n = Math.min(Math.max(0, this.onScreen), Math.max(0, reel.shots.length - 1));
-    return `/api/cinema/shot?floor=${encodeURIComponent(this.deps.floor())}&reel=${encodeURIComponent(reel.id)}&n=${n}`;
+    return shotUrl(this.deps.floor(), reel.id, n);
   }
 
   private closed() {

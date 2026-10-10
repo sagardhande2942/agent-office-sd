@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { SCREEN } from '../../../shared/cinema';
+import { ShotCache } from './shots';
 
 // What the screening room's screen shows: the shot of the build, and its caption under it. Both are
 // ordinary canvases drawn here and given to the two meshes as textures (see world.ts), so the reel is
@@ -17,10 +18,10 @@ export class ScreenPainter {
   private readonly caption = document.createElement('canvas');
   private readonly shotTex: THREE.CanvasTexture;
   private readonly captionTex: THREE.CanvasTexture;
-  /** The shots already fetched, by `${reel}/${n}`, so a reel that comes back round isn't re-fetched. */
-  private readonly pictures = new Map<string, HTMLImageElement>();
-  /** What each canvas was last painted with, so an unchanged shot isn't drawn again. */
-  private drawn = '';
+  /** The shots already fetched, so a reel that comes back round isn't fetched again (see shots.ts). */
+  private readonly cache = new ShotCache();
+  /** Counts what has been asked for, so a slow earlier fetch cannot paint over a newer one. */
+  private asked = 0;
   private said = '';
   /** What is on the screen now, kept so the font loading can paint it again with the office's. */
   private now: { reel: string; n: number; caption: string; floor: string } | null = null;
@@ -66,9 +67,10 @@ export class ScreenPainter {
   async show(reel: string, n: number, caption: string, floor: string) {
     this.now = { reel, n, caption, floor };
     this.say(caption);
-    const key = `${floor}/${reel}/${n}`;
-    const picture = this.pictures.get(key) ?? (await this.fetch(key, floor, reel, n));
-    if (!picture) return;
+    const wanted = ++this.asked;
+    const picture = await this.cache.get(floor, reel, n);
+    // Something newer was asked for while this was being fetched: that one is the wall's now.
+    if (wanted !== this.asked || !picture) return;
     const g = this.shot.getContext('2d')!;
     const { width: w, height: h } = picture;
     // Cover the screen, cropping the overflow the way CSS object-fit does.
@@ -76,7 +78,6 @@ export class ScreenPainter {
     const dw = w * scale;
     const dh = h * scale;
     g.drawImage(picture, (this.shot.width - dw) / 2, (this.shot.height - dh) / 2, dw, dh);
-    this.drawn = key;
     this.shotTex.needsUpdate = true;
   }
 
@@ -105,27 +106,12 @@ export class ScreenPainter {
     const now = this.now;
     if (!now) return;
     this.said = '';
-    this.say(now.caption);
-    this.drawn = '';
     void this.show(now.reel, now.n, now.caption, now.floor);
   }
 
-  /** The office's copy of a shot: `/api/cinema/shot`, which is a PNG of the build on this floor. */
-  private async fetch(key: string, floor: string, reel: string, n: number): Promise<HTMLImageElement | undefined> {
-    const picture = new Image();
-    picture.src = `/api/cinema/shot?floor=${encodeURIComponent(floor)}&reel=${encodeURIComponent(reel)}&n=${n}`;
-    try {
-      await picture.decode();
-    } catch {
-      return undefined;
-    }
-    this.pictures.set(key, picture);
-    return picture;
-  }
-
   /** Lets go of the shots of reels no longer on the screen. */
-  forget(keep: string[]) {
-    for (const key of [...this.pictures.keys()]) if (!keep.some((k) => key.includes(`/${k}/`))) this.pictures.delete(key);
+  forget(keep: readonly string[]) {
+    this.cache.forget(keep);
   }
 }
 
