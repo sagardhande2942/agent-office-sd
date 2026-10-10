@@ -4,6 +4,7 @@
 import { IS_MAC } from './termkeys';
 
 export const HELP_ROWS: readonly (readonly [string, string])[] = [
+  ['🌀', 'Parallel worlds in the menu: launch three independent variants of one task, enter a glowing portal in the south aisle to inspect previews, compare results, and select a winner for a PR.'],
   ['👑', 'Master / Workers in the menu: choose a master and eligible models, save reusable presets, and let the team deliver one PR. Open its activity to follow assignments or pause/resume.'],
   ['W A S D', 'Walk (hold Shift to run)'],
   ['Space', 'Jump'],

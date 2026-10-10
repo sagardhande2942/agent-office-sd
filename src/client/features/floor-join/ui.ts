@@ -79,7 +79,7 @@ export function openFloorJoin() {
     h('details', {}, h('summary', {}, 'Optional settings'), field('Repository (optional)', repo), field('Machine name (optional)', name), field('Terminal shell', shell)),
     h('p.setting-note', {}, 'Run from your agent-office folder after installing and building it. The project stays on your computer. Everyone in the office can control its terminals; connect only to an office you trust.'),
     command, copy, error,
-    h('p.setting-note', {}, 'Keep the command running. Your floor appears in the elevator automatically. Next time, run npm start -- floor-host from the same agent-office folder.'),
+    h('p.setting-note', {}, 'Keep the command running. Your floor appears in the elevator automatically. Next time, run node bin/agent-office.js floor-host from the same agent-office folder.'),
     store.me.admin && h('h3', {}, 'Paired machines'), store.me.admin && list,
     ),
   );

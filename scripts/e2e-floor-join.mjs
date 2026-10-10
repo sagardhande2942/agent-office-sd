@@ -32,7 +32,7 @@ let hostLog = '';
 const errors = [], checks = [];
 const waitFor = async test => { const until = Date.now() + 20000; while (!await test()) { if (Date.now() > until) throw Error(`Timed out. Host output: ${hostLog}`); await new Promise(r => setTimeout(r, 100)); } };
 const launchHost = args => {
-  child = spawn(process.execPath, ['--import', 'tsx', 'src/server/cli.ts', 'floor-host', '--config', tokenFile, ...args], { cwd: process.cwd(), env: { ...process.env, AGENT_OFFICE_AGENT: cfg.agentCmd } });
+  child = spawn(process.execPath, ['bin/agent-office.js', 'floor-host', '--config', tokenFile, ...args], { cwd: process.cwd(), env: { ...process.env, AGENT_OFFICE_AGENT: cfg.agentCmd } });
   child.stdout.on('data', d => { hostLog += String(d); }); child.stderr.on('data', d => { hostLog += String(d); });
 };
 const stopHost = async () => { if (!child || child.exitCode !== null) return; const stopped = new Promise(r => child.once('exit', r)); child.kill(); await stopped; child = undefined; };
@@ -60,6 +60,7 @@ try {
   await page.getByLabel('Machine name (optional)', { exact: true }).fill('Joiner laptop');
   await page.getByText('Optional settings', { exact: true }).click();
   const command = await page.getByLabel('Join command', { exact: true }).inputValue();
+  assert.ok(command.startsWith('node bin/agent-office.js floor-host --office '));
   assert.ok(command.includes('--checkout')); assert.ok(command.includes(base));
   launchHost(['--office', base, '--code', code, '--checkout', remote, '--name', 'Joiner laptop']);
   await waitFor(async () => { const r = await context.request.get(base + '/api/floor-join/status'); return (await r.json()).machines.some(m => m.floors.some(f => f.online)); });

@@ -62,8 +62,10 @@ test('project registration is idempotent, persists, and cannot move another mach
 test('both shell command formats quote paths and shell metacharacters', () => {
   const input = { office: 'https://office.test', code: 'ABCD-1234', checkout: "C:\\Alice's projects\\$(secret)`app" };
   const ps = floorJoinCommand(input, 'powershell');
+  assert.ok(ps.startsWith('node bin/agent-office.js floor-host --office '));
   assert.ok(ps.includes("'C:\\Alice''s projects\\$(secret)`app'"));
   const bash = floorJoinCommand(input, 'bash');
+  assert.ok(bash.startsWith('node bin/agent-office.js floor-host --office '));
   assert.ok(bash.includes("'C:\\Alice'\\''s projects\\$(secret)`app'"));
   assert.ok(validJoinProject({ dir: '/home/me/app', repo: 'me/app' }));
   assert.ok(!validJoinProject({ dir: '/home/me\n/app', repo: 'me/app' }));

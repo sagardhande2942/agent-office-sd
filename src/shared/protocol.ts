@@ -1,3 +1,5 @@
+import type { WorldsClientMsg, WorldsServerMsg } from './protocol/parallel-worlds.js';
+export * from './protocol/parallel-worlds.js';
 import type { MasterWorkersClientMsg, MasterWorkersServerMsg } from './protocol/master-workers.js';
 export * from './protocol/master-workers.js';
 
@@ -42,6 +44,7 @@ export * from './protocol/workers.js';
 export * from './protocol/communications.js';
 
 export type ClientMsg =
+  | WorldsClientMsg
   | MasterWorkersClientMsg
 
   | AppearanceClientMsg
@@ -70,6 +73,7 @@ export type ClientMsg =
   | DogClientMsg;
 
 export type ServerMsg =
+  | WorldsServerMsg
   | MasterWorkersServerMsg
 
   | AppearanceServerMsg

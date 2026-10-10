@@ -1,3 +1,4 @@
+import { worldsHandlers } from './parallel-worlds.js';
 import { masterWorkersHandlers, masterWorkersView } from './master-workers.js';
 
 import { appearanceHandlers, appearanceView } from './appearances.js';
@@ -32,6 +33,7 @@ import { communicationsView } from './communications.js';
 
 /** Each domain's handlers put together, in alphabetical order. */
 export const handlers: HandlerMap<ClientMsg> = {
+  ...worldsHandlers,
   ...appearanceHandlers,
   ...forkHandlers,
   ...accountsHandlers,
