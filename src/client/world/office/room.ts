@@ -1,3 +1,4 @@
+import { editable } from '../../features/object-placement/model';
 import * as THREE from 'three';
 import { BOARDS, LOFT, MACHINE_MONITOR, PLANTS, SEATING_BY_ID, STAIRS, STREET_Y, TV, WALL_HEIGHT, plantByWing } from '../../../shared/layout';
 import { wallFacing } from '../../../shared/decor';
@@ -34,6 +35,7 @@ export const rugs: Fixture = (site) => {
     [-1.5, 4],
   ].forEach(([x, z], i) => {
     const rug = mesh(roundedBox(6.2, 0.02, 4.6, 0.6), toon(PALETTE.rugs[i]), x, 0.011, z, false);
+    editable(rug, `rug-${x}-${z}`, 'Rug');
     site.group.add(rug);
   });
   return {};
@@ -133,8 +135,11 @@ export const lounge: Fixture = (site) => {
   const table = coffeeTable();
   table.position.set(13, 0, 0);
   site.group.add(table);
-  site.colliders.push({ minX: 12.2, maxX: 13.8, minZ: -0.8, maxZ: 0.8, top: 0.46 });
+  const tableCollider = { minX: 12.2, maxX: 13.8, minZ: -0.8, maxZ: 0.8, top: 0.46 };
+  site.colliders.push(tableCollider);
+  editable(table, 'lounge-coffee-table', 'Coffee table', tableCollider);
   const rug = mesh(roundedBox(7, 0.02, 7, 1.2), toon('#ffc6ff'), 13.4, 0.011, 0, false);
+  editable(rug, 'lounge-rug', 'Lounge rug');
   site.group.add(rug);
 
   // A pouf either side of the lounge (the seats still called beanbags), turned to the TV like whoever sits on it.
@@ -168,6 +173,7 @@ export const plants: Fixture<'plants'> = (site) => {
     const r = 0.3 * s;
     const collider: Collider = { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, top: 0.5 * s };
     site.colliders.push(collider);
+    if (!plantByWing(spot)) editable(p, `plant-${i}`, 'Potted plant', collider);
     if (plantByWing(spot)) site.inTheWay.push({ group: p, collider });
   }
   return { handle: { plants: pots } };

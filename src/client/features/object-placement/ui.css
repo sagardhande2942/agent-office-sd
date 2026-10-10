@@ -1,0 +1,11 @@
+.placement-backdrop { pointer-events: none; background: transparent; }
+.object-placement { pointer-events: auto; position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); width: min(540px, calc(100vw - 24px)); padding: 16px; background: var(--paper); border: 3px solid var(--ink); border-radius: 20px; box-shadow: var(--shadow); max-height: calc(100vh - 100px); overflow: auto; }
+.object-placement header { display: flex; align-items: center; justify-content: space-between; }
+.object-placement h2 { font-size: 16px; margin: 0; }
+.object-placement p { font-size: 12px; margin: 10px 0; }
+.placement-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.placement-controls[hidden] { display: none; }
+.placement-controls label { font-size: 12px; }
+.placement-controls input[type=number] { width: 74px; }
+.placement-controls input[type=number] { font: inherit; border: 2px solid var(--ink); border-radius: 8px; padding: 4px; }
+.placement-backdrop ~ .backdrop { pointer-events: auto; }
