@@ -518,7 +518,7 @@ export class RemoteFloor implements FloorActions {
    * on the surface at all and there is nothing here to call. This is how the office says so out loud,
    * by name: a gap the user can read beats a feature that silently does nothing.
    */
-  refuses(feature: 'the whiteboard' | 'the dog' | 'the docs'): string {
+  refuses(feature: 'the whiteboard' | 'the dog' | 'the docs' | 'the screening room'): string {
     return `${feature} is on ${this.machine}, which hosts this floor`;
   }
 }

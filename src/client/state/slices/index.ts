@@ -39,6 +39,7 @@ import { theme } from './theme';
 import { upgrade } from './upgrade';
 import { usage } from './usage';
 import { whiteboard } from './whiteboard';
+import { cinema } from './cinema';
 import { communications } from './communications';
 
 export const SLICES: readonly Slice[] = [
@@ -66,6 +67,7 @@ export const SLICES: readonly Slice[] = [
   jukebox,
   whiteboard,
   cabinet,
+  cinema,
   ball,
   cars,
   jail,

@@ -8,6 +8,7 @@ import type { AgentEffort, AgentProvider, WorkerInfo, WorktreeCleanup } from '..
 import { isAgentEffort, isAgentProvider } from '../shared/protocol.js';
 import { DESK_BY_ID, STATION_AGENT } from '../shared/layout.js';
 import { blockersOf } from '../shared/manager.js';
+import { REEL_SHOTS_MAX, REEL_TITLE_MAX, SHOT_BYTES_MAX, SHOT_CAPTION_MAX, SHOT_PIXELS_MAX, SHOT_SIDE_MAX } from '../shared/cinema.js';
 import { workerPr, type PullsView, type WorkerRow } from '../shared/status.js';
 import { landedWork, notLeaving } from './leave-on-merge.js';
 
@@ -155,6 +156,67 @@ export function readPrRequest(body: unknown): PrRequest | string {
   const n = typeof b.pr === 'number' ? b.pr : url ? Number(url[2]) : /^#?\d+$/.test(text) ? Number(text.replace('#', '')) : NaN;
   if (!Number.isSafeInteger(n) || n < 1) return "Say which pull request: pr, its number or its URL (or unlink: true to take the worker's off)";
   return { ...who, pr: n, ...(url ? { repo: url[1] } : {}) };
+}
+
+/**
+ * A reel for the screening room, read from its JSON body: what it shows, the pull request it
+ * demonstrates, and its shots — a caption saying what the behaviour is, and the PNG of it.
+ */
+export interface ReelRequest {
+  title: string;
+  pr?: number;
+  /** Each shot's caption, its picture, and the picture's own size (read off the PNG). */
+  shots: { caption: string; png: Buffer; width: number; height: number }[];
+}
+
+export function readReelRequest(body: unknown): ReelRequest | string {
+  const b = (body ?? {}) as { title?: unknown; pr?: unknown; shots?: unknown };
+  const title = typeof b.title === 'string' ? b.title.trim().slice(0, REEL_TITLE_MAX) : '';
+  if (!title) return 'Say what the reel shows: title';
+  if (b.pr !== undefined && !(Number.isSafeInteger(b.pr) && (b.pr as number) > 0)) return 'pr is a pull request number';
+  if (!Array.isArray(b.shots) || !b.shots.length) return 'A reel needs at least one shot';
+  if (b.shots.length > REEL_SHOTS_MAX) return `A reel is at most ${REEL_SHOTS_MAX} shots: keep the demonstration short`;
+  const shots: ReelRequest['shots'] = [];
+  let bytes = 0;
+  for (const raw of b.shots as unknown[]) {
+    const s = (raw ?? {}) as { caption?: unknown; image?: unknown };
+    const caption = typeof s.caption === 'string' ? s.caption.trim().slice(0, SHOT_CAPTION_MAX) : '';
+    if (!caption) return 'Every shot needs a caption saying what the behaviour shown is';
+    const png = checkPng(s.image);
+    if (typeof png === 'string') return png;
+    bytes += png.length;
+    if (bytes > SHOT_BYTES_MAX * REEL_SHOTS_MAX) return 'That reel is too big to send: record fewer or smaller shots';
+    shots.push({ caption, png, ...pngSize(png)! });
+  }
+  return { title, ...(b.pr !== undefined ? { pr: b.pr as number } : {}), shots };
+}
+
+/** A PNG an agent sent, as bytes, or a string saying why it isn't one. The office only ever keeps real PNGs. */
+export function checkPng(raw: unknown): Buffer | string {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (!text) return 'A shot has no picture';
+  // What the browser reads is a data URL; what the office keeps is the bytes inside it.
+  const b64 = text.startsWith('data:') ? text.slice(text.indexOf(',') + 1) : text;
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) return 'A shot has to be a PNG (a screenshot of the build, not something else)';
+  const png = Buffer.from(b64, 'base64');
+  if (png.length < 33 || png[0] !== 0x89 || png.toString('latin1', 1, 4) !== 'PNG') return 'A shot has to be a PNG (a screenshot of the build, not something else)';
+  if (png.length > SHOT_BYTES_MAX) return 'A shot is too big: capture a smaller window';
+  const size = pngSize(png);
+  if (!size) return 'That PNG is truncated: capture the shot again';
+  // The bytes are small; what every browser would decode is not, unless it is a screenshot's size.
+  if (size.width > SHOT_SIDE_MAX || size.height > SHOT_SIDE_MAX || size.width * size.height > SHOT_PIXELS_MAX) {
+    return `A shot is ${size.width}×${size.height}: capture a window, not a poster`;
+  }
+  return png;
+}
+
+/** A picture's own width and height, read off its PNG header: 24 bytes in, four big numbers. */
+export function pngSize(png: Buffer): { width: number; height: number } | null {
+  if (png.length < 24 || png.toString('latin1', 12, 16) !== 'IHDR') return null;
+  const width = png.readUInt32BE(16);
+  const height = png.readUInt32BE(20);
+  // Bounds wide enough to name what arrived in the refusal, and no wider: 2^32 is what a header claims.
+  return width > 0 && height > 0 && width <= 0xffff && height <= 0xffff ? { width, height } : null;
 }
 
 // --- The MCP server -------------------------------------------------------------------------------

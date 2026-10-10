@@ -304,7 +304,7 @@ export interface FloorActions {
    * else's disk. This is the other half — how the office says so out loud, by name, rather than
    * letting the feature look broken. A floor in this process always answers `undefined`.
    */
-  refuses(feature: 'the whiteboard' | 'the dog' | 'the docs'): string | undefined;
+  refuses(feature: 'the whiteboard' | 'the dog' | 'the docs' | 'the screening room'): string | undefined;
 
   /** Someone arrived on this floor. Presence, so it stays office-side even for a hosted floor. */
   arrived(): void;

@@ -26,6 +26,7 @@ import { Court } from './court.js';
 import { Jail } from './jail.js';
 import { Garage } from './garage.js';
 import { Jukebox } from './jukebox.js';
+import { Cinema } from './cinema.js';
 import { Tv } from './tv.js';
 import { Whiteboard } from './whiteboard.js';
 import { MeetingRoom } from './meetings.js';
@@ -134,6 +135,8 @@ export class Floor {
   readonly jukebox: Jukebox;
   /** The big TV: the link on it, and where everyone is in it. */
   readonly tv: Tv;
+  /** The screening room: the reels recorded here, and what its screen is showing. */
+  readonly cinema: Cinema;
   /** The whiteboard everyone on the floor draws on together. */
   readonly whiteboard: Whiteboard;
   /** The meeting room, where workers work through a question together (see meetings.ts). */
@@ -353,6 +356,7 @@ export class Floor {
     this.decor = new Decor(dataDir);
     this.jukebox = new Jukebox(dataDir);
     this.tv = new Tv(dataDir, (state) => ctx.emit(this, { t: 'tv', state }));
+    this.cinema = new Cinema(dataDir);
     this.whiteboard = new Whiteboard(dataDir);
     this.ready = this.workers.start();
 
@@ -500,7 +504,7 @@ export class Floor {
    * dog and the docs are all files in `dataDir`, right here. So there is nothing to refuse, and saying
    * so is what lets the office ask any floor the same question without knowing which it has.
    */
-  refuses(_feature: 'the whiteboard' | 'the dog' | 'the docs'): undefined {
+  refuses(_feature: 'the whiteboard' | 'the dog' | 'the docs' | 'the screening room'): undefined {
     return undefined;
   }
 

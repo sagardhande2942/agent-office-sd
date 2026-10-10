@@ -12,6 +12,7 @@ import { ballHandlers, ballHooks, ballView } from './ball.js';
 import { cabinetHandlers, cabinetHooks, cabinetView } from './cabinet.js';
 import { carHandlers, carHooks, carsView } from './car.js';
 import { changesHandlers, changesHooks } from './changes.js';
+import { cinemaHandlers, cinemaView } from './cinema.js';
 import { decorHandlers, decorView } from './decor.js';
 import { dogHandlers, dogView } from './dog.js';
 import { floorHandlers, projectView } from './floors.js';
@@ -41,6 +42,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...cabinetHandlers,
   ...carHandlers,
   ...changesHandlers,
+  ...cinemaHandlers,
   ...decorHandlers,
   ...dogHandlers,
   ...floorHandlers,
@@ -91,4 +93,5 @@ export const views: ViewPieces = {
   masterWorkers: masterWorkersView,
   planReview: planReviewView,
   cabinet: cabinetView,
+  cinema: cinemaView,
 };

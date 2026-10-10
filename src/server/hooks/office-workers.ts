@@ -1,7 +1,7 @@
 import { teamTargetError } from '../master-workers/role.js';
 import type http from 'node:http';
 import { notLeaving } from '../leave-on-merge.js';
-import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow, type PullsView } from '../office-workers.js';
+import { findWorker, readHireRequest, readHomeRequest, readPrRequest, readReelRequest, workerRow, type PullsView } from '../office-workers.js';
 import { gh } from '../github.js';
 import type { Floor } from '../floor.js';
 import { DESK_BY_ID, nextFreeSeat } from '../../shared/layout.js';
@@ -9,6 +9,8 @@ import type { WorkerInfo } from '../../shared/protocol.js';
 import type { Ctx } from '../office/context.js';
 import { str } from '../office/input.js';
 import { readBody, send } from '../http/util.js';
+import { REEL_BODY_BYTES } from '../../shared/cinema.js';
+import { cinemaChanged } from '../ws/handlers/cinema.js';
 
 /**
  * Pull request `n` on a floor, for a worker to have as its own: one that's open, or merged and still
@@ -67,11 +69,23 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
       workers: list.map((w) => workerRow(w, view, me.id)),
     });
   }
-  if (req.method !== 'POST' || !['', '/home', '/tell', '/pr'].includes(action)) return send(res, 405, { error: 'GET /office/workers, or POST to /office/workers, /office/workers/home, /office/workers/tell or /office/workers/pr' });
+  // What's in the screening room, for `office-workers cinema list`: the reels and what is on the
+  // screen. Its own GET, beside the roster's, rather than a read of a POST-only endpoint.
+  if (req.method === 'GET' && action === '/cinema') {
+    const local = ctx.asLocal(floor);
+    return local
+      ? send(res, 200, local.cinema.state())
+      : send(res, 403, { error: floor.refuses('the screening room') });
+  }
+  if (req.method !== 'POST' || !['', '/home', '/tell', '/pr', '/cinema', '/cinema/remove'].includes(action))
+    return send(res, 405, { error: 'GET /office/workers or /office/workers/cinema, or POST to /office/workers, /office/workers/home, /office/workers/tell, /office/workers/pr, /office/workers/cinema or /office/workers/cinema/remove' });
   let body: unknown;
   try {
-    body = JSON.parse((await readBody(req)) || '{}');
-  } catch {
+    // A reel's pictures are base64 in the body, so its budget is bigger than the 1 MB default and is
+    // REEL_BODY_BYTES: over it the request is refused with a reason rather than cut off mid-stream.
+    body = JSON.parse((await readBody(req, action.startsWith('/cinema') ? REEL_BODY_BYTES : 1024 * 1024)) || '{}');
+  } catch (err) {
+    if ((err as Error).message === 'too large') return send(res, 413, { error: 'That reel is too big to send: record fewer or smaller shots' });
     return send(res, 400, { error: 'Send JSON' });
   }
 
@@ -146,6 +160,35 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     const whose = w.id === me.id ? 'its own' : `${w.name}'s`;
     ctx.toastFloor(floor, pr ? `${who} said PR #${pr.number} is ${whose}` : `${who} said ${w.id === me.id ? 'it has' : `${w.name} has`} no pull request`);
     return send(res, 200, { ok: true, worker: row(w.id) });
+  }
+
+  if (action === '/cinema/remove') {
+    const local = ctx.asLocal(floor);
+    if (!local) return send(res, 403, { error: floor.refuses('the screening room') });
+    const id = str((body as { reel?: unknown }).reel, 32);
+    if (!/^[a-z0-9]{12}$/.test(id)) return send(res, 400, { error: 'Say which reel to remove: its id, from `office-workers cinema list`' });
+    if (!local.cinema.remove(id, who)) return send(res, 404, { error: 'No such reel in the screening room' });
+    cinemaChanged(ctx, local);
+    ctx.toastFloor(local, `🗑️ ${who} took a reel off the screening room`);
+    return send(res, 200, { ok: true, reels: local.cinema.state().reels });
+  }
+
+  if (action === '/cinema') {
+    // A worker recording a demonstration of what it shipped: the shots are pictures of the build, so
+    // this is the screening room's own directory and only a floor in this process has one.
+    const local = ctx.asLocal(floor);
+    if (!local) return send(res, 403, { error: floor.refuses('the screening room') });
+    const ask = readReelRequest(body);
+    if (typeof ask === 'string') return send(res, 400, { error: ask });
+    let reel;
+    try {
+      reel = local.cinema.add({ title: ask.title, ...(ask.pr ? { pr: ask.pr } : {}), by: who, shots: ask.shots.map(({ caption, width, height }) => ({ caption, width, height })) }, ask.shots.map((s) => s.png));
+    } catch (err) {
+      return send(res, 500, { error: (err as Error).message });
+    }
+    cinemaChanged(ctx, local);
+    ctx.toastFloor(local, `🎬 ${who} put “${reel.title}” on the screening room (${reel.shots.length} shot${reel.shots.length === 1 ? '' : 's'})`);
+    return send(res, 200, { ok: true, reel });
   }
 
   const ask = readHireRequest(body, floor.project.agentProviders);

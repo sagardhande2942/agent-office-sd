@@ -1,0 +1,25 @@
+/* The screening room (ui.ts): the floor's reels down the side, the one you're watching beside them. */
+.modal.screening, .modal.screening-empty { width: min(1180px, 100%); height: min(760px, calc(100vh - 32px)); }
+.modal.screening .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 290px minmax(0, 1fr); padding: 0; overflow: hidden; }
+.modal.screening-empty p { padding: 20px 26px; margin: 0; font-size: 15px; line-height: 1.65; color: var(--muted); }
+.modal.screening-empty code { font: 13px ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--paper-2); padding: 2px 6px; border-radius: 6px; }
+.screening .cinema-reels { display: flex; flex-direction: column; min-height: 0; overflow: auto; gap: 4px; padding: 10px; border-right: 3px solid var(--ink); background: var(--paper-2); }
+.reel { display: flex; flex-direction: column; gap: 2px; text-align: left; font: inherit; cursor: pointer; padding: 9px 11px; border-radius: 11px; border: 2px solid transparent; background: none; color: var(--ink); }
+.reel:hover { background: rgba(255, 255, 255, .75); }
+.reel.sel { border-color: var(--accent); background: #fff; }
+.reel-title { font-weight: 900; font-size: 14.5px; line-height: 1.3; }
+.reel-meta { font-weight: 700; font-size: 11.5px; color: var(--muted); }
+.reel-shots { font-weight: 800; font-size: 11.5px; color: var(--muted); }
+.screening .cinema-stage { display: flex; min-width: 0; min-height: 0; background: #141726; }
+.cinema-player { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; padding: 18px; gap: 12px; }
+.cinema-player .cinema-shot { flex: 1; min-height: 0; width: 100%; object-fit: contain; border-radius: 12px; border: 3px solid rgba(253, 251, 247, .16); background: #0d0f1a; }
+.cinema-player .cinema-caption { flex: none; margin: 0; color: #fdfbf7; font-size: 16px; font-weight: 700; line-height: 1.5; text-align: center; min-height: 24px; }
+.cinema-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cinema-bar .cinema-count { color: rgba(253, 251, 247, .7); font-weight: 800; font-size: 12.5px; margin-left: 4px; }
+.cinema-bar .cinema-pr { color: #8ab4ff; font-weight: 800; font-size: 12.5px; text-decoration: none; }
+.cinema-bar .cinema-pr:hover { text-decoration: underline; }
+.cinema-bar .cinema-live { color: #ffd166; font-weight: 800; font-size: 12.5px; margin-left: auto; }
+@media (max-width: 820px) {
+  .modal.screening .body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 34%) minmax(0, 1fr); }
+  .screening .cinema-reels { border-right: 0; border-bottom: 3px solid var(--ink); }
+}

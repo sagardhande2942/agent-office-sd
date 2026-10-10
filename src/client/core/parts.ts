@@ -42,6 +42,7 @@ import type { installSmartphone } from '../features/smartphone';
 import type { installSmoke } from '../features/smoke';
 import type { installTelescope } from '../features/telescope';
 import type { installTv } from '../features/tv';
+import type { installCinema } from '../features/cinema';
 import type { installVoice } from '../features/voice';
 import type { installWaiting } from '../features/waiting';
 import type { installWalking } from '../features/walking';
@@ -104,6 +105,7 @@ export interface Parts {
   dog: Made<typeof installDog>;
   jukebox: Made<typeof installJukebox>;
   cabinet: Made<typeof installCabinet>;
+  cinema: Made<typeof installCinema>;
   golf: Made<typeof installGolf>;
   bargames: Made<typeof installBarGames>;
   hanging: Made<typeof installHanging>;

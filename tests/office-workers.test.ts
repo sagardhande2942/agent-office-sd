@@ -43,6 +43,19 @@ test('parses status and report, and says what is wrong with them', () => {
   for (const [argv, message] of bad) assert.throws(() => parseArgs(argv), (e: Error) => e instanceof UsageError && message.test(e.message), argv.join(' '));
 });
 
+test('each cinema command reaches its own endpoint, not the roster', () => {
+  const path = (what: string) => new URL(buildRequest(what, OFFICE, {}).url).pathname;
+  const method = (what: string) => buildRequest(what, OFFICE, {}).method;
+  assert.deepEqual([path('cinema.list'), method('cinema.list')], ['/office/workers/cinema', 'GET']);
+  assert.deepEqual([path('cinema.add'), method('cinema.add')], ['/office/workers/cinema', 'POST']);
+  assert.deepEqual([path('cinema.remove'), method('cinema.remove')], ['/office/workers/cinema/remove', 'POST']);
+  // A command with no endpoint is refused rather than answered by the roster.
+  assert.throws(() => buildRequest('cinema.teleport', OFFICE, {}), /has no endpoint/);
+  assert.equal(path('list'), '/office/workers');
+  assert.equal(path('hire'), '/office/workers');
+  assert.equal(path('plan-review'), '/office/workers/plan-review');
+});
+
 test('builds the report and standup requests', () => {
   const auth = { authorization: 'Bearer tok' };
   assert.deepEqual(buildRequest('status', OFFICE), { method: 'GET', url: 'http://127.0.0.1:4455/office/report?worker=w1', headers: auth, timeout: 15_000 });
@@ -218,7 +231,7 @@ test('answers MCP: the handshake, its tools, and a call', async () => {
   assert.equal((await handleMcp({ jsonrpc: '2.0', id: 2, method: 'initialize', params: { protocolVersion: '1999-01-01' } }, io))?.result.protocolVersion, '2025-11-25');
   assert.equal(await handleMcp({ jsonrpc: '2.0', method: 'notifications/initialized' }, io), undefined);
   const tools = await handleMcp({ jsonrpc: '2.0', id: 3, method: 'tools/list' }, io);
-  assert.deepEqual(tools?.result.tools.map((t: { name: string }) => t.name), ['list_workers', 'floor_status', 'report_floor', 'hire_worker', 'send_home', 'tell_worker', 'link_pr', 'get_helper', 'worker_completion', 'submit_worker_completion', 'worker_inbox', 'request_worker', 'reply_worker', 'ack_worker_message', 'plan_review_state', 'submit_candidate_plan', 'request_plan_clarification', 'submit_plan_review', 'team_state', 'team_action']);
+  assert.deepEqual(tools?.result.tools.map((t: { name: string }) => t.name), ['list_workers', 'floor_status', 'report_floor', 'hire_worker', 'send_home', 'cinema_add', 'tell_worker', 'link_pr', 'get_helper', 'worker_completion', 'submit_worker_completion', 'worker_inbox', 'request_worker', 'reply_worker', 'ack_worker_message', 'plan_review_state', 'submit_candidate_plan', 'request_plan_clarification', 'submit_plan_review', 'team_state', 'team_action']);
 
   // A helper goes to a worker, so the call needs only who it is for and, at most, which agent it is.
   const helped = await handleMcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'get_helper', arguments: { worker: 'Byte' } } }, io);

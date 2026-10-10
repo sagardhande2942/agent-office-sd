@@ -13,6 +13,7 @@ import { gong } from '../../features/gong/world';
 import { jukebox } from '../../features/jukebox/world';
 import { bookshelf } from '../../features/bookshelf/world';
 import { cabinet } from '../../features/cabinet/world';
+import { screeningRoom } from '../../features/cinema/world';
 import { whiteboard } from '../../features/whiteboard/world';
 import { green, tee } from '../../features/golf/world';
 import { stack } from '../stack';
@@ -70,6 +71,7 @@ function floorPlan() {
     signs,
     loft,
     meetingRoom,
+    screeningRoom,
     planReviewTable,
     elevator,
     garageLift,

@@ -1,0 +1,21 @@
+{
+  "title": "Instant product cinema",
+  "shots": [
+    {
+      "caption": "The build runs: the office floor, its desks and its boards",
+      "image": "shot-1.png"
+    },
+    {
+      "caption": "A reel recorded against the build is on the screening room screen, with its caption under it",
+      "image": "shot-2.png"
+    },
+    {
+      "caption": "E at the screen opens the room: the reels down the side, the shot, and its caption",
+      "image": "shot-3.png"
+    },
+    {
+      "caption": "Every shot says what the behaviour shown is — that is what makes it a demonstration and not a screenshot",
+      "image": "shot-4.png"
+    }
+  ]
+}

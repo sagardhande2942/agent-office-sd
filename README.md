@@ -419,6 +419,14 @@ TV playback controls and theatre lighting update every viewer on the floor immed
 
 At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
 
+### Instant product cinema
+
+The meeting room has a screening room: a screen on its far wall, a projector beside it, and the caption under the screen. When a worker finishes a feature it can record a short demonstration of what it built **against the actual build** — a real browser over the production bundle, one screenshot per step — caption each shot with the behaviour it shows, and put the reel on the screen with `office-workers cinema add`. Everyone on the floor watches the same shot at the same moment; the office keeps only the captions and the PNGs, so nothing video-shaped crosses the wire. At most twelve shots per reel, and a reel with an uncaptioned shot is refused. See [the screening room](docs/cinema.md).
+
+Press **E** at the screen for the window: the floor's reels down the side, the shot you are watching with its caption, and **▶️ On the screen**, **⏸️**, **⏹️** and **◀ ▶** to step along. A new reel goes up as it arrives, `office-workers cinema list` says what is showing, and `office-workers cinema remove <id>` takes one off the floor.
+
+Anyone on the floor can put a reel up or take one down: the screening room is shared, like the whiteboard and the TV.
+
 ### Agent setup and remote terminals
 
 OpenCode model selections use per-process configuration, including models set in the default worker or `--agent-args`; no `--model` flag is sent to its interactive CLI. OpenCode 2 workers start private servers so each receives its own settings. Leave Model on **Default** to retain your OpenCode settings. See [agents](docs/agents.md) for model and resume behavior.
@@ -534,6 +542,7 @@ Every change to the app that lands on `main` is published as a GitHub release by
 
 - [Decisions](docs/decisions/further-enhancements.md): what the table of bots decided to build next, and why
 - [Streaming to the TV](docs/tv-streaming.md): what plays on the lounge TV, and how every browser stays in step with it
+- [The screening room](docs/cinema.md): recording a short captioned demonstration against the build, and showing it on the meeting room's wall
 
 ## License
 
