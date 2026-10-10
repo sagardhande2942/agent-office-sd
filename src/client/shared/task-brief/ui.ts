@@ -1,9 +1,10 @@
 import { h } from '../../ui/dom';
 import { briefError, formatBrief, TASK_BRIEF_MAX, type TaskBrief } from '../../../shared/task-brief';
 import './ui.css';
+import { aiDraftControls } from './ai';
 
 /** Inline editor: applying a brief updates the prompt, and never starts or messages a worker. */
-export function taskBriefTool(prompt: HTMLTextAreaElement, maxLength = TASK_BRIEF_MAX) {
+export function taskBriefTool(prompt: HTMLTextAreaElement, maxLength = TASK_BRIEF_MAX, context?: string) {
   const build = h('button.btn', { type: 'button' }, 'Build task brief');
   const root = h('div.task-brief-tool', {}, build);
   let editor: HTMLElement | undefined;
@@ -37,8 +38,19 @@ export function taskBriefTool(prompt: HTMLTextAreaElement, maxLength = TASK_BRIE
     const use = h('button.btn.primary', { type: 'button' }, 'Use brief');
     use.disabled = true;
     const cancel = h('button.btn', { type: 'button' }, 'Discard brief');
-    const close = () => { editor?.remove(); editor = undefined; build.disabled = false; prompt.focus(); };
+    const close = () => { ai.dispose(); editor?.remove(); editor = undefined; build.disabled = false; prompt.focus(); };
     const read = (): TaskBrief => ({ original, ...Object.fromEntries(Object.entries(fields).map(([key, field]) => [key, field.value])) } as TaskBrief);
+    const ai = aiDraftControls({ read, maxLength, context,
+      status: text => { status.textContent = text; },
+      busy: value => { for (const field of Object.values(fields)) field.disabled = value; generate.disabled = value; preview.disabled = value; if (value) use.disabled = true; },
+      apply: brief => {
+        if (prompt.value !== original) { status.textContent = 'The original prompt changed. Discard this draft and build from the updated request.'; return; }
+        for (const key of Object.keys(fields) as (keyof typeof fields)[]) fields[key].value = brief[key];
+        preview.value = formatBrief(brief); review.classList.remove('hidden'); use.disabled = false;
+        status.textContent = 'AI draft ready. Review its examples, assumptions and questions, then edit or use the brief.';
+        preview.focus();
+      },
+    });
     generate.addEventListener('click', () => {
       const brief = read(), error = briefError(brief, maxLength);
       status.textContent = error ?? 'Review the draft below. Use brief returns it to the prompt; starting the worker is a separate step.';
@@ -60,7 +72,8 @@ export function taskBriefTool(prompt: HTMLTextAreaElement, maxLength = TASK_BRIE
     cancel.addEventListener('click', close);
     editor = h('section.task-brief-editor', { 'aria-label': 'Task brief builder' },
       h('h3', {}, 'Task brief builder'),
-      h('p', {}, 'Organize your request before starting. This guided builder does not use AI or invent requirements. Examples and constraints are optional; label uncertainty as assumptions or questions.'),
+      h('p', {}, 'Write the brief manually or let AI draft it from your request. Review the result before starting a worker; label uncertainty as assumptions or questions.'),
+      ai.element,
       h('details', {}, h('summary', {}, 'Original request'), h('pre', {}, original)),
       ...rows, status, generate, review, h('div.task-brief-buttons', {}, cancel, use));
     root.append(editor); fields.goal.focus();

@@ -8,3 +8,8 @@
 .task-brief-status { font-size: 13px; color: var(--muted); }
 .task-brief-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .task-brief-review { margin-top: 12px; }
+.task-brief-modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.task-brief-modes .on { background: var(--paper-2); outline: 2px solid var(--accent); }
+.task-brief-ai { padding: 12px; border: 1px solid var(--ink); border-radius: 8px; }
+.task-brief-ai select { display: block; max-width: 100%; margin: 6px 0; }
+.task-brief-ai button { margin: 4px 8px 4px 0; }

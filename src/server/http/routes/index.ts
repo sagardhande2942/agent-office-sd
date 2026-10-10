@@ -11,6 +11,7 @@ import { pageRoutes } from './pages.js';
 import { searchRoutes } from './search.js';
 import { serviceRoutes } from './services.js';
 import { floorJoinRoutes } from '../../floor-join/routes.js';
+import { taskBriefRoutes } from '../../task-brief/routes.js';
 
 export const routes: readonly Route[] = [
   // Anyone.
@@ -30,6 +31,7 @@ export const routes: readonly Route[] = [
   // Signed in.
   authRoutes.whoami,
   ...Object.values(floorJoinRoutes),
+  ...Object.values(taskBriefRoutes),
   agentRoutes.models,
   fileRoutes.image,
   fileRoutes.whiteboardFile,

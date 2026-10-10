@@ -44,7 +44,7 @@ export function openAsk(opts: AskOptions) {
   let to: string | null = opts.newDesk ? null : (opts.workers[0]?.id ?? null);
   const ta = h('textarea', { rows: opts.initial ? 9 : 5, placeholder: opts.placeholder ?? 'What should the worker do?', 'aria-label': 'Prompt' }) as HTMLTextAreaElement;
   ta.value = opts.initial ?? '';
-  const tools = promptTools(ta, Math.max(0, 20_000 - (opts.context ? opts.context.length + 2 : 0)));
+  const tools = promptTools(ta, Math.max(0, 20_000 - (opts.context ? opts.context.length + 2 : 0)), opts.context);
   const wtBox = h('input', { type: 'checkbox', id: 'ask-wt' }) as HTMLInputElement;
   try {
     wtBox.checked = localStorage.getItem(WT_KEY) === '1';
