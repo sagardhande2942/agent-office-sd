@@ -119,11 +119,11 @@ test('the drinks say what they are for: coffee has the energy, the alcohol has t
   assert.ok(beer.calm > 0);
 });
 
-test('the drain rates are the times the office promises: ten minutes of energy, fifteen of calm', () => {
+test('the drain rates are the times the office promises: ten minutes of energy, an hour and a quarter of calm', () => {
   assert.equal(ENERGY_SECONDS, 600);
-  assert.equal(STRESS_SECONDS, 900);
+  assert.equal(STRESS_SECONDS, 4500);
   assert.equal(ENERGY_DRAIN, 1 / 600);
-  assert.equal(STRESS_DRAIN, 1 / 900);
+  assert.equal(STRESS_DRAIN, 1 / 4500);
 });
 
 test('the meters are only spent once they are right out: empty of energy, or wound right up', () => {
