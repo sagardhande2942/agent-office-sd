@@ -22,7 +22,7 @@ export const FOV = 55;
 export interface Stage {
   readonly canvas: HTMLCanvasElement;
   readonly renderer: THREE.WebGLRenderer;
-  /** Draws the scene with the toon outline (see drawFrame in core/loop.ts). */
+  /** Draws the scene with the outline pass disabled (see drawFrame in core/loop.ts). */
   readonly effect: OutlineEffect;
   readonly scene: THREE.Scene;
   readonly camera: SceneCamera;
@@ -58,6 +58,7 @@ export function createScene(canvas: HTMLCanvasElement, renderer: THREE.WebGLRend
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   const effect = new OutlineEffect(renderer, { defaultThickness: 0.0032, defaultColor: [0.17, 0.18, 0.26] });
+  effect.enabled = false;
 
   const scene = new THREE.Scene();
   // The sky's color and the fog change with the time of day and the weather (world/sky.ts).
