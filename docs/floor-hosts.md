@@ -25,6 +25,11 @@ to reconnect with its saved token; the floor becomes reachable when the host ann
 
 ## Pairing
 
+Admins can take a hosted floor off the building using its trash button in **Elevator**, even while
+the host is offline. The row disappears for all viewers without restarting the office, and anyone
+on that floor moves to another floor or the lobby. The host's checkout is retained. After updating
+an older office that left a deleted floor in the list, use Delete again to clear the stale row.
+
 ### Quick connect from the UI
 
 1. Keep the office running (including `npm run dev`). For ngrok, run `ngrok http 4600` in another terminal.
