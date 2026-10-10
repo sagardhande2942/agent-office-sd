@@ -435,7 +435,7 @@ Codex input alerts require a visible sign-in/trust prompt or a permission hook; 
 
 Antigravity CLI is selectable when hiring, configuring board agents and queue tasks, or choosing comparison candidates/reviewers. Install and sign in with `agy` on the office machine, then use `agent-office --agent agy` for the default. See [agent setup](docs/agents.md#antigravity-cli).
 
-Antigravity office hooks report activity and defer tool calls to native approvals (including Always Allow grants). If an older office hook causes “pre-tool hook denied” errors, update and restart the office, then resume the worker to regenerate its hook helper.
+Antigravity office hooks observe invocation, completed tools and stop events without installing a pre-tool permission hook. Permissions follow the CLI settings. For automatic approval, set `"toolPermission": "always-proceed"` in `~/.gemini/antigravity-cli/settings.json` (the snake-case `tool_permission_mode` key is not supported). Update and restart the office, then resume the worker to replace older hooks that requested approval on every tool call.
 
 Remote worker terminals provide **Local typing** for responsive editing over slow floor-host connections. Draft locally, then press Enter to send or use Insert to paste without submitting. Update both office and floor host to remove per-key acknowledgements and room-state refresh traffic. See [remote terminal typing](docs/floor-hosts.md#typing-in-remote-terminals).
 
