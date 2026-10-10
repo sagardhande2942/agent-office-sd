@@ -9,6 +9,7 @@ import path from 'node:path';
 import {
   CODEX_HOOK_EVENTS,
   codexHookArgs,
+  codexHookCommand,
   codexModelArgs,
   normalizeCodexHook,
   validateCodexHook,
@@ -46,7 +47,55 @@ test('generates one stable CLI hook override per supported event', () => {
     assert.match(args[i * 2 + 1], new RegExp(`^hooks\\.${CODEX_HOOK_EVENTS[i]}=\\[\\{hooks=`));
     assert.match(args[i * 2 + 1], /type="command"/);
     assert.match(args[i * 2 + 1], /timeout=3/);
-    assert.match(args[i * 2 + 1], /agent-office-codex-hook\.cjs/);
+    const encoded = args[i * 2 + 1].match(/-EncodedCommand ([A-Za-z0-9+/=]+)/)?.[1];
+    assert.match(encoded ? Buffer.from(encoded, 'base64').toString('utf16le') : args[i * 2 + 1], /agent-office-codex-hook\.cjs/);
+  }
+});
+
+test('Windows hook commands safely encode paths for cmd and PowerShell', () => {
+  const command = codexHookCommand("C:\\Alice's office\\%PATH% & $test`\\hook.cjs", 'Stop', 'win32', 'C:\\Program Files\\node.exe');
+  assert.match(command, /^powershell\.exe -NoProfile -NonInteractive -EncodedCommand [A-Za-z0-9+/=]+$/);
+  const script = Buffer.from(command.split(' ').at(-1)!, 'base64').toString('utf16le');
+  assert.equal(script, "$OutputEncoding = [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); & 'C:\\Program Files\\node.exe' 'C:\\Alice''s office\\%PATH% & $test`\\hook.cjs' 'Stop'; exit $LASTEXITCODE");
+  assert.equal(codexHookCommand('/tmp/office data/hook.cjs', 'Stop', 'linux', '/usr/bin/node'), "'/usr/bin/node' '/tmp/office data/hook.cjs' 'Stop'");
+});
+
+test('native Windows shells execute generated hooks and preserve authenticated JSON stdin', { skip: process.platform !== 'win32', timeout: 15000 }, async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "office hook's %literal% & $name-"));
+  const received: unknown[] = [];
+  const response = { hookSpecificOutput: { hookEventName: 'Stop', additionalContext: 'Café — कार्य' } };
+  const server = createServer((req, res) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      received.push({ authorization: req.headers.authorization, body: JSON.parse(body) });
+      res.writeHead(200).end(JSON.stringify(response));
+    });
+  });
+  try {
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address(); assert.ok(address && typeof address === 'object');
+    const command = codexHookCommand(writeCodexHook(dir), 'Stop');
+    for (const shell of ['cmd', 'powershell']) {
+      const child = spawn(shell === 'cmd' ? process.env.COMSPEC || 'cmd.exe' : 'powershell.exe',
+        shell === 'cmd' ? ['/d', '/s', '/c', `"${command}"`] : ['-NoProfile', '-NonInteractive', '-Command', command], {
+          windowsVerbatimArguments: shell === 'cmd', windowsHide: true,
+          env: { ...process.env, AGENT_OFFICE_HOOK_URL: `http://127.0.0.1:${address.port}`, AGENT_OFFICE_HOOK_TOKEN: 'windows-test-token', AGENT_OFFICE_WORKER_ID: 'windows-worker' },
+          stdio: ['pipe', 'pipe', 'pipe'],
+        });
+      let output = '', error = '';
+      child.stdout.on('data', chunk => { output += chunk; });
+      child.stderr.on('data', chunk => { error += chunk; });
+      const ended = new Promise<number | null>((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+      child.stdin.end(JSON.stringify({ session_id: 'windows-session-é', turn_id: 'windows-turn' }));
+      assert.equal(await ended, 0, error);
+      assert.deepEqual(JSON.parse(output), response);
+    }
+    assert.equal(received.length, 2);
+    for (const event of received) assert.deepEqual(event, { authorization: 'Bearer windows-test-token', body: { session_id: 'windows-session-é', hook_event_name: 'Stop', turn_id: 'windows-turn' } });
+  } finally {
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 

@@ -419,7 +419,7 @@ At side angles, TV video is masked by the whiteboard’s thin panel and stand ra
 
 OpenCode model selections use per-process configuration, including models set in the default worker or `--agent-args`; no `--model` flag is sent to its interactive CLI. OpenCode 2 workers start private servers so each receives its own settings. Leave Model on **Default** to retain your OpenCode settings. See [agents](docs/agents.md) for model and resume behavior.
 
-Codex input alerts require a visible sign-in/trust prompt or a permission hook; missing startup hooks alone do not mean the worker needs you. See [agent status tracking](docs/agents.md).
+Codex input alerts require a visible sign-in/trust prompt or a permission hook; missing startup hooks alone do not mean the worker needs you. Native Windows hook commands support cmd.exe and PowerShell with paths containing spaces; restart the office or floor host and existing Codex workers after updating. See [agent status tracking](docs/agents.md).
 
 Antigravity CLI is selectable when hiring, configuring board agents and queue tasks, or choosing comparison candidates/reviewers. Install and sign in with `agy` on the office machine, then use `agent-office --agent agy` for the default. See [agent setup](docs/agents.md#antigravity-cli).
 
