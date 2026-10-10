@@ -29,7 +29,8 @@ test('workspace hooks preserve project hooks, shared desks and original formatti
     assert.equal(addAntigravityHooks(dir, helper, 'one'), true);
     assert.equal(addAntigravityHooks(dir, helper, 'two'), true);
     const hooks = JSON.parse(readFileSync(file, 'utf8'));
-    assert.equal(hooks['agent-office-antigravity-one'].PreToolUse[0].matcher, '*');
+    assert.equal(hooks['agent-office-antigravity-one'].PreToolUse, undefined);
+    assert.equal(hooks['agent-office-antigravity-one'].PostToolUse[0].matcher, '*');
     assert.equal(hooks['agent-office-antigravity-one'].PreInvocation[0].type, 'command');
     removeAntigravityHooks(dir, 'one');
     assert.ok(JSON.parse(readFileSync(file, 'utf8'))['agent-office-antigravity-two']);
@@ -74,7 +75,7 @@ test('hooks discard tool content and reject foreign conversations and malformed 
 });
 
 
-test('pre-tool telemetry preserves native approvals even when reporting is skipped or fails', () => {
+test('telemetry returns no permission decision even when reporting is skipped or fails', () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'office-agy-decision-'));
   try {
     const helper = writeAntigravityHook(dir);
@@ -87,11 +88,11 @@ test('pre-tool telemetry preserves native approvals even when reporting is skipp
       ...['run_command', 'view_file'].map(name => ({ input: JSON.stringify({ conversationId: 'root', toolCall: { name } }), worker: 'one' })),
     ];
     for (const fixture of cases) {
-      const output = execFileSync(process.execPath, [helper, 'PreToolUse', 'one'], {
+      const output = execFileSync(process.execPath, [helper, 'PostToolUse', 'one'], {
         input: fixture.input, encoding: 'utf8', timeout: 5000,
         env: { ...process.env, AGENT_OFFICE_WORKER_ID: fixture.worker, AGENT_OFFICE_HOOK_URL: 'http://127.0.0.1:0', AGENT_OFFICE_HOOK_TOKEN: 'test' },
       });
-      assert.deepEqual(JSON.parse(output), { decision: 'ask' });
+      assert.deepEqual(JSON.parse(output), {});
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

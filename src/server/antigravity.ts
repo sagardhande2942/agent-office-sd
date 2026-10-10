@@ -4,7 +4,7 @@ import path from 'node:path';
 import { excludeFromGit } from './config.js';
 import type { LifecycleReport } from './workers/lifecycle.js';
 
-export const ANTIGRAVITY_EVENTS = ['PreInvocation', 'PreToolUse', 'PostToolUse', 'Stop'] as const;
+export const ANTIGRAVITY_EVENTS = ['PreInvocation', 'PostToolUse', 'Stop'] as const;
 const record = (v: unknown): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
 const id = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(v);
 export function normalizeAntigravityHook(event: string, payload: unknown): LifecycleReport | undefined {
@@ -75,7 +75,7 @@ export function writeAntigravityHook(dataDir: string): string {
   const file = path.join(dataDir, 'antigravity-hook.cjs');
   writeFileSync(file, HOOK_SOURCE, { mode: 0o600 }); chmodSync(file, 0o600); return file;
 }
-// Bound input and forward metadata only; defer pre-tool gating to native approvals.
+// Observe activity after tools complete; leave permission gating to the CLI.
 export const HOOK_SOURCE = String.raw`
 const event = process.argv[2], worker = process.argv[3];
 let bytes = 0, chunks = [], overflow = false;
@@ -90,6 +90,6 @@ process.stdin.on('end', async () => {
     const url = new URL('/hooks/antigravity', process.env.AGENT_OFFICE_HOOK_URL);
     url.searchParams.set('worker', worker); url.searchParams.set('event', event);
     await fetch(url, { method: 'POST', headers: { authorization: 'Bearer ' + process.env.AGENT_OFFICE_HOOK_TOKEN, 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(2000) });
-  } catch {} finally { process.stdout.write(event === 'PreToolUse' ? '{"decision":"ask"}' : '{}'); }
+  } catch {} finally { process.stdout.write('{}'); }
 });
 `;
