@@ -134,13 +134,8 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
     const r = 0.3 * sc;
     colliders.push({ minX: px - r, maxX: px + r, minZ: pz - r, maxZ: pz + r, top: 0.5 * sc });
   }
-  // A young palm on the deck and a peace lily by the doors: added to `group`, not `parts`, since
+  // A peace lily by the doors: added to `group`, not `parts`, since
   // they are merged by color and the parts are merged by material.
-  const deckPalm = greenPlant('areca_palm', 0.65);
-  deckPalm.position.set(minX + 3.7, 0, 14.6);
-  deckPalm.rotation.y = 0.6;
-  group.add(deckPalm);
-  colliders.push({ minX: minX + 3.5, maxX: minX + 3.9, minZ: 14.4, maxZ: 14.8, top: 0.33 });
   const deckLily = greenPlant('peace_lily', 0.9);
   deckLily.position.set(minX + 0.75, 0, 14.6);
   deckLily.rotation.y = -0.4;
