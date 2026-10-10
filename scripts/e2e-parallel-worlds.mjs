@@ -56,6 +56,8 @@ try {
     const render = effect.render.bind(effect);
     window.__worldsDraw = () => render(g.ctx.scene, g.camera);
     effect.render = () => {};
+    // First-person hand passes clear the drawing buffer even when their render is frozen.
+    g.ctx.renderer.clearDepth = () => {};
   });
   async function menu() { await page.keyboard.press('Tab'); await page.getByRole('menuitem', { name: /Parallel worlds/ }).click(); }
   async function close() {
