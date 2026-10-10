@@ -8,7 +8,7 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['W A S D', 'Walk (hold Shift to run)'],
   ['Space', 'Jump'],
   ['Y', 'Switch instantly between 2D and 3D exploration without reloading. Finish camera-controlled activities first.'],
-  ['☕', 'Press E at the coffee machine in the kitchen for a minute of quicker walking and higher jumps. Three cups in a row gives you the jitters'],
+  ['☕', 'Press E at the coffee machine in the kitchen for three minutes of quicker walking and higher jumps. Three cups in a row gives you the jitters'],
   ['Mouse', 'Look around in first person (click to capture the mouse, Esc to free it)'],
   ['Click / E', "Use what you look at: hire a worker, open its terminal, read a board, call a meeting in the meeting room, watch the TV, put a song on the jukebox, tee off from the balcony, sit on a couch, a beanbag, a chair or the balcony bench (walk off to get up)"],
   ['👥', 'Click someone under "In the office" to walk over to them (on another floor, you ride the elevator first). The line under their name says what they have open or where they are'],

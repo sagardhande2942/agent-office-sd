@@ -1,17 +1,17 @@
 /**
- * Coffee from the kitchen machine: a minute of quicker walking and higher jumps. Keep drinking
+ * Coffee from the kitchen machine: three minutes of quicker walking and higher jumps. Keep drinking
  * before the last cup wears off and you get the jitters for a few seconds.
  * Times are seconds, on whichever clock the caller passes in as `now`.
  */
 
 /** How long one cup keeps you going. */
-export const BUZZ_SECONDS = 60;
+export const BUZZ_SECONDS = 180;
 /** Walking and running speed while buzzed, as a multiple of normal. */
 const SPEED = 1.4;
 /** Jump speed while buzzed: about 45% higher jumps. */
 const JUMP = 1.2;
 /** The boost eases off over the last few seconds instead of stopping dead. */
-const FADE_SECONDS = 4;
+const FADE_SECONDS = 12;
 /** The cup in a row that brings on the jitters. */
 const JITTERY_CUP = 3;
 const JITTER_SECONDS = 4;
@@ -25,7 +25,7 @@ export class Caffeine {
 
   /**
    * Drinks a cup — or a can of Diet Coke off the fridge's shelf, which has the same caffeine in it —
-   * which tops the buzz back up to a full minute. Returns whether it brought on the jitters.
+   * which tops the buzz back up to a full three minutes. Returns whether it brought on the jitters.
    */
   drink(now: number): boolean {
     this.cups = this.buzzed(now) ? this.cups + 1 : 1;

@@ -13,7 +13,7 @@ declare module '../../world/types' {
 }
 
 /**
- * The kitchen's coffee machine: a cup is a minute of quicker feet and higher jumps (and one too many,
+ * The kitchen's coffee machine: a cup is three minutes of quicker feet and higher jumps (and one too many,
  * the jitters). What the caffeine does to you each frame is feelTheCoffee's, in core/loop.ts.
  */
 export function installCoffee(ctx: Ctx) {
@@ -21,15 +21,15 @@ export function installCoffee(ctx: Ctx) {
   /** What it does to you (see player/effects.ts): feelTheCoffee writes it each frame, the view's shake (ctx.shake) in its jitters too. */
   const buzz = ctx.player.effects.add();
 
-  /** A cup from the kitchen machine: a minute of quicker feet and higher jumps, and a mug in your hand. */
+  /** A cup from the kitchen machine: three minutes of quicker feet and higher jumps, and a mug in your hand. */
   function drinkCoffee() {
     const jittery = caffeine.drink(performance.now() / 1000);
     restoreVitals(ctx,CUP);
     ctx.sound.coffee();
     if (ctx.player.view === 'first') ctx.hands.sip();
     if (jittery) toast('☕ One cup too many… you’ve got the jitters!', 'warn');
-    else if (caffeine.cups > 1) toast('☕ Another cup: back to a full minute of buzz');
-    else toast('☕ Fresh coffee! A minute of quicker feet and higher jumps');
+    else if (caffeine.cups > 1) toast('☕ Another cup: back to a full three minutes of buzz');
+    else toast('☕ Fresh coffee! Three minutes of quicker feet and higher jumps');
   }
 
   ctx.interactions.define('coffee', {
