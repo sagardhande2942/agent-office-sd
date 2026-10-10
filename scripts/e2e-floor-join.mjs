@@ -77,7 +77,7 @@ try {
   assert.ok(existsSync(tokenFile));
   const saved = JSON.parse(readFileSync(tokenFile, 'utf8'));
   assert.equal(saved.project.dir, remote);
-  launchHost([]);
+  launchHost(['--office', base, '--code', code, '--checkout', remote]);
   await waitFor(async () => { const r = await context.request.get(base + '/api/floor-join/status'); return (await r.json()).machines.some(m => m.floors.some(f => f.online)); });
   const defs = JSON.parse(readFileSync(path.join(data, 'floors.json'), 'utf8'));
   assert.equal(defs.filter(f => f.repo === 'joiner/sample-app').length, 1);

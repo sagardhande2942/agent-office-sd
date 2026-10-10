@@ -61,6 +61,11 @@ npm start -- floor-host
 ```
 
 If this same office's ngrok URL changes, reconnect with `npm start -- floor-host --office "https://NEW-URL" --same-office`.
+
+Reconnect uses the saved machine token, even if you paste the original command with a pairing code again. For a changed URL belonging to the same office, add `--same-office` to retain that identity. Use the same Windows user and `--config` file; a different profile has no saved token. A genuinely different machine or checkout cannot take over an existing floor.
+
+On Windows, run `claude --version` (or your chosen agent's command) in the floor-host terminal before connecting. If the worker reports that its CLI is missing from PATH, install it on the joiner's machine and restart the floor host after verifying the command works.
+
 This explicitly sends the saved token to that new address; use it only for the same trusted office.
 For a different office, use a fresh `--code` and `--checkout`. Credentials otherwise stay scoped to
 the saved office address. Use `--config` for separate office connections.

@@ -31,7 +31,7 @@ export function joinOptions(argv: string[]) {
 
 export function savedJoinToken(saved: { office: string; token: string } | undefined, office: string, code: string | undefined, sameOffice: boolean) {
   const address = (url: string) => url.replace(/^http/, 'ws').replace(/\/+$/, '');
-  return !code && saved && (sameOffice || address(saved.office) === address(office)) ? saved.token : undefined;
+  return saved && (sameOffice || address(saved.office) === address(office)) ? saved.token : undefined;
 }
 
 export function joinProject(checkout: string, repo?: string, name?: string): FloorJoinProject {

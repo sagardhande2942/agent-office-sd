@@ -427,6 +427,9 @@ Admins can remove a remote floor with the trash button in **Elevator**, includin
 
 **Bring your own project from another computer.** Open **☰ → Connect your floor**. The office host generates a pairing code; the joiner enters the office's public URL, that code, and their own project folder, then copies and runs the join command from their agent-office checkout. The floor appears in the elevator immediately: no host-side path entry, `hosts add-floor`, or office restart. The joiner needs an installed, built copy of this version (`npm install`, then `npm run build`) even if the office runs with `npm run dev`. With ngrok, forward **4600** and use its HTTPS URL. Everyone in the office can control the joiner's terminals, so connect only to a trusted office. See [floor-host setup](docs/floor-hosts.md#quick-connect-from-the-ui).
 
+Remote floor reconnects retain the saved machine identity even when the original pairing command is reused. For a changed URL of the same office, use `--same-office`. Agent CLIs must be available on the joiner's PATH; restart the floor host after installing one. See [floor-host setup](docs/floor-hosts.md#quick-connect-from-the-ui).
+
+
 ### Playable 2D Game
 
 Open **`/2d`** for the complete office in a desktop, top-down view. It uses the same artwork, rooms, furniture, characters, collisions and feature modules as 3D. **Tab** opens the same menu: boards, Queue, Plan Comparison, Boss Control Center, Smartphone, meetings, messages, services, whiteboard, settings and the other office actions.
