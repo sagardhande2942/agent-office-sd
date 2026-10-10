@@ -80,7 +80,8 @@ try {
   await page.getByRole('button', { name: 'Enter world', exact: true }).first().click();
   const room = page.getByRole('dialog', { name: 'Minimal universe', exact: true }); await room.waitFor();
   const frame = page.frameLocator('iframe[title="Minimal preview"]');
-  await frame.getByRole('button', { name: 'Try this version' }).click();
+  // Invoke the preview's own click handler without GPU-dependent iframe coordinate delivery.
+  await frame.getByRole('button', { name: 'Try this version' }).evaluate(button => button.click());
   await frame.getByRole('button', { name: 'Interaction verified' }).waitFor();
   await page.screenshot({ animations: 'disabled', path: path.join(output, 'room.png') });
   check('world room loads a real discovered server and its interactive preview');
