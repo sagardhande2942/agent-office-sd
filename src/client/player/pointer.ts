@@ -58,6 +58,8 @@ export abstract class PlayerInput {
   /** When the mouse last moved, or a lock that settles landed. */
   private movedAt = 0;
   enabled = true;
+  /** Scene editors keep walking and drag-to-look, with a free cursor for picking objects. */
+  pointerLockEnabled = true;
   /** False while the mouse picks something else (an emote on the wheel), so it doesn't turn the camera. */
   mouseLook = true;
 
@@ -93,7 +95,7 @@ export abstract class PlayerInput {
 
     dom.addEventListener('pointerdown', (e) => {
       if (!this.enabled) return;
-      if (this.view === 'first' && e.pointerType === 'mouse' && !this.lockFailed) {
+      if (this.canLock && e.pointerType === 'mouse') {
         if (this.locked) {
           if (e.button === 0) this.onClick?.(CENTER);
           return;
@@ -118,10 +120,8 @@ export abstract class PlayerInput {
       const now = performance.now();
       const rested = now - this.movedAt;
       this.movedAt = now;
-      if (!this.mouseLook) return;
+      if (!this.enabled || !this.mouseLook) return;
       if (this.locked) {
-        // Held for a moment under a window (see yieldMouse), the mouse doesn't turn your head.
-        if (!this.enabled) return;
         // Taken back from a click, the hand that clicked may be moving on still: that isn't looking around.
         if (this.settleUntil) {
           if (rested < SETTLE_REST && now < this.settleUntil) return;
@@ -161,7 +161,7 @@ export abstract class PlayerInput {
       this.settleUntil = this.settleNext ? this.movedAt + SETTLE_MAX : 0;
       this.settleNext = false;
       // A lock that lands with a window open (the one yieldMouse takes, or a relock racing the next window) is let go.
-      if (!this.enabled) this.unlock();
+      if (!this.enabled || !this.canLock) this.unlock();
     });
     document.addEventListener('pointerlockerror', () => this.refused());
     dom.addEventListener(
@@ -185,7 +185,7 @@ export abstract class PlayerInput {
 
   /** Whether clicking the scene will capture the mouse for looking around. */
   get canLock(): boolean {
-    return this.view === 'first' && !this.lockFailed && typeof this.dom.requestPointerLock === 'function';
+    return this.pointerLockEnabled && this.view === 'first' && !this.lockFailed && typeof this.dom.requestPointerLock === 'function';
   }
 
   unlock() {

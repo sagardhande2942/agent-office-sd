@@ -1,5 +1,5 @@
 // Reproducible desktop checks using the production bundle and an isolated real office.
-// npm run build && node --import tsx scripts/e2e-game2d.mjs
+// npm run build && node --import tsx scripts/e2e-object-placement.mjs
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -55,11 +55,12 @@ try {
     return page.evaluate(id => {
       const g = window.__office; let o;
       g.office.group.traverse(p => { if(p.userData.editable?.id === id) o=p; });
-      const v=o.position.clone(); v.y += id.startsWith('plant') ? .6 : .3; v.project(g.camera);
+      const v=o.position.clone(); v.y += id.startsWith('plant') ? (g.camera.isOrthographicCamera ? .6 : .2) : .3; v.project(g.camera);
       return {x:(v.x+1)*innerWidth/2,y:(1-v.y)*innerHeight/2};
     },id);
   }
   await openEditor();
+  assert.equal(await page.evaluate(()=>window.__office.player.enabled),false,'2D retains stationary editing');
   const target = await objectPixel('lounge-coffee-table');
   await page.mouse.move(target.x,target.y); await page.mouse.down();
   await page.mouse.move(target.x-50,target.y+20,{steps:10}); await page.mouse.up();
@@ -91,7 +92,67 @@ try {
   await page.waitForFunction(()=>window.__office.player.enabled);
   const tableRecord = await page.evaluate(()=>Object.entries(localStorage).find(([k])=>k.endsWith(':lounge-coffee-table'))[1]);
   assert.deepEqual(JSON.parse(tableRecord),actual);
+  // Real perspective-camera navigation while the scene editor owns the cursor.
+  await page.goto(base + '/?floor=f2');
+  await page.waitForFunction(()=>window.__office?.store.floor==='f2' && window.__office.player.enabled);
+  const pose = () => page.evaluate(()=> {
+    const p=window.__office.player; p.setView('first'); p.pos.set(-6,0,5);
+    p.camYaw=0; p.lookPitch=-.25; p.clearKeys(); p.updateCamera(true);
+  });
+  const position = () => page.evaluate(()=>window.__office.player.pos.toArray());
+  const transform = () => page.evaluate(()=> {
+    const o=window.__office.office.plants[5];
+    return {position:o.position.toArray(),rotation:o.rotation.toArray(),scale:o.scale.toArray()};
+  });
+  await pose(); await openEditor();
+  await page.waitForFunction(()=>window.__office.player.enabled && !window.__office.player.canLock && !document.pointerLockElement);
+  const beforeWalk=await position();
+  await page.keyboard.down('KeyA'); await page.waitForTimeout(300); await page.keyboard.up('KeyA');
+  const afterWalk=await position(); assert.ok(Math.abs(afterWalk[0]-beforeWalk[0])>.3);
+  const beforeLook=await page.evaluate(()=>window.__office.player.camYaw);
+  const beforeLookObject=await transform();
+  await page.mouse.move(180,250); await page.mouse.down({button:'right'});
+  await page.mouse.move(260,280,{steps:8}); await page.mouse.up({button:'right'});
+  assert.ok(Math.abs(await page.evaluate(()=>window.__office.player.camYaw)-beforeLook)>.1);
+  assert.deepEqual(await transform(),beforeLookObject);
+  assert.equal(await page.evaluate(()=>!!document.pointerLockElement),false);
+  await pose(); await page.waitForTimeout(100);
+  const heldPixel=await objectPixel('plant-5');
+  await page.mouse.move(heldPixel.x,heldPixel.y); await page.mouse.down();
+  await page.waitForFunction(()=>document.querySelector('.object-placement p').textContent.includes('Potted plant'));
+  const heldStart=await transform(), playerStart=await position();
+  await page.keyboard.down('KeyW'); await page.waitForTimeout(350); await page.keyboard.up('KeyW');
+  const heldEnd=await transform(), playerEnd=await position(); await page.mouse.up();
+  assert.ok(Math.abs(playerEnd[2]-playerStart[2])>.3);
+  assert.ok(Math.abs(heldEnd.position[2]-heldStart.position[2])>.3,'held object follows walking with stationary cursor');
+  assert.ok(Math.abs(await page.evaluate(()=>window.__office.player.camYaw))<1e-6,'left drag does not turn camera');
+  await page.getByLabel('Rotation degrees').focus();
+  const beforeTyping=await position();
+  await page.keyboard.down('KeyW'); await page.waitForTimeout(180); await page.keyboard.up('KeyW');
+  assert.deepEqual(await position(),beforeTyping);
+  await page.getByRole('button',{name:'Move',exact:true}).click();
+  await page.getByRole('button',{name:'Menu',exact:true}).click();
+  assert.equal(await page.evaluate(()=>window.__office.player.enabled),false);
+  const beforeMenuWalk=await position();
+  await page.keyboard.down('KeyW'); await page.waitForTimeout(180); await page.keyboard.up('KeyW');
+  assert.deepEqual(await position(),beforeMenuWalk);
+  await page.locator('.hud-menu .close').click();
+  await page.waitForFunction(()=>window.__office.player.enabled);
+  await page.evaluate(()=>window.__office.player.setView('third'));
+  const thirdYaw=await page.evaluate(()=>window.__office.player.camYaw);
+  await page.mouse.move(180,250); await page.mouse.down({button:'right'});
+  await page.mouse.move(240,270,{steps:6}); await page.mouse.up({button:'right'});
+  assert.ok(Math.abs(await page.evaluate(()=>window.__office.player.camYaw)-thirdYaw)>.1);
+  await page.screenshot({path:path.join(output,'object-editor-3d-movement.png')});
+  await page.evaluate(()=>window.__office.player.setView('first'));
+  await page.getByRole('button',{name:'Close',exact:true}).click();
+  await page.waitForFunction(()=>window.__office.player.enabled && window.__office.player.canLock && !!document.pointerLockElement);
+  await page.evaluate(()=>window.__office.player.unlock());
+  await page.waitForFunction(()=>!document.pointerLockElement);
+  await openEditor(); await page.keyboard.press('Escape');
+  await page.waitForFunction(()=>window.__office.player.enabled && window.__office.player.canLock && !!document.pointerLockElement);
+  check('3D editor navigation','WASD walking, first-person right-drag, third-person orbit, walking during object drag, input/menu guards and mouse-look restoration');
   assert.deepEqual(errors,[]);
-  writeFileSync(path.join(output,'checks.json'),JSON.stringify({passed:['mouse dragging','precise rotation and uniform scaling','immediate auto-save','Escape restores controls','exact reload','touch dragging','snapping and reset','independent objects','close restores controls'],saved},null,2));
+  writeFileSync(path.join(output,'checks.json'),JSON.stringify({passed:['mouse dragging','precise rotation and uniform scaling','immediate auto-save','Escape restores controls','exact reload','touch dragging','snapping and reset','independent objects','close restores controls',...checks.map(c=>c.name)],saved},null,2));
 } catch(error) { console.log('errors',errors); console.log(await page.evaluate(()=>({text:document.querySelector('.object-placement')?.textContent, enabled:window.__office.player.enabled}))); await page.screenshot({path:path.join(output,'failure.png')}); throw error; } finally { await browser?.close(); office.shutdown(); }
 console.log(`Evidence: ${output}`); process.exit(0);
