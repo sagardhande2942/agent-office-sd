@@ -34,8 +34,8 @@ export const CAN_SECONDS = 30;
 /** How long a full bar of energy lasts if you never touch coffee: ten minutes. */
 export const ENERGY_SECONDS = 10 * 60;
 export const ENERGY_DRAIN = 1 / ENERGY_SECONDS;
-/** And how long it takes, doing nothing in particular, to wind right up: three quarters of an hour. */
-export const STRESS_SECONDS = 45 * 60;
+/** And how long it takes, doing nothing in particular, to wind right up: an hour and a quarter. */
+export const STRESS_SECONDS = 75 * 60;
 export const STRESS_DRAIN = 1 / STRESS_SECONDS;
 
 /** At or under this your legs get heavy, and the office says so. */

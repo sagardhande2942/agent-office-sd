@@ -19,7 +19,7 @@ import type { Fixture } from './office/fixture';
 export interface Kitchen {
   group: THREE.Group;
   colliders: Collider[];
-  /** The coffee machine: E at it for three minutes of quicker feet and higher jumps. */
+  /** The coffee machine: E at it for five minutes of quicker feet and higher jumps. */
   interactable: Interactable;
   /** The fridge beside it: E opens its doors, and the Diet Coke and ice creams inside. */
   fridge: Fridge;
