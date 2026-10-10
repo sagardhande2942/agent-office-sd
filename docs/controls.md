@@ -86,3 +86,9 @@ Keyboard movement cancels click-to-walk. Activities that take over the camera (i
 The top bar has a direct **2D / 3D** toggle, available in both views. Switching preserves the selected floor and running workers. In 2D, jumping moves your character while the camera and cutaway stay anchored to the supporting floor.
 
 In **2D Game**, open **Tab → 2D graphics settings** to choose **Reduced (current)** or **Enhanced**. Reduced is the default and preserves the existing quality. Enhanced increases rendering resolution (2–3× pixel ratio) and enables real-time shadows. Changes apply immediately, persist in this browser, and affect only 2D exploration; activities retain their original rendering. Choose Reduced on slower hardware.
+
+### Performance and frame rate
+
+Open **Settings → You → Performance** to select **30, 60, 90, 120 FPS**, or **Match display** for 3D and 2D Game. The default is 60 FPS. This is a maximum: your display and device may run slower. Choose 30 FPS to reduce rendering power use; Match display can use more power on high-refresh screens. Changes apply immediately and persist in this browser.
+
+Scene updates pause while the tab is hidden and run at up to 15 FPS while an ordinary window blocks movement. Scene editors retain the selected frame rate. Workers and network updates continue; returning to the tab resumes without advancing movement through the hidden interval. Lite (`/lite`) remains the lowest-cost view.

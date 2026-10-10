@@ -555,3 +555,9 @@ Every change to the app that lands on `main` is published as a GitHub release by
 Customize office scenery from **Menu → Customize objects**. Drag a plant, rug or coffee table to move it; choose Rotate or Scale for drag adjustments, or enter precise values. In 3D, WASD/arrows keep walking active and right-drag changes your view while left-drag edits objects. Everyone on the floor sees edits live; transforms save automatically on the office server and return for all players after reload or restart. See [Object placement](docs/object-placement.md).
 
 Remote Git floors also support **Master / Workers**. Update and rebuild both the office and floor host, reconnect, then open the activity from the remote floor’s menu. Agents run with the host’s installed, signed-in CLIs. See [Master / Workers](docs/master-workers.md#remote-floors).
+
+### Performance and frame rate
+
+Open **Settings → You → Performance** to select **30, 60, 90, 120 FPS**, or **Match display** for 3D and 2D Game. The default is 60 FPS. This is a maximum: your display and device may run slower. Choose 30 FPS to reduce rendering power use; Match display can use more power on high-refresh screens. Changes apply immediately and persist in this browser.
+
+Scene updates pause while the tab is hidden and run at up to 15 FPS while an ordinary window blocks movement. Scene editors retain the selected frame rate. Workers and network updates continue; returning to the tab resumes without advancing movement through the hidden interval. Lite (`/lite`) remains the lowest-cost view.

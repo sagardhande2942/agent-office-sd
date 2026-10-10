@@ -191,6 +191,21 @@ interface TickEntry {
 
 /** What runs each frame, phase by phase (see TICK_PHASES). */
 export class Ticks {
+  private readonly rates = new List<() => number | null>();
+
+  /** Frame admission policies: null pauses, 0 follows the display, positive values cap FPS. */
+  limit(fn: () => number | null): Off { return this.rates.add(fn); }
+
+  frameRate(): number | null {
+    let rate = 0;
+    for (const fn of this.rates.items) {
+      const next = fn();
+      if (next === null) return null;
+      if (Number.isFinite(next) && next > 0) rate = rate ? Math.min(rate, next) : next;
+    }
+    return rate;
+  }
+
   private readonly phases = new Map<TickPhase, List<TickEntry>>();
 
   add(phase: TickPhase, fn: (f: Frame) => void): Off {
