@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { bottleMaterial } from './bottle';
 import { toon } from '../toon';
 import type { Fridge } from '../fridge';
 
@@ -16,6 +17,7 @@ export function samsungFridge(scene: THREE.Object3D, at: { x: number; z: number;
   scene.scale.set(1.1 / 0.91, 1.23, 1 / 0.76);
   group.add(scene);
   const paint = (material: THREE.Material) => {
+    if (material.name.startsWith('DietCoke ')) return bottleMaterial(material);
     if (!(material instanceof THREE.MeshStandardMaterial)) return material;
     const color = material.name === 'Brushed stainless steel' ? '#adb5bd'
       : material.name === 'Metal edges' ? '#c3c9d2' : material.color;

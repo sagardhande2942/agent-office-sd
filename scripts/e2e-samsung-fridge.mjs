@@ -49,6 +49,12 @@ try {
   await page.keyboard.press('c');
   await page.waitForFunction(() => window.__office.office.fridge.cans === 4);
   assert.equal(await page.evaluate(() => window.__office.office.fridge.group.getObjectByName('fridge_can_0').visible), false);
+  await page.waitForFunction(() => window.__office.hands.can.visible);
+  assert.ok(await page.evaluate(() => {
+    let labeled = false;
+    window.__office.hands.can.traverse(o => { if (o.isMesh && o.material?.map && o.material.name === 'DietCoke printed label') labeled = true; });
+    return labeled;
+  }));
   await page.screenshot({ path: path.join(output, 'drink-taken.png') });
   await page.keyboard.press('e');
   await page.waitForFunction(() => !window.__office.office.fridge.open);
@@ -56,7 +62,7 @@ try {
   await page.keyboard.press('c');
   assert.equal(await page.evaluate(() => window.__office.office.fridge.cans), 4);
   assert.deepEqual(errors, []);
-  writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks: ['Samsung fixture installed in real office', 'E opens both hinged doors', 'C removes visible drink and decrements stock', 'E closes doors', 'Closed fridge does not dispense'], errors }, null, 2));
+  writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks: ['Samsung fixture installed in real office', 'E opens both hinged doors', 'C removes visible bottle and decrements stock', 'First-person hand holds a textured Diet Coke bottle', 'E closes doors', 'Closed fridge does not dispense'], errors }, null, 2));
   console.log('Fridge browser checks passed:', output);
 } catch (error) {
   console.error(errors); console.error(await page?.locator('body').innerText().catch(() => ''));

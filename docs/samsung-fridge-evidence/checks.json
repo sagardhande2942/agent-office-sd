@@ -2,7 +2,8 @@
   "checks": [
     "Samsung fixture installed in real office",
     "E opens both hinged doors",
-    "C removes visible drink and decrements stock",
+    "C removes visible bottle and decrements stock",
+    "First-person hand holds a textured Diet Coke bottle",
     "E closes doors",
     "Closed fridge does not dispense"
   ],

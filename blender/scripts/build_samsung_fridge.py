@@ -101,21 +101,22 @@ for xx,width in [(-.229,.35),(.215,.37)]:
  for zz in [.37,.71,1.05,1.39]:
   box('Interior shelf',(xx,.01,zz),(width,.55,.018),liner,.002)
   box('Shelf front trim',(xx,-.263,zz+.005),(width,.012,.022),chrome,.002)
-cola=mat('Diet Coke red',(.65,.018,.028),.25,.4)
-def cylinder(name,loc,radius,depth,material):
- bpy.ops.mesh.primitive_cylinder_add(vertices=12,radius=radius,depth=depth,location=loc); o=bpy.context.object; o.name=name; o.data.materials.append(material); return o
+# Use the same bottle geometry/materials as the held drink, with linked meshes for stock.
+sys.path.insert(0,str(Path(__file__).resolve().parent))
+from build_diet_coke_bottle import build_bottle
+template=build_bottle('fridge_can_0',(.065,-.21,.725))
+def stock(name,at):
+ root=bpy.data.objects.new(name,None); bpy.context.collection.objects.link(root); root.location=at
+ for child in template.children:
+  clone=child.copy(); clone.data=child.data; bpy.context.collection.objects.link(clone); clone.parent=root
+ return root
 for row,yy in [('front',-.21),('back',-.06)]:
  for i in range(5):
-  xx=.065+i*.071
-  can=empty('fridge_can_'+str(i) if row=='front' else 'back_can_'+str(i),(xx,yy,.725))
-  bpy.context.view_layer.update()
-  for n,z,r,d,m in [('Can sleeve',.782,.030,.112,cola),('Can lid',.840,.030,.004,chrome),('Can base',.725,.029,.004,chrome)]:
-   parent_to(cylinder(n,(xx,yy,z),r,d,m),can)
-  parent_to(box('Can white band',(xx,yy-.030,.789),(.031,.002,.018),white,.001),can)
-for xx in [.085,.215,.345]:
- cylinder('Cola bottle',(xx,.05,1.17),.033,.21,cola)
- cylinder('Bottle neck',(xx,.05,1.30),.015,.065,black)
- cylinder('Bottle cap',(xx,.05,1.336),.018,.014,black)
+  if row=='front' and i==0: continue
+  stock('fridge_can_'+str(i) if row=='front' else 'back_can_'+str(i),(.065+i*.071,yy,.725))
+for i,xx in enumerate([.085,.215,.345]): stock('stock_bottle_'+str(i),(xx,.05,1.065))
+def cylinder(name,loc,radius,depth,material):
+ bpy.ops.mesh.primitive_cylinder_add(vertices=12,radius=radius,depth=depth,location=loc); o=bpy.context.object; o.name=name; o.data.materials.append(material); return o
 flavors=[mat('Ice cream '+str(i),c,0,.6) for i,c in enumerate([(.8,.25,.4),(.4,.7,.6),(.8,.65,.3),(.5,.3,.7)])]
 for i in range(4):
  xx=-.31+(i%2)*.155; yy=-.12+(i//2)*.22
@@ -126,6 +127,7 @@ box('Fresh food drawer',(.214,.055,.235),(.35,.48,.20),liner,.008)
 # Merge meshes by material under each fixed parent to keep draw calls low.
 parents={o.parent for o in bpy.context.scene.objects if o.type=='MESH'}
 for parent in parents:
+ if parent and parent.name.startswith(('fridge_can_', 'back_can_', 'stock_bottle_')): continue
  buckets={}
  for o in list(bpy.context.scene.objects):
   if o.type=='MESH' and o.parent==parent: buckets.setdefault(o.data.materials[0].name,[]).append(o)

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { dietCokeBottle } from '../samsung-fridge/bottle';
 import type { Drink } from '../../../shared/rooftop';
 import { mesh, toon, toonUnique } from '../toon';
 
@@ -17,26 +18,9 @@ export function coffeeMug(scale = 1): THREE.Group {
   return mug;
 }
 
-/**
- * A can of Diet Coke off the fridge's shelf, standing on y = 0: the red sleeve, the white wave round
- * it, the bare aluminium ends and the tab on top. The same can the fridge is stocked with (see
- * world/fridge.ts), built in toon materials so it can be held in a hand without a painted label.
- */
+/** Compatibility name for the fridge drink; the prop is now a contoured glass Diet Coke bottle. */
 export function sodaCan(scale = 1): THREE.Group {
-  const S = scale;
-  const r = 0.033 * S;
-  const h = 0.115 * S;
-  const can = new THREE.Group();
-  const sleeve = toon('#c8102e');
-  const alu = toon('#c9ccd1');
-  can.add(mesh(new THREE.CylinderGeometry(r, r, h, 18), sleeve, 0, h / 2, 0, false));
-  for (const y of [0.004 * S, h - 0.004 * S]) can.add(mesh(new THREE.CylinderGeometry(r * 1.015, r * 1.015, 0.008 * S, 18), alu, 0, y, 0, false));
-  // The white wave the label is mostly known for, round the middle of the sleeve: an open cylinder
-  // standing a little proud of the can, so it reads as print on the sleeve rather than a hoop round it.
-  can.add(mesh(new THREE.CylinderGeometry(r * 1.015, r * 1.015, h * 0.34, 18, 1, true), toon('#ffffff'), 0, h * 0.5, 0, false));
-  // The tab on top, where it was opened.
-  can.add(mesh(new THREE.CylinderGeometry(r * 0.36, r * 0.36, 0.004 * S, 10), alu, 0, h + 0.002 * S, 0, false));
-  return can;
+  return dietCokeBottle(scale);
 }
 
 /** Clear glass, faintly blue; no cartoon outline, so the drink inside shows through it. */

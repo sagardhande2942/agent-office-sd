@@ -9,6 +9,7 @@ import dogPugUrl from '../models/dog-pug.glb?url';
 import dogPupUrl from '../models/dog-pup.glb?url';
 import dogPomeranianUrl from '../models/dog-pomeranian.glb?url';
 import dogShibaUrl from '../models/dog-shiba.glb?url';
+import dietCokeBottleUrl from '../models/diet-coke-bottle.glb?url';
 import samsungFridgeUrl from '../models/samsung-fridge.glb?url';
 import kitchenUrl from '../models/kitchen.glb?url';
 import loungeUrl from '../models/lounge.glb?url';
@@ -30,6 +31,7 @@ const MODELS = {
   'dog-pomeranian': { url: dogPomeranianUrl, preload: false },
   cars: { url: carsUrl, preload: true },
   desk_props: { url: deskPropsUrl, preload: true },
+  'diet-coke-bottle': { url: dietCokeBottleUrl, preload: true },
   'samsung-fridge': { url: samsungFridgeUrl, preload: true },
   kitchen: { url: kitchenUrl, preload: true },
   lounge: { url: loungeUrl, preload: true },
