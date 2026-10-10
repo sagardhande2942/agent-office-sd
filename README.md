@@ -425,7 +425,7 @@ The meeting room has a screening room: a screen on its far wall, a projector bes
 
 Press **E** at the screen for the window: the floor's reels down the side, the shot you are watching with its caption, and **▶️ On the screen**, **⏸️**, **⏹️** and **◀ ▶** to step along. A new reel goes up as it arrives, `office-workers cinema list` says what is showing, and `office-workers cinema remove <id>` takes one off the floor.
 
-Anyone on the floor can put a reel up or take one down: the screening room is shared, like the whiteboard and the TV.
+Anyone on the floor can put a reel up or take one down: the screening room is shared, like the whiteboard and the TV. Local and remotely hosted floors use the same controls. Update both the office and the floor-host command for remote cinema: workers upload to their own host, which keeps the pictures and streams the room state. Screenshots are fetched through the paired connection; an offline host returns a clear error and its saved reels return after reconnect.
 
 ### Agent setup and remote terminals
 

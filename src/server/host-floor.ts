@@ -1,3 +1,5 @@
+import { cinemaHostCalls, cinemaHostState } from './cinema/host.js';
+import { HOST_CINEMA_PATHS, hostCinemaHook } from './cinema/host-hooks.js';
 import type { BossGuard } from '../shared/boss.js';
 import http from 'node:http';
 import { Floor, type FloorContext } from './floor.js';
@@ -140,6 +142,7 @@ export class HostFloors {
     state('cars', { state: floor.garage.state() });
     state('meeting', { state: floor.meetings.state() });
     state('tv', { state: floor.tv.state() });
+    this.reportCinema(floorId, floor);
     state('helper', { helpers: floor.helpers.states() });
     // The two boards and the dungeon joined them when riding onto a hosted floor became a thing: the
     // office builds the view someone walks into out of exactly these, so a board or a jail that is
@@ -154,11 +157,14 @@ export class HostFloors {
    * disk — because it is only ever a suggestion for the office's `hosts add-floor`, which has no way
    * to look here.
    */
+  reportCinema(floorId: string, floor: Floor) {
+    this.parts.send({ t: 'event', floorId, seq: 0, msg: cinemaHostState(floor) });
+  }
+
   projectsDir: string = '';
 
   /** Tells the office a floor is up, with its seats and whoever is already on it. */
   private report(floorId: string, floor: Floor) {
-    this.reportRooms(floorId, floor);
     for (const w of floor.workers.list()) this.byWorker.set(w.id, floor);
     this.parts.send({
       t: 'ready',
@@ -180,10 +186,13 @@ export class HostFloors {
         providers: floor.project.agentProviders,
         bossGuard: true,
         workerBreaks: true,
+        cinema: true,
         projectsDir: this.projectsDir,
         workers: floor.workers.list().map((w) => ({ id: w.id, status: w.status, deskId: w.deskId })),
       },
     });
+    // Announce reachability before snapshots can trigger browser image requests.
+    this.reportRooms(floorId, floor);
   }
 
   /**
@@ -255,7 +264,9 @@ export class HostFloors {
       else this.parts.send({ t: 'result', floorId, seq, value: value ?? null });
       // Some calls change a room, and the office has no event to hear it by — its own Floor reads
       // those states directly. A hosted floor must say so, or the office's copy goes stale forever.
-      if (!terminal) this.reportRooms(floorId, floor);
+      if (Object.hasOwn(cinemaHostCalls, msg.t)) {
+        if (msg.t !== 'cinema.shot') this.reportCinema(floorId, floor);
+      } else if (!terminal) this.reportRooms(floorId, floor);
     } catch (err) {
       if (!terminal || seq !== 0) this.parts.send({ t: 'refused', floorId, reason: (err as Error).message, seq });
     }
@@ -264,6 +275,7 @@ export class HostFloors {
   /** The floor cases, each against this machine's own floor. */
   private async apply(floor: Floor, msg: ToOffice): Promise<unknown> {
     const m = msg as unknown as Record<string, unknown>;
+    if (Object.hasOwn(cinemaHostCalls, msg.t)) return cinemaHostCalls[msg.t](floor, m);
     const s = (k: string) => (typeof m[k] === 'string' ? (m[k] as string) : '');
     const num = (k: string) => (Number.isFinite(Number(m[k])) ? Number(m[k]) : 0);
     switch (msg.t) {
@@ -441,8 +453,8 @@ export class HostFloors {
  * why decision 7's question about whose token a forwarded hook carries has no subject.
  *
  * A path this does not serve answers 404 rather than pretending. That includes the office's own
- * `/office/*` MCP endpoints, which live beside the office and are not here: an agent's office tools
- * are unavailable on a hosted floor rather than silently wrong.
+ * Other `/office/*` endpoints still live beside the office. The cinema module alone registers its
+ * authenticated loopback routes here, because its reel files belong to this machine.
  */
 /** The paths a worker's status reports arrive on. One constant, not a fresh array per request. */
 const HOOK_PATHS = new Set(['/hooks/claude', '/hooks/opencode', '/hooks/codex', '/hooks/grok', '/hooks/muse']);
@@ -452,6 +464,7 @@ export function startHooks(
    *  server can be started before the floors are open — which it must be, since a worker's environment
    *  needs its URL before any worker starts. */
   workersOf: (workerId: string) => import('./workers.js').WorkerManager | undefined,
+  cinema?: { floorOf(id: string): Floor | undefined; changed(floor: Floor): void },
 ): Promise<{ url: string; close: () => void }> {
   const server = http.createServer(async (req, res) => {
     const done = (code: number) => {
@@ -463,6 +476,12 @@ export function startHooks(
       url = new URL(req.url ?? '/', 'http://127.0.0.1');
     } catch {
       return done(400);
+    }
+    if (HOST_CINEMA_PATHS.has(url.pathname)) {
+      const id = url.searchParams.get('worker') ?? '';
+      const floor = cinema?.floorOf(id);
+      if (!floor) return done(401);
+      return hostCinemaHook(req, res, url, floor, id, () => cinema!.changed(floor));
     }
     if (req.method !== 'POST' || !HOOK_PATHS.has(url.pathname)) return done(404);
     let payload: unknown = {};

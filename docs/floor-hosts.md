@@ -266,3 +266,7 @@ Verify with `npm run typecheck`, `npm test`, `npm run build`, and `node --import
 ![Local typing below a remote worker terminal](remote-terminal-typing.png)
 
 The same browser harness checks that both Esc and ✕ restore actual game mouse-look. It suppresses scene rendering during that focus check to avoid software-WebGL overhead; the screenshot above comes from the normal Lite client.
+
+### Remote screening room
+
+The meeting-room cinema works over the paired floor connection. Update both ends and reconnect, then press **E** at the screen and use **On the screen**. Workers record and upload with the same `office-workers cinema add/list/remove` commands using their local hook environment. Reels stay on the host; viewers fetch bounded PNGs through the office. An offline host reports an error, and its saved reels return on reconnect. See [the screening room](cinema.md#remote-floors).

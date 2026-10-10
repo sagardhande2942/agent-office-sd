@@ -113,8 +113,7 @@ characters the office makes itself, so no picture folder is ever named from outs
 
 A restart brings back what was on. A reel whose pictures have gone is **forgotten** rather than left
 listing shots with nothing behind them, and the pictures of a reel the floor has dropped are deleted
-with it (`Cinema.forget`). The reels are files on the floor's own disk, like the whiteboard's, so a
-floor hosted on someone else's machine refuses the room by name rather than pretending to have it.
+with it (`Cinema.forget`). The reels stay on the floor's own disk. On remote floors, the paired connection carries playback controls, room metadata, and individual requested PNGs. The office never opens paths on the remote machine.
 
 **What is kept, and what is refused.** A shot has to be a PNG (by its magic bytes and its header), under
 `SHOT_BYTES_MAX` on disk *and* under `SHOT_PIXELS_MAX` when decoded — a few kilobytes of one-colour PNG
@@ -187,9 +186,16 @@ beside it. Re-run it with `npm run build && node --import tsx scripts/record-cin
 - **Anyone on the floor may put a reel up or take one down.** There is no ownership: the screening room
   is a shared floor like the whiteboard and the TV, where whoever is in the room decides what is on the
   wall. A floor that wants a demonstration to be its recorder's alone needs a rule this doesn't have.
-- **A hosted floor has no screening room.** Its reels would be pictures on someone else's disk, which
-  the office must never read, so the room refuses by name there — exactly as the whiteboard does. The
-  obvious next step is letting the host serve its own shots over the floor socket, which is the
-  measurement in [remote agents](remote-agents-plan.md#finding-10) that hasn't been taken.
+
 - **The screen shows one reel at a time**, like the TV. A second screen would be its own wall space,
   and the walls in the meeting room are spoken for.
+
+## Remote floors
+
+Update and rebuild both the office and the machine running `floor-host`, then reconnect using its existing command and saved token. Viewers use **E → On the screen**, pause, stop, and step exactly as on a local floor. Older hosts receive an update message when playback is requested.
+
+Workers on the remote floor use the same `office-workers cinema add/list/remove` commands with their existing hook environment. The loopback endpoint authenticates the worker token, validates captioned PNGs and existing size limits, and saves the reel on that machine. Uploads do not send a whole reel over the WebSocket. Metadata streams immediately, and the office fetches one screenshot at a time (under the existing 2 MiB frame cap). It shares simultaneous requests and caches at most four shots per remote floor; removed reels stop being served.
+
+The host clock is translated to the office clock when room state arrives, so late arrivals and viewers use the same playback timeline. If the host disconnects, screenshot requests return HTTP 503, and controls report that the machine is asleep. Reconnecting republishes the saved room state and clears the screenshot cache. Cached browser images may remain visible while offline.
+
+Verify with `npm run typecheck`, `npm test`, `npm run build`, and `node --import tsx scripts/e2e-remote-cinema.mjs`.
