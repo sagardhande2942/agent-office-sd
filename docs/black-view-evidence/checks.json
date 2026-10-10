@@ -1,0 +1,24 @@
+{
+  "before": {
+    "lit": 126118,
+    "total": 750000,
+    "autoClear": true
+  },
+  "after": {
+    "lit": 749556,
+    "total": 750000,
+    "autoClear": true
+  },
+  "plan": {
+    "lit": 749300,
+    "total": 750000,
+    "autoClear": true
+  },
+  "returned": {
+    "lit": 749569,
+    "total": 750000,
+    "autoClear": true
+  },
+  "custom": 1,
+  "errors": []
+}

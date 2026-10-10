@@ -14,6 +14,7 @@ import type { Parts } from './parts';
 import type { Frame } from './registry';
 import { FOV } from './scene';
 import { FirstPersonBody } from '../world/character/person-first';
+import { renderOverlay } from './render-overlay';
 
 /** Covering less ground than this (m/s) since your last footstep, your feet make no sound: a walk is 4.6. */
 const QUIET_FEET = 1.2;
@@ -202,11 +203,13 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     if (firstPerson && !ctx.view.covered() && !ctx.activities.any('hidesHands')) {
       // Hands go on top of everything, so they never clip into a desk you walk up to. They have
       // lights of their own, turned down to match wherever you're standing.
-      renderer.clearDepth();
       hands.setLight(sky.lightAt(camera.position));
       sky.shading(false);
-      effect.render(hands.scene, hands.camera);
-      sky.shading(true);
+      try {
+        renderOverlay(renderer, () => effect.render(hands.scene, hands.camera));
+      } finally {
+        sky.shading(true);
+      }
     }
   }
 }
