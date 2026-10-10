@@ -12,6 +12,7 @@ import dogShibaUrl from '../models/dog-shiba.glb?url';
 import kitchenUrl from '../models/kitchen.glb?url';
 import loungeUrl from '../models/lounge.glb?url';
 import plantsUrl from '../models/plants.glb?url';
+import basketballPlantUrl from '../models/basketball-plant.glb?url';
 import { toon } from './toon';
 
 // The things in the world modelled in Blender rather than built in code. Each .glb is exported by a
@@ -30,6 +31,7 @@ const MODELS = {
   kitchen: { url: kitchenUrl, preload: true },
   lounge: { url: loungeUrl, preload: true },
   plants: { url: plantsUrl, preload: true },
+  'basketball-plant': { url: basketballPlantUrl, preload: true },
 } satisfies Record<string, { url: string; preload: boolean }>;
 
 export type ModelName = keyof typeof MODELS;

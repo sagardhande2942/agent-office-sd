@@ -1,5 +1,6 @@
 import { planReviewTable } from '../../features/plan-review/world';
 import { enhancements } from './enhancements';
+import { basketballPlant } from './basketball-plant';
 import * as THREE from 'three';
 import type { WallRect } from '../../../shared/decor';
 import type { FloorPalette } from '../../../shared/floors';
@@ -63,6 +64,7 @@ function floorPlan() {
     bookshelf,
     kitchen,
     plants,
+    basketballPlant,
     lamps,
     wing,
     signs,
