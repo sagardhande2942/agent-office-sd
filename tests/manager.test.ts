@@ -226,3 +226,82 @@ test('the clock finds the manager by its desk, nudges changes once and stops on 
   stop(); crew.unshift(manager);
   t.mock.timers.tick(60_000); assert.equal(prompts.length, 2);
 });
+
+// ---- PR conflicts: the office sees a conflict on the list, and says which files fight -------------
+//
+// `gh pr list` now carries mergeable/mergeStateStatus, so a pull request that cannot merge is a
+// blocker on the worker without anyone opening the PR window (see src/shared/conflicts.ts).
+
+/** A pull request GitHub says cannot merge: open, ready, and dirty against its base. */
+const conflictingPull = (number: number): GhPull => ({ ...pull(number, 'pass'), headRefName: `office/w${number}`, updatedAt: '2026-01-01T00:00:00Z', mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' });
+
+/** A worker with an open PR (its branch matches) and, optionally, the files its checklist reported. */
+const prWorker = (id: string, pr: number, files?: string[]) => worker(id, 'working', { pr: { number: pr, url: `https://github.com/o/r/pull/${pr}` }, lastOutputAt: NOW, ...(files ? { completion: { revision: 1, summary: 'did it', checks: [], files, submittedAt: NOW, status: 'ready' as const } } : {}) });
+
+test("a worker's pull request conflicting with its base is a blocker, and it reaches attention", () => {
+  const w = prWorker('mochi', 4);
+  assert.deepEqual(blockersOf(w, undefined, NOW, undefined, [conflictingPull(4)]).map((b) => [b.kind, b.why]), [
+    ['conflicting', 'PR #4 conflicts with main and cannot merge until it is resolved'],
+  ]);
+  const r = report([w], [], [conflictingPull(4)]);
+  assert.deepEqual(r.workers[0].blockers.map((b) => b.kind), ['conflicting']);
+  assert.deepEqual(r.attention.map((a) => [a.kind, a.worker?.name]), [['conflicting', 'mochi']]);
+});
+
+test('a clean, draft, unknown or merged pull request raises no conflicting blocker', () => {
+  const w = prWorker('mochi', 4);
+  const clean = { ...pull(4, 'pass'), headRefName: 'office/w4', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' } as GhPull;
+  assert.deepEqual(blockersOf(w, undefined, NOW, undefined, [clean]), []);
+  const unknown = { ...pull(4, 'pass'), headRefName: 'office/w4', mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN' } as GhPull;
+  assert.deepEqual(blockersOf(w, undefined, NOW, undefined, [unknown]), [], 'a forge that will not say is not a conflict');
+  const draft = { ...pull(4, 'pass'), headRefName: 'office/w4', isDraft: true, mergeable: 'CONFLICTING' } as GhPull;
+  assert.deepEqual(blockersOf(w, undefined, NOW, undefined, [draft]), []);
+  assert.deepEqual(blockersOf(w, undefined, NOW, undefined, [{ ...conflictingPull(4), state: 'MERGED' }]), [], 'a merged PR cannot conflict');
+  assert.deepEqual(blockersOf(w, undefined, NOW, undefined, []), [], 'with no pulls to judge, nothing is claimed');
+});
+
+test('the conflict blocker outranks a failed task and a stalled worker but not a question', () => {
+  const w = prWorker('mochi', 4);
+  const failed = task('t1', { status: 'done', outcome: 'failed', error: 'boom', finishedAt: NOW });
+  assert.deepEqual(blockersOf(w, failed, NOW, undefined, [conflictingPull(4)]).map((b) => b.kind), ['conflicting', 'failed']);
+  assert.deepEqual(blockersOf(prWorker('mochi', 4), task('t1'), NOW, undefined, [conflictingPull(4)]).map((b) => b.kind), ['conflicting']);
+});
+
+test('the manager hash changes when a conflict appears and when it clears, so it is nudged once each way', () => {
+  const empty = managerReport({ workers: [], rows: [], tasks: [], pulls: [], floor: { id: 'f1', name: 'Floor one', branch: 'main' }, maxWorkers: 2, freeDesk: 'desk-1', now: NOW });
+  const clean = report([prWorker('mochi', 4)], [], [{ ...pull(4, 'pass'), headRefName: 'office/w4', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' } as GhPull]);
+  const dirty = report([prWorker('mochi', 4)], [], [conflictingPull(4)]);
+  assert.equal(managerHash(clean), managerHash(empty), 'a clean floor is not a new thing to be told');
+  assert.notEqual(managerHash(dirty), managerHash(clean), 'a conflict appearing is a change');
+  assert.equal(shouldNudge(managerHash(clean), managerHash(dirty), true), true);
+  assert.equal(shouldNudge(managerHash(dirty), managerHash(dirty), true), false, 'and it is not said twice');
+  assert.equal(shouldNudge(managerHash(dirty), managerHash(clean), true), true, 'the conflict clearing is a change too');
+});
+
+test('two workers whose open pull requests change the same file each see the other and the files', () => {
+  const mochi = prWorker('mochi', 4, ['src/a.ts', 'docs/x.md']);
+  const byte = prWorker('byte', 5, ['src/a.ts']);
+  const r = report([mochi, byte], [], [pull(4, 'pass'), pull(5, 'pass')]);
+  assert.deepEqual(r.workers[0].overlaps, [{ worker: { id: 'byte', name: 'byte' }, pr: 5, files: ['src/a.ts'] }]);
+  assert.deepEqual(r.workers[1].overlaps, [{ worker: { id: 'mochi', name: 'mochi' }, pr: 4, files: ['src/a.ts'] }]);
+});
+
+test('workers on different files overlap nothing, and a conflicting one names the other PR in its why', () => {
+  const apart = report([prWorker('mochi', 4, ['src/a.ts']), prWorker('byte', 5, ['src/b.ts'])], [], [pull(4, 'pass'), pull(5, 'pass')]);
+  assert.deepEqual(apart.workers.map((w) => w.overlaps), [undefined, undefined]);
+  const fight = report([prWorker('mochi', 4, ['src/a.ts']), prWorker('byte', 5, ['src/a.ts'])], [], [conflictingPull(4), pull(5, 'pass')]);
+  const why = fight.workers[0].blockers.find((b) => b.kind === 'conflicting')!.why;
+  assert.match(why, /PR #5 from byte \(src\/a\.ts\)/, 'the why says who else is landing there, so a person can tell whether to rebase or wait');
+  const other = fight.workers[1];
+  assert.deepEqual(other.overlaps?.map((o) => o.pr), [4]);
+});
+
+test('overlap needs an open pull request and a filed checklist; without either there is no signal', () => {
+  // A worker whose PR merged is out of the collision picture, whatever files it reported.
+  const merged = prWorker('mochi', 4, ['src/a.ts']);
+  const r = report([merged, prWorker('byte', 5, ['src/a.ts'])], [], [{ ...pull(4, 'pass'), headRefName: 'office/w4', state: 'MERGED' }, pull(5, 'pass')]);
+  assert.deepEqual(r.workers[1].overlaps, undefined);
+  // A worker with no checklist reports no files, so it contributes nothing to another's overlap.
+  const noFiles = report([prWorker('mochi', 4), prWorker('byte', 5, ['src/a.ts'])], [], [pull(4, 'pass'), pull(5, 'pass')]);
+  assert.deepEqual(noFiles.workers[1].overlaps, undefined);
+});

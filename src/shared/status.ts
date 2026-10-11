@@ -106,7 +106,7 @@ export interface PullsView {
 
 /** Why a worker or a task isn't getting on: what kind of stop it is, in words, and since when. */
 export interface Blocker {
-  kind: 'needs_input' | 'failed' | 'stalled' | 'worktree_deleted' | 'no_desk' | 'over_limit' | 'hiring_paused';
+  kind: 'needs_input' | 'failed' | 'conflicting' | 'stalled' | 'worktree_deleted' | 'no_desk' | 'over_limit' | 'hiring_paused';
   why: string;
   since?: number;
 }

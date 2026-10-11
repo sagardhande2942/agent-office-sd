@@ -1,6 +1,8 @@
 import type { AgentEffort, AgentProvider, GhIssue, GhMergeMethod, GhPull } from '../../../shared/protocol';
-import { store } from '../../state';
+import { store, workerForPull } from '../../state';
 import { repoOf } from '../../../shared/forgeweb';
+import type { CollisionWorker } from '../../../shared/conflicts';
+import { overlapLines, workerFileCollisions } from '../../../shared/conflicts';
 import type { MeetingPreset } from '../meeting';
 import { officePrompt } from '../prompts';
 
@@ -49,6 +51,21 @@ function mergeCommand(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) 
   return `gh pr merge ${it.number} --${method}${deleteBranch ? ' --delete-branch' : ''} --repo ${nameWithOwner(it.url)}`;
 }
 
+/**
+ * The other open pull requests changing the same files as this one, as the fix-conflicts prompt's
+ * `{{others}}`: the one thing a worker resolving conflicts doesn't know, and can't see from the PR
+ * alone — several workers merge at once, and the ones landing on these files decide what the conflict
+ * actually means. Empty when the office knows of no overlap, and the prompt drops the line.
+ */
+export function othersOf(it: GhPull): string {
+  const mine = workerForPull(store.workers.values(), it);
+  if (!mine) return '';
+  const board = [...store.workers.values()].map(
+    (w): CollisionWorker => ({ id: w.id, name: w.name, ...(w.pr?.number !== undefined ? { pr: w.pr.number } : {}), ...(w.completion?.files ? { files: w.completion.files } : {}) }),
+  );
+  return overlapLines(workerFileCollisions(board).get(mine.id) ?? []);
+}
+
 function mergeVars(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) {
   return { ...pullVars(it), repo: nameWithOwner(it.url), merge: mergeCommand(it, method, deleteBranch) };
 }
@@ -58,7 +75,7 @@ export function fixAndMergePrompt(it: GhPull, method: GhMergeMethod, deleteBranc
 }
 
 export function fixConflictsPrompt(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) {
-  return officePrompt('pull.fixConflicts', mergeVars(it, method, deleteBranch));
+  return officePrompt('pull.fixConflicts', { ...mergeVars(it, method, deleteBranch), others: othersOf(it) });
 }
 
 export function pullContext(it: GhPull) {

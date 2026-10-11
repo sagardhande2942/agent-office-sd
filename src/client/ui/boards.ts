@@ -1,5 +1,6 @@
 import type { GhIssue, GhLabel, GhPull, WorkerInfo } from '../../shared/protocol';
 import { FORGE_CLI, FORGE_LABEL } from '../../shared/protocol';
+import { isConflicting } from '../../shared/conflicts';
 import type { Net } from '../net';
 import { store, workerForPull } from '../state';
 import { h, openModal, timeAgo } from './dom';
@@ -301,6 +302,7 @@ export function openBoard(kind: 'issues' | 'pulls', net: Net, actions: BoardActi
                 ...labelChips(it.labels),
                 `by ${it.author}`,
                 it.reviewDecision === 'CHANGES_REQUESTED' ? '🛠 changes requested' : '',
+                isConflicting(it) ? '⚠️ conflicts' : '',
                 CHECK_ICON[it.checks],
                 h('span', { style: 'color:#2a9d4b' }, `+${it.additions}`),
                 h('span', { style: 'color:#c3423f' }, `-${it.deletions}`),

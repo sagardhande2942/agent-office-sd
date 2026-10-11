@@ -68,6 +68,40 @@ function commentsOf(raw: any[]): GhComment[] {
   }));
 }
 
+/**
+ * One pull request as `gh pr list` sent it, filled in as the board shows it. The merge state is
+ * carried through the same guard as the head commit: a field the CLI leaves out (or an older gh that
+ * doesn't know it) stays undefined, which the office reads as "not known to conflict", never as
+ * "conflicting" — see isConflicting in shared/conflicts.ts.
+ */
+export function pullOf(p: any): GhPull {
+  return {
+    number: p.number,
+    title: p.title,
+    state: p.state,
+    isDraft: !!p.isDraft,
+    url: p.url,
+    author: p.author?.login ?? '',
+    labels: labels(p.labels),
+    reviewDecision: p.reviewDecision ?? '',
+    headRefName: p.headRefName,
+    headRefOid: typeof p.headRefOid === 'string' ? p.headRefOid : undefined,
+    baseRefName: p.baseRefName,
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+    additions: p.additions ?? 0,
+    deletions: p.deletions ?? 0,
+    checks: checksOf(p.statusCheckRollup),
+    body: String(p.body ?? '').slice(0, 4000),
+    closes: closesIn(String(p.body ?? '')),
+    mergeable: typeof p.mergeable === 'string' ? p.mergeable : undefined,
+    mergeStateStatus: typeof p.mergeStateStatus === 'string' ? p.mergeStateStatus : undefined,
+  };
+}
+
+/** What `gh pr list` is asked for, so a pull request on the board can say whether it conflicts. */
+export const PULL_FIELDS = 'number,title,state,isDraft,url,author,labels,reviewDecision,headRefName,headRefOid,baseRefName,createdAt,updatedAt,additions,deletions,statusCheckRollup,body,mergeable,mergeStateStatus';
+
 /** A floor on GitHub: its issues and pull requests, read with the GitHub CLI (gh). */
 export class GitHub extends Forge {
   private labelList?: { at: number; list: Promise<GhLabel[]> };
@@ -331,7 +365,7 @@ export class GitHub extends Forge {
   }
 
   protected async listPulls(): Promise<GhPull[]> {
-    const fields = 'number,title,state,isDraft,url,author,labels,reviewDecision,headRefName,headRefOid,baseRefName,createdAt,updatedAt,additions,deletions,statusCheckRollup,body';
+    const fields = PULL_FIELDS;
     const [open, merged, closed] = await Promise.all([
       this.onRepo(['pr', 'list', '--state', 'open', '--limit', '150', '--json', fields]),
       this.onRepo(['pr', 'list', '--state', 'merged', '--limit', '30', '--json', fields]),
@@ -340,26 +374,7 @@ export class GitHub extends Forge {
     // `--state closed` includes merged PRs; keep only the ones closed without merging.
     const seen = new Set<number>();
     const all = [...JSON.parse(open), ...JSON.parse(merged), ...JSON.parse(closed)].filter((p: any) => !seen.has(p.number) && seen.add(p.number));
-    return all.map((p: any) => ({
-      number: p.number,
-      title: p.title,
-      state: p.state,
-      isDraft: !!p.isDraft,
-      url: p.url,
-      author: p.author?.login ?? '',
-      labels: labels(p.labels),
-      reviewDecision: p.reviewDecision ?? '',
-      headRefName: p.headRefName,
-      headRefOid: typeof p.headRefOid === 'string' ? p.headRefOid : undefined,
-      baseRefName: p.baseRefName,
-      createdAt: p.createdAt,
-      updatedAt: p.updatedAt,
-      additions: p.additions ?? 0,
-      deletions: p.deletions ?? 0,
-      checks: checksOf(p.statusCheckRollup),
-      body: String(p.body ?? '').slice(0, 4000),
-      closes: closesIn(String(p.body ?? '')),
-    }));
+    return all.map(pullOf);
   }
 }
 

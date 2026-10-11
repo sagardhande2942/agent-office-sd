@@ -48,6 +48,10 @@ export interface GhPull {
   body: string;
   /** Issues it closes ("closes #12" in its description), as GitHub links them. */
   closes: number[];
+  /** MERGEABLE, CONFLICTING or UNKNOWN (the forge still working it out). See GhPullDetail.mergeable. */
+  mergeable?: string;
+  /** CLEAN, BLOCKED, BEHIND, DIRTY, UNSTABLE, DRAFT, HAS_HOOKS or UNKNOWN. See GhPullDetail.mergeStateStatus. */
+  mergeStateStatus?: string;
 }
 
 export interface GhState<T> {

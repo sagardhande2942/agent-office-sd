@@ -1,8 +1,10 @@
 import { FORGE_LABEL, FORGE_CLI } from '../../../shared/protocol';
 import type { GhCheck, GhMergeMethod, GhPull, GhPullDetail } from '../../../shared/protocol';
+import { isConflicting } from '../../../shared/conflicts';
 import type { Net } from '../../net';
 import { h, openModal } from '../dom';
 import { mergeWaiters } from './api';
+import { othersOf } from './prompts';
 import { MERGE_KEY, mergePref, savePref } from './prefs';
 
 // ---- Whether a PR can merge ---------------------------------------------------------------------
@@ -21,7 +23,7 @@ interface MergeStatus {
 
 /** An open PR whose branch can't merge until someone resolves conflicts with the base. */
 export function conflicted(d: GhPullDetail) {
-  return d.state === 'OPEN' && !d.isDraft && (d.mergeable === 'CONFLICTING' || d.mergeStateStatus === 'DIRTY');
+  return isConflicting(d);
 }
 
 export function mergeStatus(d: GhPullDetail): MergeStatus {
@@ -107,6 +109,8 @@ export function openMerge(it: GhPull, d: GhPullDetail, net: Net, handToWorker: (
       methodBtns,
       h('label.gh-check', { for: 'merge-del' }, del, `Delete ${it.headRefName} after merging`),
       st.auto ? h('label.gh-check', { for: 'merge-auto', title: `${FORGE_CLI[d.forge]} pr merge --auto (the repo must allow auto-merge)` }, auto, 'Merge automatically once the requirements pass') : null,
+      // Which other open pull requests land on these files: what the worker this hands over will read.
+      conflicted(d) && othersOf(it) ? h('p.gh-others', { style: 'margin-top:10px' }, othersOf(it)) : null,
       result,
     ),
     h('footer', {}, st.can || conflicted(d) ? null : worker, h('span.grow'), cancel, conflicted(d) ? worker : go),

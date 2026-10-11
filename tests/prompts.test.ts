@@ -156,3 +156,18 @@ test('the worktree note the queue adds can be rewritten, or left off', (t) => {
   none.queue.add('Fix it', 'Ada');
   assert.equal(none.workers[0].prompt, 'Fix it');
 });
+
+test('the fix-conflicts prompt names the other open pull requests on the same files, and drops the line when there are none', () => {
+  const vars = { number: 5, title: 'T', url: 'https://github.com/o/r/pull/5', branch: 'feat', base: 'main', repo: 'o/r', merge: 'gh pr merge 5 --squash --repo o/r' };
+  const withOthers = fillPrompt(PROMPTS['pull.fixConflicts'].text, { ...vars, others: 'Other open pull requests changing the same files: PR #9 from byte (src/a.ts, src/b.ts).' });
+  assert.match(withOthers, /Other open pull requests changing the same files: PR #9 from byte \(src\/a\.ts, src\/b\.ts\)\./);
+  assert.match(withOthers, /merge it\.\n\nOther open pull requests changing the same files: PR #9 from byte \(src\/a\.ts, src\/b\.ts\)\.\n\n1\. Get onto its branch/, 'the line lands as its own paragraph after the summary, before the steps');
+  assert.doesNotMatch(withOthers, /\{\{/);
+
+  // With no overlap known, that line and its blank line go, and the rest is what it always was.
+  const alone = fillPrompt(PROMPTS['pull.fixConflicts'].text, { ...vars, others: '' });
+  assert.doesNotMatch(alone, /Other open pull requests/);
+  assert.match(alone, /has merge conflicts with `main`\. Resolve them and merge it\.\n\n1\. Get onto its branch/);
+  assert.match(alone, /7\. When the checks pass, merge it: `gh pr merge 5 --squash --repo o\/r`\./);
+  assert.equal(alone, fillPrompt(PROMPTS['pull.fixConflicts'].text, { ...vars, others: '' }), 'the single-PR case is stable');
+});
