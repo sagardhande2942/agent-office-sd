@@ -42,6 +42,8 @@ Back to the [README](../README.md).
 
 You can also click a nearby desk to interact with it, or click a worker in the Workers panel (**🤖 Workers**, top right) to open its terminal.
 
+In first person, aim the center crosshair at the desk or laptop. It turns orange when you can interact; click or press **E** to open the terminal. A desk within reach uses the same reach for its screen and keyboard, so you don't need to hunt for a closer corner. Walls and other solid objects still block aiming at a desk behind them.
+
 On a phone, use the Lite dashboard at `/lite` instead: a terminal there has a row of keys under it (**1** **2** **3**, the arrows, Enter, Tab, Esc, Ctrl+C) and a box to send a prompt. See [Features](features.md).
 
 ## In a terminal
