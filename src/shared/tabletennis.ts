@@ -79,6 +79,44 @@ export function otherSide(side: PingPongSide): PingPongSide {
   return side === 'west' ? 'east' : 'west';
 }
 
+/**
+ * The ground a player covers at their own end of the table: a stride either side of their spot and
+ * a pace back from it, so you have to walk to the ball rather than covering the table from one spot.
+ */
+export const PINGPONG_COURT = {
+  /** How far either side of your spot (along the table) you may walk. */
+  across: 1.15,
+  /** How far in front of your spot, towards the table, and behind it, you may go. */
+  forward: 0.45,
+  back: 0.5,
+  /** How fast you shuffle along it (m/s), and how long a struck ball leaves you recovering (s). */
+  pace: 2.6,
+  recovery: 0.45,
+  /** How far your bat reaches from your body to play a ball (m). */
+  lunge: 0.95,
+} as const;
+
+/** Whether (x, z) is somewhere `side` can stand and play from. */
+export function onCourt(side: PingPongSide, x: number, z: number): boolean {
+  const spot = side === 'west' ? PINGPONG_SPOTS.west : PINGPONG_SPOTS.east;
+  const dir = side === 'west' ? 1 : -1;
+  const back = -dir * PINGPONG_COURT.back;
+  const forward = dir * PINGPONG_COURT.forward;
+  return x >= Math.min(spot.x + back, spot.x + forward) && x <= Math.max(spot.x + back, spot.x + forward) && Math.abs(z - spot.z) <= PINGPONG_COURT.across;
+}
+
+/** Keeps a player on their own end of the table, and returns where they end up. */
+export function onCourtSpot(side: PingPongSide, x: number, z: number): { x: number; z: number } {
+  const spot = side === 'west' ? PINGPONG_SPOTS.west : PINGPONG_SPOTS.east;
+  const dir = side === 'west' ? 1 : -1;
+  const lo = spot.x - dir * PINGPONG_COURT.back;
+  const hi = spot.x + dir * PINGPONG_COURT.forward;
+  return {
+    x: Math.max(Math.min(lo, hi), Math.min(Math.max(lo, hi), x)),
+    z: Math.max(spot.z - PINGPONG_COURT.across, Math.min(spot.z + PINGPONG_COURT.across, z)),
+  };
+}
+
 /** Which way a body at (x, z) has to turn to face the middle of the table. */
 export function facingTable(x: number, z: number): number {
   return Math.atan2(PINGPONG_TABLE.x - x, PINGPONG_TABLE.z - z);
@@ -108,60 +146,153 @@ export function shotTarget(side: PingPongSide, aim = 0, depth = 0, spread = 0): 
   };
 }
 
+/** The four ways to strike the ball, from a flat drive to a smash. */
+export type PingPongShotKind = 'drive' | 'topspin' | 'backspin' | 'smash';
+
 /**
- * The launch velocity that carries the ball from `from` to `to` (a point on the far half), at about
- * `speed` m/s along the table. Fixed speeds and lifts are what sent every shot off the far end: the
- * arc is solved for the target instead, lengthening the flight until it clears the net.
+ * What each stroke is: how fast it leaves the bat (m/s along the table), how much spin it carries
+ * (`tops`, positive over the ball and negative under it) and how much it pulls across the table
+ * (`side`). A smash is flat and fast, a topspin loop dips and kicks on, a backspin returns floaty
+ * and skids, a drive is somewhere between the loop and the smash.
  */
-export function solveShot(from: { x: number; y: number; z: number }, to: { x: number; z: number }, speed: number = PINGPONG_PHYSICS.shotSpeed): PingPongShot {
+export const PINGPONG_STROKES: Record<PingPongShotKind, { speed: number; tops: number; side: number; label: string }> = {
+  drive: { speed: 3.9, tops: 0.35, side: 0, label: 'Drive' },
+  topspin: { speed: 3.2, tops: 1.7, side: 0, label: 'Topspin' },
+  backspin: { speed: 2.7, tops: -1.3, side: 0, label: 'Backspin' },
+  smash: { speed: 6.2, tops: 0.7, side: 0, label: 'Smash' },
+};
+
+/** What the spin does to a ball in flight and off the table. */
+export const PINGPONG_SPIN = {
+  /** How hard a full spin pulls the ball down (m/s² per unit of `tops`): a loop dips, a chop floats. */
+  magnus: 1.5,
+  /** How much a side spin walks the ball across the table while it is in the air (m/s² per unit). */
+  drift: 1.1,
+  /** The rebound: a topped ball kicks up and on, a cut one skids and dies. */
+  kick: 1.22,
+  skid: 0.74,
+  /** And how much each does to the pace off the bat. */
+  kickPace: 1.08,
+  skidPace: 0.93,
+  /** Spin is bled off as the ball flies, so a long rally settles down. */
+  bleed: 0.55,
+} as const;
+
+/** The player swapping stroke while the ball is away. */
+export const PINGPONG_STROKES_ORDER: PingPongShotKind[] = ['drive', 'topspin', 'backspin', 'smash'];
+
+/**
+ * The launch velocity that carries the ball from `from` to `to` (a point on the far half) as the
+ * stroke says. Fixed speeds and lifts are what sent every shot off the far end: the arc is solved
+ * for the target instead, lengthening the flight until it clears the net.
+ */
+export function solveShot(from: { x: number; y: number; z: number }, to: { x: number; z: number }, kind: PingPongShotKind = 'drive'): PingPongShot {
   const g = PINGPONG_PHYSICS.gravity;
+  const stroke = PINGPONG_STROKES[kind];
   const landY = PINGPONG_TABLE.height + PINGPONG_PHYSICS.ballRadius;
   const dx = to.x - from.x;
   const dz = to.z - from.z;
   const dist = Math.max(0.2, Math.hypot(dx, dz));
   // The tape, plus the ball's own radius and a little for the net being felt a stride early or late.
   const clear = PINGPONG_TABLE.height + PINGPONG_TABLE.netHeight + PINGPONG_PHYSICS.ballRadius + 0.06;
-  let t = Math.max(PINGPONG_PHYSICS.minFlight, Math.min(PINGPONG_PHYSICS.maxFlight, dist / Math.max(0.5, speed)));
+  let t = Math.max(PINGPONG_PHYSICS.minFlight, Math.min(PINGPONG_PHYSICS.maxFlight, dist / Math.max(0.5, stroke.speed)));
   let vx = dx / t;
-  let vy = (landY - from.y) / t + 0.5 * g * t;
+  let vy = (landY - from.y) / t + 0.5 * g * t + (PINGPONG_SPIN.magnus * stroke.tops * t) / 2;
   // A longer flight is a higher arc over the same target, so keep lengthening until it clears the tape.
   for (let i = 0; i < 24 && t < PINGPONG_PHYSICS.maxFlight; i++) {
     const atNet = Math.abs(vx) < 1e-4 ? Infinity : (PINGPONG_TABLE.x - from.x) / vx;
-    const clears = atNet <= 0 || atNet >= t || from.y + vy * atNet - 0.5 * g * atNet * atNet >= clear;
+    const height = from.y + vy * atNet - (0.5 * g + PINGPONG_SPIN.magnus * stroke.tops) * atNet * atNet;
+    const clears = atNet <= 0 || atNet >= t || height >= clear;
     if (clears) break;
     t = Math.min(PINGPONG_PHYSICS.maxFlight, t * 1.06);
     vx = dx / t;
-    vy = (landY - from.y) / t + 0.5 * g * t;
+    vy = (landY - from.y) / t + 0.5 * g * t + (PINGPONG_SPIN.magnus * stroke.tops * t) / 2;
   }
-  return { vx, vy, vz: dz / t, t };
+  return { vx, vy, vz: dz / t, t, kind, tops: stroke.tops, side: stroke.side };
+}
+
+/** A ball in flight, with the spin it is carrying. */
+export interface PingPongFlight {
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vy: number;
+  vz: number;
+  tops: number;
+  side: number;
+}
+
+/**
+ * One tick of a ball in flight: gravity, the spin pulling it down or floating it up and walking it
+ * across the table, and the spin bleeding off as it goes. The game and its tests both fly the ball
+ * with this, so what a test proves is what a player sees.
+ */
+export function flyStep(b: PingPongFlight, dt: number) {
+  b.vy -= (PINGPONG_PHYSICS.gravity + PINGPONG_SPIN.magnus * b.tops) * dt;
+  b.vz += PINGPONG_SPIN.drift * b.side * dt;
+  const bleed = Math.max(0, 1 - PINGPONG_SPIN.bleed * dt);
+  b.tops *= bleed;
+  b.side *= bleed;
+  b.x += b.vx * dt;
+  b.y += b.vy * dt;
+  b.z += b.vz * dt;
+}
+
+/** What the table does to a ball coming off it: a topped one kicks up and carries on, a cut one skids. */
+export function tableBounce(b: PingPongFlight) {
+  const spin = Math.min(1, Math.abs(b.tops) / 1.7);
+  const lift = b.tops >= 0 ? 1 + (PINGPONG_SPIN.kick - 1) * spin : 1 + (PINGPONG_SPIN.skid - 1) * spin;
+  const pace = b.tops >= 0 ? 1 + (PINGPONG_SPIN.kickPace - 1) * spin : 1 + (PINGPONG_SPIN.skidPace - 1) * spin;
+  b.vy = -b.vy * PINGPONG_PHYSICS.restitution * lift;
+  b.vx *= pace;
+  // The spin goes into the table: a topped ball squirts on, a cut ball comes off with less of it.
+  b.tops *= b.tops >= 0 ? 0.55 : 1.25;
 }
 
 /**
  * Flies a ball from `from` along `vel` for `seconds`, and says where it first touches down: on the
  * table (`'bounce'` with the point), in the net's band (`'net'`), or past everything (`'floor'`).
- * The one flight model the game and its tests share, so what a test proves is what a player sees.
  */
 export function flyBall(
   from: { x: number; y: number; z: number },
   vel: { vx: number; vy: number; vz: number },
   seconds: number,
+  spin?: { tops: number; side: number },
   step = 1 / 240,
 ): { where: 'bounce' | 'net' | 'floor' | 'air'; at: { x: number; y: number; z: number }; t: number } {
-  const g = PINGPONG_PHYSICS.gravity;
   const top = PINGPONG_TABLE.height;
-  const p = { ...from };
-  const v = { ...vel };
+  const b: PingPongFlight = { ...from, ...vel, tops: spin?.tops ?? 0, side: spin?.side ?? 0 };
   for (let t = 0; t < seconds; t += step) {
-    v.vy -= g * step;
-    p.x += v.vx * step;
-    p.y += v.vy * step;
-    p.z += v.vz * step;
-    if (Math.abs(p.x - PINGPONG_TABLE.x) < 0.05 && p.y >= top && p.y <= top + PINGPONG_TABLE.netHeight && Math.abs(p.z - PINGPONG_TABLE.z) <= PINGPONG_TABLE.width / 2 + 0.1)
-      return { where: 'net', at: p, t };
-    if (p.y <= top && v.vy < 0) return { where: onTableSurface(p.x, p.z) ? 'bounce' : 'floor', at: p, t };
-    if (p.y <= 0) return { where: 'floor', at: p, t };
+    flyStep(b, step);
+    if (Math.abs(b.x - PINGPONG_TABLE.x) < 0.05 && b.y >= top && b.y <= top + PINGPONG_TABLE.netHeight && Math.abs(b.z - PINGPONG_TABLE.z) <= PINGPONG_TABLE.width / 2 + 0.1)
+      return { where: 'net', at: b, t };
+    if (b.y <= top && b.vy < 0) return { where: onTableSurface(b.x, b.z) ? 'bounce' : 'floor', at: b, t };
+    if (b.y <= 0) return { where: 'floor', at: b, t };
   }
-  return { where: 'air', at: p, t: seconds };
+  return { where: 'air', at: b, t: seconds };
+}
+
+/**
+ * Where and when a ball in flight crosses the plane in front of the bat held by `side`: the shot it
+ * can be played from. `null` when it never gets there (already past, or out of the room).
+ */
+export function meetPoint(b: PingPongFlight, side: PingPongSide, seconds = 2): { x: number; y: number; z: number; t: number } | null {
+  const plane = side === 'west' ? PINGPONG_TABLE.x - PINGPONG_PHYSICS.paddleReach : PINGPONG_TABLE.x + PINGPONG_PHYSICS.paddleReach;
+  const step = 1 / 120;
+  const walked: PingPongFlight = { ...b };
+  for (let t = 0; t < seconds; t += step) {
+    const before = Math.sign(walked.x - plane);
+    flyStep(walked, step);
+    if (before !== 0 && Math.sign(walked.x - plane) !== before) return { x: plane, y: walked.y, z: walked.z, t };
+    // It bounces on the way, exactly as the game will bounce it.
+    if (walked.y <= PINGPONG_TABLE.height && walked.vy < 0 && onTableSurface(walked.x, walked.z)) {
+      walked.y = PINGPONG_TABLE.height;
+      tableBounce(walked);
+    }
+    if (walked.y <= 0) return null;
+  }
+  return null;
 }
 
 export interface PingPongPlayer {
@@ -179,16 +310,25 @@ export interface PingPongBallState {
   vx: number;
   vy: number;
   vz: number;
+  /** The spin it is carrying: over the ball (positive) or under it, and across it. */
+  tops: number;
+  side: number;
+  /** The stroke it was last struck with. */
+  kind: PingPongShotKind;
   t: number;
 }
 
-/** A shot solved by {@link solveShot}: how it leaves the paddle, and how long it is in the air. */
+/** A shot solved by {@link solveShot}: how it leaves the bat, what spin it carries, how long it flies. */
 export interface PingPongShot {
   vx: number;
   vy: number;
   vz: number;
-  /** Seconds between leaving the paddle and touching the table. */
+  /** Seconds between leaving the bat and touching the table. */
   t: number;
+  kind: PingPongShotKind;
+  /** Spin over the ball (positive) or under it (negative), and across it. */
+  tops: number;
+  side: number;
 }
 
 export interface PingPongState {
@@ -197,24 +337,58 @@ export interface PingPongState {
   westPlayer?: PingPongPlayer;
   eastPlayer?: PingPongPlayer;
   score: { west: number; east: number };
+  /** Games won, of `PINGPONG_MATCH.games` to win the match. */
+  games: { west: number; east: number };
   server: PingPongSide;
   rally: number;
   lastHitBy?: PingPongSide;
   lastBounceSide?: PingPongSide;
   winner?: PingPongSide;
   status: 'idle' | 'waiting' | 'serve' | 'rally' | 'point' | 'ended';
+  /** The stroke the server is holding the ball up for, and the side it must be struck from. */
+  serving?: { side: PingPongSide; kind: PingPongShotKind };
   ball?: PingPongBallState;
 }
+
+/** How a match is played: games to win, points in a game, and how long between points (s). */
+export const PINGPONG_MATCH = { games: 3, points: 11, winBy: 2, breakSeconds: 1.6 } as const;
 
 export function defaultPingPongState(): PingPongState {
   return {
     active: false,
     mode: 'bot',
     score: { west: 0, east: 0 },
+    games: { west: 0, east: 0 },
     server: 'west',
     rally: 0,
     status: 'idle',
   };
+}
+
+/**
+ * The match after a point to `winner`: the score on, whether it won the game, whose serve is next
+ * (two each, alternating) and whether the match is over. One place, so the floor and every client
+ * read the same match off the same rule.
+ */
+export function afterPoint(state: PingPongState, winner: PingPongSide): { score: { west: number; east: number }; games: { west: number; east: number }; server: PingPongSide; gameWon: boolean; matchWon: boolean } {
+  const score = { ...state.score, [winner]: state.score[winner] + 1 };
+  const games = { ...state.games };
+  // Two serves each, alternating: the point about to be played decides whose it is.
+  const next = score.west + score.east + 1;
+  const server: PingPongSide = Math.floor((next - 1) / 2) % 2 === 0 ? state.server : otherSide(state.server);
+  const gameWon = score[winner] >= PINGPONG_MATCH.points && score[otherSide(winner)] <= score[winner] - PINGPONG_MATCH.winBy;
+  if (gameWon) {
+    games[winner]++;
+    return { score: { west: 0, east: 0 }, games, server: winner, gameWon, matchWon: games[winner] >= PINGPONG_MATCH.games };
+  }
+  return { score, games, server, gameWon, matchWon: false };
+}
+
+/** The score as it goes on the board by the table: games first, then the points in this game. */
+export function scoreLine(state: PingPongState): string {
+  const p = state.score;
+  const g = state.games;
+  return `${g.west} - ${g.east}  ·  ${p.west} - ${p.east}`;
 }
 
 /** Checks whether a point (x, z) is within the given table half, with optional margin. */

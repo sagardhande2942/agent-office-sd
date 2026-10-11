@@ -1,40 +1,51 @@
 /**
- * Table tennis player and bot gameplay controller: paddle swinging, shot solving,
- * ball flight, bounces, scoring, and the bot's returns.
+ * Table tennis gameplay: your feet, your bat, the ball, and the worker bot at the other end.
+ *
+ * Shots are solved for the spot they are aimed at (see shared/tabletennis solveShot) and carry the
+ * spin of the stroke that played them, which the flight and the bounce both answer to. You walk
+ * round your own end of the table to reach a ball rather than covering it from one spot, and the
+ * bot reads the ball's flight, walks to where it is going, and plays the space you have left open.
  */
 import * as THREE from 'three';
 import {
   type BotDifficulty,
   type PingPongBallState,
   type PingPongMode,
+  type PingPongShotKind,
   type PingPongSide,
   type PingPongState,
+  flyStep,
   inTableHalf,
+  onCourtSpot,
   otherSide,
+  PINGPONG_COURT,
+  PINGPONG_MATCH,
   PINGPONG_PHYSICS,
   PINGPONG_SPOTS,
   PINGPONG_TABLE,
   shotTarget,
   solveShot,
+  tableBounce,
 } from '../../../shared/tabletennis';
 import type { PlayerController } from '../../player';
+import { TableTennisBot, type BotPlan } from './bot';
 import type { TableTennisCourt3D } from './world';
 
 export interface TableTennisCallbacks {
-  sendServe(side: PingPongSide, vx: number, vy: number, vz: number): void;
-  sendHit(side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number): void;
+  sendServe(side: PingPongSide, vx: number, vy: number, vz: number, swing: { tops: number; side: number; kind: PingPongShotKind }): void;
+  sendHit(side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number, swing: { tops: number; side: number; kind: PingPongShotKind }): void;
   awardPoint(winner: PingPongSide, reason?: string): void;
   playSound(kind: 'paddle' | 'table' | 'net' | 'point' | 'win'): void;
   onDone(): void;
 }
 
-/** How near the ball has to be to the paddle for a swing to meet it (m). */
-const REACH = 0.72;
-/** How long the net holds the ball back before it will bounce it again (s), so it can't rattle. */
+/** The bat hangs this far out in front of your body (m). */
+const REACH = 0.46;
+/** How high it hangs (m), and how far out to your right-hand side. */
+const HAND = 1.04;
+const SIDEWAYS = 0.26;
+/** How long the net holds the ball before it will bounce it again (s), so it can't rattle. */
 const NET_HOLD = 0.25;
-/** A paddle's reach across the table and its depth, the halves an aim is measured in (m). */
-const AIM_SPAN = PINGPONG_TABLE.width / 2;
-const DEPTH_SPAN = PINGPONG_TABLE.length / 4;
 
 export class TableTennisController {
   active = false;
@@ -43,28 +54,40 @@ export class TableTennisController {
   difficulty: BotDifficulty = 'normal';
   /** The half the opponent plays: the far side in bot mode, the other player's side in PvP. */
   opponent: PingPongSide = 'east';
+  /** The stroke you will play if you swing now. */
+  stroke: PingPongShotKind = 'topspin';
+  /** The last stroke played, for the sound and the bot's reading of it. */
+  lastStroke: PingPongShotKind = 'topspin';
+  /** The floor's match as it was last seen, so a swing knows whose serve it would be. */
+  private state: PingPongState = { active: false, mode: 'bot', score: { west: 0, east: 0 }, games: { west: 0, east: 0 }, server: 'west', rally: 0, status: 'idle' };
 
   // Ball physical state
   ballPos = new THREE.Vector3(PINGPONG_TABLE.x, PINGPONG_TABLE.height + 0.1, PINGPONG_TABLE.z);
   ballVel = new THREE.Vector3(0, 0, 0);
+  /** The spin on the ball in flight. */
+  ballTops = 0;
+  ballSide = 0;
   ballInPlay = false;
-  bouncesOnCurrentSide = 0;
   lastBounceSide: PingPongSide | null = null;
   lastHitter: PingPongSide | null = null;
+  /** How long the rally has gone on, and how long since a shot was played (s). */
+  rally = 0;
   /** The server's clock for the shot in flight, so a ball struck by the other player is taken once. */
   private seenAt = 0;
   private netHold = 0;
-  /** Where the ball was last frame: a slow frame steps it far, so a bat is met against the whole way. */
+  private breakT = 0;
   private readonly ballPrev = new THREE.Vector3();
+  private bot = new TableTennisBot();
+  private botPlan: BotPlan | undefined;
 
-  // Local player paddle state
-  paddleOffsetZ = 0;
-  paddleOffsetX = 0;
+  // Your feet and bat
+  private pos: { x: number; z: number } = { x: PINGPONG_SPOTS.west.x, z: PINGPONG_SPOTS.west.z };
   swinging = false;
   swingProgress = 0;
+  /** How long you are still recovering from a swing (s). */
+  private recovering = 0;
 
-  // Opponent paddle state (the bot's, or where the far player's bat is)
-  oppPaddleZ = PINGPONG_TABLE.z;
+  // The other player's feet and bat
   oppSwinging = false;
   oppSwingProgress = 0;
 
@@ -80,10 +103,14 @@ export class TableTennisController {
     this.mode = mode;
     this.difficulty = difficulty;
     this.opponent = otherSide(side);
-    this.paddleOffsetZ = 0;
-    this.paddleOffsetX = 0;
     this.ballInPlay = false;
-    this.oppPaddleZ = PINGPONG_TABLE.z;
+    this.rally = 0;
+    // You may serve the moment you are at the table; the break is between points, not before the first.
+    this.breakT = PINGPONG_MATCH.breakSeconds;
+    this.recovering = 0;
+    this.bot = new TableTennisBot(difficulty);
+    this.bot.reset(this.opponent);
+    this.pos = { x: side === 'west' ? PINGPONG_SPOTS.west.x : PINGPONG_SPOTS.east.x, z: PINGPONG_SPOTS.east.z };
 
     // Stand at your end of the table, facing it. camYaw is a camera heading, which is the body's
     // turned half a circle round from it (see player/index.ts), so it takes the other way.
@@ -100,23 +127,143 @@ export class TableTennisController {
     this.cb.onDone();
   }
 
-  /** Where your paddle is in the world, given your side and how far across and in you have moved it. */
-  get paddleX(): number {
+  /** Where you are standing, on your own end of the table. */
+  get where(): { x: number; z: number } {
+    return this.pos;
+  }
+
+  /** Where the other player is standing: the bot's, or the far player's own body. */
+  get oppWhere(): { x: number; z: number } {
+    return this.mode === 'bot' ? this.bot.where : { x: this.opponent === 'west' ? PINGPONG_SPOTS.west.x : PINGPONG_SPOTS.east.x, z: PINGPONG_TABLE.z };
+  }
+
+  /** Where your bat is in the world, in your hand. */
+  get bat(): { x: number; y: number; z: number } {
+    const dir = this.side === 'west' ? 1 : -1;
+    const swing = Math.sin(Math.max(0, this.swingProgress));
+    return {
+      x: this.pos.x + dir * (REACH + swing * 0.5),
+      y: HAND + swing * 0.16,
+      z: this.pos.z + (this.side === 'west' ? SIDEWAYS : -SIDEWAYS),
+    };
+  }
+
+  /** Where the far bat is. */
+  get oppBat(): { x: number; y: number; z: number } {
+    const dir = this.opponent === 'west' ? 1 : -1;
+    const swing = Math.sin(Math.max(0, this.oppSwingProgress));
+    return {
+      x: this.oppWhere.x + dir * (REACH + swing * 0.5),
+      y: HAND + swing * 0.16,
+      z: this.oppWhere.z + (this.opponent === 'west' ? SIDEWAYS : -SIDEWAYS),
+    };
+  }
+
+  /**
+   * Walks you round your own end of the table. `mx` and `mz` are -1..1: in, back, and either way
+   * across. You are slower for a moment after a swing, which is what a lunge costs you.
+   */
+  move(dt: number, mx: number, mz: number) {
+    if (!this.active) return;
+    const pace = PINGPONG_COURT.pace * (this.recovering > 0 ? 0.45 : 1);
+    const len = Math.hypot(mx, mz);
+    if (len < 0.01) return;
+    // In, back, and across, in the table's own frame: +x for a west player.
+    const dir = this.side === 'west' ? 1 : -1;
+    const step = Math.min(1, len) * pace * dt;
+    this.pos = onCourtSpot(this.side, this.pos.x + dir * mz * step, this.pos.z + mx * step);
+  }
+
+  swing(kind: PingPongShotKind = this.stroke) {
+    if (!this.active || this.swinging) return;
+    this.swinging = true;
+    this.swingProgress = 0;
+    this.recovering = PINGPONG_COURT.recovery;
+    this.lastStroke = kind;
+
+    if (!this.court()) return;
+    // Nothing in flight: that is a serve, but only if it is yours to play and the break is over.
+    if (!this.ballInPlay) {
+      if (this.serving(this.state)) this.serve(kind);
+      return;
+    }
+    const bat = this.bat;
+    if (this.batCanReach(bat)) this.hit(this.side, kind, this.paddleAim());
+  }
+
+  /** Where your bat sends the ball: across by how far off the middle you are standing. */
+  private paddleAim(): number {
+    return (this.pos.z - PINGPONG_TABLE.z) * 0.8;
+  }
+
+  /** Strikes the ball in play with `kind`, aimed at `aim` in the far half. */
+  private hit(side: PingPongSide, kind: PingPongShotKind, aim = 0, depth = 0, fromZ?: number) {
     const reach = PINGPONG_PHYSICS.paddleReach;
-    return (this.side === 'west' ? PINGPONG_TABLE.x - reach : PINGPONG_TABLE.x + reach) + this.paddleOffsetX;
+    const from = {
+      x: side === 'west' ? PINGPONG_TABLE.x - reach : PINGPONG_TABLE.x + reach,
+      y: PINGPONG_TABLE.height + PINGPONG_PHYSICS.paddleHeight,
+      z: fromZ ?? (side === this.side ? this.pos.z : this.bot.where.z),
+    };
+    const spot = shotTarget(side, aim / (PINGPONG_TABLE.width / 2), depth / (PINGPONG_TABLE.length / 4), (Math.random() - 0.5) * 0.1);
+    const shot = solveShot(from, spot, kind);
+
+    this.ballVel.set(shot.vx, shot.vy, shot.vz);
+    this.ballPos.set(from.x, from.y, from.z);
+    this.ballTops = shot.tops;
+    this.ballSide = shot.side;
+    this.ballInPlay = true;
+    this.lastHitter = side;
+    this.lastBounceSide = null;
+    this.netHold = 0;
+    this.rally++;
+    this.breakT = 0;
+
+    this.cb.playSound('paddle');
+    this.cb.sendHit(side, from.x, from.y, from.z, shot.vx, shot.vy, shot.vz, { tops: shot.tops, side: shot.side, kind });
   }
 
-  get paddleY(): number {
-    return PINGPONG_TABLE.height + PINGPONG_PHYSICS.paddleHeight;
+  /** The bot's serve, played from where it is standing. */
+  private serveBot(kind: PingPongShotKind) {
+    const reach = 1.2;
+    const from = this.opponent === 'west'
+      ? { x: PINGPONG_TABLE.x - reach, y: PINGPONG_TABLE.height + 0.22, z: this.bot.where.z }
+      : { x: PINGPONG_TABLE.x + reach, y: PINGPONG_TABLE.height + 0.22, z: this.bot.where.z };
+    const shot = solveShot(from, shotTarget(this.opponent, (Math.random() - 0.5) * 0.4, -0.2), kind);
+    this.ballInPlay = true;
+    this.ballPos.set(from.x, from.y, from.z);
+    this.ballVel.set(shot.vx, shot.vy, shot.vz);
+    this.ballTops = shot.tops;
+    this.ballSide = shot.side;
+    this.lastHitter = this.opponent;
+    this.lastBounceSide = null;
+    this.netHold = 0;
+    this.rally = 1;
+    this.breakT = 0;
+    this.cb.playSound('paddle');
+    this.cb.sendServe(this.opponent, shot.vx, shot.vy, shot.vz, { tops: shot.tops, side: shot.side, kind });
   }
 
-  get paddleZ(): number {
-    return PINGPONG_TABLE.z + this.paddleOffsetZ;
-  }
+  private serve(kind: PingPongShotKind) {
+    const reach = 1.2;
+    const from = this.side === 'west'
+      ? { x: PINGPONG_TABLE.x - reach, y: PINGPONG_TABLE.height + 0.22, z: this.pos.z }
+      : { x: PINGPONG_TABLE.x + reach, y: PINGPONG_TABLE.height + 0.22, z: this.pos.z };
+    const spot = shotTarget(this.side, this.paddleAim() / (PINGPONG_TABLE.width / 2), -0.25, (Math.random() - 0.5) * 0.08);
+    const shot = solveShot(from, spot, kind);
 
-  /** Where the far side's paddle is: just past the end of the table, tracking across it. */
-  get oppPaddleX(): number {
-    return this.opponent === 'west' ? PINGPONG_TABLE.x - PINGPONG_PHYSICS.paddleReach : PINGPONG_TABLE.x + PINGPONG_PHYSICS.paddleReach;
+    this.ballInPlay = true;
+    this.ballPos.set(from.x, from.y, from.z);
+    this.ballVel.set(shot.vx, shot.vy, shot.vz);
+    this.ballTops = shot.tops;
+    this.ballSide = shot.side;
+    this.lastHitter = this.side;
+    this.lastBounceSide = null;
+    this.netHold = 0;
+    this.rally = 1;
+    this.breakT = 0;
+
+    this.cb.playSound('paddle');
+    this.cb.sendServe(this.side, shot.vx, shot.vy, shot.vz, { tops: shot.tops, side: shot.side, kind });
   }
 
   /**
@@ -128,77 +275,23 @@ export class TableTennisController {
     this.seenAt = ball.t;
     this.ballPos.set(ball.x, ball.y, ball.z);
     this.ballVel.set(ball.vx, ball.vy, ball.vz);
+    this.ballTops = ball.tops ?? 0;
+    this.ballSide = ball.side ?? 0;
+    this.lastStroke = ball.kind ?? 'drive';
     this.ballInPlay = true;
     this.lastBounceSide = null;
     this.netHold = 0;
-    this.bouncesOnCurrentSide = 0;
+    this.breakT = 0;
+    this.rally++;
     this.lastHitter = ball.vx >= 0 ? 'west' : 'east';
-  }
-
-  swing() {
-    if (!this.active || this.swinging) return;
-    this.swinging = true;
-    this.swingProgress = 0;
-
-    if (!this.court()) return;
-    // Nothing in flight: this swing is the serve.
-    if (!this.ballInPlay) {
-      this.serve();
-      return;
-    }
-
-    if (this.batCanReach(this.paddleX, this.paddleY, this.paddleZ)) this.hit(this.side);
-  }
-
-  /** Strikes the ball in play, aimed into the far half by where your paddle is. */
-  private hit(side: PingPongSide, aim = 0, depth = 0) {
-    const reach = PINGPONG_PHYSICS.paddleReach;
-    const from = side === 'west'
-      ? { x: PINGPONG_TABLE.x - reach, y: this.paddleY, z: PINGPONG_TABLE.z + (side === this.side ? this.paddleOffsetZ : 0) }
-      : { x: PINGPONG_TABLE.x + reach, y: this.paddleY, z: PINGPONG_TABLE.z + (side === this.side ? this.paddleOffsetZ : 0) };
-    const spot = shotTarget(side, aim / AIM_SPAN, depth / DEPTH_SPAN, (Math.random() - 0.5) * 0.12);
-    const shot = solveShot(from, spot, PINGPONG_PHYSICS.shotSpeed + Math.random() * 0.3);
-
-    this.ballVel.set(shot.vx, shot.vy, shot.vz);
-    this.ballPos.set(from.x, from.y, from.z);
-    this.lastHitter = side;
-    this.bouncesOnCurrentSide = 0;
-    this.lastBounceSide = null;
-    this.netHold = 0;
-
-    this.cb.playSound('paddle');
-    this.cb.sendHit(side, from.x, from.y, from.z, shot.vx, shot.vy, shot.vz);
-  }
-
-  private serve() {
-    const reach = 1.2;
-    const from = this.side === 'west'
-      ? { x: PINGPONG_TABLE.x - reach, y: PINGPONG_TABLE.height + 0.22, z: PINGPONG_TABLE.z + this.paddleOffsetZ * 0.5 }
-      : { x: PINGPONG_TABLE.x + reach, y: PINGPONG_TABLE.height + 0.22, z: PINGPONG_TABLE.z + this.paddleOffsetZ * 0.5 };
-    const spot = shotTarget(this.side, (this.paddleOffsetZ * 0.5) / AIM_SPAN, -0.25, (Math.random() - 0.5) * 0.1);
-    const shot = solveShot(from, spot, PINGPONG_PHYSICS.shotSpeed * 0.85 + Math.random() * 0.2);
-
-    this.ballInPlay = true;
-    this.ballPos.set(from.x, from.y, from.z);
-    this.ballVel.set(shot.vx, shot.vy, shot.vz);
-    this.lastHitter = this.side;
-    this.bouncesOnCurrentSide = 0;
-    this.lastBounceSide = null;
-    this.netHold = 0;
-
-    this.cb.playSound('paddle');
-    this.cb.sendServe(this.side, shot.vx, shot.vy, shot.vz);
-  }
-
-  shiftPaddle(dz: number, dx = 0) {
-    this.paddleOffsetZ = Math.max(-0.6, Math.min(0.6, this.paddleOffsetZ + dz));
-    this.paddleOffsetX = Math.max(-0.3, Math.min(0.3, this.paddleOffsetX + dx));
   }
 
   update(dt: number, state: PingPongState) {
     const c = this.court();
     if (!c) return;
+    this.state = state;
 
+    this.recovering = Math.max(0, this.recovering - dt);
     if (this.swinging) {
       this.swingProgress += dt * 6.5;
       if (this.swingProgress >= Math.PI) {
@@ -215,53 +308,69 @@ export class TableTennisController {
     }
 
     this.ballPrev.copy(this.ballPos);
-    // The ball. Where the bats are is the avatar's business (they hang in their holders' hands).
     if (this.mode === 'bot') this.updateBot(dt);
     if (this.ballInPlay) {
       this.updateBallPhysics(dt);
-    } else if (this.active) {
-      // Waiting on the serve: the ball rests on the server's paddle.
-      c.setBall(this.paddleX, this.paddleY, this.paddleZ, true);
-    } else if (state.ball) {
-      c.setBall(state.ball.x, state.ball.y, state.ball.z, true);
+    } else {
+      // Between points: the ball waits on the server's bat, and the next serve is theirs.
+      this.breakT += dt;
+      const theirs = state.serving?.side ?? state.server;
+      const at = theirs === this.side ? this.bat : this.oppBat;
+      c.setBall(at.x, at.y, at.z, true);
+      // The bot serves its own serve, once the break is over.
+      if (this.mode === 'bot' && theirs === this.opponent && this.readyToServe && state.status !== 'ended') {
+        this.serveBot(state.serving?.kind ?? 'topspin');
+      }
     }
   }
 
-  private updateBot(dt: number) {
-    // Track across the table after the ball, with a beat of reaction, and only when it's coming.
-    const toward = this.opponent === 'east' ? 1 : -1;
-    const incoming = this.ballInPlay && Math.sign(this.ballVel.x) === toward;
-    const targetZ = incoming ? this.ballPos.z : PINGPONG_TABLE.z;
-    const botSpeed = this.difficulty === 'easy' ? 2.5 : this.difficulty === 'normal' ? 3.8 : 5.2;
-    this.oppPaddleZ += (targetZ - this.oppPaddleZ) * Math.min(1, dt * botSpeed);
+  /** How long the break between points lasts before the next serve can be played (s). */
+  get readyToServe(): boolean {
+    return !this.ballInPlay && this.breakT >= PINGPONG_MATCH.breakSeconds;
+  }
 
-    if (!incoming || this.oppSwinging) return;
-    if (!this.batCanReach(this.oppPaddleX, this.paddleY, this.oppPaddleZ, 0.9)) return;
-    const near = Math.hypot(this.ballPos.x - this.oppPaddleX, this.ballPos.z - this.oppPaddleZ);
+  /** Whether it is this side's serve to play. */
+  serving(state: PingPongState): boolean {
+    return (state.serving?.side ?? state.server) === this.side && this.readyToServe;
+  }
+
+  /** The stroke the floor has put up for the serve. */
+  serveKind(state: PingPongState): PingPongShotKind {
+    return state.serving?.kind ?? 'topspin';
+  }
+
+  private updateBot(dt: number) {
+    const flight = this.ballInPlay
+      ? { x: this.ballPos.x, y: this.ballPos.y, z: this.ballPos.z, vx: this.ballVel.x, vy: this.ballVel.y, vz: this.ballVel.z, tops: this.ballTops, side: this.ballSide }
+      : null;
+    this.bot.look(flight ? this.rally : null, dt);
+    this.botPlan = this.bot.plan(flight, this.opponent, this.pos);
+    this.bot.step(dt, this.botPlan.to);
+
+    const toward = this.opponent === 'east' ? 1 : -1;
+    if (!this.ballInPlay || Math.sign(this.ballVel.x) !== toward || this.oppSwinging) return;
+    const bat = this.oppBat;
+    if (!this.bot.canMeet({ ...this.ballPos, vx: this.ballVel.x, vy: this.ballVel.y, vz: this.ballVel.z, tops: this.ballTops, side: this.ballSide }, this.botPlan)) return;
+    if (!this.batCanReach(bat)) return;
     this.oppSwinging = true;
     this.oppSwingProgress = 0;
-    // How well it reaches the ball decides how deep it puts it back.
-    const reach = (0.8 - near) / 0.8;
-    const aim = (this.oppPaddleZ - this.ballPos.z) * 1.2;
-    this.hit(this.opponent, aim, -0.2 - reach * (this.difficulty === 'easy' ? 0 : 0.5));
+    this.hit(this.opponent, this.botPlan.stroke ?? 'topspin', this.botPlan.aim ? (this.botPlan.aim.z - PINGPONG_TABLE.z) * 2 : 0, 0, this.bot.where.z);
   }
 
   /**
-   * Whether a bat held at (x, y, z) meets the ball: the closest the ball came to it over the whole of
+   * Whether a bat held at `bat` meets the ball: the closest the ball came to it over the whole of
    * this frame, not just where it ended up. On a slow frame the ball steps most of a metre, and a
    * bat that only looked at the end of it would swing through where the ball had been.
    */
-  private batCanReach(x: number, y: number, z: number, reach = REACH): boolean {
+  private batCanReach(bat: { x: number; y: number; z: number }, reach = PINGPONG_COURT.lunge): boolean {
     const dx = this.ballPos.x - this.ballPrev.x;
     const dy = this.ballPos.y - this.ballPrev.y;
     const dz = this.ballPos.z - this.ballPrev.z;
     const len2 = dx * dx + dy * dy + dz * dz;
-    const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((x - this.ballPrev.x) * dx + (y - this.ballPrev.y) * dy + (z - this.ballPrev.z) * dz) / len2));
-    const px = this.ballPrev.x + dx * t;
+    const t = len2 < 1e-9 ? 0 : Math.max(0, Math.min(1, ((bat.x - this.ballPrev.x) * dx + (bat.y - this.ballPrev.y) * dy + (bat.z - this.ballPrev.z) * dz) / len2));
     const py = this.ballPrev.y + dy * t;
-    const pz = this.ballPrev.z + dz * t;
-    if (Math.abs(py - y) > 0.45) return false;
-    return Math.hypot(px - x, pz - z) < reach;
+    if (Math.abs(py - bat.y) > 0.45) return false;
+    return Math.hypot(this.ballPrev.x + dx * t - bat.x, this.ballPrev.z + dz * t - bat.z) < reach;
   }
 
   private updateBallPhysics(dt: number) {
@@ -271,59 +380,67 @@ export class TableTennisController {
     // Step small enough that the ball cannot skip the net or the far edge on a slow frame.
     const steps = Math.min(64, Math.max(1, Math.ceil(dt / 0.008)));
     const h = dt / steps;
+    const flight = { x: this.ballPos.x, y: this.ballPos.y, z: this.ballPos.z, vx: this.ballVel.x, vy: this.ballVel.y, vz: this.ballVel.z, tops: this.ballTops, side: this.ballSide };
     for (let i = 0; i < steps; i++) {
       if (!this.ballInPlay) return;
-
-      this.ballVel.y -= PINGPONG_PHYSICS.gravity * h;
-      this.ballPos.x += this.ballVel.x * h;
-      this.ballPos.y += this.ballVel.y * h;
-      this.ballPos.z += this.ballVel.z * h;
+      flyStep(flight, h);
       this.netHold = Math.max(0, this.netHold - h);
 
       // The net, once: it stops the ball dead rather than flipping it back and forth every frame.
       if (
         this.netHold <= 0 &&
-        Math.abs(this.ballPos.x - PINGPONG_TABLE.x) < PINGPONG_TABLE.thickness / 2 + this.ballVel.x * h &&
-        this.ballPos.y >= PINGPONG_TABLE.height &&
-        this.ballPos.y <= PINGPONG_TABLE.height + PINGPONG_TABLE.netHeight &&
-        Math.abs(this.ballPos.z - PINGPONG_TABLE.z) <= PINGPONG_TABLE.width / 2 + 0.08
+        Math.abs(flight.x - PINGPONG_TABLE.x) < PINGPONG_TABLE.thickness / 2 + Math.abs(this.ballVel.x * h) &&
+        flight.y >= PINGPONG_TABLE.height &&
+        flight.y <= PINGPONG_TABLE.height + PINGPONG_TABLE.netHeight &&
+        Math.abs(flight.z - PINGPONG_TABLE.z) <= PINGPONG_TABLE.width / 2 + 0.08
       ) {
-        this.ballPos.x = PINGPONG_TABLE.x + Math.sign(this.ballVel.x || 1) * (PINGPONG_TABLE.thickness / 2 + 0.01);
+        flight.x = PINGPONG_TABLE.x + Math.sign(this.ballVel.x || 1) * (PINGPONG_TABLE.thickness / 2 + 0.01);
         this.ballVel.x *= -0.2;
         this.ballVel.y *= 0.4;
         this.netHold = NET_HOLD;
         this.cb.playSound('net');
+        this.ballPos.set(flight.x, flight.y, flight.z);
         continue;
       }
 
-      if (this.ballPos.y <= PINGPONG_TABLE.height && this.ballVel.y < 0) {
-        const side = inTableHalf('west', this.ballPos.x, this.ballPos.z) ? 'west' : inTableHalf('east', this.ballPos.x, this.ballPos.z) ? 'east' : null;
+      if (flight.y <= PINGPONG_TABLE.height && this.ballVel.y < 0) {
+        const side = inTableHalf('west', flight.x, flight.z) ? 'west' : inTableHalf('east', flight.x, flight.z) ? 'east' : null;
         if (side) {
-          this.ballPos.y = PINGPONG_TABLE.height;
-          this.ballVel.y = -this.ballVel.y * PINGPONG_PHYSICS.restitution;
+          flight.y = PINGPONG_TABLE.height;
+          tableBounce(flight);
+          this.ballVel.set(flight.vx, flight.vy, flight.vz);
+          this.ballTops = flight.tops;
+          this.ballSide = flight.side;
           this.cb.playSound('table');
           if (this.lastBounceSide === side) {
             // Bounced twice on the far side without being returned: the striker loses the point.
             this.ballInPlay = false;
+            this.ballPos.set(flight.x, flight.y, flight.z);
+            this.cb.playSound('point');
             this.cb.awardPoint(otherSide(side), 'Double bounce');
             return;
           }
           this.lastBounceSide = side;
+          this.ballPos.set(flight.x, flight.y, flight.z);
           continue;
         }
       }
 
-      if (this.ballPos.y <= 0) {
+      if (flight.y <= 0) {
         this.ballInPlay = false;
-        const winner = this.lastBounceSide && this.lastHitter && this.lastBounceSide !== this.lastHitter
-          ? this.lastHitter
-          : this.lastHitter
-            ? otherSide(this.lastHitter)
-            : otherSide(this.side);
+        this.ballPos.set(flight.x, flight.y, flight.z);
+        this.cb.playSound('point');
+        // Bounced on the far side and never returned is the striker's point; anything else is not.
+        const winner = this.lastBounceSide && this.lastHitter && this.lastBounceSide !== this.lastHitter ? this.lastHitter : this.lastHitter ? otherSide(this.lastHitter) : otherSide(this.side);
         this.cb.awardPoint(winner, 'Out');
+        return;
       }
     }
-
+    // The flight carries the velocity on to the next frame: gravity has to keep pulling between them.
+    this.ballPos.set(flight.x, flight.y, flight.z);
+    this.ballVel.set(flight.vx, flight.vy, flight.vz);
+    this.ballTops = flight.tops;
+    this.ballSide = flight.side;
     c.setBall(this.ballPos.x, this.ballPos.y, this.ballPos.z, true);
   }
 }

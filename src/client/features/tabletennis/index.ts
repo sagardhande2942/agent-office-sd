@@ -13,7 +13,7 @@ import { openTableTennisDialog } from './ui';
 import { standingSpot, TableTennisBats, TableTennisOpponent } from './avatar';
 import { TableTennisController } from './controller';
 import type { TableTennisCourt3D } from './world';
-import type { BotDifficulty, PingPongMode, PingPongPlayer, PingPongSide } from '../../../shared/tabletennis';
+import { facingTable, PINGPONG_STROKES, PINGPONG_STROKES_ORDER, scoreLine, type BotDifficulty, type PingPongMode, type PingPongPlayer, type PingPongShotKind, type PingPongSide } from '../../../shared/tabletennis';
 
 // Augment InteractKinds with 'pingpong' (lowercase letters only per registry rules)
 declare module '../../world/types' {
@@ -29,6 +29,7 @@ export interface TableTennisDeps {
 
 export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   const court = (): TableTennisCourt3D | undefined => ctx.office.tableTennis;
+  const STROKES = PINGPONG_STROKES_ORDER;
   let bats: TableTennisBats | undefined;
   let opponent: TableTennisOpponent | undefined;
 
@@ -78,30 +79,24 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
         ctx.net.send({ t: 'pingpong.leave' });
         return true;
       }
+      // The stroke you play: the modifier keys pick it, and Tab cycles when you'd rather not hold them.
       if (e.code === 'Space') {
-        controller.swing();
+        controller.swing(strokeFor(e));
         return true;
       }
-      if (e.code === 'KeyA' || e.code === 'ArrowLeft') {
-        controller.shiftPaddle(0.08);
+      if (e.code === 'Tab') {
+        controller.stroke = STROKES[(STROKES.indexOf(controller.stroke) + 1) % STROKES.length];
+        toast(`🏓 ${PINGPONG_STROKES[controller.stroke].label}`, 'info');
+        ctx.hint.invalidate();
         return true;
       }
-      if (e.code === 'KeyD' || e.code === 'ArrowRight') {
-        controller.shiftPaddle(-0.08);
-        return true;
-      }
-      if (e.code === 'KeyW' || e.code === 'ArrowUp') {
-        controller.shiftPaddle(0, 0.06);
-        return true;
-      }
-      if (e.code === 'KeyS' || e.code === 'ArrowDown') {
-        controller.shiftPaddle(0, -0.06);
-        return true;
-      }
+      // Walking round your own end. The office's own movement keys don't move you while you play:
+      // you are on the court, not wandering the balcony.
+      if (e.code === 'KeyA' || e.code === 'KeyD' || e.code === 'KeyW' || e.code === 'KeyS') return true;
       if (e.code !== 'KeyF' && e.code !== 'KeyG' && !(e.code in DESK_KEYS)) return false;
       return true;
     },
-    hint: (el) => renderPlayHint(el),
+    hint: (el) => renderPlayHint(el, controller.stroke),
     // Your own body and hands stay: you are stood at the table holding a bat, not a floating one.
     bothHands: true,
   });
@@ -110,17 +105,22 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   const ordinaryClick = ctx.player.onClick;
   ctx.player.onClick = (ndc) => {
     if (controller.active) {
-      controller.swing();
+      controller.swing(controller.stroke);
       return;
     }
     ordinaryClick?.(ndc);
   };
 
   window.addEventListener('mousedown', (e) => {
-    if (controller.active && e.button === 0) {
-      controller.swing();
-    }
+    if (controller.active && e.button === 0) controller.swing(strokeFor(e));
   });
+
+  /** The stroke a swing plays: Shift smashes, Control cuts, otherwise whatever you last picked. */
+  function strokeFor(e: { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }): PingPongShotKind {
+    if (e.shiftKey) return 'smash';
+    if (e.ctrlKey || e.metaKey) return 'backspin';
+    return controller.stroke;
+  }
 
   // Play tick
   ctx.ticks.add('play', ({ dt, t }) => {
@@ -128,17 +128,27 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       controller.stop();
       ctx.net.send({ t: 'pingpong.leave' });
     }
+    // Your feet: the walk keys, on your own end of the table.
+    if (controller.active) {
+      const held = (a: string, b: string) => (ctx.player.holding(a) ? 1 : 0) - (ctx.player.holding(b) ? 1 : 0);
+      controller.move(dt, held('KeyD', 'KeyA'), held('KeyW', 'KeyS'));
+      ctx.player.pos.set(controller.where.x, 0, controller.where.z);
+      ctx.player.facing = facingTable(controller.where.x, controller.where.z);
+      ctx.player.camYaw = ctx.player.facing - Math.PI;
+    }
     controller.update(dt, store.pingpong);
     if (!controller.active) return;
-    // Your own bat where you stand, the far one where they do, and the far player themselves.
+    // Both bats, in the hands of the players who are actually holding them.
     const far = farPlayer(controller.opponent);
+    const oppAt = far.peer ? { x: far.peer.x, z: far.peer.z } : controller.oppWhere;
     (bats ??= new TableTennisBats(court, controller.side)).update(
-      { x: ctx.player.pos.x, z: ctx.player.pos.z },
-      far.peer ? { x: far.peer.x, z: far.peer.z } : standingSpot(controller.opponent),
+      controller.bat,
+      { x: oppAt.x + (controller.opponent === 'west' ? 1 : -1) * 0.46, y: 1.04, z: oppAt.z + (controller.opponent === 'west' ? 0.26 : -0.26) },
       controller.swinging ? controller.swingProgress : -1,
       controller.oppSwinging ? controller.oppSwingProgress : -1,
     );
-    opponent?.update(dt, t, controller.oppSwinging ? controller.oppSwingProgress : -1);
+    // The far player moves to the ball, so their body walks about their end too.
+    opponent?.update(dt, t, controller.oppSwinging ? controller.oppSwingProgress : -1, oppAt);
   });
 
   /** Whoever is on the far side of the net: their body in the room, if they're a person here. */
@@ -161,7 +171,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   // Listen to remote server events
   ctx.messages.on('pingpong.state', () => {
     const s = store.pingpong;
-    court()?.updateScore(`🏓 ${s.score.west} - ${s.score.east}`);
+    court()?.updateScore(`🏓 ${scoreLine(s)}`);
     // The other player struck it: fly the same ball from where the floor has it, so a rally is the
     // same rally from both ends of the table.
     controller.adopt(s.ball);
@@ -217,13 +227,20 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   });
 }
 
-function renderPlayHint(el: HTMLElement) {
+function renderPlayHint(el: HTMLElement, stroke: PingPongShotKind) {
   el.replaceChildren(
     h('span.hint-title', {}, '🏓 Table Tennis'),
-    h('span.hint-key', {}, '[Space / Click]'),
-    ' Swing · ',
-    h('span.hint-key', {}, '[A/D]'),
-    ' Move · ',
+    h('span.hint-key', {}, '[W A S D]'),
+    ' Footwork · ',
+    h('span.hint-key', {}, '[Space]'),
+    ` ${PINGPONG_STROKES[stroke].label}`,
+    ' (',
+    h('span.hint-key', {}, '[Shift]'),
+    ' Smash · ',
+    h('span.hint-key', {}, '[Ctrl]'),
+    ' Chop · ',
+    h('span.hint-key', {}, '[Tab]'),
+    ' Change) · ',
     h('span.hint-key', {}, '[E / Esc]'),
     ' Step Back',
   );

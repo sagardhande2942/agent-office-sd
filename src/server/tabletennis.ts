@@ -3,13 +3,16 @@
  * player joining/leaving (PvP and Worker Bot), score tracking, and bot returns.
  */
 import {
+  afterPoint,
   type BotDifficulty,
   type PingPongBallState,
   type PingPongMode,
+  type PingPongShotKind,
   type PingPongSide,
   type PingPongState,
   defaultPingPongState,
-  PINGPONG_PHYSICS,
+  otherSide,
+    PINGPONG_PHYSICS,
   PINGPONG_TABLE,
 } from '../shared/tabletennis.js';
 
@@ -17,9 +20,9 @@ export interface FloorTableTennis {
   state(): PingPongState;
   join(playerId: string, playerName: string, side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty): boolean;
   leave(playerId: string): boolean;
-  serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number): { ball: PingPongBallState; state: PingPongState } | null;
-  hit(playerId: string, side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number): { ball: PingPongBallState; state: PingPongState } | null;
-  awardPoint(playerId: string, winner: PingPongSide, reason?: string): { score: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean } | null;
+  serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null;
+  hit(playerId: string, side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null;
+  awardPoint(playerId: string, winner: PingPongSide, reason?: string): { score: { west: number; east: number }; games: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean; gameWon?: boolean } | null;
   reset(): boolean;
 }
 
@@ -28,6 +31,10 @@ export interface FloorTableTennis {
  * other, and within the speeds a ball can actually be hit at. A client that sends a shot of its own
  * inventing — or one aimed at the players behind it — has it corrected rather than obeyed.
  */
+function clampSpin(v: number): number {
+  return Number.isFinite(v) ? Math.max(-3, Math.min(3, v)) : 0;
+}
+
 function clampedShot(side: PingPongSide, vx: number, vy: number, vz: number): { vx: number; vy: number; vz: number } {
   const limit = 8;
   const finite = (v: number, fallback: number) => (Number.isFinite(v) ? fallback : v);
@@ -49,16 +56,17 @@ export class TableTennisMatch implements FloorTableTennis {
 
   join(playerId: string, playerName: string, side: PingPongSide, mode: PingPongMode, botName = 'Worker Bot', difficulty: BotDifficulty = 'normal'): boolean {
     if (mode === 'bot') {
-      const otherSide: PingPongSide = side === 'west' ? 'east' : 'west';
       this.current = {
         active: true,
         mode: 'bot',
         score: { west: 0, east: 0 },
+        games: { west: 0, east: 0 },
         server: side,
         rally: 0,
         status: 'serve',
+        serving: { side, kind: 'topspin' },
         [side === 'west' ? 'westPlayer' : 'eastPlayer']: { id: playerId, name: playerName },
-        [otherSide === 'west' ? 'westPlayer' : 'eastPlayer']: {
+        [otherSide(side) === 'west' ? 'westPlayer' : 'eastPlayer']: {
           id: 'bot',
           name: botName,
           isBot: true,
@@ -75,6 +83,7 @@ export class TableTennisMatch implements FloorTableTennis {
         active: true,
         mode: 'pvp',
         score: { west: 0, east: 0 },
+        games: { west: 0, east: 0 },
         server: 'west',
         rally: 0,
         status: 'waiting',
@@ -89,6 +98,7 @@ export class TableTennisMatch implements FloorTableTennis {
 
     if (this.current.westPlayer && this.current.eastPlayer) {
       this.current.status = 'serve';
+      this.current.serving = { side: this.current.server, kind: 'topspin' };
     } else {
       this.current.status = 'waiting';
     }
@@ -118,10 +128,12 @@ export class TableTennisMatch implements FloorTableTennis {
     return changed;
   }
 
-  serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number): { ball: PingPongBallState; state: PingPongState } | null {
+  serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null {
     if (!this.current.active) return null;
+    if (this.current.server !== side) return null;
     const player = side === 'west' ? this.current.westPlayer : this.current.eastPlayer;
-    if (!player || player.id !== playerId) return null;
+    // The worker bot's serves are played by the client that is playing it.
+    if (!player || (player.id !== playerId && !player.isBot)) return null;
 
     const startX = side === 'west' ? PINGPONG_TABLE.x - 1.2 : PINGPONG_TABLE.x + 1.2;
     const ball: PingPongBallState = {
@@ -129,17 +141,21 @@ export class TableTennisMatch implements FloorTableTennis {
       y: PINGPONG_TABLE.height + 0.25,
       z: PINGPONG_TABLE.z,
       ...clampedShot(side, vx, vy, vz),
+      tops: clampSpin(spin?.tops ?? 0),
+      side: clampSpin(spin?.side ?? 0),
+      kind: spin?.kind ?? 'topspin',
       t: Date.now(),
     };
 
     this.current.ball = ball;
     this.current.lastHitBy = side;
+    delete this.current.serving;
     this.current.status = 'rally';
     this.current.rally = 1;
     return { ball, state: this.state() };
   }
 
-  hit(playerId: string, side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number): { ball: PingPongBallState; state: PingPongState } | null {
+  hit(playerId: string, side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null {
     if (!this.current.active) return null;
     const player = side === 'west' ? this.current.westPlayer : this.current.eastPlayer;
     if (!player || (player.id !== playerId && !player.isBot)) return null;
@@ -149,6 +165,9 @@ export class TableTennisMatch implements FloorTableTennis {
       y: Number.isFinite(y) ? y : PINGPONG_TABLE.height,
       z: Number.isFinite(z) ? z : PINGPONG_TABLE.z,
       ...clampedShot(side, vx, vy, vz),
+      tops: clampSpin(spin?.tops ?? 0),
+      side: clampSpin(spin?.side ?? 0),
+      kind: spin?.kind ?? 'drive',
       t: Date.now(),
     };
 
@@ -171,31 +190,23 @@ export class TableTennisMatch implements FloorTableTennis {
    * is spent as the point is scored, so a replayed message cannot keep handing out points. Anything
    * else — a stranger's client, a claim on a rally with nobody's bat in it — is refused.
    */
-  awardPoint(playerId: string, winner: PingPongSide, reason = ''): { score: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean } | null {
+  awardPoint(playerId: string, winner: PingPongSide, reason = ''): { score: { west: number; east: number }; games: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean; gameWon?: boolean } | null {
     if (!this.current.active) return null;
     if (!this.plays(playerId)) return null;
-    const hitter = this.current.lastHitBy;
-    if (!hitter) return null;
+    if (!this.current.lastHitBy) return null;
 
-    this.current.score[winner]++;
-    const { west, east } = this.current.score;
-    const totalPoints = west + east;
+    const next = afterPoint(this.current, winner);
+    const was = { ...this.current.score };
+    this.current.score = next.score;
+    this.current.games = next.games;
+    this.current.server = next.server;
 
-    // Check match victory (e.g. 11 points and win by 2)
-    const pointsToWin = PINGPONG_PHYSICS.pointsToWin;
-    const matchWon = (west >= pointsToWin || east >= pointsToWin) && Math.abs(west - east) >= 2;
-
-    if (matchWon) {
+    if (next.matchWon) {
       this.current.status = 'ended';
       this.current.winner = winner;
     } else {
-      this.current.status = 'serve';
-      // Rotate server every 2 points, or every point in deuce (>= 10-10)
-      if (west >= 10 && east >= 10) {
-        this.current.server = totalPoints % 2 === 0 ? 'west' : 'east';
-      } else {
-        this.current.server = Math.floor(totalPoints / 2) % 2 === 0 ? 'west' : 'east';
-      }
+      this.current.status = 'point';
+      this.current.serving = { side: next.server, kind: 'topspin' };
     }
 
     // The rally is over and the strike that ended it is spent: the next claim needs a new one.
@@ -205,23 +216,31 @@ export class TableTennisMatch implements FloorTableTennis {
     this.current.rally = 0;
 
     const winnerName = (winner === 'west' ? this.current.westPlayer?.name : this.current.eastPlayer?.name) ?? winner;
-    const text = matchWon
-      ? `🏆 ${winnerName} won the match (${west} - ${east})!`
-      : `🏓 Point for ${winnerName}! (${west} - ${east})${reason ? ` · ${reason}` : ''}`;
+    const games = `${next.games.west} - ${next.games.east}`;
+    const points = `${next.score.west} - ${next.score.east}`;
+    const text = next.matchWon
+      ? `🏆 ${winnerName} won the match ${games}!`
+      : next.gameWon
+        ? `🏅 ${winnerName} took the game ${games} · that game was ${was.west} - ${was.east}`
+        : `🏓 Point for ${winnerName}! (${points})${reason ? ` · ${reason}` : ''}`;
 
     return {
-      score: { west, east },
+      score: next.score,
+      games: next.games,
       winner,
       text,
-      matchWon,
+      matchWon: next.matchWon,
+      gameWon: next.gameWon,
     };
   }
 
   reset(): boolean {
     if (!this.current.active) return false;
     this.current.score = { west: 0, east: 0 };
+    this.current.games = { west: 0, east: 0 };
     this.current.rally = 0;
     this.current.status = 'serve';
+    this.current.serving = { side: this.current.server, kind: 'topspin' };
     delete this.current.ball;
     delete this.current.winner;
     return true;

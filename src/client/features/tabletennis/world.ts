@@ -140,8 +140,10 @@ export function buildTableTennisTable(): TableTennisCourt3D {
       p.rotation.z = rotZ;
     },
     updateScore(text: string) {
-      // Re-create text plane or update
+      // Re-create text plane or update. The text is kept on the sign too, so what the board says
+      // can be read without looking at the pixels of it.
       scoreSign.material = textPlane(text, { bg: '#2b2d42', color: '#ffd166', size: 48, border: '#ffffff' }).material;
+      scoreSign.userData.text = text;
     },
     update(_dt: number) {},
   };

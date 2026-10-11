@@ -10,12 +10,9 @@ import { facingTable, PINGPONG_SPOTS, type PingPongSide } from '../../../shared/
 import { noOutline } from '../../core/outline';
 import { Person } from '../../world/character';
 
-/** How far in front of its body a bat is held, how high, to which side, and how far it swings (m). */
-const REACH = 0.4;
-const HEIGHT = 0.98;
-const SIDEWAYS = 0.2;
-const SWING_OUT = 0.5;
-const SWING_UP = 0.16;
+/** How far a bat swings out as it is struck, and how high it comes (m). */
+const SWING_OUT = 0.1;
+const SWING_UP = 0.02;
 /** How the worker bot at the far end is put together: one of each face, hair and outfit. */
 const LOOK = { skin: 2, hair: 1, style: 0 };
 
@@ -44,15 +41,24 @@ export class TableTennisOpponent {
     scene.add(this.person.root);
   }
 
-  /** `progress` is the controller's swing, 0..π while it is under way and -1 when it is not. */
-  update(dt: number, t: number, progress: number) {
+  /**
+   * `progress` is the controller's swing, 0..π while it is under way and -1 when it is not; `at` is
+   * where the other player is standing, which they walk about as they play.
+   */
+  update(dt: number, t: number, progress: number, at: { x: number; z: number }) {
     this.swing = progress;
-    this.person.update(dt, t, false, false, 1);
-    const reach = Math.sin(Math.max(0, this.swing)) * SWING_OUT;
+    const pos = this.person.root.position;
+    const dx = at.x - pos.x;
+    const dz = at.z - pos.z;
+    const moved = Math.hypot(dx, dz);
+    pos.x += dx * Math.min(1, dt * 12);
+    pos.z += dz * Math.min(1, dt * 12);
+    this.person.update(dt, t, moved > 0.02, false, 1);
+    const reach = Math.sin(Math.max(0, this.swing));
     const arm = this.person.rig.armR;
-    arm.rotation.x = -0.7 - reach;
-    arm.rotation.z = -0.25 - reach * 0.25;
-    this.person.root.rotation.y = facingTable(this.person.root.position.x, this.person.root.position.z);
+    arm.rotation.x = -0.7 - reach * 0.9;
+    arm.rotation.z = -0.25 - reach * 0.35;
+    this.person.root.rotation.y = facingTable(pos.x, pos.z);
   }
 
   get swinging() {
@@ -78,8 +84,11 @@ export class TableTennisBats {
     private readonly mineSide: PingPongSide,
   ) {}
 
-  /** `mine` and `theirs` are where the two holders stand; swings are 0..π while under way, -1 when not. */
-  update(mine: { x: number; z: number }, theirs: { x: number; z: number } | undefined, swing: number, oppSwing: number) {
+  /**
+   * `mine` and `theirs` are where the two bats are, in the world, in their holders' hands; swings are
+   * 0..π while under way and -1 when not.
+   */
+  update(mine: { x: number; y: number; z: number }, theirs: { x: number; y: number; z: number } | undefined, swing: number, oppSwing: number) {
     this.swing = swing;
     this.oppSwing = oppSwing;
     const c = this.court();
@@ -91,12 +100,11 @@ export class TableTennisBats {
   }
 }
 
-/** Hangs a bat out in front of whoever is holding it, turned to face down the table, swinging.
- * The bats are children of the table, so a place in the room is measured from where the table is. */
-function place(bat: THREE.Group, at: { x: number; z: number }, swing: number, side: PingPongSide, table: THREE.Vector3) {
+/** Puts a bat in its holder's hand, turned to face down the table, and swings it out. The bats are
+ * children of the table, so a place in the room is measured from where the table stands. */
+function place(bat: THREE.Group, at: { x: number; y: number; z: number }, swing: number, side: PingPongSide, table: THREE.Vector3) {
   const dir = side === 'west' ? 1 : -1;
   const reach = Math.sin(Math.max(0, swing));
-  const hand = side === 'west' ? SIDEWAYS : -SIDEWAYS;
-  bat.position.set(at.x + dir * (REACH + reach * SWING_OUT) - table.x, HEIGHT + reach * SWING_UP - table.y, at.z + hand - table.z);
+  bat.position.set(at.x + dir * reach * SWING_OUT - table.x, at.y + reach * SWING_UP - table.y, at.z - table.z);
   bat.rotation.set(-0.9 - reach * 0.6, side === 'west' ? -Math.PI / 2 : Math.PI / 2, 0);
 }

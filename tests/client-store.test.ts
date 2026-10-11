@@ -244,7 +244,7 @@ test('a new store starts every field where it always has', async () => {
       placements: { map: 'office', items: {} },
       lore: [],
       codingAgents: { config: defaultCodingAgentsConfig() },
-      pingpong: { active: false, mode: 'bot', score: { east: 0, west: 0 }, server: 'west', rally: 0, status: 'idle' },
+      pingpong: { active: false, mode: 'bot', score: { east: 0, west: 0 }, games: { east: 0, west: 0 }, server: 'west', rally: 0, status: 'idle' },
       you: '', peers: [], workers: [], screens: [], project: null, floors: [], floor: null, projectsDir: { dir: '', custom: false },
       repos: { list: [], loading: false, at: 0 }, issues: { items: [], fetchedAt: 0, loading: true }, pulls: { items: [], fetchedAt: 0, loading: true },
       ice: [], chat: [], invites: false, communications: { messages: [] }, queue: { tasks: [], maxWorkers: 0 }, me: { admin: false },

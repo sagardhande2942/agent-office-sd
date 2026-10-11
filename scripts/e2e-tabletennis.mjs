@@ -71,6 +71,8 @@ try {
 
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
+  const pageErrors = [];
+  page.on('pageerror', (e) => pageErrors.push(e.message));
 
   console.log(`Connecting to office at ${base}...`);
   await page.goto(base + '/');
@@ -167,6 +169,13 @@ try {
   // Serve the ball using Space, and watch where it actually goes
   const table = { x: PINGPONG_TABLE.x, z: PINGPONG_TABLE.z, length: PINGPONG_TABLE.length, width: PINGPONG_TABLE.width, height: PINGPONG_TABLE.height };
   await page.evaluate(() => {
+    // Count what the floor tells everyone, so we can prove it took the shots and not just the ball moved.
+    window.__floor = { hits: 0, points: 0, sides: [] };
+    window.__office.ctx.messages.on('pingpong.hit', (m) => {
+      window.__floor.hits++;
+      window.__floor.sides.push(m.side);
+    });
+    window.__office.ctx.messages.on('pingpong.point', () => window.__floor.points++);
     const ball = window.__office.office.tableTennis.ball;
     window.__trace = [];
     // Sampled on the game's own frame, not a timer: headless Chromium throttles timers hard, and
@@ -177,9 +186,24 @@ try {
     };
     window.__traceTimer = requestAnimationFrame(sample);
   });
+  // Wait out the break between points before serving, then serve with a chosen stroke.
+  await page.waitForFunction(() => window.__office.store.pingpong.status === 'serve', { timeout: 10000 });
   await page.locator('canvas').focus();
+  // The break between points has to be served out of, so wait past one before serving.
+  await page.waitForTimeout(2000);
   await page.keyboard.press('Space');
   await page.waitForTimeout(9000);
+  const afterServe = await page.evaluate(() => window.__office.store.pingpong);
+  const floor = await page.evaluate(() => window.__floor);
+  // Headless SwiftShader draws a few frames a second, so the bot has very little time to reach a
+  // ball struck at it; what this proves is that the floor really ran the rally (shots registered and
+  // a point scored), not that the bot won it. Its feet and its choices are covered by the unit tests.
+  check(
+    'floor-ran-the-rally',
+    floor.hits >= 1 && floor.sides.includes('west') && floor.points >= 1,
+    `The floor took ${floor.hits} shot(s) (${floor.sides.join(', ')}) and scored ${floor.points} point(s).`,
+  );
+  assert.deepEqual(pageErrors, [], 'no page errors while playing');
   const trace = await page.evaluate(() => {
     cancelAnimationFrame(window.__traceTimer);
     return window.__trace;
@@ -211,6 +235,29 @@ try {
     `The worker bot returns the ball: ${bounces.length} touch downs in the first rally (ball left the table's width on ${away.length} of ${trace.length} frames).`,
   );
 
+  // The score board shows games as well as the points in the game.
+  const board = await page.evaluate(() => window.__office.office.tableTennis.scoreSign.userData.text ?? '');
+  const points = await page.evaluate(() => window.__office.store.pingpong);
+  assert.ok(points.games && 'games' in points, 'the match keeps a count of games won');
+  assert.ok(board === '' || /\d\s*-\s*\d/.test(board), `the board by the table reads the score (got ${JSON.stringify(board)})`);
+
+  // Walking: you cover your own end of the table, and cannot walk onto it.
+  const feet = await page.evaluate(async () => {
+    const p = window.__office.player;
+    const before = { x: p.pos.x, z: p.pos.z };
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyD', bubbles: true }));
+    await new Promise((r) => setTimeout(r, 900));
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyD', bubbles: true }));
+    await new Promise((r) => setTimeout(r, 200));
+    return { before, after: { x: p.pos.x, z: p.pos.z } };
+  });
+  const walked = Math.abs(feet.after.z - feet.before.z);
+  check(
+    'footwork',
+    walked > 0.1 && walked <= 1.3,
+    `A held walk key moves you along your own end: ${walked.toFixed(2)}m across, staying at x=${feet.after.x.toFixed(2)}.`,
+  );
+
   // Both players are there: a body at the far end of the table, and yours in hand.
   const east = { x: PINGPONG_SPOTS.east.x, z: PINGPONG_SPOTS.east.z };
   const players = await page.evaluate((east) => {
@@ -234,6 +281,13 @@ try {
   // Screenshot in-game table tennis match
   await page.screenshot({ path: path.join(output, '03-gameplay.png') });
   check('gameplay-screenshot', true, `Saved active gameplay screenshot to ${path.join(output, '03-gameplay.png')}`);
+
+  // And the same moment from outside, where both players and both bats are in shot.
+  await page.evaluate(() => window.__office.player.setView('third'));
+  await page.waitForTimeout(600);
+  await page.screenshot({ path: path.join(output, '04-third-person.png') });
+  check('third-person-screenshot', true, `Saved the rally from outside to ${path.join(output, '04-third-person.png')}`);
+  await page.evaluate(() => window.__office.player.setView('first'));
 
   // Step back / leave match
   await page.locator('canvas').focus();

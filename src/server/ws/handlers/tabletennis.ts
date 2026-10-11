@@ -6,7 +6,8 @@ import type { TableTennisClientMsg } from '../../../shared/protocol.js';
 import type { Ctx } from '../../office/context.js';
 import type { Client } from '../../office/client.js';
 import { num, str } from '../../office/input.js';
-import { defaultPingPongState, type PingPongSide } from '../../../shared/tabletennis.js';
+import { defaultPingPongState, type PingPongBallState, type PingPongShotKind, type PingPongSide } from '../../../shared/tabletennis.js';
+import type { PingPongSwing } from '../../../shared/protocol/tabletennis.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
 export const tableTennisView: ViewPieces['pingpong'] = (_ctx, floor) =>
@@ -14,6 +15,22 @@ export const tableTennisView: ViewPieces['pingpong'] = (_ctx, floor) =>
 
 export const tableTennisChanged = (ctx: Ctx, floor: Floor) =>
   ctx.toFloor(floor, { t: 'pingpong.state', state: floor.pingpong?.state() ?? defaultPingPongState() });
+
+/** A client's stroke, as far as the floor will take it: a known stroke, and spin inside its range. */
+function spinOf(swing?: PingPongSwing): { tops: number; side: number; kind: PingPongShotKind } | undefined {
+  if (!swing) return undefined;
+  const kinds: PingPongShotKind[] = ['drive', 'topspin', 'backspin', 'smash'];
+  return {
+    tops: Math.max(-3, Math.min(3, num(swing.tops))),
+    side: Math.max(-3, Math.min(3, num(swing.side))),
+    kind: kinds.includes(swing.kind) ? swing.kind : 'drive',
+  };
+}
+
+/** The stroke and spin a ball is carrying, for everyone watching. */
+function swingOf(ball: PingPongBallState): PingPongSwing {
+  return { tops: ball.tops, side: ball.side, kind: ball.kind };
+}
 
 export const tableTennisHandlers = {
   async 'pingpong.join'(ctx: Ctx, c: Client, msg: { t: 'pingpong.join'; side: PingPongSide; mode: 'bot' | 'pvp'; botName?: string; difficulty?: 'easy' | 'normal' | 'pro' }) {
@@ -41,11 +58,11 @@ export const tableTennisHandlers = {
     }
   },
 
-  async 'pingpong.serve'(ctx: Ctx, c: Client, msg: { t: 'pingpong.serve'; side: PingPongSide; vx: number; vy: number; vz: number }) {
+  async 'pingpong.serve'(ctx: Ctx, c: Client, msg: { t: 'pingpong.serve'; side: PingPongSide; vx: number; vy: number; vz: number; swing?: PingPongSwing }) {
     const floor = ctx.floorOf(c);
     if (!floor?.pingpong) return;
     const side: PingPongSide = msg.side === 'east' ? 'east' : 'west';
-    const result = floor.pingpong.serve(c.id, side, num(msg.vx), num(msg.vy), num(msg.vz));
+    const result = floor.pingpong.serve(c.id, side, num(msg.vx), num(msg.vy), num(msg.vz), spinOf(msg.swing));
     if (result) {
       ctx.toFloor(floor, {
         t: 'pingpong.hit',
@@ -56,16 +73,17 @@ export const tableTennisHandlers = {
         vx: result.ball.vx,
         vy: result.ball.vy,
         vz: result.ball.vz,
+        swing: swingOf(result.ball),
       });
       tableTennisChanged(ctx, floor);
     }
   },
 
-  async 'pingpong.hit'(ctx: Ctx, c: Client, msg: { t: 'pingpong.hit'; side: PingPongSide; x: number; y: number; z: number; vx: number; vy: number; vz: number }) {
+  async 'pingpong.hit'(ctx: Ctx, c: Client, msg: { t: 'pingpong.hit'; side: PingPongSide; x: number; y: number; z: number; vx: number; vy: number; vz: number; swing?: PingPongSwing }) {
     const floor = ctx.floorOf(c);
     if (!floor?.pingpong) return;
     const side: PingPongSide = msg.side === 'east' ? 'east' : 'west';
-    const result = floor.pingpong.hit(c.id, side, num(msg.x), num(msg.y), num(msg.z), num(msg.vx), num(msg.vy), num(msg.vz));
+    const result = floor.pingpong.hit(c.id, side, num(msg.x), num(msg.y), num(msg.z), num(msg.vx), num(msg.vy), num(msg.vz), spinOf(msg.swing));
     if (result) {
       ctx.toFloor(floor, {
         t: 'pingpong.hit',
@@ -76,6 +94,7 @@ export const tableTennisHandlers = {
         vx: result.ball.vx,
         vy: result.ball.vy,
         vz: result.ball.vz,
+        swing: swingOf(result.ball),
       });
       tableTennisChanged(ctx, floor);
     }
@@ -91,8 +110,9 @@ export const tableTennisHandlers = {
         t: 'pingpong.point',
         winner: res.winner,
         score: res.score,
+        games: res.games,
         text: res.text,
-        sound: res.matchWon ? 'win' : 'point',
+        sound: res.matchWon ? 'win' : res.gameWon ? 'game' : 'point',
       });
       tableTennisChanged(ctx, floor);
     }
