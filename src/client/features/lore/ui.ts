@@ -1,7 +1,7 @@
 import './ui.css';
 import type { Net } from '../../net';
 import type { LoreNote } from '../../../shared/protocol/lore';
-import { cleanLoreContent, cleanLoreTitle, parseLoreTags, formatLoreForPrompt } from '../../../shared/lore';
+import { cleanLoreContent, cleanLoreTitle, parseLoreTags, formatLoreForPrompt, knowledgeShelfNotes } from '../../../shared/lore';
 import { store } from '../../state';
 import { h, openModal, toast, timeAgo } from '../../ui/dom';
 
@@ -19,8 +19,8 @@ export function openLoreShelf(opts: LoreShelfOptions) {
   const tagsEl = h('div.lore-shelf-tags');
   const searchInput = h('input.lore-shelf-search-input', {
     type: 'search',
-    placeholder: 'Search lore by title, author, gotchas, or tags…',
-    'aria-label': 'Search lore notes',
+    placeholder: 'Search knowledge by title, author, gotchas, or tags…',
+    'aria-label': 'Search knowledge notes',
   }) as HTMLInputElement;
 
   const newBtn = h('button.btn.primary', { type: 'button' }, '➕ Add note');
@@ -28,7 +28,7 @@ export function openLoreShelf(opts: LoreShelfOptions) {
   const header = h(
     'header',
     {},
-    h('div', {}, h('h2', {}, '📜 Lore Shelf & Shift Handovers'), h('p.setting-note', { style: 'margin:2px 0 0' }, 'Gotchas, build quirks, and notes handed over by workers on this floor.')),
+    h('div', {}, h('h2', {}, '📜 Lore Shelf · Knowledge Base'), h('p.setting-note', { style: 'margin:2px 0 0' }, 'Reusable discoveries, verified fixes, architecture, and build quirks for this project.')),
     h('button.btn.close', { type: 'button', 'aria-label': 'Close' }, '✕'),
   );
 
@@ -50,7 +50,7 @@ export function openLoreShelf(opts: LoreShelfOptions) {
 
   function renderTags() {
     const allTags = new Set<string>();
-    for (const note of store.lore) {
+    for (const note of knowledgeShelfNotes(store.lore)) {
       for (const t of note.tags) allTags.add(t);
     }
     const tags = [...allTags].sort();
@@ -88,7 +88,8 @@ export function openLoreShelf(opts: LoreShelfOptions) {
 
   function renderNotes() {
     const q = query.toLowerCase().trim();
-    const filtered = store.lore.filter((n) => {
+    const knowledge = knowledgeShelfNotes(store.lore);
+    const filtered = knowledge.filter((n) => {
       if (activeTag && !n.tags.includes(activeTag)) return false;
       if (!q) return true;
       return (
@@ -104,8 +105,8 @@ export function openLoreShelf(opts: LoreShelfOptions) {
         h(
           'div.lore-shelf-empty',
           {},
-          store.lore.length === 0
-            ? 'No lore notes yet. Click “➕ Add note” or write a handover before sending a worker home!'
+          knowledge.length === 0
+            ? 'No reusable knowledge yet. Workers record discoveries here, or use “➕ Add note” to save a project tip.'
             : 'No notes match your filter.',
         ),
       );

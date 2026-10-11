@@ -89,7 +89,7 @@ try {
   console.log('Pressed Tab to open menu');
 
   // Click lore menu option
-  const loreAction = page.locator('button:has-text("Lore & shift notes"), [data-hud="lore"]');
+  const loreAction = page.locator('button:has-text("Knowledge base"), [data-hud="lore"]');
   await loreAction.waitFor({ state: 'visible' });
   await loreAction.click();
   console.log('Clicked lore action');
@@ -102,8 +102,10 @@ try {
   // Verify seed note is displayed
   await page.locator('h3.lore-card-title:has-text("Database connection pool gotcha")').waitFor({ state: 'visible' });
   console.log('Seed note verified');
-  await page.locator('h3.lore-card-title:has-text("Handover: Automatic worker handover")').waitFor({ state: 'visible' });
-  console.log('Automatic worker handover verified');
+  assert.ok(floor.lore.list().some(n => n.tags.includes('handover')), 'automatic handover remains saved');
+  assert.equal(await modal.locator('h3.lore-card-title').filter({ hasText: 'Handover:' }).count(), 0);
+  assert.equal(await modal.locator('.lore-tag-chip').filter({ hasText: '#handover' }).count(), 0);
+  console.log('Knowledge-only shelf verified; handover remains saved');
 
   // Open editor to add a new note
   const addBtn = modal.locator('button:has-text("Add note")');
