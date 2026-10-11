@@ -1,20 +1,22 @@
 {
   "checks": [
+    "Table tennis uses a wide elevated court view",
     "Aim moves the landing target without moving the player",
     "Holding a shot does not fire it before release",
     "A second connected browser receives the same angled velocity and spin",
     "Both left and right landing directions are available",
     "Full charge produces greater shot pace than a tap",
     "Losing window focus cancels a held shot",
-    "Mouse release sends one shot without duplicate click handlers"
+    "Mouse release sends one shot without duplicate click handlers",
+    "Leaving restores normal office field of view"
   ],
   "browserErrors": [],
   "tap": {
-    "vx": 2.5950333614828365,
-    "vz": -0.38325704382366665
+    "vx": 2.595264822515698,
+    "vz": -0.38339028039886835
   },
   "charged": {
-    "vx": 4.5634081408836,
-    "vz": 0.7830780310653297
+    "vx": 4.557906848092551,
+    "vz": 0.8103346725485812
   }
 }

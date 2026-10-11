@@ -52,6 +52,7 @@ try {
  };
  const leave = async () => { await page.keyboard.press('KeyE'); await page.waitForFunction(() => !window.__office.store.pingpong.active); };
  await play();
+ assert.ok(await page.evaluate(() => window.__office.camera.fov >= 75 && window.__office.camera.position.y >= 2.5)); check('Table tennis uses a wide elevated court view');
  const feetBefore = await page.evaluate(() => window.__office.player.pos.toArray());
  await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(500); await page.keyboard.up('ArrowLeft');
  const left = await page.evaluate(() => ({ feet: window.__office.player.pos.toArray(), target: window.__office.scene.getObjectByName('tabletennis-shot-target').position.toArray() }));
@@ -81,7 +82,7 @@ try {
  const canvas = await page.locator('canvas').boundingBox();
  await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2); await page.mouse.down(); await page.waitForTimeout(300); await page.mouse.up();
  await page.waitForFunction(() => window.__sent.length >= 3); assert.equal(await page.evaluate(() => window.__sent.length), 3); check('Mouse release sends one shot without duplicate click handlers');
- await leave(); assert.deepEqual(errors, []);
+ await leave(); await page.waitForTimeout(100); assert.ok(await page.evaluate(() => window.__office.camera.fov < 70)); check('Leaving restores normal office field of view'); assert.deepEqual(errors, []);
  writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks, browserErrors: errors, tap: { vx: tap.vx, vz: tap.vz }, charged: { vx: hard.vx, vz: hard.vz } }, null, 2));
  console.log(`Evidence: ${output}`);
 } finally { await browser?.close(); office.shutdown(); }

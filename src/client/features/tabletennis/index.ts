@@ -12,6 +12,7 @@ import { playTableTennisSound } from './sound';
 import { openTableTennisDialog } from './ui';
 import { standingSpot, TableTennisBats, TableTennisOpponent } from './avatar';
 import { TableTennisControls } from './controls';
+import { TableTennisCamera } from './camera';
 import { TableTennisController } from './controller';
 import type { TableTennisCourt3D } from './world';
 import { facingTable, PINGPONG_STROKES, PINGPONG_STROKES_ORDER, scoreLine, type BotDifficulty, type PingPongMode, type PingPongPlayer, type PingPongShotKind, type PingPongSide } from '../../../shared/tabletennis';
@@ -59,6 +60,12 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
 
   const controls = new TableTennisControls(ctx.player, controller, ctx.scene);
 
+  const camera = new TableTennisCamera(ctx.camera, controller);
+  ctx.ticks.add('aim', () => {
+    camera.update();
+    if (controller.active) ctx.me.root.visible = false; // Hats must not hide the near court or incoming ball.
+  });
+
   /** Stands the other player up at their end: a worker bot for a bot match, or nobody in PvP
    * (the other player's own body is in the room with you, at the same place). */
   function opponentDown() {
@@ -101,8 +108,10 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       return true;
     },
     hint: (el) => renderPlayHint(el, controller.stroke),
-    // Your own body and hands stay: you are stood at the table holding a bat, not a floating one.
+    // The court view replaces the first-person body and hand overlays.
     bothHands: true,
+    takesCamera: true,
+    hidesHands: true,
   });
 
   // Left click swings paddle while playing table tennis

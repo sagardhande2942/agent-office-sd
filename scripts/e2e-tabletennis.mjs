@@ -258,7 +258,7 @@ try {
     `A held walk key moves you along your own end: ${walked.toFixed(2)}m across, staying at x=${feet.after.x.toFixed(2)}.`,
   );
 
-  // Both players are there: a body at the far end of the table, and yours in hand.
+  // The opponent is visible; the local avatar stays out of the court camera.
   const east = { x: PINGPONG_SPOTS.east.x, z: PINGPONG_SPOTS.east.z };
   const players = await page.evaluate((east) => {
     const bodies = window.__office.scene.children.filter((o) => o.visible && o.position && Math.hypot(o.position.x - east.x, o.position.z - east.z) < 0.6);
@@ -271,7 +271,7 @@ try {
     };
   }, east);
   check('opponent-on-show', players.atEast >= 1, `${players.atEast} body/bodies standing at the far end of the table (the worker bot).`);
-  check('your-own-body-visible', players.meVisible === true, 'Your own body is on show while you play, not hidden.');
+  check('court-view-unobstructed', players.meVisible === false, 'The local avatar cannot obscure incoming balls.');
   check(
     'bats-in-hand',
     Math.abs(players.myBat[0] - 4.4) < 0.8 && Math.abs(players.theirBat[0] - 7.6) < 0.8,

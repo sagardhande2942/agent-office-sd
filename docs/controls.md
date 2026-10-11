@@ -104,3 +104,5 @@ At the balcony table, **hold Space or the left mouse button** to charge (up to 0
 Shots use the same decaying-spin flight model for their target and actual trajectory. Low contacts need more lift to clear the net, so their maximum pace is limited by clearance. Serves remain assisted launches into the far half; a regulation toss and own-half service bounce are not simulated yet.
 
 For development verification, run `node --import tsx scripts/e2e-tabletennis-shots.mjs`. It checks charging/release, both aim directions, focus cancellation, one-shot mouse input and matching shot values in a second browser. [Desktop](tabletennis-evidence/charged-shot-desktop.png) and [mobile](tabletennis-evidence/charged-shot-mobile.png) captures show the power HUD.
+
+Table tennis uses a wide, elevated court camera that keeps the table and high balls in view, independently of shot aim. Leaving the match restores your normal office view.
