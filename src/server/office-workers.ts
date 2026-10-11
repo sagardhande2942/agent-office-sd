@@ -11,6 +11,7 @@ import { blockersOf } from '../shared/manager.js';
 import { REEL_SHOTS_MAX, REEL_TITLE_MAX, SHOT_BYTES_MAX, SHOT_CAPTION_MAX, SHOT_PIXELS_MAX, SHOT_SIDE_MAX } from '../shared/cinema.js';
 import { workerPr, type PullsView, type WorkerRow } from '../shared/status.js';
 import { landedWork, notLeaving } from './leave-on-merge.js';
+import { WORKER_FEATURE_TOOLS } from './worker-features.js';
 
 export type { PullsView, WorkerRow } from '../shared/status.js';
 
@@ -226,7 +227,9 @@ export const MCP_NAME = 'agent-office';
 /** What it needs from the worker's environment; Codex hands an MCP server only what it's told to. */
 const MCP_ENV = ['AGENT_OFFICE_HOOK_URL', 'AGENT_OFFICE_WORKER_ID', 'AGENT_OFFICE_HOOK_TOKEN'];
 /** Its tools that only look, which Claude Code workers may call without asking. */
-export const MCP_READ_ONLY = [`mcp__${MCP_NAME}__list_workers`, `mcp__${MCP_NAME}__floor_status`];
+export const MCP_READ_ONLY = [`mcp__${MCP_NAME}__list_workers`, `mcp__${MCP_NAME}__floor_status`, ...WORKER_FEATURE_TOOLS.filter(tool => tool.readOnly).map(tool => `mcp__${MCP_NAME}__${tool.name}`)];
+/** Worker-owned knowledge is explicitly authorized; destructive management operations still ask. */
+export const MCP_ALLOWED = [...MCP_READ_ONLY, ...WORKER_FEATURE_TOOLS.filter(tool => !tool.readOnly).map(tool => `mcp__${MCP_NAME}__${tool.name}`)];
 
 /**
  * Writes Claude Code's --mcp-config file for the MCP server (bin/office-workers.js `mcp`, run by the

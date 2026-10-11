@@ -27,6 +27,7 @@ import { Jail } from './jail.js';
 import { Garage } from './garage.js';
 import { Jukebox } from './jukebox.js';
 import { LoreStore } from './lore.js';
+import { floorWorkerFeatures } from './worker-features.js';
 import { Cinema } from './cinema.js';
 import { Tv } from './tv.js';
 import { Whiteboard } from './whiteboard.js';
@@ -204,6 +205,7 @@ export class Floor {
       ctx.agentArgs,
       ctx.hook,
       {
+        features: floorWorkerFeatures(this, msg => ctx.emit(this, msg)),
         update: (worker) => {
           ctx.emit(this, { t: 'worker.update', worker });
           // Still being built: the first updates come from waking the workers already at their desks.

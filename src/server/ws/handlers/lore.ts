@@ -20,7 +20,7 @@ export const loreHandlers = {
     if (!title || !content) {
       return ctx.warn(c, 'Lore notes require a title and content.');
     }
-    const note = floor.lore.save({
+    const note = await floor.lore.save({
       ...msg.note,
       author: msg.note.author || c.peer.name,
     });
@@ -30,7 +30,7 @@ export const loreHandlers = {
   async 'lore.delete'(ctx, c, msg) {
     const floor = here(ctx, c);
     if (!floor || !floor.lore) return;
-    const ok = floor.lore.delete(msg.id);
+    const ok = await floor.lore.delete(msg.id);
     if (ok) {
       ctx.toFloor(floor, { t: 'lore.deleted', id: msg.id });
     } else {

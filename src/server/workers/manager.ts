@@ -1,4 +1,5 @@
-import { teamPromptError } from '../master-workers/role.js';
+import { featurePrompt, featureEvent } from './features.js';
+import { promptWorker } from './prompt.js';
 import { planningSeat, planningVersion, planningPrompt, promotePlanWorker } from './plan-review.js';
 import type { PlanReviewWorker } from '../../shared/plan-review.js';
 import { submitCompletion } from './completion.js';
@@ -8,7 +9,7 @@ import { isHelperId } from '../../shared/helper.js';
 import type { DeskDef } from '../../shared/layout.js';
 import type { ForgeKind } from '../../shared/protocol.js';
 import { takeBreak, breakOver } from './breaks.js';
-import { validBossPrompt, validBossGuard, type BossGuard } from '../../shared/boss.js';
+import type { BossGuard } from '../../shared/boss.js';
 import { WORKER_COORDINATION } from '../prompts.js';
 const FINDING_LINES = 180;
 import { randomBytes } from 'node:crypto';
@@ -398,6 +399,7 @@ export class WorkerManager {
   async kill(id: string, cleanup?: WorktreeCleanup, landed?: string, landedRepos?: Record<string, string | undefined>): Promise<{ note?: string; error?: string }> {
     const w = this.workers.get(id);
     if (!w) return {};
+    featureEvent(this.events, 'remove', w.info);
     this.workers.delete(id);
     for (const [helperId, helper] of this.workers) if (helper.info.helper?.hostId === id) await this.kill(helperId);
     this.tasks.forget(id);
@@ -530,30 +532,7 @@ export class WorkerManager {
   clearHelperReport(id: string, messageId: string): void { return helperOps.clearHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist()}, id, messageId); }
   async deliverHelperReport(id: string, by?: string): Promise<string | undefined> { return helperOps.deliverHelperReport({workers:this.workers,emitUpdate:(w:Worker)=>this.emitUpdate(w),persist:()=>this.persist(),events:this.events,prompt:(id:string,text:string,by?:string)=>this.prompt(id,text,by)}, id, by); }
   prompt(id: string, text: string, by?: string, guard?: BossGuard): string | undefined {
-    const w = this.workers.get(id);
-    if (!w) return 'No such worker';
-    const managed=teamPromptError(w.info,by);if(managed)return managed;
-    if (guard !== undefined && (!validBossGuard(w.info, guard) || !validBossPrompt(text))) return 'Worker changed or is unavailable for a boss prompt';
-    if (w.dsh) {
-      const clean = text.replace(/\r\n?/g, '\n').trim();
-      if (!clean) return 'Empty prompt';
-      w.dsh.prompt(clean);
-      w.info.activity = truncate(clean, 80);
-      this.tasks.notePrompt(w, clean);
-      if (by) w.info.lastInput = { by, at: Date.now() };
-      this.emitUpdate(w);
-      return undefined;
-    }
-    if (!w.pty) return 'Worker is not running';
-    const clean = text.replace(/\r\n?/g, '\n').trim();
-    if (!clean) return 'Empty prompt';
-    w.pty.write(`\x1b[200~${clean}\x1b[201~`);
-    setTimeout(() => { if (guard === undefined || validBossGuard(w.info, guard)) w.pty?.write('\r'); }, 120);
-    w.info.activity = truncate(clean, 80);
-    this.tasks.notePrompt(w, clean);
-    if (by) w.info.lastInput = { by, at: Date.now() };
-    this.emitUpdate(w);
-    return undefined;
+    return promptWorker(this.ctx, id, text, by, guard);
   }
 
   /** Pushes a worktree worker's branch and opens a pull request for it, as `as` or else the office (see WorkerPrs.openPr). */
@@ -687,6 +666,7 @@ export class WorkerManager {
     }
     const shell = defaultShell();
     const isShell = info.kind === 'shell';
+    if (!isShell) prompt = featurePrompt(this.events, info, prompt);
     if (!isShell && prompt) prompt = info.planReview?.locked ? planningPrompt(info, prompt) : `${prompt}\n\n${WORKER_COORDINATION}`;
     const adapter = isShell ? undefined : providerAdapter(info.provider);
     const configured = !isShell && info.provider === this.defaultProvider;
@@ -970,6 +950,7 @@ export class WorkerManager {
   rest(id:string,on:boolean):string|undefined { const w=this.workers.get(id); if(!w) return 'No such worker'; const err=takeBreak(w.info,on); if(err) return err; this.persist(); this.emitUpdate(w); }
   private emitUpdate(w: Worker) {
     breakOver(w.info,w.info);
+    featureEvent(this.events, 'update', w.info);
     this.events.update({ ...w.info });
   }
   private handleOf(w:Worker):WorkerHandle { return workerHandle(w,{

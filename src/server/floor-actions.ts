@@ -221,8 +221,8 @@ export interface FloorLore {
     desk?: string;
     pr?: { number: number; url?: string };
     tags?: string[];
-  }): import('../shared/protocol/lore.js').LoreNote;
-  delete(id: string): boolean;
+  }): Awaitable<import('../shared/protocol/lore.js').LoreNote>;
+  delete(id: string): Awaitable<boolean>;
 }
 
 /** The room's music, the ball game, the cars, and the meeting room. */

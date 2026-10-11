@@ -10,8 +10,9 @@ import type { TeamCoordinator } from './coordinator.js';
 import { readBody, send } from '../http/util.js';
 import { floorCompletion } from '../hooks/completion.js';
 import { floorCommunications } from '../hooks/communications.js';
+import { WORKER_FEATURE_PATHS, floorWorkerFeatureHook } from '../hooks/worker-features.js';
 export const TEAM_HOST_CALLS = new Set(['master-workers.start', 'master-workers.control', 'master-workers.capacity']);
-const allowed = new Set(['/office/workers', '/office/workers/inbox', '/office/workers/request', '/office/workers/reply', '/office/workers/ack', '/office/workers/completion', '/office/workers/complete']);
+const allowed = new Set(['/office/workers', '/office/workers/inbox', '/office/workers/request', '/office/workers/reply', '/office/workers/ack', '/office/workers/completion', '/office/workers/complete', ...WORKER_FEATURE_PATHS]);
 /** The existing coordinator executes against host-local worktrees and agent sign-ins. */
 export class HostTeams {
   private budgets = new Map<string, { limit: number | null; paused?: string }>();
@@ -83,6 +84,7 @@ export class HostTeams {
       send(res, 403, { error: 'Team participants use team actions; ordinary hiring, PR management and unrelated office operations are disabled' }); return true;
     }
     try {
+      if (await floorWorkerFeatureHook(floor, req, res, url, msg => this.emit({ t: 'event', floorId: floor.id, seq: 0, msg }))) return true;
       if (['/office/workers/completion', '/office/workers/complete'].includes(url.pathname)) await floorCompletion(floor, req, res, url);
       else if (url.pathname === '/office/workers') send(res, 200, { floor: { id: floor.id, name: floor.def.name }, you: id, workers: floor.workers.list() });
       else {

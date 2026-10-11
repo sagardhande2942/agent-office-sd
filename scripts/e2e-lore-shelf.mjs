@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -33,7 +33,10 @@ writeFileSync(path.join(loreDir, 'seed-1.json'), JSON.stringify({
   tags: ['database', 'gotcha'],
 }));
 
-const cfg = loadConfig(['--home', dir, '--port', '4600', '--password', 'lore-test-pw', '--no-open']);
+// Use a fixture agent for both the worker and task naming; never call a real model in browser QA.
+const fixtureAgent = path.join(dir, 'claude');
+writeFileSync(fixtureAgent, `#!${process.execPath}\nif(process.argv.includes('-p') || process.argv.includes('--print')) { console.log(JSON.stringify({name:'Automatic worker handover',summary:'Fixture handover'})); process.exit(0); }\nsetInterval(()=>{},1000);\n`, { mode: 0o755 });
+const cfg = loadConfig(['--home', dir, '--port', '4600', '--password', 'lore-test-pw', '--no-open', '--agent', fixtureAgent]);
 cfg.port = 0;
 const office = await startServer(cfg, { publicDir: path.resolve('dist/public') });
 const base = `http://127.0.0.1:${office.server.address().port}`;
@@ -57,6 +60,17 @@ try {
   const loginRes = await context.request.post(base + '/api/login', { data: { password: 'lore-test-pw' } });
   assert.ok(loginRes.ok(), 'login failed');
   console.log('Signed in successfully');
+
+  const floor = office.floors()[0];
+  await floor.ready;
+  const worker = floor.workers.spawn('desk-1', 'e2e', 'Automatic worker handover', false, 'agent', 'claude');
+  assert.ok(typeof worker !== 'string', String(worker));
+  const token = JSON.parse(readFileSync(path.join(local, '.agent-office', 'workers.json'), 'utf8')).find(w => w.id === worker.id).hookToken;
+  const response = await fetch(`http://127.0.0.1:${office.hookPort}/office/workers/complete?worker=${worker.id}`, {
+    method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ revision: worker.completionRevision ?? 0, summary: 'Verified database fixture setup and recorded the next shift context.', checks: [{ name: 'Fixture checks', status: 'passed', evidence: 'Two fixture checks passed' }], files: [], filesNote: 'Verification only', prNote: 'No code changes' }),
+  });
+  assert.ok(response.ok, await response.text());
 
   const page = await context.newPage();
   page.setDefaultTimeout(30000);
@@ -88,6 +102,8 @@ try {
   // Verify seed note is displayed
   await page.locator('h3.lore-card-title:has-text("Database connection pool gotcha")').waitFor({ state: 'visible' });
   console.log('Seed note verified');
+  await page.locator('h3.lore-card-title:has-text("Handover: Automatic worker handover")').waitFor({ state: 'visible' });
+  console.log('Automatic worker handover verified');
 
   // Open editor to add a new note
   const addBtn = modal.locator('button:has-text("Add note")');
@@ -124,7 +140,7 @@ try {
   process.exitCode = 1;
 } finally {
   if (browser) await browser.close();
-  office?.server?.close();
+  office.shutdown();
   rmSync(dir, { recursive: true, force: true });
   process.exit(process.exitCode ?? 0);
 }

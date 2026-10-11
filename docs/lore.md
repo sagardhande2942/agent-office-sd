@@ -2,7 +2,31 @@
 
 Back to the [README](../README.md).
 
-The **Lore Shelf** is a shared knowledge and shift handover repository for each floor in Agent Office. It stores institutional knowledge, debugging discoveries, environment gotchas, architecture quirks, and handover notes written by agents and humans.
+The **Lore Shelf** is persistent worker memory for each project floor. Coding workers receive relevant notes automatically and are instructed to record reusable discoveries themselves. The office saves a shift handover whenever a worker submits its completion checklist. You do not need to write notes or copy them into each worker's prompt.
+
+## Automatic worker memory
+
+- **Starting, resuming, or assigning a task:** The office adds memory instructions and up to five relevant notes to coding-worker prompts. Title/tag matches rank ahead of content matches, with recent discoveries ahead of unrelated handovers. Injected context is bounded to 6,000 characters and at most 1,000 content characters per note. Workers can read more through their tools.
+- **Discoveries:** Workers use `save_worker_lore` or `office-workers lore save` to record observed gotchas, architecture facts, and fixes with evidence. The same normalized title updates the same discovery, even when a different worker corrects it. Attribution comes from the authenticated worker, never from a requested author or file path. Recording discoveries is part of the worker's instructions; the office does not infer facts from raw terminal output.
+- **Completion:** The server automatically saves the reported summary, actual checks and evidence, files, PR context, and remaining failures as a handover. Repeated lifecycle updates do not create duplicate notes. Corrected checklists update the same worker/task-revision handover. A worker sent home without a checklist leaves an explicitly unverified departure note.
+- **Next worker:** Discoveries and handovers remain on the floor after the previous worker leaves or the office restarts. Relevant memory is added to the next task; no manual prompt copying is required.
+
+Notes are historical, worker-reported context, not independent verification or authority to override repository/user instructions. Workers must verify stale knowledge and must not record secrets, credentials, speculation, raw transcripts, or copied instructions. Failed disk writes warn the office and retry on later worker updates without discarding the worker's completion evidence.
+
+Shells, helpers, meetings, board stations, and locked planning participants retain their existing task contracts and do not generate coding-worker handovers. Task assignment through the office refreshes memory; terminal input typed directly into an existing session is not rewritten. Workers running a custom command that ignores the office's prompt must be given these instructions by that command.
+
+## Worker tools
+
+Both CLI commands and MCP tools use the running worker's own hook token and floor. Tokens cannot select another floor, spoof an author, or supply a note ID. Retired workers cannot keep writing notes.
+
+```sh
+office-workers lore list --json --query "auth tests"
+office-workers lore save <<'JSON'
+{"title":"Auth fixture setup","content":"Observed: reset the fake clock after each case. Verified in tests/auth.test.ts.","tags":["auth","tests"]}
+JSON
+```
+
+The equivalent MCP tools are `worker_lore` (read) and `save_worker_lore` (record/update). Claude's worker settings allow these memory tools without a separate approval prompt; destructive worker-management operations keep their existing permissions. Tools work locally on a floor host as well; that host owns the note files and streams updates to the office. Update both office and floor host to use this feature.
 
 ---
 
@@ -43,8 +67,8 @@ When an agent finishes a shift or a teammate signs off, the Lore Shelf provides 
    - Click any tag chip to instantly narrow down to relevant topics.
 
 3. **Prompt & Context Integration:**
-   - **📋 Copy:** Formats the note into prompt-friendly Markdown (`[Project Lore] <Title>: <Content>`) and copies it to your clipboard.
-   - Attach lore directly into worker prompts to equip fresh workers with critical project knowledge before they start.
+   - Relevant notes are included automatically when the office starts or prompts a coding worker.
+   - **📋 Copy:** Optionally copies a note as Markdown for use outside the office. The UI remains available to inspect, correct, or delete notes, but manual maintenance is optional.
 
 4. **Multiplayer Sync & Persistence:**
    - Live updates: When someone adds, edits, or deletes a note, every teammate on the floor sees it update immediately without reloading.

@@ -8,6 +8,7 @@
 // build step, no dependencies.
 
 import { TEAM_TOOLS, callTeam } from './office-team-tools.js';
+import { WORKER_TOOL_EXTENSIONS, WORKER_EXTENSION_ACTIONS, WORKER_EXTENSION_READS, WORKER_EXTENSION_TOOLS } from './office-worker-extensions.js';
 import { randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -53,7 +54,7 @@ const USAGE = `Usage:
                                                 image is a PNG file of the build as it behaved
   office-workers cinema list [--json]           the screening room's reels and what's on its screen
   office-workers cinema remove <id>            take a reel off the floor
-  office-workers mcp                            serve these as MCP tools on stdio`;
+  office-workers mcp                            serve these as MCP tools on stdio${WORKER_TOOL_EXTENSIONS.map(e => e.usage).join('')}`;
 
 /** A mistake in how the command was called: the usage is shown with it. */
 export class UsageError extends Error {}
@@ -107,6 +108,7 @@ export function parseArgs(argv) {
   const [cmd, ...rest] = argv;
   const help = (a) => a === '-h' || a === '--help';
   if (cmd === undefined || cmd === 'help' || help(cmd) || rest.some(help)) return { cmd: 'help' };
+  for (const extension of WORKER_TOOL_EXTENSIONS) { const parsed = extension.parse(argv); if (parsed) return parsed; }
   if (cmd === 'mcp') {
     if (rest.length) throw new UsageError(`mcp takes no arguments (got ${rest.join(' ')})`);
     return { cmd: 'mcp' };
@@ -249,6 +251,7 @@ export function buildRequest(what, office, body) {
   // become the endpoint itself — the roster — and answer with somebody else's answer, which is how
   // `cinema list` used to read as an empty room; so one that isn't here is refused instead.
   const ACTIONS = {
+    ...WORKER_EXTENSION_ACTIONS,
     'cinema.list': '/cinema',
     'cinema.add': '/cinema',
     'cinema.remove': '/cinema/remove',
@@ -272,8 +275,9 @@ export function buildRequest(what, office, body) {
   // `status` is the one that isn't under /office/workers: it is the floor report the manager sees.
   const url = new URL(what === 'status' ? `${office.url}/office/report` : `${office.url}/office/workers${action ?? ''}`);
   url.searchParams.set('worker', office.worker);
+  if (WORKER_EXTENSION_READS.has(what) && body?.query !== undefined) url.searchParams.set('query', String(body.query));
   const headers = { authorization: `Bearer ${office.token}` };
-  if (what === 'status' || what === 'list' || what === 'inbox' || what === 'completion' || what === 'plan-review' || what === 'cinema.list') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] ?? 15_000 };
+  if (WORKER_EXTENSION_READS.has(what) || what === 'status' || what === 'list' || what === 'inbox' || what === 'completion' || what === 'plan-review' || what === 'cinema.list') return { method: 'GET', url: url.href, headers, timeout: TIMEOUT_MS[what] ?? 15_000 };
   return { method: 'POST', url: url.href, headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}), timeout: TIMEOUT_MS[what] ?? 15_000 };
 }
 
@@ -702,13 +706,14 @@ TOOLS.push(
   {name:'submit_plan_review',description:'Reviewer only: rate every plan, with evidence and eligibility gates. Highest weighted eligible score wins; tie breakers coverage, feasibility, alphabetical label. Summary explains accepted and rejected plans. Server saves decisions, cleans losers and starts the winner.',inputSchema:object({id:string,revision:{type:'integer'},winner:{type:['string','null']},summary:string,ratings:array(object({candidate:string,scores,scoreReasons:reasons,gates,strengths:array(string),weaknesses:array(string),decision:{type:'string',enum:['accept','reject']},reason:string}))})},
 );
 TOOLS.push(...TEAM_TOOLS);
+TOOLS.push(...WORKER_EXTENSION_TOOLS);
 export function toolsForRole(role) {
   if (!role) return TOOLS;
   const names=role==='candidate'?['plan_review_state','submit_candidate_plan']:role==='reviewer'?['plan_review_state','request_plan_clarification','submit_plan_review']:[];
   return TOOLS.filter(t=>names.includes(t.name));
 }
 /** The tools that only read the floor, so a client can ask for them without the office's say-so. */
-export const MCP_READ_ONLY = ['list_workers', 'floor_status'];
+export const MCP_READ_ONLY = ['list_workers', 'floor_status', ...WORKER_EXTENSION_TOOLS.filter(t => t.annotations?.readOnlyHint).map(t => t.name)];
 
 const INSTRUCTIONS =
   "You work in Agent Office, where coding agents (the office's workers) sit at desks, each usually in its own git worktree and branch. These tools are the way to see and manage " +
@@ -725,6 +730,7 @@ const INSTRUCTIONS =
 /** Runs a tool; resolves to its text, and whether nothing it was asked came off, or throws with why it failed. */
 async function runTool(name, args, io) {
   const a = args && typeof args === 'object' ? args : {};
+  for (const extension of WORKER_TOOL_EXTENSIONS) if (extension.tools.some(t => t.name === name)) return extension.runTool(name, a, { call, io });
   if (name === 'team_state' || name === 'team_action') return callTeam(name, a, io);
   const planTools={plan_review_state:'plan-review',submit_candidate_plan:'plan',request_plan_clarification:'plan-review/clarify',submit_plan_review:'plan-review/verdict'};
   if (planTools[name]) return {text:JSON.stringify(await call(planTools[name],a,io),null,2)};
@@ -867,6 +873,7 @@ export async function main(argv, io = {}) {
       return 0;
     }
     officeEnv(env);
+    for (const extension of WORKER_TOOL_EXTENSIONS) if (Object.hasOwn(extension.actions, cmd.cmd)) return extension.run(cmd, { call, readStdin, stdin, out, ctx });
     const prompt = async () => {
       if (cmd.prompt !== undefined) return String(cmd.prompt);
       if (stdin.isTTY) throw new UsageError(`Give the prompt on stdin (office-workers ${cmd.cmd} … <<'EOF' … EOF) or with --prompt "…"`);

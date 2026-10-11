@@ -56,6 +56,7 @@ export interface FloorReady {
   /** Supports shared screening-room controls and bounded screenshot fetching. */
   cinema?: boolean;
   masterWorkers?: boolean;
+  lore?: boolean;
   /**
    * The branch this host's checkout is on, and the agent CLIs it has installed.
    *
@@ -87,6 +88,7 @@ export interface FloorReady {
 export const HOST_CALLS = ['worker.search', 'queue.dropIssue', 'gh.claim', 'cinema.shot', 'master-workers.capacity'] as const;
 
 export const FLOOR_CASES = [
+  'lore.list', 'lore.save', 'lore.delete',
   'master-workers.start', 'master-workers.control',
   'ball.left',
   'ball.take',
