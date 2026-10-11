@@ -28,25 +28,31 @@ export interface TableTennisDeps {
 export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   const court = (): TableTennisCourt3D | undefined => ctx.office.tableTennis;
 
-  const controller = new TableTennisController(ctx.player, court, {
-    sendServe(side: PingPongSide, vx: number, vy: number, vz: number) {
-      ctx.net.send({ t: 'pingpong.serve', side, vx, vy, vz });
+  const controller = new TableTennisController(
+    ctx.player,
+    court,
+    {
+      sendServe(side: PingPongSide, vx: number, vy: number, vz: number) {
+        ctx.net.send({ t: 'pingpong.serve', side, vx, vy, vz });
+      },
+      sendHit(side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number) {
+        ctx.net.send({ t: 'pingpong.hit', side, x, y, z, vx, vy, vz });
+      },
+      awardPoint(winner: PingPongSide, reason?: string) {
+        ctx.net.send({ t: 'pingpong.point', winner, reason });
+      },
+      playSound(kind) {
+        ctx.sound.tableTennis(kind);
+      },
+      onDone() {
+        if (court()?.group.userData.interact) court()!.group.userData.interact.off = false;
+        ctx.hint.invalidate();
+      },
     },
-    sendHit(side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number) {
-      ctx.net.send({ t: 'pingpong.hit', side, x, y, z, vx, vy, vz });
-    },
-    awardPoint(winner: PingPongSide, reason?: string) {
-      ctx.net.send({ t: 'pingpong.point', winner, reason });
-    },
-    playSound(kind) {
-      ctx.sound.tableTennis(kind);
-    },
-    onDone() {
-      ctx.hint.invalidate();
-    },
-  });
+    () => ctx.me,
+  );
 
-  // Register player activity
+  // Register player activity: hide first-person hands/body (table tennis renders 3D paddle)
   ctx.activities.add({
     id: 'tabletennis',
     active: () => controller.active,
@@ -86,10 +92,20 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       return true;
     },
     hint: (el) => renderPlayHint(el),
-    takesCamera: true,
+    hidesHands: true,
+    bothHands: true,
   });
 
-  // Left click also swings paddle
+  // Left click swings paddle while playing table tennis
+  const ordinaryClick = ctx.player.onClick;
+  ctx.player.onClick = (ndc) => {
+    if (controller.active) {
+      controller.swing();
+      return;
+    }
+    ordinaryClick?.(ndc);
+  };
+
   window.addEventListener('mousedown', (e) => {
     if (controller.active && e.button === 0) {
       controller.swing();
@@ -140,6 +156,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
         workers,
         currentUserId: store.you,
         onJoin(side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty) {
+          if (court()?.group.userData.interact) court()!.group.userData.interact.off = true;
           ctx.net.send({ t: 'pingpong.join', side, mode, botName, difficulty });
           controller.start(side, mode, difficulty);
         },

@@ -10,6 +10,7 @@ import {
   type PingPongState,
   inTableHalf,
   PINGPONG_PHYSICS,
+  PINGPONG_SPOTS,
   PINGPONG_TABLE,
 } from '../../../shared/tabletennis';
 import type { PlayerController } from '../../player';
@@ -49,10 +50,13 @@ export class TableTennisController {
   botSwinging = false;
   botSwingProgress = 0;
 
+  private savedView: 'first' | 'third' = 'first';
+
   constructor(
     private readonly player: PlayerController,
     private readonly court: () => TableTennisCourt3D | undefined,
     private readonly cb: TableTennisCallbacks,
+    private readonly me?: () => { root: { visible: boolean } } | undefined,
   ) {}
 
   start(side: PingPongSide, mode: PingPongMode, difficulty: BotDifficulty = 'normal') {
@@ -64,16 +68,24 @@ export class TableTennisController {
     this.paddleOffsetX = 0;
     this.ballInPlay = false;
 
-    // Teleport player to their playing spot
-    const spotX = side === 'west' ? PINGPONG_TABLE.x - 2.0 : PINGPONG_TABLE.x + 2.0;
-    this.player.pos.set(spotX, 0, PINGPONG_TABLE.z);
-    this.player.facing = side === 'west' ? Math.PI / 2 : -Math.PI / 2;
+    // Teleport player to their playing spot, facing the table
+    // (West player at X=4 faces East (+X, -Math.PI/2), East player at X=8 faces West (-X, Math.PI/2))
+    const spot = side === 'west' ? PINGPONG_SPOTS.west : PINGPONG_SPOTS.east;
+    this.player.pos.set(spot.x, 0, spot.z);
+    this.player.facing = spot.rotY;
     this.player.camYaw = this.player.facing;
+    this.player.lookPitch = -0.12;
+
+    this.savedView = this.player.view;
+    this.player.view = 'first';
+    const m = this.me?.();
+    if (m) m.root.visible = false;
   }
 
   stop() {
     this.active = false;
     this.ballInPlay = false;
+    this.player.view = this.savedView;
     this.cb.onDone();
   }
 
@@ -143,6 +155,11 @@ export class TableTennisController {
   update(dt: number, state: PingPongState) {
     const c = this.court();
     if (!c) return;
+
+    if (this.active && this.player.view === 'first') {
+      const m = this.me?.();
+      if (m) m.root.visible = false;
+    }
 
     // Swing animation
     if (this.swinging) {

@@ -47,8 +47,8 @@ export const PINGPONG_HALVES = {
 } as const;
 
 export const PINGPONG_SPOTS = {
-  west: { x: PINGPONG_TABLE.x - 2.0, y: 0, z: PINGPONG_TABLE.z, rotY: Math.PI / 2 },
-  east: { x: PINGPONG_TABLE.x + 2.0, y: 0, z: PINGPONG_TABLE.z, rotY: -Math.PI / 2 },
+  west: { x: PINGPONG_TABLE.x - 2.0, y: 0, z: PINGPONG_TABLE.z, rotY: -Math.PI / 2 },
+  east: { x: PINGPONG_TABLE.x + 2.0, y: 0, z: PINGPONG_TABLE.z, rotY: Math.PI / 2 },
 } as const;
 
 export const PINGPONG_PHYSICS = {

@@ -28,9 +28,11 @@ test('table tennis court fits on the extended balcony with player room and walkw
   assert.ok(table.z - table.width / 2 > BALCONY.minZ + 0.8, 'north walkway along south wall is clear');
   assert.ok(table.z + table.width / 2 < BALCONY.maxZ - 0.8, 'south walkway along balcony glass rail is clear');
 
-  // Player spots have clearance
+  // Player spots have clearance and face the table
   assert.ok(PINGPONG_SPOTS.west.x > BALCONY.minX + 2, 'west player spot is on balcony deck');
   assert.ok(PINGPONG_SPOTS.east.x < BALCONY.maxX - 1, 'east player spot is on balcony deck');
+  assert.equal(PINGPONG_SPOTS.west.rotY, -Math.PI / 2, 'west player faces east toward the table');
+  assert.equal(PINGPONG_SPOTS.east.rotY, Math.PI / 2, 'east player faces west toward the table');
 });
 
 test('inTableHalf and onTableSurface correctly partition the table halves', () => {
