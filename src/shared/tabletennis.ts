@@ -1,3 +1,5 @@
+import { flyStep, netContact } from './tabletennis-ballistics.js';
+export { flyStep, solveShot } from './tabletennis-ballistics.js';
 /**
  * Table tennis (ping pong) on the balcony: dimensions, court geometry, physics constants,
  * and game state shared between client and server.
@@ -181,36 +183,6 @@ export const PINGPONG_SPIN = {
 /** The player swapping stroke while the ball is away. */
 export const PINGPONG_STROKES_ORDER: PingPongShotKind[] = ['drive', 'topspin', 'backspin', 'smash'];
 
-/**
- * The launch velocity that carries the ball from `from` to `to` (a point on the far half) as the
- * stroke says. Fixed speeds and lifts are what sent every shot off the far end: the arc is solved
- * for the target instead, lengthening the flight until it clears the net.
- */
-export function solveShot(from: { x: number; y: number; z: number }, to: { x: number; z: number }, kind: PingPongShotKind = 'drive'): PingPongShot {
-  const g = PINGPONG_PHYSICS.gravity;
-  const stroke = PINGPONG_STROKES[kind];
-  const landY = PINGPONG_TABLE.height + PINGPONG_PHYSICS.ballRadius;
-  const dx = to.x - from.x;
-  const dz = to.z - from.z;
-  const dist = Math.max(0.2, Math.hypot(dx, dz));
-  // The tape, plus the ball's own radius and a little for the net being felt a stride early or late.
-  const clear = PINGPONG_TABLE.height + PINGPONG_TABLE.netHeight + PINGPONG_PHYSICS.ballRadius + 0.06;
-  let t = Math.max(PINGPONG_PHYSICS.minFlight, Math.min(PINGPONG_PHYSICS.maxFlight, dist / Math.max(0.5, stroke.speed)));
-  let vx = dx / t;
-  let vy = (landY - from.y) / t + 0.5 * g * t + (PINGPONG_SPIN.magnus * stroke.tops * t) / 2;
-  // A longer flight is a higher arc over the same target, so keep lengthening until it clears the tape.
-  for (let i = 0; i < 24 && t < PINGPONG_PHYSICS.maxFlight; i++) {
-    const atNet = Math.abs(vx) < 1e-4 ? Infinity : (PINGPONG_TABLE.x - from.x) / vx;
-    const height = from.y + vy * atNet - (0.5 * g + PINGPONG_SPIN.magnus * stroke.tops) * atNet * atNet;
-    const clears = atNet <= 0 || atNet >= t || height >= clear;
-    if (clears) break;
-    t = Math.min(PINGPONG_PHYSICS.maxFlight, t * 1.06);
-    vx = dx / t;
-    vy = (landY - from.y) / t + 0.5 * g * t + (PINGPONG_SPIN.magnus * stroke.tops * t) / 2;
-  }
-  return { vx, vy, vz: dz / t, t, kind, tops: stroke.tops, side: stroke.side };
-}
-
 /** A ball in flight, with the spin it is carrying. */
 export interface PingPongFlight {
   x: number;
@@ -221,22 +193,6 @@ export interface PingPongFlight {
   vz: number;
   tops: number;
   side: number;
-}
-
-/**
- * One tick of a ball in flight: gravity, the spin pulling it down or floating it up and walking it
- * across the table, and the spin bleeding off as it goes. The game and its tests both fly the ball
- * with this, so what a test proves is what a player sees.
- */
-export function flyStep(b: PingPongFlight, dt: number) {
-  b.vy -= (PINGPONG_PHYSICS.gravity + PINGPONG_SPIN.magnus * b.tops) * dt;
-  b.vz += PINGPONG_SPIN.drift * b.side * dt;
-  const bleed = Math.max(0, 1 - PINGPONG_SPIN.bleed * dt);
-  b.tops *= bleed;
-  b.side *= bleed;
-  b.x += b.vx * dt;
-  b.y += b.vy * dt;
-  b.z += b.vz * dt;
 }
 
 /** What the table does to a ball coming off it: a topped one kicks up and carries on, a cut one skids. */
@@ -261,11 +217,12 @@ export function flyBall(
   spin?: { tops: number; side: number },
   step = 1 / 240,
 ): { where: 'bounce' | 'net' | 'floor' | 'air'; at: { x: number; y: number; z: number }; t: number } {
-  const top = PINGPONG_TABLE.height;
+  const top = PINGPONG_TABLE.height + PINGPONG_PHYSICS.ballRadius;
   const b: PingPongFlight = { ...from, ...vel, tops: spin?.tops ?? 0, side: spin?.side ?? 0 };
   for (let t = 0; t < seconds; t += step) {
+    const before = { x: b.x, y: b.y, z: b.z };
     flyStep(b, step);
-    if (Math.abs(b.x - PINGPONG_TABLE.x) < 0.05 && b.y >= top && b.y <= top + PINGPONG_TABLE.netHeight && Math.abs(b.z - PINGPONG_TABLE.z) <= PINGPONG_TABLE.width / 2 + 0.1)
+    if (netContact(before, b))
       return { where: 'net', at: b, t };
     if (b.y <= top && b.vy < 0) return { where: onTableSurface(b.x, b.z) ? 'bounce' : 'floor', at: b, t };
     if (b.y <= 0) return { where: 'floor', at: b, t };
@@ -286,8 +243,8 @@ export function meetPoint(b: PingPongFlight, side: PingPongSide, seconds = 2): {
     flyStep(walked, step);
     if (before !== 0 && Math.sign(walked.x - plane) !== before) return { x: plane, y: walked.y, z: walked.z, t };
     // It bounces on the way, exactly as the game will bounce it.
-    if (walked.y <= PINGPONG_TABLE.height && walked.vy < 0 && onTableSurface(walked.x, walked.z)) {
-      walked.y = PINGPONG_TABLE.height;
+    if (walked.y <= PINGPONG_TABLE.height + PINGPONG_PHYSICS.ballRadius && walked.vy < 0 && onTableSurface(walked.x, walked.z)) {
+      walked.y = PINGPONG_TABLE.height + PINGPONG_PHYSICS.ballRadius;
       tableBounce(walked);
     }
     if (walked.y <= 0) return null;

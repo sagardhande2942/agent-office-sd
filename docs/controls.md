@@ -96,3 +96,11 @@ In **2D Game**, open **Tab → 2D graphics settings** to choose **Reduced (curre
 Open **Settings → You → Performance** to select **30, 60, 90, 120 FPS**, or **Match display** for 3D and 2D Game. The default is 60 FPS. This is a maximum: your display and device may run slower. Choose 30 FPS to reduce rendering power use; Match display can use more power on high-refresh screens. Changes apply immediately and persist in this browser.
 
 Scene updates pause while the tab is hidden and run at up to 15 FPS while an ordinary window blocks movement. Scene editors retain the selected frame rate. Workers and network updates continue; returning to the tab resumes without advancing movement through the hidden interval. Lite (`/lite`) remains the lowest-cost view.
+
+### Table tennis shots
+
+At the balcony table, **hold Space or the left mouse button** to charge (up to 0.85 seconds), then **release** to strike. A tap is a softer shot; a charged stroke travels faster. **Mouse or arrow keys** place the golden target ring across the opponent’s half and short/deep. **WASD** moves your feet independently. **Tab** cycles strokes, **Shift** selects a smash and **Ctrl** selects backspin when starting the charge. The power meter shows your charge. Returns require the ball to bounce on your side first; an outgoing ball cannot be struck again. **E / Esc** leaves play, and changing tabs cancels an unfinished charge.
+
+Shots use the same decaying-spin flight model for their target and actual trajectory. Low contacts need more lift to clear the net, so their maximum pace is limited by clearance. Serves remain assisted launches into the far half; a regulation toss and own-half service bounce are not simulated yet.
+
+For development verification, run `node --import tsx scripts/e2e-tabletennis-shots.mjs`. It checks charging/release, both aim directions, focus cancellation, one-shot mouse input and matching shot values in a second browser. [Desktop](tabletennis-evidence/charged-shot-desktop.png) and [mobile](tabletennis-evidence/charged-shot-mobile.png) captures show the power HUD.

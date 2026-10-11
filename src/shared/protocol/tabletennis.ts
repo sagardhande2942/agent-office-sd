@@ -13,7 +13,7 @@ export type TableTennisClientMsg =
   /** Step back from the table / leave current match. */
   | { t: 'pingpong.leave' }
   /** Serve the ball from your side. */
-  | { t: 'pingpong.serve'; side: PingPongSide; vx: number; vy: number; vz: number; swing?: PingPongSwing }
+  | { t: 'pingpong.serve'; side: PingPongSide; vx: number; vy: number; vz: number; swing?: PingPongSwing; origin?: { x: number; y: number; z: number } }
   /** Return/hit the ball with your paddle across the net. */
   | { t: 'pingpong.hit'; side: PingPongSide; x: number; y: number; z: number; vx: number; vy: number; vz: number; swing?: PingPongSwing }
   /** Award a point (due to out-of-bounds, net fault, double bounce, etc.). */

@@ -11,6 +11,7 @@ import type { PeerInfo } from '../../../shared/protocol';
 import { playTableTennisSound } from './sound';
 import { openTableTennisDialog } from './ui';
 import { standingSpot, TableTennisBats, TableTennisOpponent } from './avatar';
+import { TableTennisControls } from './controls';
 import { TableTennisController } from './controller';
 import type { TableTennisCourt3D } from './world';
 import { facingTable, PINGPONG_STROKES, PINGPONG_STROKES_ORDER, scoreLine, type BotDifficulty, type PingPongMode, type PingPongPlayer, type PingPongShotKind, type PingPongSide } from '../../../shared/tabletennis';
@@ -37,11 +38,11 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
     ctx.player,
     court,
     {
-      sendServe(side: PingPongSide, vx: number, vy: number, vz: number) {
-        ctx.net.send({ t: 'pingpong.serve', side, vx, vy, vz });
+      sendServe(side: PingPongSide, vx: number, vy: number, vz: number, swing, origin) {
+        ctx.net.send({ t: 'pingpong.serve', side, vx, vy, vz, swing, origin });
       },
-      sendHit(side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number) {
-        ctx.net.send({ t: 'pingpong.hit', side, x, y, z, vx, vy, vz });
+      sendHit(side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number, swing) {
+        ctx.net.send({ t: 'pingpong.hit', side, x, y, z, vx, vy, vz, swing });
       },
       awardPoint(winner: PingPongSide, reason?: string) {
         ctx.net.send({ t: 'pingpong.point', winner, reason });
@@ -55,6 +56,8 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       },
     },
   );
+
+  const controls = new TableTennisControls(ctx.player, controller, ctx.scene);
 
   /** Stands the other player up at their end: a worker bot for a bot match, or nobody in PvP
    * (the other player's own body is in the room with you, at the same place). */
@@ -81,7 +84,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       }
       // The stroke you play: the modifier keys pick it, and Tab cycles when you'd rather not hold them.
       if (e.code === 'Space') {
-        controller.swing(strokeFor(e));
+        if (!e.repeat) controls.press('space', strokeFor(e));
         return true;
       }
       if (e.code === 'Tab') {
@@ -92,6 +95,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       }
       // Walking round your own end. The office's own movement keys don't move you while you play:
       // you are on the court, not wandering the balcony.
+      if (e.code.startsWith('Arrow')) return true;
       if (e.code === 'KeyA' || e.code === 'KeyD' || e.code === 'KeyW' || e.code === 'KeyS') return true;
       if (e.code !== 'KeyF' && e.code !== 'KeyG' && !(e.code in DESK_KEYS)) return false;
       return true;
@@ -105,15 +109,10 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   const ordinaryClick = ctx.player.onClick;
   ctx.player.onClick = (ndc) => {
     if (controller.active) {
-      controller.swing(controller.stroke);
       return;
     }
     ordinaryClick?.(ndc);
   };
-
-  window.addEventListener('mousedown', (e) => {
-    if (controller.active && e.button === 0) controller.swing(strokeFor(e));
-  });
 
   /** The stroke a swing plays: Shift smashes, Control cuts, otherwise whatever you last picked. */
   function strokeFor(e: { shiftKey?: boolean; ctrlKey?: boolean; metaKey?: boolean }): PingPongShotKind {
@@ -134,8 +133,9 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       controller.move(dt, held('KeyD', 'KeyA'), held('KeyW', 'KeyS'));
       ctx.player.pos.set(controller.where.x, 0, controller.where.z);
       ctx.player.facing = facingTable(controller.where.x, controller.where.z);
-      ctx.player.camYaw = ctx.player.facing - Math.PI;
+
     }
+    controls.update(dt);
     controller.update(dt, store.pingpong);
     if (!controller.active) return;
     // Both bats, in the hands of the players who are actually holding them.
@@ -233,7 +233,7 @@ function renderPlayHint(el: HTMLElement, stroke: PingPongShotKind) {
     h('span.hint-key', {}, '[W A S D]'),
     ' Footwork · ',
     h('span.hint-key', {}, '[Space]'),
-    ` ${PINGPONG_STROKES[stroke].label}`,
+    ` Hold / release: ${PINGPONG_STROKES[stroke].label}`,
     ' (',
     h('span.hint-key', {}, '[Shift]'),
     ' Smash · ',

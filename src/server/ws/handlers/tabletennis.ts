@@ -58,11 +58,11 @@ export const tableTennisHandlers = {
     }
   },
 
-  async 'pingpong.serve'(ctx: Ctx, c: Client, msg: { t: 'pingpong.serve'; side: PingPongSide; vx: number; vy: number; vz: number; swing?: PingPongSwing }) {
+  async 'pingpong.serve'(ctx: Ctx, c: Client, msg: { t: 'pingpong.serve'; side: PingPongSide; vx: number; vy: number; vz: number; swing?: PingPongSwing; origin?: { x: number; y: number; z: number } }) {
     const floor = ctx.floorOf(c);
     if (!floor?.pingpong) return;
     const side: PingPongSide = msg.side === 'east' ? 'east' : 'west';
-    const result = floor.pingpong.serve(c.id, side, num(msg.vx), num(msg.vy), num(msg.vz), spinOf(msg.swing));
+    const result = floor.pingpong.serve(c.id, side, num(msg.vx), num(msg.vy), num(msg.vz), spinOf(msg.swing), msg.origin ? { x: num(msg.origin.x), y: num(msg.origin.y), z: num(msg.origin.z) } : undefined);
     if (result) {
       ctx.toFloor(floor, {
         t: 'pingpong.hit',

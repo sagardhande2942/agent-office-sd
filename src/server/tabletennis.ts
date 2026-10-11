@@ -20,7 +20,7 @@ export interface FloorTableTennis {
   state(): PingPongState;
   join(playerId: string, playerName: string, side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty): boolean;
   leave(playerId: string): boolean;
-  serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null;
+  serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }, origin?: { x: number; y: number; z: number }): { ball: PingPongBallState; state: PingPongState } | null;
   hit(playerId: string, side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null;
   awardPoint(playerId: string, winner: PingPongSide, reason?: string): { score: { west: number; east: number }; games: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean; gameWon?: boolean } | null;
   reset(): boolean;
@@ -37,9 +37,9 @@ function clampSpin(v: number): number {
 
 function clampedShot(side: PingPongSide, vx: number, vy: number, vz: number): { vx: number; vy: number; vz: number } {
   const limit = 8;
-  const finite = (v: number, fallback: number) => (Number.isFinite(v) ? fallback : v);
+  const finite = (v: number, fallback: number) => (Number.isFinite(v) ? v : fallback);
   const away = side === 'west' ? 1 : -1;
-  const speed = Math.max(-limit, Math.min(limit, finite(vx, away * PINGPONG_PHYSICS.shotSpeed) * away) * away);
+  const speed = away * Math.max(0.5, Math.min(limit, Math.abs(finite(vx, PINGPONG_PHYSICS.shotSpeed))));
   return {
     vx: speed,
     vy: Math.max(-limit, Math.min(limit, finite(vy, 2))),
@@ -128,18 +128,19 @@ export class TableTennisMatch implements FloorTableTennis {
     return changed;
   }
 
-  serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null {
+  serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }, origin?: { x: number; y: number; z: number }): { ball: PingPongBallState; state: PingPongState } | null {
     if (!this.current.active) return null;
     if (this.current.server !== side) return null;
     const player = side === 'west' ? this.current.westPlayer : this.current.eastPlayer;
     // The worker bot's serves are played by the client that is playing it.
     if (!player || (player.id !== playerId && !player.isBot)) return null;
 
-    const startX = side === 'west' ? PINGPONG_TABLE.x - 1.2 : PINGPONG_TABLE.x + 1.2;
+    const dir = side === 'west' ? 1 : -1;
+    const bounded = (value: number | undefined, fallback: number, low: number, high: number) => typeof value === 'number' && Number.isFinite(value) ? Math.max(low, Math.min(high, value)) : fallback;
     const ball: PingPongBallState = {
-      x: startX,
-      y: PINGPONG_TABLE.height + 0.25,
-      z: PINGPONG_TABLE.z,
+      x: PINGPONG_TABLE.x + dir * bounded(origin ? (origin.x - PINGPONG_TABLE.x) * dir : undefined, -1.2, -2.6, -0.15),
+      y: bounded(origin?.y, PINGPONG_TABLE.height + 0.22, PINGPONG_TABLE.height + 0.04, 2.5),
+      z: bounded(origin?.z, PINGPONG_TABLE.z, PINGPONG_TABLE.z - 1.3, PINGPONG_TABLE.z + 1.3),
       ...clampedShot(side, vx, vy, vz),
       tops: clampSpin(spin?.tops ?? 0),
       side: clampSpin(spin?.side ?? 0),
