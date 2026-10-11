@@ -116,3 +116,14 @@ test('CLI bridge uses inherited authentication and propagates API errors without
  assert.equal(await main(['--help'],io),0);assert.match(output[0],/team_action/);
  assert.equal(await main(['action'],io),1);assert.equal(body,'{"action":"finish"}');assert.deepEqual(errors,['Only the master']);assert.ok(!errors.join().includes('secret'));
 });
+
+test('team presets preserve configured model defaults and reject duplicate default pool choices',()=>{
+ const f=fixture();try{
+  const defaults=config({...request,master:{provider:'claude'},models:[{provider:'codex'},{provider:'claude'}]});
+  assert.equal(defaults.master.model,undefined);
+  f.presets.edit({id:'defaults',name:'Agent defaults',...defaults});
+  const loaded=new TeamPresets(path.join(f.dir,'presets.json')).state()[0];
+  assert.deepEqual(loaded.master,{provider:'claude'});assert.deepEqual(loaded.models,[{provider:'codex'},{provider:'claude'}]);
+  assert.throws(()=>config({...request,models:[{provider:'codex'},{provider:'codex'}]}),/distinct/);
+ }finally{f.dispose();}
+});

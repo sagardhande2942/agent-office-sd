@@ -22,9 +22,9 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
   const control=(action:'pause'|'resume'|'stop')=>net.send({t:'master-workers.control',action});
   const model=(initial:AgentChoice,label:string)=>{
     const project=store.project?{...store.project,agentProviders:providers}:null;
-    const fields=agentFields(project,`team-model-${sequence++}`,initial,'Provider',true,'team participant');
+    const fields=agentFields(project,`team-model-${sequence++}`,initial,'Provider');
     fields.element.querySelector('select')!.setAttribute('aria-label',`${label} provider`);
-    return {el:h('div.team-model',{},h('strong',{},label),fields.element),read:fields.choice,valid:()=>fields.valid()&&!!fields.model()};
+    return {el:h('div.team-model',{},h('strong',{},label),fields.element),read:fields.choice,valid:fields.valid};
   };
   const replayButton=(run:TeamRun)=>h('button.btn',{type:'button',onclick:()=>{modal.close();openTaskReplay(run);}},'Replay');
   const pastActivities=()=>h('details',{},h('summary',{},'Previous activities'),...store.masterWorkers.past.map(p=>h('section',{},h('strong',{},p.brief),h('p',{},p.phase),replayButton(p),...(safePrUrl(p.pr)?[h('a',{href:safePrUrl(p.pr),target:'_blank',rel:'noopener noreferrer'},'Open PR')]:[]))));
@@ -43,7 +43,7 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
     draft.models.forEach(add);
     const limit=h('input',{type:'number',min:1,max:5,value:draft.maxWorkers,'aria-label':'Maximum workers'}) as HTMLInputElement;
     capture=()=>{draft={master:master.read(),models:rows.map(r=>r.read()),maxWorkers:Number(limit.value),brief:brief.value,requirements:requirements.value.split('\n').map(s=>s.trim()).filter(Boolean),constraints:constraints.value};presetName=name.value;};
-    const valid=()=>{capture();if(!master.valid()||!rows.every(r=>r.valid())){toast('Choose explicit models for the master and every eligible worker','error');return false;}return true;};
+    const valid=()=>{capture();if(!master.valid()||!rows.every(r=>r.valid())){toast('Choose valid providers and models for the master and eligible workers','error');return false;}return true;};
     const savePreset=(duplicate=false)=>{
       if(!valid())return;if(!presetName.trim()){toast('Give the preset a name','error');return;}
       presetId=duplicate||!presetId?crypto.randomUUID():presetId;
@@ -68,14 +68,14 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
     };
     body.replaceChildren(h('div.team-overview',{},h('strong',{},r.phase),h('span',{},`${r.workers.filter(w=>store.workers.has(w.workerId)).length} workers · limit ${r.maxWorkers}`)),h('h3',{},r.brief),h('ol',{},...r.requirements.map(v=>h('li',{},v))));
     if(r.error||state.error)body.append(h('p.error',{role:'alert'},r.error??state.error));
-    if(r.masterId)body.append(h('section.team-card',{},h('h3',{},`Master · ${r.master.provider}/${r.master.model}`),h('p.muted',{},usage(r.masterId)),terminal(r.masterId,'Master terminal')));
+    if(r.masterId)body.append(h('section.team-card',{},h('h3',{},`Master · ${r.master.provider}/${r.master.model??'configured default'}`),h('p.muted',{},usage(r.masterId)),terminal(r.masterId,'Master terminal')));
     if(r.plan)body.append(details('plan','Master plan',h('pre',{},r.plan)));
     for(const t of r.tasks){
       const card=h('section.team-card',{},h('h3',{},`${t.title} · ${t.status}`),h('p',{},t.acceptance));
       if(t.dependencies.length)card.append(h('p.muted',{},'Depends on: '+t.dependencies.join(', ')));
       if(t.reason)card.append(h('p',{},'Model choice: '+t.reason));
       card.append(details(t.id+'-assignment','Assignment',h('pre',{},t.instructions),h('p',{},'Files: '+t.files.join(', '))));
-      for(const a of t.attempts)card.append(details(t.id+'-'+a.workerId,`${a.choice.provider}/${a.choice.model} · ${a.status}`,h('p',{},a.summary??`Terminal: ${store.workers.get(a.workerId)?.status??'unavailable'}`),h('pre',{},a.checks??''),h('p',{},a.review??''),h('p.muted',{},a.commits?.join(', ')??''),...(a.workerId?[h('p.muted',{},usage(a.workerId)),terminal(a.workerId,'Worker terminal')]:[])));
+      for(const a of t.attempts)card.append(details(t.id+'-'+a.workerId,`${a.choice.provider}/${a.choice.model??'configured default'} · ${a.status}`,h('p',{},a.summary??`Terminal: ${store.workers.get(a.workerId)?.status??'unavailable'}`),h('pre',{},a.checks??''),h('p',{},a.review??''),h('p.muted',{},a.commits?.join(', ')??''),...(a.workerId?[h('p.muted',{},usage(a.workerId)),terminal(a.workerId,'Worker terminal')]:[])));
       if(t.evidence)card.append(h('p',{},t.evidence));body.append(card);
     }
     if(!r.tasks.length)body.append(h('p.muted',{},'The master is inspecting the project and planning the work.'));

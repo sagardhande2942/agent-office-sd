@@ -22,3 +22,5 @@
 .modal.gh-window.issue footer .provider-choice label { font-size: 12px; }
 .modal.gh-window.issue footer .provider-note { flex: 0 1 auto; max-width: 150px; }
 .modal.gh-window.issue footer .provider-model { flex: 0 1 auto; min-width: 190px; }
+
+.provider-defaults { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }

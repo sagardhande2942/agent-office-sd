@@ -160,7 +160,7 @@ function loadCatalogue(provider: AgentProvider): Promise<void> | undefined {
  * takes, and how its model is asked for, is its row in the provider table (shared/providers.ts), so
  * a provider added there gets its fields here.
  */
-export function agentFields(project: ProjectInfo | null, id: string, initial: AgentChoice, label = 'Provider', requireModel = false, modelContext = 'planning seat'): AgentFields {
+export function agentFields(project: ProjectInfo | null, id: string, initial: AgentChoice, label = 'Provider'): AgentFields {
   const options = supportedProviders(project);
   const fallback = resolvedProvider(project?.defaultProvider, project);
   const select = h('select.provider-select', { id, 'aria-label': 'Worker provider' }) as HTMLSelectElement;
@@ -176,7 +176,9 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
   effortSelect.append(h('option', { value: '' }, 'Default'));
   for (const e of AGENT_EFFORTS) effortSelect.append(h('option', { value: e }, EFFORT_LABEL[e]));
   const hint = h('small.provider-model-hint');
-  const fields = h('div.provider-model', {}, modelLabel, modelSelect, modelInput, suggestions, effortLabel, effortSelect, hint);
+  const agentDefault = h('button.btn.small', { type: 'button' }, 'Use agent default');
+  const officeDefault = h('button.btn.small', { type: 'button' }, 'Use office default');
+  const fields = h('div.provider-model', {}, modelLabel, modelSelect, modelInput, suggestions, effortLabel, effortSelect, hint, h('div.provider-defaults', {}, agentDefault, officeDefault));
   const element = h('div.provider-choice', {}, h('label', { for: id }, label), select, note, fields);
 
   const value = () => (options.includes(select.value as AgentProvider) ? (select.value as AgentProvider) : fallback);
@@ -194,7 +196,7 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
   const pick = (id: string) => {
     const models = known();
     chosen = id;
-    modelSelect.replaceChildren(h('option', { value: '' }, requireModel ? 'Choose a model' : meta().models?.unset ?? 'Default'), ...models.map((m) => h('option', { value: m.id }, m.name ?? m.id)));
+    modelSelect.replaceChildren(h('option', { value: '' }, 'Agent default'), ...models.map((m) => h('option', { value: m.id }, m.name ?? m.id)));
     if (id && !models.some((m) => m.id === id)) modelSelect.append(h('option', { value: id }, id));
     modelSelect.value = id;
     if (modelInput.value.trim() !== id) modelInput.value = id;
@@ -219,9 +221,9 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
     modelInput.classList.toggle('hidden', !field || !typed());
     modelLabel.htmlFor = typed() ? modelInput.id : modelSelect.id;
     for (const control of [modelSelect, modelInput]) control.setAttribute('aria-label', `${m.label} model`);
-    modelInput.placeholder = requireModel ? 'Explicit model ID' : field?.unset ?? '';
-    modelSelect.required = requireModel && !!field && !typed();
-    modelInput.required = requireModel && !!field && typed();
+    modelInput.placeholder = field?.unset ?? 'Agent default';
+    modelSelect.required = false;
+    modelInput.required = false;
     modelInput.maxLength = field?.max ?? 256;
     effortLabel.textContent = m.effortLabel ?? 'Effort';
     effortLabel.classList.toggle('hidden', !m.takesEffort);
@@ -231,7 +233,10 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
     else if (field.catalog && catalogue?.request) hint.textContent = `Loading ${m.label} models…`;
     else if (field.catalog && catalogue?.failed) hint.textContent = `${m.label}’s models couldn’t be listed: leave it empty for its default, or type a model id.`;
     else hint.textContent = field.hint;
-    if (requireModel && field && !catalogue?.request) hint.textContent = catalogue?.failed ? `Models could not be listed. Type an explicit model ID for this ${modelContext}.` : `Choose an explicit model for this ${modelContext}.`;
+    agentDefault.classList.toggle('hidden', !field);
+    officeDefault.disabled = !options.includes(officeChoice(project).provider);
+    officeDefault.title = 'Use the provider, model and effort saved in office Settings';
+    agentDefault.title = 'Use this provider’s configured model without an explicit model override';
     fields.classList.toggle('hidden', !field && !m.takesEffort && !hint.textContent);
     paintEffort();
   };
@@ -257,6 +262,8 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
     paint();
     load();
   };
+  agentDefault.addEventListener('click', () => { pick(''); modelInput.setCustomValidity(''); paint(); });
+  officeDefault.addEventListener('click', () => set(officeChoice(project)));
   set(initial);
   // Another provider's model and effort mean nothing to this one: it starts on its own defaults.
   select.addEventListener('change', () => set({ provider: value() }));
@@ -284,7 +291,7 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
     set,
     choice: () => ({ provider: value(), ...(model() ? { model: model() } : {}), ...(effort() ? { effort: effort() } : {}) }),
     valid: () => {
-      const okay = (!requireModel || !!chosen) && (!chosen || !!meta().validModel?.(chosen));
+      const okay = !chosen || !!meta().validModel?.(chosen);
       modelInput.setCustomValidity(okay ? '' : (meta().models?.invalid ?? 'That isn’t a model id this provider takes.'));
       if (!okay) (typed() ? modelInput : modelSelect).reportValidity();
       return okay;

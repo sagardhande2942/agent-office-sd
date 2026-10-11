@@ -24,7 +24,10 @@ test('every selectable coding provider can be a candidate and reviewer without c
   assert.equal(readPlanRequest({...request,candidates:[{provider:'codex',model:'gpt-5'},{provider:'cursor',model:'gpt-5'}]}).candidates.length,2);
   assert.throws(()=>readPlanRequest({...request,candidates:[{provider:'claude',model:'sonnet'},{provider:'opencode',model:'anthropic/sonnet'}]}),/aliases/);
   assert.throws(()=>readPlanRequest({...request,reviewer:{provider:'custom'}}),/selectable models/);
-  assert.throws(()=>readPlanRequest({...request,reviewer:{provider:'pi'}}),/explicit model/);
+  for (const provider of Object.keys(models)) {
+    const defaults=readPlanRequest({...request,candidates:[{provider}],reviewer:{provider}});
+    assert.equal(defaults.candidates[0].model,undefined);assert.equal(defaults.reviewer.model,undefined);
+  }
 });
 
 test('plan CLI bridge reads state and submits JSON through authenticated role-scoped endpoints', async () => {
