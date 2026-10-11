@@ -18,7 +18,7 @@ import {
 
 export interface FloorTableTennis {
   state(): PingPongState;
-  join(playerId: string, playerName: string, side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty): boolean;
+  join(playerId: string, playerName: string, side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty, westDifficulty?: BotDifficulty): boolean;
   leave(playerId: string): boolean;
   serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }, origin?: { x: number; y: number; z: number }): { ball: PingPongBallState; state: PingPongState } | null;
   hit(playerId: string, side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null;
@@ -54,7 +54,20 @@ export class TableTennisMatch implements FloorTableTennis {
     return { ...this.current };
   }
 
-  join(playerId: string, playerName: string, side: PingPongSide, mode: PingPongMode, botName = 'Worker Bot', difficulty: BotDifficulty = 'normal'): boolean {
+  join(playerId: string, playerName: string, side: PingPongSide, mode: PingPongMode, botName = 'Worker Bot', difficulty: BotDifficulty = 'normal', westDifficulty: BotDifficulty = 'normal'): boolean {
+    if (mode === 'bots') {
+      if (this.current.active) {
+        if (this.current.mode !== 'bots') return false;
+        this.current.watcherIds ??= [];
+        if (!this.current.watcherIds.includes(playerId)) this.current.watcherIds.push(playerId);
+        return true;
+      }
+      this.current = { ...defaultPingPongState(), active: true, mode: 'bots', operatorId: playerId, watcherIds: [playerId],
+        status: 'serve', serving: { side: 'west', kind: 'topspin' },
+        westPlayer: { id: 'bot-west', name: 'West Bot', isBot: true, difficulty: westDifficulty },
+        eastPlayer: { id: 'bot-east', name: 'East Bot', isBot: true, difficulty } };
+      return true;
+    }
     if (mode === 'bot') {
       this.current = {
         active: true,
@@ -107,6 +120,8 @@ export class TableTennisMatch implements FloorTableTennis {
   }
 
   leave(playerId: string): boolean {
+    if (this.current.mode === 'bots' && this.current.operatorId === playerId) { this.current = defaultPingPongState(); return true; }
+    if (this.current.mode === 'bots' && this.current.watcherIds?.includes(playerId)) { this.current.watcherIds = this.current.watcherIds.filter(id => id !== playerId); return true; }
     let changed = false;
     if (this.current.westPlayer?.id === playerId) {
       delete this.current.westPlayer;
@@ -129,7 +144,7 @@ export class TableTennisMatch implements FloorTableTennis {
   }
 
   serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }, origin?: { x: number; y: number; z: number }): { ball: PingPongBallState; state: PingPongState } | null {
-    if (!this.current.active) return null;
+    if (!this.current.active || (this.current.mode === 'bots' && this.current.operatorId !== playerId)) return null;
     if (this.current.server !== side) return null;
     const player = side === 'west' ? this.current.westPlayer : this.current.eastPlayer;
     // The worker bot's serves are played by the client that is playing it.
@@ -157,7 +172,7 @@ export class TableTennisMatch implements FloorTableTennis {
   }
 
   hit(playerId: string, side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number, spin?: { tops: number; side: number; kind?: PingPongShotKind }): { ball: PingPongBallState; state: PingPongState } | null {
-    if (!this.current.active) return null;
+    if (!this.current.active || (this.current.mode === 'bots' && this.current.operatorId !== playerId)) return null;
     const player = side === 'west' ? this.current.westPlayer : this.current.eastPlayer;
     if (!player || (player.id !== playerId && !player.isBot)) return null;
 
@@ -182,7 +197,7 @@ export class TableTennisMatch implements FloorTableTennis {
   /** Whether `playerId` is one of the two in this match, the worker bot included. */
   private plays(playerId: string): boolean {
     const { westPlayer, eastPlayer } = this.current;
-    return [westPlayer?.id, eastPlayer?.id].includes(playerId);
+    return [westPlayer?.id, eastPlayer?.id, this.current.operatorId].includes(playerId);
   }
 
   /**
@@ -192,7 +207,7 @@ export class TableTennisMatch implements FloorTableTennis {
    * else — a stranger's client, a claim on a rally with nobody's bat in it — is refused.
    */
   awardPoint(playerId: string, winner: PingPongSide, reason = ''): { score: { west: number; east: number }; games: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean; gameWon?: boolean } | null {
-    if (!this.current.active) return null;
+    if (!this.current.active || (this.current.mode === 'bots' && this.current.operatorId !== playerId)) return null;
     if (!this.plays(playerId)) return null;
     if (!this.current.lastHitBy) return null;
 

@@ -1,0 +1,12 @@
+{
+  "checks": [
+    "Watch bots play starts two bots with separate difficulty settings",
+    "A second viewer watches the same exhibition without taking over",
+    "Both bots return balls without human shot input and both viewers receive the rally",
+    "Exhibition keeps the bats-and-names view without manual shot controls",
+    "Points score automatically and the next serve starts without user input",
+    "A spectator can leave while the bots keep playing",
+    "Operator exit stops the exhibition for everyone"
+  ],
+  "browserErrors": []
+}

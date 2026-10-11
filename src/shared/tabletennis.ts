@@ -6,7 +6,7 @@ export { flyStep, solveShot } from './tabletennis-ballistics.js';
  */
 
 export type PingPongSide = 'west' | 'east';
-export type PingPongMode = 'bot' | 'pvp';
+export type PingPongMode = 'bot' | 'pvp' | 'bots';
 export type BotDifficulty = 'easy' | 'normal' | 'pro';
 
 export const PINGPONG_TABLE = {
@@ -291,6 +291,9 @@ export interface PingPongShot {
 export interface PingPongState {
   active: boolean;
   mode: PingPongMode;
+  /** The client running a bot exhibition; watchers cannot submit its shots or scores. */
+  operatorId?: string;
+  watcherIds?: string[];
   westPlayer?: PingPongPlayer;
   eastPlayer?: PingPongPlayer;
   score: { west: number; east: number };

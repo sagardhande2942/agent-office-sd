@@ -1,12 +1,13 @@
 import { h, openModal, type Modal } from '../../ui/dom';
 import type { BotDifficulty, PingPongMode, PingPongSide, PingPongState } from '../../../shared/tabletennis';
 import './ui.css';
+import { watchBotsCard } from './watch-ui';
 
 export interface OpenTableTennisOpts {
   state: PingPongState;
   workers: string[];
   currentUserId?: string;
-  onJoin: (side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty) => void;
+  onJoin: (side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty, westDifficulty?: BotDifficulty) => void;
   onLeave: () => void;
   onReset: () => void;
 }
@@ -28,7 +29,7 @@ export function openTableTennisDialog(opts: OpenTableTennisOpts): Modal {
     'header.tabletennis-header',
     {},
     h('h2', {}, '🏓 Balcony Table Tennis'),
-    h('p', {}, 'Regulation ping pong court on the extended balcony. Play against an AI worker bot or challenge another player!'),
+    h('p', {}, 'Regulation ping pong court on the extended balcony. Play a worker bot, challenge another player, or watch two bots play!'),
   );
 
   // Scoreboard banner
@@ -150,7 +151,8 @@ export function openTableTennisDialog(opts: OpenTableTennisOpts): Modal {
     ),
   );
 
-  const body = h('div.tabletennis-body', {}, scoreboard, botCard, pvpCard, controlsCard);
+  const watchCard = watchBotsCard(opts.state, (west, east) => { modal.close(); opts.onJoin('west', 'bots', undefined, opts.state.mode === 'bots' && opts.state.active ? opts.state.eastPlayer?.difficulty : east, west); });
+  const body = h('div.tabletennis-body', {}, scoreboard, botCard, pvpCard, watchCard, controlsCard);
   modalEl.append(header, body);
 
   const modal = openModal(modalEl, {

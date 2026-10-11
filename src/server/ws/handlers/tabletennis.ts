@@ -33,19 +33,19 @@ function swingOf(ball: PingPongBallState): PingPongSwing {
 }
 
 export const tableTennisHandlers = {
-  async 'pingpong.join'(ctx: Ctx, c: Client, msg: { t: 'pingpong.join'; side: PingPongSide; mode: 'bot' | 'pvp'; botName?: string; difficulty?: 'easy' | 'normal' | 'pro' }) {
+  async 'pingpong.join'(ctx: Ctx, c: Client, msg: { t: 'pingpong.join'; side: PingPongSide; mode: 'bot' | 'pvp' | 'bots'; botName?: string; difficulty?: 'easy' | 'normal' | 'pro'; westDifficulty?: 'easy' | 'normal' | 'pro' }) {
     const floor = ctx.floorOf(c);
     if (!floor?.pingpong) return;
     const side: PingPongSide = msg.side === 'east' ? 'east' : 'west';
-    const mode = msg.mode === 'pvp' ? 'pvp' : 'bot';
+    const mode = msg.mode === 'bots' ? 'bots' : msg.mode === 'pvp' ? 'pvp' : 'bot';
     const botName = msg.botName ? str(msg.botName, 40) : 'Worker Bot';
     const difficulty = msg.difficulty === 'easy' || msg.difficulty === 'pro' ? msg.difficulty : 'normal';
 
-    const ok = floor.pingpong.join(c.id, c.peer.name, side, mode, botName, difficulty);
+    const ok = floor.pingpong.join(c.id, c.peer.name, side, mode, botName, difficulty, msg.westDifficulty === 'easy' || msg.westDifficulty === 'pro' ? msg.westDifficulty : 'normal');
     if (ok) {
       tableTennisChanged(ctx, floor);
-      const opponent = mode === 'bot' ? botName : 'another player';
-      ctx.toastFloor(floor, `🏓 ${c.peer.name} stepped to the table tennis board (vs ${opponent})`);
+      const opponent = mode === 'bots' ? 'two worker bots' : mode === 'bot' ? botName : 'another player';
+      ctx.toastFloor(floor, mode === 'bots' ? `🏓 ${c.peer.name} is watching the bot match` : `🏓 ${c.peer.name} stepped to the table tennis board (vs ${opponent})`);
     }
   },
 
@@ -121,6 +121,8 @@ export const tableTennisHandlers = {
   async 'pingpong.reset'(ctx: Ctx, c: Client) {
     const floor = ctx.floorOf(c);
     if (!floor?.pingpong) return;
+    const state = floor.pingpong.state();
+    if (state.mode === 'bots' && state.operatorId !== c.id) return;
     if (floor.pingpong.reset()) {
       tableTennisChanged(ctx, floor);
     }

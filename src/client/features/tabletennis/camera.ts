@@ -18,8 +18,8 @@ export class TableTennisCamera {
     this.savedFov ??= camera.fov;
     const dir = c.side === 'west' ? 1 : -1, table = PINGPONG_TABLE;
     // Follow your feet from behind and above; turning to aim never turns the court out of view.
-    this.target.set(table.x, 1.15 + Math.max(0, c.ballPos.y - 1.8) * 0.35, table.z);
-    const points = [c.ballPos];
+    this.target.set(table.x, 1.15 + Math.max(0, c.ballInPlay ? c.ballPos.y - 1.8 : 0) * 0.35, table.z);
+    const points = c.ballInPlay ? [c.ballPos] : [];
     for (const x of [-(table.length / 2), (table.length / 2)]) for (const z of [-(table.width / 2), (table.width / 2)])
       points.push(new THREE.Vector3(table.x + x, table.height, table.z + z));
     let required = 52;

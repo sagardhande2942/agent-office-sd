@@ -9,7 +9,7 @@ export interface PingPongSwing {
 
 export type TableTennisClientMsg =
   /** Join a table tennis match on the balcony as west or east player, against a worker bot or another player. */
-  | { t: 'pingpong.join'; side: PingPongSide; mode: PingPongMode; botName?: string; difficulty?: BotDifficulty }
+  | { t: 'pingpong.join'; side: PingPongSide; mode: PingPongMode; botName?: string; difficulty?: BotDifficulty; westDifficulty?: BotDifficulty }
   /** Step back from the table / leave current match. */
   | { t: 'pingpong.leave' }
   /** Serve the ball from your side. */

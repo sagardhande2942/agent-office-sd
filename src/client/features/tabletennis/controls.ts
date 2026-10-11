@@ -25,7 +25,7 @@ export class TableTennisControls {
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.held = undefined; });
   }
   press(source: 'space' | 'mouse', kind: PingPongShotKind) {
-    if (!this.controller.active || !this.player.enabled || this.held || this.controller.swinging) return;
+    if (this.controller.mode === 'bots' || !this.controller.active || !this.player.enabled || this.held || this.controller.swinging) return;
     this.held = { source, since: performance.now(), kind };
   }
   private get power() { return this.held ? Math.min(1, 0.25 + (performance.now() - this.held.since) / 850 * 0.75) : 0.25; }
@@ -37,8 +37,8 @@ export class TableTennisControls {
   }
   update(dt: number) {
     const c = this.controller;
-    this.hud.hidden = !c.active; this.marker.visible = c.active;
-    if (!c.active) { this.held = undefined; return; }
+    this.hud.hidden = !c.active || c.mode === 'bots'; this.marker.visible = c.active && c.mode !== 'bots';
+    if (!c.active || c.mode === 'bots') { this.held = undefined; return; }
     const dir = c.side === 'west' ? 1 : -1;
     const base = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
     this.player.camYaw += ((this.player.holding('ArrowLeft') ? 1 : 0) - (this.player.holding('ArrowRight') ? 1 : 0)) * dt * 0.7;

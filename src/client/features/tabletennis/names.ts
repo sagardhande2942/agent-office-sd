@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { textSprite, disposeSprite } from '../../world/toon';
-import { PINGPONG_SPOTS, type PingPongState } from '../../../shared/tabletennis';
+import { PINGPONG_SPOTS, type PingPongSide, type PingPongState } from '../../../shared/tabletennis';
 import type { PeerInfo } from '../../../shared/protocol';
 
 /** A single name per seat, without creating duplicate people at the table. */
@@ -14,8 +14,12 @@ export class TableTennisNames {
       label.sprite.scale.copy(label.scale).multiplyScalar(Math.min(1, size));
     }
   }
-  update(state: PingPongState, peers: Map<string, PeerInfo>, you: string, local: THREE.Vector3) {
+  update(state: PingPongState, peers: Map<string, PeerInfo>, you: string, local: THREE.Vector3, bots?: Partial<Record<PingPongSide, { x: number; z: number }>>) {
     const keepBodies = new Set<THREE.Object3D>(), keepLabels = new Set<string>();
+    if (state.active) for (const id of state.watcherIds ?? (state.operatorId ? [state.operatorId] : [])) {
+      const root = this.peerBody?.(id);
+      if (root) { keepBodies.add(root); if (!this.hidden.has(root)) this.hidden.set(root, root.visible); root.visible = false; }
+    }
     if (state.active) for (const side of ['west', 'east'] as const) {
       const player = side === 'west' ? state.westPlayer : state.eastPlayer;
       if (!player) continue;
@@ -30,7 +34,7 @@ export class TableTennisNames {
         label = { name: player.name, sprite, scale: sprite.scale.clone() }; this.labels.set(side, label);
       }
       const peer = peers.get(player.id), spot = PINGPONG_SPOTS[side];
-      const at = player.id === you ? local : root?.position ?? peer ?? spot;
+      const at = player.isBot && bots?.[side] ? bots[side]! : player.id === you ? local : root?.position ?? peer ?? spot;
       label.sprite.position.set(at.x, 1.6, at.z);
     }
     for (const [root, visible] of this.hidden) if (!keepBodies.has(root)) { root.visible = visible; this.hidden.delete(root); }

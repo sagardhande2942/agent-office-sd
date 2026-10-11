@@ -51,6 +51,7 @@ const NET_HOLD = 0.25;
 
 export class TableTennisController {
   active = false;
+  automatesOpponent = true;
   aim = 0;
   depth = 0;
   side: PingPongSide = 'west';
@@ -142,7 +143,7 @@ export class TableTennisController {
 
   /** Where the other player is standing: the bot's, or the far player's own body. */
   get oppWhere(): { x: number; z: number } {
-    return this.mode === 'bot' ? this.bot.where : { x: this.opponent === 'west' ? PINGPONG_SPOTS.west.x : PINGPONG_SPOTS.east.x, z: PINGPONG_TABLE.z };
+    return this.mode !== 'pvp' ? this.bot.where : { x: this.opponent === 'west' ? PINGPONG_SPOTS.west.x : PINGPONG_SPOTS.east.x, z: PINGPONG_TABLE.z };
   }
 
   /** Where your bat is in the world, in your hand. */
@@ -181,6 +182,9 @@ export class TableTennisController {
     const step = Math.min(1, len) * pace * dt;
     this.pos = onCourtSpot(this.side, this.pos.x + dir * mz * step, this.pos.z + mx * step);
   }
+
+  /** A bot-controlled seat follows the same court bounds as a human player. */
+  automateAt(at: { x: number; z: number }) { this.pos = onCourtSpot(this.side, at.x, at.z); }
 
   swing(kind: PingPongShotKind = this.stroke, power = 0.5) {
     if (!this.active || this.swinging) return;
@@ -307,7 +311,7 @@ export class TableTennisController {
     }
 
     this.ballPrev.copy(this.ballPos);
-    if (this.mode === 'bot') this.updateBot(dt);
+    if (this.mode !== 'pvp') this.updateBot(dt);
     if (this.ballInPlay) {
       this.updateBallPhysics(dt);
     } else {
@@ -317,7 +321,7 @@ export class TableTennisController {
       const at = theirs === this.side ? this.bat : this.oppBat;
       c.setBall(at.x, at.y, at.z, true);
       // The bot serves its own serve, once the break is over.
-      if (this.mode === 'bot' && theirs === this.opponent && this.readyToServe && state.active && ['serve', 'point'].includes(state.status)) {
+      if (this.mode !== 'pvp' && this.automatesOpponent && theirs === this.opponent && this.readyToServe && state.active && ['serve', 'point'].includes(state.status)) {
         this.serveBot(state.serving?.kind ?? 'topspin');
       }
     }
@@ -346,6 +350,7 @@ export class TableTennisController {
     this.botPlan = this.bot.plan(flight, this.opponent, this.pos, this.lastBounceSide === this.opponent);
     this.bot.step(dt, this.botPlan.to);
 
+    if (!this.automatesOpponent) return;
     const toward = this.opponent === 'east' ? 1 : -1;
     if (!this.ballInPlay || this.lastHitter === this.opponent || this.lastBounceSide !== this.opponent || Math.sign(this.ballVel.x) !== toward || this.oppSwinging) return;
     const bat = this.oppBat;

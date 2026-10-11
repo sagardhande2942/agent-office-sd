@@ -14,6 +14,7 @@ import { TableTennisBats } from './avatar';
 import { TableTennisControls } from './controls';
 import { TableTennisCamera } from './camera';
 import { TableTennisNames } from './names';
+import { TableTennisWatch } from './watch';
 import type { Object3D } from 'three';
 import { TableTennisController } from './controller';
 import type { TableTennisCourt3D } from './world';
@@ -48,6 +49,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
         ctx.net.send({ t: 'pingpong.hit', side, x, y, z, vx, vy, vz, swing });
       },
       awardPoint(winner: PingPongSide, reason?: string) {
+        if (controller.mode === 'bots' && !controller.automatesOpponent) return;
         ctx.net.send({ t: 'pingpong.point', winner, reason });
       },
       playSound(kind) {
@@ -60,12 +62,13 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
     },
   );
 
+  const watch = new TableTennisWatch(controller, () => ctx.net.send({ t: 'pingpong.reset' }));
   const controls = new TableTennisControls(ctx.player, controller, ctx.scene);
 
   const camera = new TableTennisCamera(ctx.camera, controller);
   const names = new TableTennisNames(ctx.scene, deps.peerBody);
   ctx.ticks.add('aim', () => {
-    names.update(store.pingpong, store.peers, store.you, ctx.player.pos);
+    names.update(store.pingpong, store.peers, store.you, ctx.player.pos, controller.active ? { [controller.side]: controller.where, [controller.opponent]: controller.oppWhere } : undefined);
     camera.update();
     names.resize(ctx.camera);
     if (controller.active) ctx.me.root.visible = false; // Hats must not hide the near court or incoming ball.
@@ -87,6 +90,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
         ctx.net.send({ t: 'pingpong.leave' });
         return true;
       }
+      if (controller.mode === 'bots') return true;
       // The stroke you play: the modifier keys pick it, and Tab cycles when you'd rather not hold them.
       if (e.code === 'Space') {
         if (!e.repeat) controls.press('space', strokeFor(e));
@@ -105,7 +109,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       if (e.code !== 'KeyF' && e.code !== 'KeyG' && !(e.code in DESK_KEYS)) return false;
       return true;
     },
-    hint: (el) => renderPlayHint(el, controller.stroke),
+    hint: (el) => controller.mode === 'bots' ? el.replaceChildren('🏓 Watching bots · E / Esc: stop watching') : renderPlayHint(el, controller.stroke),
     // The court view replaces the first-person body and hand overlays.
     bothHands: true,
     takesCamera: true,
@@ -135,9 +139,10 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       ctx.net.send({ t: 'pingpong.leave' });
     }
     // Your feet: the walk keys, on your own end of the table.
+    watch.update(dt, store.pingpong, store.you);
     if (controller.active) {
       const held = (a: string, b: string) => (ctx.player.holding(a) ? 1 : 0) - (ctx.player.holding(b) ? 1 : 0);
-      controller.move(dt, held('KeyD', 'KeyA'), held('KeyW', 'KeyS'));
+      if (controller.mode !== 'bots') controller.move(dt, held('KeyD', 'KeyA'), held('KeyW', 'KeyS'));
       ctx.player.pos.set(controller.where.x, 0, controller.where.z);
       ctx.player.facing = facingTable(controller.where.x, controller.where.z);
 
@@ -169,6 +174,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   // Listen to remote server events
   ctx.messages.on('pingpong.state', () => {
     const s = store.pingpong;
+    if (controller.active && controller.mode === 'bots' && (!s.active || s.mode !== 'bots')) controller.stop();
     court()?.updateScore(`🏓 ${scoreLine(s)}`);
     // The other player struck it: fly the same ball from where the floor has it, so a rally is the
     // same rally from both ends of the table.
@@ -203,10 +209,12 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
         state: store.pingpong,
         workers,
         currentUserId: store.you,
-        onJoin(side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty) {
+        onJoin(side: PingPongSide, mode: PingPongMode, botName?: string, difficulty?: BotDifficulty, westDifficulty?: BotDifficulty) {
           if (court()?.group.userData.interact) court()!.group.userData.interact.off = true;
-          ctx.net.send({ t: 'pingpong.join', side, mode, botName, difficulty });
+          ctx.net.send({ t: 'pingpong.join', side, mode, botName, difficulty, westDifficulty });
           controller.start(side, mode, difficulty);
+          controller.automatesOpponent = mode !== 'bots';
+          if (mode === 'bots') watch.start(westDifficulty ?? 'normal');
           bats = new TableTennisBats(court, side);
         },
         onLeave() {
