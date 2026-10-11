@@ -7,8 +7,12 @@ import {
   PINGPONG_HALVES,
   PINGPONG_SPOTS,
   PINGPONG_PHYSICS,
+  flyBall,
   inTableHalf,
   onTableSurface,
+  otherSide,
+  shotTarget,
+  solveShot,
   defaultPingPongState,
 } from '../src/shared/tabletennis.js';
 import { TableTennisMatch } from '../src/server/tabletennis.js';
@@ -31,8 +35,11 @@ test('table tennis court fits on the extended balcony with player room and walkw
   // Player spots have clearance and face the table
   assert.ok(PINGPONG_SPOTS.west.x > BALCONY.minX + 2, 'west player spot is on balcony deck');
   assert.ok(PINGPONG_SPOTS.east.x < BALCONY.maxX - 1, 'east player spot is on balcony deck');
-  assert.equal(PINGPONG_SPOTS.west.rotY, -Math.PI / 2, 'west player faces east toward the table');
-  assert.equal(PINGPONG_SPOTS.east.rotY, Math.PI / 2, 'east player faces west toward the table');
+  // A body's forward is (sin rotY, cos rotY), so the west player, west of the table, faces east.
+  assert.equal(PINGPONG_SPOTS.west.rotY, Math.PI / 2, 'west player faces east toward the table');
+  assert.equal(PINGPONG_SPOTS.east.rotY, -Math.PI / 2, 'east player faces west toward the table');
+  assert.ok(Math.sin(PINGPONG_SPOTS.west.rotY) > 0.9, 'the west spot looks along +x, at the table');
+  assert.ok(Math.sin(PINGPONG_SPOTS.east.rotY) < -0.9, 'the east spot looks along -x, at the table');
 });
 
 test('inTableHalf and onTableSurface correctly partition the table halves', () => {
@@ -62,6 +69,47 @@ test('net stands in the exact middle of the table across its width', () => {
   assert.ok(PINGPONG_NET.y1 > PINGPONG_NET.y0);
   assert.ok(PINGPONG_NET.minZ < PINGPONG_TABLE.z - PINGPONG_TABLE.width / 2);
   assert.ok(PINGPONG_NET.maxZ > PINGPONG_TABLE.z + PINGPONG_TABLE.width / 2);
+});
+
+test('every shot a solved paddle plays lands on the far half, never off the end', () => {
+  // What the game used to do: fixed speeds and a fixed lift, which carried every serve and every
+  // return about a metre past the far edge of a 2.74m table, so the ball only ever left the floor.
+  for (const side of ['west', 'east'] as const) {
+    const from = { x: side === 'west' ? PINGPONG_TABLE.x - 1.4 : PINGPONG_TABLE.x + 1.4, y: PINGPONG_TABLE.height + 0.15, z: PINGPONG_TABLE.z };
+    const near = PINGPONG_TABLE.x + PINGPONG_TABLE.length / 2 - PINGPONG_TABLE.x;
+    for (const aim of [-1, -0.5, 0, 0.5, 1]) {
+      for (const depth of [-1, 0, 1]) {
+        const to = shotTarget(side, aim, depth);
+        const shot = solveShot(from, to);
+        const flight = flyBall(from, shot, shot.t + 0.5);
+        assert.equal(flight.where, 'bounce', `${side} shot (aim ${aim}, depth ${depth}) lands on the table, not ${flight.where} at x=${flight.at.x.toFixed(2)}`);
+        assert.ok(inTableHalf(otherSide(side), flight.at.x, flight.at.z), `${side} shot (aim ${aim}, depth ${depth}) lands in the far half at x=${flight.at.x.toFixed(2)}`);
+        assert.ok(flight.t <= shot.t + 0.02, `it comes down within the flight it was solved for (${flight.t.toFixed(3)}s vs ${shot.t.toFixed(3)}s)`);
+      }
+    }
+    assert.ok(near > 0, 'the far half is a real target to aim into');
+  }
+});
+
+test('a serve from either end clears the net and lands on the table', () => {
+  for (const side of ['west', 'east'] as const) {
+    for (const z of [-0.6, -0.3, 0, 0.3, 0.6]) {
+      const from = { x: side === 'west' ? PINGPONG_TABLE.x - 1.2 : PINGPONG_TABLE.x + 1.2, y: PINGPONG_TABLE.height + 0.22, z: PINGPONG_TABLE.z + z * 0.5 };
+      const shot = solveShot(from, shotTarget(side, z, -0.25));
+      const flight = flyBall(from, shot, shot.t + 0.5);
+      assert.equal(flight.where, 'bounce', `${side} serve from z=${z} lands on the table, not ${flight.where}`);
+      assert.ok(inTableHalf(otherSide(side), flight.at.x, flight.at.z), `${side} serve from z=${z} lands in the far half`);
+    }
+  }
+});
+
+test('a short shot just over the net still clears the tape', () => {
+  const from = { x: PINGPONG_TABLE.x - 1.4, y: PINGPONG_TABLE.height + 0.15, z: PINGPONG_TABLE.z };
+  // Aimed as close to the net on the far side as the table allows.
+  const to = { x: PINGPONG_TABLE.x + PINGPONG_PHYSICS.edgeMargin, z: PINGPONG_TABLE.z };
+  const shot = solveShot(from, to);
+  const flight = flyBall(from, shot, shot.t + 0.5);
+  assert.equal(flight.where, 'bounce', `the shortest legal shot is not in the net: ${flight.where}`);
 });
 
 test('TableTennisMatch: joining in bot mode creates an automated AI worker bot opponent', () => {
@@ -111,39 +159,67 @@ test('TableTennisMatch: serving and hitting increments rally and sets ball state
 test('TableTennisMatch: score tracking, server rotation and match win', () => {
   const match = new TableTennisMatch();
   match.join('p1', 'Alice', 'west', 'bot');
+  // A point can only be scored out of a rally somebody struck.
+  const strike = () => match.serve('p1', 'west', 3, 2, 0);
 
   // Point 1 for west
-  match.awardPoint('west', 'Ball out of bounds');
+  strike();
+  match.awardPoint('p1', 'west', 'Ball out of bounds');
   assert.deepEqual(match.state().score, { west: 1, east: 0 });
   assert.equal(match.state().server, 'west');
 
   // Point 2 for west -> total points 2, server rotates to east
-  match.awardPoint('west');
+  strike();
+  match.awardPoint('p1', 'west');
   assert.deepEqual(match.state().score, { west: 2, east: 0 });
   assert.equal(match.state().server, 'east');
 
   // Fast forward to 10-9
-  for (let i = 0; i < 8; i++) match.awardPoint('west');
-  for (let i = 0; i < 9; i++) match.awardPoint('east');
+  for (let i = 0; i < 8; i++) { strike(); match.awardPoint('p1', 'west'); }
+  for (let i = 0; i < 9; i++) { strike(); match.awardPoint('p1', 'east'); }
   assert.deepEqual(match.state().score, { west: 10, east: 9 });
   assert.equal(match.state().status, 'serve');
 
   // West wins 11-9 (11 points and >= 2 point lead)
-  const win = match.awardPoint('west');
+  strike();
+  const win = match.awardPoint('p1', 'west');
   assert.ok(win?.matchWon);
   assert.equal(match.state().status, 'ended');
   assert.equal(match.state().winner, 'west');
 });
 
-test('TableTennisMatch: worker bot AI computes returns toward west half with reaction delay', () => {
+test('TableTennisMatch: a point is only scored by a player, once per strike', () => {
   const match = new TableTennisMatch();
   match.join('p1', 'Alice', 'west', 'bot');
 
-  const ret = match.computeBotReturn('normal');
-  assert.ok(ret);
-  assert.ok(ret.vx < -4.0, `bot ball travels west towards player (-x), vx=${ret.vx}`);
-  assert.ok(ret.vy > 2.5, `bot ball has upward lift to clear net, vy=${ret.vy}`);
-  assert.ok(ret.delay >= 100 && ret.delay <= 300, `bot has realistic reaction delay: ${ret.delay}ms`);
+  // Nobody struck a ball: no point, however it is claimed.
+  assert.equal(match.awardPoint('p1', 'east'), null);
+  assert.deepEqual(match.state().score, { west: 0, east: 0 });
+
+  // A client that isn't in the match cannot hand out its points either.
+  match.serve('p1', 'west', 3, 2, 0);
+  assert.equal(match.awardPoint('someone-else', 'east'), null);
+  assert.deepEqual(match.state().score, { west: 0, east: 0 });
+
+  // The rally's own player scores it, and the strike is spent with the point.
+  assert.ok(match.awardPoint('p1', 'east', 'Out'));
+  assert.deepEqual(match.state().score, { west: 0, east: 1 });
+  assert.equal(match.awardPoint('p1', 'east', 'Out'), null, 'the same strike cannot be paid out twice');
+  assert.deepEqual(match.state().score, { west: 0, east: 1 });
+});
+
+test('TableTennisMatch: a shot from a client is corrected, not obeyed', () => {
+  const match = new TableTennisMatch();
+  match.join('p1', 'Alice', 'west', 'bot');
+
+  // A west player's ball travels east; one sent back the other way is turned round.
+  const away = match.serve('p1', 'west', 3, 2, 0);
+  assert.ok(away && away.ball.vx > 0, `a serve from the west travels east, vx=${away?.ball.vx}`);
+  const back = match.hit('bot', 'east', 7.4, 0.9, 15, -3, 2, 0);
+  assert.ok(back && back.ball.vx < 0, `a return from the east travels west, vx=${back?.ball.vx}`);
+  // Nonsense from a client is replaced with something playable rather than flown off the floor.
+  const wild = match.hit('p1', 'west', 4.6, 0.9, 15, Number.NaN, 900, 0);
+  assert.ok(wild && Number.isFinite(wild.ball.vy) && wild.ball.vy <= 8, `lift is bounded, vy=${wild?.ball.vy}`);
 });
 
 test('TableTennisMatch: leaving clears players and resets match state', () => {

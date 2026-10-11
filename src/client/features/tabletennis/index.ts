@@ -7,11 +7,13 @@ import { aside, hintTitle, key, onE } from '../../core/hint';
 import { DESK_KEYS } from '../../interaction';
 import { store } from '../../state';
 import { h, toast } from '../../ui/dom';
+import type { PeerInfo } from '../../../shared/protocol';
 import { playTableTennisSound } from './sound';
 import { openTableTennisDialog } from './ui';
+import { standingSpot, TableTennisBats, TableTennisOpponent } from './avatar';
 import { TableTennisController } from './controller';
 import type { TableTennisCourt3D } from './world';
-import type { BotDifficulty, PingPongMode, PingPongSide } from '../../../shared/tabletennis';
+import type { BotDifficulty, PingPongMode, PingPongPlayer, PingPongSide } from '../../../shared/tabletennis';
 
 // Augment InteractKinds with 'pingpong' (lowercase letters only per registry rules)
 declare module '../../world/types' {
@@ -27,6 +29,8 @@ export interface TableTennisDeps {
 
 export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   const court = (): TableTennisCourt3D | undefined => ctx.office.tableTennis;
+  let bats: TableTennisBats | undefined;
+  let opponent: TableTennisOpponent | undefined;
 
   const controller = new TableTennisController(
     ctx.player,
@@ -49,8 +53,14 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
         ctx.hint.invalidate();
       },
     },
-    () => ctx.me,
   );
+
+  /** Stands the other player up at their end: a worker bot for a bot match, or nobody in PvP
+   * (the other player's own body is in the room with you, at the same place). */
+  function opponentDown() {
+    opponent?.dispose(ctx.scene);
+    opponent = undefined;
+  }
 
   // Register player activity: hide first-person hands/body (table tennis renders 3D paddle)
   ctx.activities.add({
@@ -92,7 +102,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
       return true;
     },
     hint: (el) => renderPlayHint(el),
-    hidesHands: true,
+    // Your own body and hands stay: you are stood at the table holding a bat, not a floating one.
     bothHands: true,
   });
 
@@ -113,18 +123,49 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   });
 
   // Play tick
-  ctx.ticks.add('play', ({ dt }) => {
+  ctx.ticks.add('play', ({ dt, t }) => {
     if (controller.active && (ctx.trip() || ctx.activities.running('hanger') || ctx.activities.running('climber') || ctx.player.seat)) {
       controller.stop();
       ctx.net.send({ t: 'pingpong.leave' });
     }
     controller.update(dt, store.pingpong);
+    if (!controller.active) return;
+    // Your own bat where you stand, the far one where they do, and the far player themselves.
+    const far = farPlayer(controller.opponent);
+    (bats ??= new TableTennisBats(court, controller.side)).update(
+      { x: ctx.player.pos.x, z: ctx.player.pos.z },
+      far.peer ? { x: far.peer.x, z: far.peer.z } : standingSpot(controller.opponent),
+      controller.swinging ? controller.swingProgress : -1,
+      controller.oppSwinging ? controller.oppSwingProgress : -1,
+    );
+    opponent?.update(dt, t, controller.oppSwinging ? controller.oppSwingProgress : -1);
   });
+
+  /** Whoever is on the far side of the net: their body in the room, if they're a person here. */
+  function farPlayer(side: PingPongSide): { peer?: PeerInfo; bot?: PingPongPlayer } {
+    const s = store.pingpong;
+    const who = side === 'west' ? s.westPlayer : s.eastPlayer;
+    if (!who) return {};
+    if (who.isBot) return { bot: who };
+    const peer = store.peers.get(who.id);
+    return peer && store.onMyFloor(peer) ? { peer } : {};
+  }
+
+  /** Stands the worker bot up at its end of the table; in PvP the other player's body is already here. */
+  function syncOpponent() {
+    const { bot } = farPlayer(controller.opponent);
+    if (bot && !opponent) opponent = new TableTennisOpponent(ctx.scene, bot.name, '#06d6a0', controller.opponent);
+    if (!bot && opponent) opponentDown();
+  }
 
   // Listen to remote server events
   ctx.messages.on('pingpong.state', () => {
     const s = store.pingpong;
     court()?.updateScore(`🏓 ${s.score.west} - ${s.score.east}`);
+    // The other player struck it: fly the same ball from where the floor has it, so a rally is the
+    // same rally from both ends of the table.
+    controller.adopt(s.ball);
+    if (controller.active) syncOpponent();
   });
 
   ctx.messages.on('pingpong.hit', (m) => {
@@ -159,9 +200,13 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
           if (court()?.group.userData.interact) court()!.group.userData.interact.off = true;
           ctx.net.send({ t: 'pingpong.join', side, mode, botName, difficulty });
           controller.start(side, mode, difficulty);
+          bats = new TableTennisBats(court, side);
+          if (mode === 'bot') opponent = new TableTennisOpponent(ctx.scene, botName || 'Worker Bot', '#06d6a0', controller.opponent);
         },
         onLeave() {
           controller.stop();
+          bats = undefined;
+          opponentDown();
           ctx.net.send({ t: 'pingpong.leave' });
         },
         onReset() {

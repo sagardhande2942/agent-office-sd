@@ -19,9 +19,25 @@ export interface FloorTableTennis {
   leave(playerId: string): boolean;
   serve(playerId: string, side: PingPongSide, vx: number, vy: number, vz: number): { ball: PingPongBallState; state: PingPongState } | null;
   hit(playerId: string, side: PingPongSide, x: number, y: number, z: number, vx: number, vy: number, vz: number): { ball: PingPongBallState; state: PingPongState } | null;
-  awardPoint(winner: PingPongSide, reason?: string): { score: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean } | null;
+  awardPoint(playerId: string, winner: PingPongSide, reason?: string): { score: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean } | null;
   reset(): boolean;
-  computeBotReturn(difficulty?: BotDifficulty): { vx: number; vy: number; vz: number; delay: number } | null;
+}
+
+/**
+ * A shot as the floor will accept it from a client: sent from the striker's own half towards the
+ * other, and within the speeds a ball can actually be hit at. A client that sends a shot of its own
+ * inventing — or one aimed at the players behind it — has it corrected rather than obeyed.
+ */
+function clampedShot(side: PingPongSide, vx: number, vy: number, vz: number): { vx: number; vy: number; vz: number } {
+  const limit = 8;
+  const finite = (v: number, fallback: number) => (Number.isFinite(v) ? fallback : v);
+  const away = side === 'west' ? 1 : -1;
+  const speed = Math.max(-limit, Math.min(limit, finite(vx, away * PINGPONG_PHYSICS.shotSpeed) * away) * away);
+  return {
+    vx: speed,
+    vy: Math.max(-limit, Math.min(limit, finite(vy, 2))),
+    vz: Math.max(-limit, Math.min(limit, finite(vz, 0))),
+  };
 }
 
 export class TableTennisMatch implements FloorTableTennis {
@@ -112,9 +128,7 @@ export class TableTennisMatch implements FloorTableTennis {
       x: startX,
       y: PINGPONG_TABLE.height + 0.25,
       z: PINGPONG_TABLE.z,
-      vx,
-      vy,
-      vz,
+      ...clampedShot(side, vx, vy, vz),
       t: Date.now(),
     };
 
@@ -131,12 +145,10 @@ export class TableTennisMatch implements FloorTableTennis {
     if (!player || (player.id !== playerId && !player.isBot)) return null;
 
     const ball: PingPongBallState = {
-      x,
-      y,
-      z,
-      vx,
-      vy,
-      vz,
+      x: Number.isFinite(x) ? x : PINGPONG_TABLE.x,
+      y: Number.isFinite(y) ? y : PINGPONG_TABLE.height,
+      z: Number.isFinite(z) ? z : PINGPONG_TABLE.z,
+      ...clampedShot(side, vx, vy, vz),
       t: Date.now(),
     };
 
@@ -147,8 +159,23 @@ export class TableTennisMatch implements FloorTableTennis {
     return { ball, state: this.state() };
   }
 
-  awardPoint(winner: PingPongSide, reason = ''): { score: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean } | null {
+  /** Whether `playerId` is one of the two in this match, the worker bot included. */
+  private plays(playerId: string): boolean {
+    const { westPlayer, eastPlayer } = this.current;
+    return [westPlayer?.id, eastPlayer?.id].includes(playerId);
+  }
+
+  /**
+   * Scores the point a client saw end. The floor only takes a point from someone playing this match,
+   * once the rally they are claiming has actually been struck (`lastHitBy`), and once only: the strike
+   * is spent as the point is scored, so a replayed message cannot keep handing out points. Anything
+   * else — a stranger's client, a claim on a rally with nobody's bat in it — is refused.
+   */
+  awardPoint(playerId: string, winner: PingPongSide, reason = ''): { score: { west: number; east: number }; winner: PingPongSide; text: string; matchWon?: boolean } | null {
     if (!this.current.active) return null;
+    if (!this.plays(playerId)) return null;
+    const hitter = this.current.lastHitBy;
+    if (!hitter) return null;
 
     this.current.score[winner]++;
     const { west, east } = this.current.score;
@@ -171,7 +198,10 @@ export class TableTennisMatch implements FloorTableTennis {
       }
     }
 
+    // The rally is over and the strike that ended it is spent: the next claim needs a new one.
     delete this.current.ball;
+    delete this.current.lastHitBy;
+    delete this.current.lastBounceSide;
     this.current.rally = 0;
 
     const winnerName = (winner === 'west' ? this.current.westPlayer?.name : this.current.eastPlayer?.name) ?? winner;
@@ -195,19 +225,5 @@ export class TableTennisMatch implements FloorTableTennis {
     delete this.current.ball;
     delete this.current.winner;
     return true;
-  }
-
-  computeBotReturn(difficulty: BotDifficulty = 'normal'): { vx: number; vy: number; vz: number; delay: number } | null {
-    // Return arc towards West half: target x in [4.8, 5.6], z in [14.6, 15.4]
-    const zOffset = (Math.random() - 0.5) * (difficulty === 'easy' ? 0.8 : difficulty === 'normal' ? 0.6 : 0.4);
-    const speedMultiplier = difficulty === 'easy' ? 0.85 : difficulty === 'normal' ? 1.0 : 1.25;
-
-    // Ball traveling west (-x)
-    const vx = (-4.8 - Math.random() * 0.8) * speedMultiplier;
-    const vy = 3.2 + Math.random() * 0.4;
-    const vz = zOffset * 2.5;
-    const delay = difficulty === 'easy' ? 240 : difficulty === 'normal' ? 160 : 100;
-
-    return { vx, vy, vz, delay };
   }
 }

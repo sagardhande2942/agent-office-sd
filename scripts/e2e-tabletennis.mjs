@@ -12,7 +12,7 @@ import { chromium } from 'playwright-core';
 import { loadConfig } from '../src/server/config.ts';
 import { startServer } from '../src/server/server.ts';
 import { BALCONY } from '../src/shared/layout.ts';
-import { PINGPONG_TABLE } from '../src/shared/tabletennis.ts';
+import { PINGPONG_SPOTS, PINGPONG_TABLE } from '../src/shared/tabletennis.ts';
 
 const output = path.resolve(process.env.TABLETENNIS_ARTIFACTS ?? '/tmp/agent-office-tabletennis-evidence');
 mkdirSync(output, { recursive: true });
@@ -164,9 +164,72 @@ try {
     `Match active vs Worker Bot. West: ${pingpongState.westPlayer?.name}, East: ${pingpongState.eastPlayer?.name}, Score: ${pingpongState.score.west}-${pingpongState.score.east}`,
   );
 
-  // Serve the ball using Space
+  // Serve the ball using Space, and watch where it actually goes
+  const table = { x: PINGPONG_TABLE.x, z: PINGPONG_TABLE.z, length: PINGPONG_TABLE.length, width: PINGPONG_TABLE.width, height: PINGPONG_TABLE.height };
+  await page.evaluate(() => {
+    const ball = window.__office.office.tableTennis.ball;
+    window.__trace = [];
+    // Sampled on the game's own frame, not a timer: headless Chromium throttles timers hard, and
+    // what matters is where the ball was on the frames it was drawn on.
+    const sample = () => {
+      window.__trace.push(ball.position.toArray());
+      window.__traceTimer = requestAnimationFrame(sample);
+    };
+    window.__traceTimer = requestAnimationFrame(sample);
+  });
+  await page.locator('canvas').focus();
   await page.keyboard.press('Space');
-  await page.waitForTimeout(600);
+  await page.waitForTimeout(9000);
+  const trace = await page.evaluate(() => {
+    cancelAnimationFrame(window.__traceTimer);
+    return window.__trace;
+  });
+
+  // Every touch down has to be on the table: the bug was that a shot carried straight past the far
+  // edge and the rally was over before it began. A touch down is a low point in the ball's height
+  // (headless SwiftShader draws a few frames a second, so the ball can step over the bounce).
+  const bounces = [];
+  for (let i = 1; i < trace.length - 1; i++) {
+    const [x, y, z] = trace[i];
+    const [, prevY] = trace[i - 1];
+    const [, nextY] = trace[i + 1];
+    const inside = Math.abs(x) <= table.length / 2 + 0.05 && Math.abs(z) <= table.width / 2 + 0.05;
+    const lowest = y < prevY && y <= nextY && y < table.height + 0.5;
+    if (inside && lowest && (bounces.length === 0 || Math.hypot(x - bounces.at(-1).x, z - bounces.at(-1).z) > 0.2)) {
+      bounces.push({ x, y, z });
+    }
+  }
+  const away = trace.filter(([x]) => Math.abs(x) > table.length / 2 + 0.05);
+  check(
+    'serve-lands-on-table',
+    bounces.length >= 1,
+    `The ball touches down ${bounces.length} time(s) on the table, first at local (${bounces[0]?.x.toFixed(2)}, ${bounces[0]?.z.toFixed(2)}), over ${trace.length} drawn frames.`,
+  );
+  check(
+    'ball-rallies',
+    bounces.length >= 2,
+    `The worker bot returns the ball: ${bounces.length} touch downs in the first rally (ball left the table's width on ${away.length} of ${trace.length} frames).`,
+  );
+
+  // Both players are there: a body at the far end of the table, and yours in hand.
+  const east = { x: PINGPONG_SPOTS.east.x, z: PINGPONG_SPOTS.east.z };
+  const players = await page.evaluate((east) => {
+    const bodies = window.__office.scene.children.filter((o) => o.visible && o.position && Math.hypot(o.position.x - east.x, o.position.z - east.z) < 0.6);
+    const court = window.__office.office.tableTennis;
+    return {
+      atEast: bodies.length,
+      meVisible: window.__office.me.root.visible,
+      myBat: court.westPaddle.position.clone().add(court.group.position).toArray(),
+      theirBat: court.eastPaddle.position.clone().add(court.group.position).toArray(),
+    };
+  }, east);
+  check('opponent-on-show', players.atEast >= 1, `${players.atEast} body/bodies standing at the far end of the table (the worker bot).`);
+  check('your-own-body-visible', players.meVisible === true, 'Your own body is on show while you play, not hidden.');
+  check(
+    'bats-in-hand',
+    Math.abs(players.myBat[0] - 4.4) < 0.8 && Math.abs(players.theirBat[0] - 7.6) < 0.8,
+    `The bats hang at the players who hold them: yours at x=${players.myBat[0].toFixed(2)}, theirs at x=${players.theirBat[0].toFixed(2)} (not out over the middle of the table at x=6).`,
+  );
 
   // Screenshot in-game table tennis match
   await page.screenshot({ path: path.join(output, '03-gameplay.png') });

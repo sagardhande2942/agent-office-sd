@@ -85,7 +85,7 @@ export const tableTennisHandlers = {
     const floor = ctx.floorOf(c);
     if (!floor?.pingpong) return;
     const winner: PingPongSide = msg.winner === 'east' ? 'east' : 'west';
-    const res = floor.pingpong.awardPoint(winner, msg.reason ? str(msg.reason, 60) : undefined);
+    const res = floor.pingpong.awardPoint(c.id, winner, msg.reason ? str(msg.reason, 60) : undefined);
     if (res) {
       ctx.toFloor(floor, {
         t: 'pingpong.point',
