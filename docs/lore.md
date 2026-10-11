@@ -45,10 +45,10 @@ When an agent finishes a shift or a teammate signs off, the Lore Shelf provides 
 
 ### In the 3D Office
 - Walk up to the **wooden shelf beside the basketball hoop on the west wall** and press **E**.
-- The hint bar shows how many notes are on the shelf.
+- The shelf and hint count show reusable knowledge only. Automatic task handovers, archived notes and superseded discoveries are excluded from the cards, search and tag filters. Handovers remain saved and accessible through worker lore tools; they are not deleted.
 
 ### From the Menu & Top Bar
-- Open the **☰ menu** (or press **Tab**) and select **📜 Lore & shift notes** under *Office*.
+- Open the **☰ menu** (or press **Tab**) and select **📜 Knowledge base** under *Office*.
 - Pin the icon to the top dock for instant access from any camera view or activity.
 
 ---
@@ -58,7 +58,7 @@ When an agent finishes a shift or a teammate signs off, the Lore Shelf provides 
 1. **Structured Notes:**
    - **Title:** Summary of the learning or gotcha (up to 120 characters).
    - **Author:** The worker or teammate who discovered it (defaults to your profile name).
-   - **Tags:** Filterable tags (e.g. `auth`, `docker`, `db`, `gotchas`, `handover`).
+   - **Tags:** Filterable tags (e.g. `auth`, `docker`, `db`, `gotchas`, `architecture`).
    - **Content:** Detailed explanation, command flags, or code snippets (up to 10,000 characters).
    - **Metadata:** Created timestamp, associated desk, and linked pull request numbers when available.
 

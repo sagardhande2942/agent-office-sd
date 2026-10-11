@@ -1,5 +1,6 @@
 import type { Ctx } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
+import { knowledgeShelfNotes } from '../../../shared/lore';
 import { store } from '../../state';
 import { toast } from '../../ui/dom';
 import { HUD_ACTIONS } from '../../ui/menu';
@@ -20,16 +21,16 @@ export function installLore(ctx: Ctx) {
   HUD_ACTIONS.push({
     id: 'lore',
     icon: '📜',
-    label: 'Lore & shift notes',
+    label: 'Knowledge base',
     section: 'Office',
-    title: () => 'Read and write shared knowledge, shift handovers, and project tips',
+    title: () => 'Read and write reusable project knowledge, fixes, and gotchas',
     run: () => showLoreShelf(),
   });
 
   ctx.interactions.define('lore', {
     reach: 4,
     hint: () => {
-      const count = store.lore.length;
+      const count = knowledgeShelfNotes(store.lore).length;
       return {
         k: 'lore',
         parts: [

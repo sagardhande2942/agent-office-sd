@@ -59,3 +59,9 @@ export function formatLoreForPrompt(notes: readonly LoreNote[]): string {
   }
   return lines.join('\n').trim();
 }
+
+/** The shelf presents reusable knowledge; task records remain available to worker/history tools. */
+export function knowledgeShelfNotes(notes: readonly LoreNote[]): LoreNote[] {
+  return notes.filter(note => !note.id.startsWith('handover-') && !note.tags.some(tag => tag.toLowerCase() === 'handover')
+    && note.curation?.status !== 'archived' && note.curation?.status !== 'superseded');
+}
