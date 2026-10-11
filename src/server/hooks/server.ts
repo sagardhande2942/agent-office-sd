@@ -15,6 +15,7 @@ import { providerHook } from '../providers/index.js';
 import type { AgentProvider } from '../../shared/providers.js';
 import { workerCommunications } from './communications.js';
 import { workerHelper } from './helper.js';
+import { workerFeatureHook } from './worker-features.js';
 
 /** Starts the hook server, and says which port it listens on. */
 export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Server; hookPort: number }> {
@@ -28,6 +29,7 @@ export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Serv
     if (await workerTeam(ctx, req, res, url)) return;
     if (['/office/report', '/office/workers/report'].includes(url.pathname)) return workerManager(ctx, req, res, url);
     if (await workerPlanReview(ctx, req, res, url)) return;
+    if (await workerFeatureHook(ctx, req, res, url)) return;
     if (['/office/workers/completion', '/office/workers/complete'].includes(url.pathname)) return workerCompletion(ctx, req, res, url);
     if (url.pathname === '/office/queue') return officeQueue(ctx, req, res, url);
     if (url.pathname === '/office/workers/helper') return workerHelper(ctx, req, res, url);

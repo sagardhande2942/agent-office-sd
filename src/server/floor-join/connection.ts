@@ -147,6 +147,7 @@ export async function connectOnce(
       const hooks = await startHooks((workerId) => host?.floorOf(workerId)?.workers, {
         floorOf: id => host?.floorOf(id),
         changed: floor => host?.reportCinema(floor.id, floor),
+        publish: (floor, msg) => host?.reportWorkerFeature(floor.id, msg),
       }, (req, res, url) => host?.teams.hook(req, res, url, id => host?.floorOf(id)) ?? Promise.resolve(false));
       stopHooks = hooks.close;
       if (settled) return;

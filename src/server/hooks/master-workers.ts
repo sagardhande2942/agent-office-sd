@@ -2,6 +2,7 @@ import type http from 'node:http';
 import type { Ctx } from '../office/context.js';
 import { team, teamAction } from '../master-workers/service.js';
 import { readBody, send } from '../http/util.js';
+import { WORKER_FEATURE_PATHS } from './worker-features.js';
 /** Enforce team roles even when a participant bypasses advertised MCP tools. */
 export async function workerTeam(ctx:Ctx,req:http.IncomingMessage,res:http.ServerResponse,url:URL):Promise<boolean> {
   if(!url.pathname.startsWith('/office/')) return false;
@@ -20,7 +21,7 @@ export async function workerTeam(ctx:Ctx,req:http.IncomingMessage,res:http.Serve
     } catch(e) { send(res,400,{error:(e as Error).message}); } return true;
   }
   if(role) {
-    const allowed=['/office/workers','/office/workers/inbox','/office/workers/request','/office/workers/reply','/office/workers/ack','/office/workers/completion','/office/workers/complete'];
+    const allowed=['/office/workers','/office/workers/inbox','/office/workers/request','/office/workers/reply','/office/workers/ack','/office/workers/completion','/office/workers/complete',...WORKER_FEATURE_PATHS];
     if(!allowed.includes(url.pathname) || (url.pathname==='/office/workers'&&req.method!=='GET')) {send(res,403,{error:'Team participants use team actions; ordinary hiring, PR management and unrelated office operations are disabled'});return true;}
   }
   return false;

@@ -104,6 +104,7 @@ export interface RepoChoice {
 /** Everything that belongs to the floor you're on: sent when you walk in, and when you change floors. */
 
 export interface FloorView {
+  lore?: import('./lore.js').LoreNote[];
   placements?: import('./object-placement.js').PlacementView;
   appearances?: import('../appearances.js').AppearanceState;
   /** The floor you're on; null while the building has none. */

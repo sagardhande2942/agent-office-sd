@@ -12,6 +12,7 @@ import { elevator, garageLift } from '../elevator';
 import { gong } from '../../features/gong/world';
 import { jukebox } from '../../features/jukebox/world';
 import { bookshelf } from '../../features/bookshelf/world';
+import { loreShelf } from '../../features/lore/world';
 import { cabinet } from '../../features/cabinet/world';
 import { screeningRoom } from '../../features/cinema/world';
 import { whiteboard } from '../../features/whiteboard/world';
@@ -63,6 +64,7 @@ function floorPlan() {
     jukebox,
     cabinet,
     bookshelf,
+    loreShelf,
     samsungKitchen,
     plants,
     basketballPlant,

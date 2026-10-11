@@ -59,7 +59,7 @@ test('guard validation rejects malformed guards and changes at the server', () =
 
 test('session boundary prevents guarded writes to changed workers and suppresses delayed Enter at an approval', async () => {
   const writes:string[]=[];const w={info:worker('a'),pty:{write:(s:string)=>writes.push(s)}};
-  const manager={workers:new Map([['a',w]]),tasks:{notePrompt:()=>{}},emitUpdate:()=>{}} as unknown as WorkerManager;
+  const manager={ctx:{workers:new Map([['a',w]]),events:{},notePrompt:()=>{},emit:()=>{}}} as unknown as WorkerManager;
   assert.ok(WorkerManager.prototype.prompt.call(manager,'a','hi','QA',{...guard,status:'working'}));assert.deepEqual(writes,[]);
   assert.ok(WorkerManager.prototype.prompt.call(manager,'a','\x1b[201~','QA',guard));assert.deepEqual(writes,[]);
   assert.equal(WorkerManager.prototype.prompt.call(manager,'a','hi','QA',guard),undefined);assert.equal(writes.length,1);

@@ -1,0 +1,25 @@
+.modal.lore-curator { width: min(820px, 94vw); max-height: 90vh; display: flex; flex-direction: column; }
+.modal.lore-curator > header { display: flex; align-items: flex-start; gap: 16px; padding: 20px 24px 12px; }
+.modal.lore-curator > header > div { flex: 1; min-width: 0; }
+.lore-curator header h2 { margin: 0 0 6px; }
+.lore-curator header p { margin: 0; opacity: .7; font-size: 13px; }
+.curator-scroll { overflow: auto; padding: 0 24px 24px; }
+.curator-status { padding: 12px; border: 1px solid var(--border, #48535f); border-radius: 8px; font-size: 13px; line-height: 1.7; }
+.curator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.curator-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.curator-field input[type=checkbox] { align-self: flex-start; width: 20px; height: 20px; }
+.curator-form .provider-choice { margin: 18px 0 12px; }
+.curator-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.curator-runtime, .curator-notes, .curator-history { margin-top: 22px; }
+.curator-run, .curator-note { border: 1px solid var(--border, #48535f); border-radius: 8px; padding: 12px; margin: 10px 0; overflow-wrap: anywhere; }
+.curator-run small, .curator-note small { display: block; opacity: .7; margin-top: 5px; }
+.curator-run p, .curator-note p { font-size: 13px; line-height: 1.5; }
+.curator-badge { display: inline-block; font-size: 11px; margin-left: 10px; padding: 3px 7px; border-radius: 5px; background: #6d758333; }
+.curator-history pre { white-space: pre-wrap; font-size: 12px; line-height: 1.6; max-height: 240px; overflow: auto; }
+@media (max-width: 600px) { .curator-grid { grid-template-columns: 1fr; } .curator-scroll { padding: 0 16px 16px; } }
+.modal.lore-curator .curator-field { display: flex; flex-direction: column; gap: 6px; }
+.modal.lore-curator [hidden] { display: none !important; }
+.modal.lore-curator .curator-field input:not([type=checkbox]), .modal.lore-curator .curator-field select, .modal.lore-curator .curator-notes > select { width: 100%; padding: 8px 10px; border: 2px solid var(--ink); border-radius: 9px; color: var(--ink); background: #fff; font: inherit; font-size: 13px; }
+.modal.lore-curator .provider-note, .modal.lore-curator .provider-model-hint, .modal.lore-curator #curator-agent-effort, .modal.lore-curator label[for=curator-agent-effort] { display: none !important; }
+.modal.lore-curator .provider-choice { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; }
+.modal.lore-curator .provider-model { grid-column: 1 / -1; margin-top: 6px; }

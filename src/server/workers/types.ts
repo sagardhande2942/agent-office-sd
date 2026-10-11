@@ -111,6 +111,7 @@ export interface Worker {
 }
 
 export interface WorkerEvents {
+  readonly features?: readonly import('./features.js').WorkerFeature[];
   helperReportDelivery?(workerId: string, messageId: string, phase: 'claim' | 'complete' | 'release'): string | undefined;
   update(info: WorkerInfo): void;
   /** It's gone (sent home), and what it was as it went. */

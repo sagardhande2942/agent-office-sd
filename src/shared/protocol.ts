@@ -1,3 +1,5 @@
+import type { CuratorClientMsg, CuratorServerMsg } from './lore-curator.js';
+export * from './lore-curator.js';
 import type { WorldsClientMsg, WorldsServerMsg } from './protocol/parallel-worlds.js';
 import type { PlacementClientMsg, PlacementServerMsg } from './protocol/object-placement.js';
 export * from './protocol/object-placement.js';
@@ -9,6 +11,8 @@ import type { AppearanceClientMsg, AppearanceServerMsg } from './protocol/appear
 export * from './protocol/appearances.js';
 import type { PlanReviewClientMsg, PlanReviewServerMsg } from './protocol/plan-review.js';
 export * from './protocol/plan-review.js';
+import type { LoreClientMsg, LoreServerMsg } from './protocol/lore.js';
+export * from './protocol/lore.js';
 import type { TvClientMsg } from './protocol/toys.js';
 import type { CinemaClientMsg, CinemaServerMsg } from './protocol/cinema.js';
 // Wire protocol between browser and server. Every WebSocket frame is one JSON object.
@@ -48,6 +52,8 @@ export * from './protocol/communications.js';
 export * from './protocol/cinema.js';
 
 export type ClientMsg =
+  | CuratorClientMsg
+  | LoreClientMsg
   | PlacementClientMsg
   | WorldsClientMsg
   | MasterWorkersClientMsg
@@ -79,6 +85,8 @@ export type ClientMsg =
   | DogClientMsg;
 
 export type ServerMsg =
+  | CuratorServerMsg
+  | LoreServerMsg
   | PlacementServerMsg
   | WorldsServerMsg
   | MasterWorkersServerMsg

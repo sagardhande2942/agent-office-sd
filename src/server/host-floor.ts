@@ -1,6 +1,8 @@
 import { HostTeams, TEAM_HOST_CALLS } from './master-workers/host.js';
 import { cinemaHostCalls, cinemaHostState } from './cinema/host.js';
 import { HOST_CINEMA_PATHS, hostCinemaHook } from './cinema/host-hooks.js';
+import { workerFeatureHostCalls, workerFeatureSnapshots } from './worker-features.js';
+import { floorWorkerFeatureHook } from './hooks/worker-features.js';
 import type { BossGuard } from '../shared/boss.js';
 import http from 'node:http';
 import { Floor, type FloorContext } from './floor.js';
@@ -149,6 +151,7 @@ export class HostFloors {
     state('meeting', { state: floor.meetings.state() });
     state('tv', { state: floor.tv.state() });
     this.reportCinema(floorId, floor);
+    for (const msg of workerFeatureSnapshots(floor)) this.reportWorkerFeature(floorId, msg);
     state('helper', { helpers: floor.helpers.states() });
     this.teams.report(floor);
     // The two boards and the dungeon joined them when riding onto a hosted floor became a thing: the
@@ -167,6 +170,7 @@ export class HostFloors {
   reportCinema(floorId: string, floor: Floor) {
     this.parts.send({ t: 'event', floorId, seq: 0, msg: cinemaHostState(floor) });
   }
+  reportWorkerFeature(floorId: string, msg: ServerMsg) { this.parts.send({ t: 'event', floorId, seq: 0, msg }); }
 
   projectsDir: string = '';
 
@@ -195,6 +199,7 @@ export class HostFloors {
         workerBreaks: true,
         cinema: true,
         masterWorkers: true,
+        lore: true, curator: true,
         projectsDir: this.projectsDir,
         workers: floor.workers.list().map((w) => ({ id: w.id, status: w.status, deskId: w.deskId })),
       },
@@ -287,6 +292,7 @@ export class HostFloors {
     const m = msg as unknown as Record<string, unknown>;
     if (TEAM_HOST_CALLS.has(msg.t)) return this.teams.call(floor, m);
     if (Object.hasOwn(cinemaHostCalls, msg.t)) return cinemaHostCalls[msg.t](floor, m);
+    if (Object.hasOwn(workerFeatureHostCalls, msg.t)) return workerFeatureHostCalls[msg.t](floor, m);
     const s = (k: string) => (typeof m[k] === 'string' ? (m[k] as string) : '');
     const num = (k: string) => (Number.isFinite(Number(m[k])) ? Number(m[k]) : 0);
     switch (msg.t) {
@@ -475,7 +481,7 @@ export function startHooks(
    *  server can be started before the floors are open — which it must be, since a worker's environment
    *  needs its URL before any worker starts. */
   workersOf: (workerId: string) => import('./workers.js').WorkerManager | undefined,
-  cinema?: { floorOf(id: string): Floor | undefined; changed(floor: Floor): void },
+  cinema?: { floorOf(id: string): Floor | undefined; changed(floor: Floor): void; publish?(floor: Floor, msg: ServerMsg): void },
   workerTools?: (req: http.IncomingMessage, res: http.ServerResponse, url: URL) => Promise<boolean>,
 ): Promise<{ url: string; close: () => void }> {
   const server = http.createServer(async (req, res) => {
@@ -490,6 +496,8 @@ export function startHooks(
       return done(400);
     }
     if (workerTools && await workerTools(req, res, url)) return;
+    const featureFloor = cinema?.floorOf(url.searchParams.get('worker') ?? '');
+    if (await floorWorkerFeatureHook(featureFloor, req, res, url, msg => { if (featureFloor) cinema?.publish?.(featureFloor, msg); })) return;
     if (HOST_CINEMA_PATHS.has(url.pathname)) {
       const id = url.searchParams.get('worker') ?? '';
       const floor = cinema?.floorOf(id);
