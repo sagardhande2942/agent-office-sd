@@ -9,6 +9,7 @@ import { startServer } from '../src/server/server.js';
 import { LoreStore } from '../src/server/lore.js';
 import { HostFloors, hostParts, startHooks } from '../src/server/host-floor.js';
 import type { FromFloor } from '../src/shared/floorhost.js';
+import { DEFAULT_CURATOR_SETTINGS } from '../src/shared/lore-curator.js';
 
 async function waitFor(predicate: () => boolean) {
   const deadline = Date.now() + 5000;
@@ -46,7 +47,7 @@ test('real workers receive lore, own authenticated discoveries, broadcast handov
     assert.equal(knowledge.status, 200); assert.equal(knowledge.body.note.workerId, ada.id); assert.equal(knowledge.body.note.author, ada.name);
     const corrected = await call('lore', { title: 'auth timeout fix', content: 'Verified correction: reset the clock after each case.', tags: ['auth'] });
     assert.equal(corrected.body.note.id, knowledge.body.note.id);
-    assert.ok((await call('lore')).body.notes.some((n: any) => n.id === knowledge.body.note.id));
+    assert.ok(!(await call('lore')).body.notes.some((n: any) => n.id === knowledge.body.note.id), 'changed knowledge stays out of context until verified');
     const revision = (await call('completion')).body.revision;
     const port = (office.server.address() as { port: number }).port, origin = `http://127.0.0.1:${port}`;
     const login = await fetch(origin + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password: 'worker-lore-test' }) });
@@ -68,7 +69,8 @@ test('real workers receive lore, own authenticated discoveries, broadcast handov
     assert.equal((await call('lore')).status, 401, 'retired workers cannot keep writing knowledge');
     const next = floor.workers.spawn('desk-1', 'tester', 'Continue auth work', false, 'agent', 'claude');
     assert.ok(typeof next !== 'string');
-    await waitFor(() => readFileSync(log, 'utf8').includes('reset the clock after each case'));
+    await waitFor(() => readFileSync(log, 'utf8').includes('Auth timeout fixed'));
+    assert.ok(!readFileSync(log, 'utf8').includes('reset the clock after each case'), 'unverified correction is not injected');
     await floor.workers.kill(next.id, 'keep');
     assert.ok(floor.lore.list().some(n => /completion is unverified/.test(n.content)));
   } finally {
@@ -99,6 +101,12 @@ test('floor-host workers save discoveries and completion handovers on host-local
     assert.equal((await call('complete', { revision, summary: 'Host work ready', checks: [{ name: 'Host tests', status: 'passed', evidence: '4 passed' }], files: [], filesNote: 'Research', prNote: 'No code change' })).status, 200);
     assert.equal(new LoreStore(path.join(project, '.agent-office')).list().length, 2);
     assert.ok(sent.some(msg => msg.t === 'event' && (msg.msg as any).t === 'lore.saved' && (msg.msg as any).note.tags.includes('handover')));
-    assert.ok(sent.some(msg => msg.t === 'ready' && msg.floor.lore === true));
+    assert.ok(sent.some(msg => msg.t === 'ready' && msg.floor.lore === true && msg.floor.curator === true));
+    await host.call({ t: 'curator.configure', floorId: 'hosted', seq: 400, settings: { ...DEFAULT_CURATOR_SETTINGS, provider: 'codex', model: 'gpt-5.5', schedule: 'daily', dailyTime: '03:30', timezone: 'Asia/Kolkata' } });
+    await host.call({ t: 'curator.get', floorId: 'hosted', seq: 401 });
+    const result = sent.find(msg => msg.t === 'result' && msg.seq === 401);
+    assert.ok(result && result.t === 'result');
+    assert.equal((result.value as any).settings.model, 'gpt-5.5');
+    assert.equal(JSON.parse(readFileSync(path.join(project, '.agent-office/lore-curator.json'), 'utf8')).settings.dailyTime, '03:30');
   } finally { host?.shutdown(); hooks.close(); await new Promise(resolve => setTimeout(resolve, 300)); rmSync(dir, { recursive: true, force: true }); }
 });

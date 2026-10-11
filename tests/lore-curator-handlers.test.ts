@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { curatorHandlers } from '../src/server/ws/handlers/lore-curator.js';
+import { DEFAULT_CURATOR_SETTINGS } from '../src/shared/lore-curator.js';
+import type { Ctx } from '../src/server/office/context.js';
+import type { Client } from '../src/server/office/client.js';
+test('curator controls require admin authorization while inspection remains available', async () => {
+  let calls = 0; const warnings: string[] = [], sent: any[] = [];
+  const floor = { id: 'floor', curator: { state: () => ({ settings: DEFAULT_CURATOR_SETTINGS }), configure: () => { calls++; }, start: () => { calls++; }, pause: () => { calls++; }, restore: () => { calls++; }, history: () => [] } };
+  const ctx = { floorOf: () => floor, meOf: () => ({ admin: false }), warn: (_c: unknown, msg: string) => warnings.push(msg), sendTo: (_c: unknown, msg: unknown) => sent.push(msg) } as unknown as Ctx;
+  const client = { accountId: 'reader' } as Client;
+  await curatorHandlers['curator.get'](ctx, client, { t: 'curator.get' });
+  await curatorHandlers['curator.history'](ctx, client, { t: 'curator.history', id: 'note' });
+  assert.ok(sent.some(m => m.t === 'curator.state')); assert.ok(sent.some(m => m.t === 'curator.history'));
+  await curatorHandlers['curator.configure'](ctx, client, { t: 'curator.configure', settings: DEFAULT_CURATOR_SETTINGS });
+  await curatorHandlers['curator.run'](ctx, client, { t: 'curator.run' });
+  await curatorHandlers['curator.pause'](ctx, client, { t: 'curator.pause', paused: true });
+  await curatorHandlers['curator.restore'](ctx, client, { t: 'curator.restore', id: 'note' });
+  assert.equal(calls, 0); assert.equal(warnings.length, 4);
+  ctx.meOf = () => ({ admin: true }) as ReturnType<Ctx['meOf']>;
+  await curatorHandlers['curator.run'](ctx, client, { t: 'curator.run' }); assert.equal(calls, 1);
+});

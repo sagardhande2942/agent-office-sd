@@ -42,6 +42,7 @@ import { installBasketball } from './features/basketball';
 import { installBoards } from './features/boards';
 import { installBookshelf } from './features/bookshelf';
 import { installLore } from './features/lore';
+import { installLoreCurator } from './features/lore-curator';
 import { installCabinet } from './features/cabinet';
 import { installCinema } from './features/cinema';
 import { installCarrying } from './features/carrying';
@@ -171,6 +172,7 @@ parts.smartphone = installSmartphone(ctx, parts);
 parts.boss = installBoss(ctx, parts);
 parts.bookshelf = installBookshelf(ctx);
 installLore(ctx);
+installLoreCurator(ctx);
 installHerald(ctx, parts);
 
 parts.bar = installBar(ctx, { roof: parts.rooftop.roof, djAt: parts.rooftop.djAt, reach });

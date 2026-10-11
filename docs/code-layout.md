@@ -121,3 +121,7 @@ Worker appearance factories register through `client/world/character/appearance.
 ### Frame pacing
 
 `features/performance` registers browser-local FPS preferences through Settings extensions and `ctx.ticks.limit`. Frame policies return a positive FPS cap, `0` for display pacing, or `null` to suspend scene ticks. The core `FrameClock` admits display callbacks and resets elapsed movement time after suspension. Ordinary movement-blocking windows use 15 FPS; scene editors retain the selected cap. Network message dispatch runs independently.
+
+### Knowledge curation
+
+`server/lore-curator/` owns the persistent journal and note overlays, scheduler, bounded repository evidence reader, schema-validated recommendations, and isolated noninteractive agent adapters. `CuratorMemory` preserves original lore files while exposing lifecycle metadata; worker prompt selection excludes archived, superseded, unverified, and nonmatching notes. The service joins worker lifecycle hooks through `worker-features.ts`, and its host calls/snapshots join the same registry. `ws/handlers/lore-curator.ts` supplies floor-scoped controls; `lore-curator/surface.ts` supplies the remote RPC facade. `client/features/lore-curator/` installs its menu action and Workers settings extension without adding logic to the HUD, settings shell or state store. Types and validation live in `shared/lore-curator.ts`.

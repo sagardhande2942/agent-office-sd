@@ -8,12 +8,12 @@ const words = (text: string) => [...new Set(text.toLowerCase().match(/[a-z0-9_-]
 /** Prefer matching discoveries, then recent handovers. The floor supplies only its own notes. */
 export function selectWorkerLore(notes: readonly LoreNote[], query: string): LoreNote[] {
   const terms = words(query);
-  return notes.map(note => {
+  return notes.filter(note => !note.curation || note.curation.status === 'active').map(note => {
     const heading = new Set(words(`${note.title} ${note.tags.join(' ')}`));
     const body = new Set(words(note.content));
     const score = terms.reduce((n, term) => n + (heading.has(term) ? 4 : body.has(term) ? 1 : 0), 0);
     return { note, score };
-  }).sort((a, b) => b.score - a.score || Number(a.note.tags.includes('handover')) - Number(b.note.tags.includes('handover')) || b.note.updatedAt - a.note.updatedAt)
+  }).filter(item => item.score > 0).sort((a, b) => b.score - a.score || Number(a.note.tags.includes('handover')) - Number(b.note.tags.includes('handover')) || b.note.updatedAt - a.note.updatedAt)
     .slice(0, WORKER_LORE_LIMIT).map(({ note }) => note);
 }
 

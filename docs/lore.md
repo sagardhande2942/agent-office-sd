@@ -75,3 +75,28 @@ When an agent finishes a shift or a teammate signs off, the Lore Shelf provides 
    - File persistence: Notes are stored in `.agent-office/lore/<id>.json` on the floor's disk. Notes survive server restarts, crashes, and branch switching.
    - Note IDs contain 1–128 letters, digits, underscores, or hyphens. A persisted note's ID must match its filename; unsafe IDs and mismatched files are ignored on load.
    - If disk deletion fails, the note stays on the shelf and a warning appears. Restore access to the file and retry deleting it.
+
+## Automatic knowledge curator
+
+Open **Knowledge curator** from the Office menu, or **Settings → Workers → Configure curator**. An admin configures it once per floor; workers then maintain the shelf without routine human edits. Automatic curation starts disabled so you can choose its schedule and model first.
+
+- Choose an interval (5–43,200 minutes), or a daily time with an IANA timezone such as `Asia/Kolkata`.
+- Select **Claude Code** or **Codex**, and an optional provider model. Only installed background adapters are offered; these settings are independent of coding-worker defaults. Install/sign in on the machine that owns the floor, then restart its host if you installed a new CLI. Use a recent CLI supporting the noninteractive flags below.
+- Toggle **After worker completion** for cleanup 30 seconds after a coding worker submits its checklist. Bursts are combined and remaining queued notes are processed in bounded batches. Discovery writes enter the persistent queue; by themselves they wait for completion or a scheduled run.
+- Set **Maximum notes per run** (2–50), use **Run now**, or **Pause / Resume schedule**. Run now works even when automation is disabled or paused. Pausing or changing settings cancels the current run before recommendations are applied.
+
+The panel shows the next scheduled run, queued notes, retry time, selected agent/model on each run, results, and lifecycle states. Settings, queued note versions, schedule deadlines, the last 100 runs, and original note revisions persist in `.agent-office/lore-curator.json`. The panel shows the latest 20 runs and latest 20 original revisions per inspected note. A missed schedule produces one catch-up run when the office returns, rather than one run per missed interval. A daily time skipped by daylight saving is skipped that day; a repeated time runs once on that local date. Only one curator runs per floor. Failed runs retain pending work and retry after 5 minutes, backing off to at most an hour while enabled and unpaused.
+
+### Cleanup and recovery
+
+Identical discovery content is consolidated without a model call. The selected agent reviews other compatible duplicates, conflicting claims, and obsolete information. A semantic merge preserves both observations and source identities. Task handovers stay separate. Age alone is not a reason to archive a fact.
+
+Notes become **active**, **needs-verification**, **superseded**, or **archived**. Workers receive only active notes with a task keyword match; unrelated notes no longer fill spare context slots. A changed discovery retains its earlier revision and waits for verification before being injected. Repeating an identical save does not invalidate the note. Worker reports and curator checks remain context, not proof that tests passed or instructions to execute.
+
+The curator receives bounded committed text excerpts at the floor's current `HEAD`, excluding obvious credential paths/content. It cannot verify facts that require uncommitted changes, unavailable files, or live environment checks; uncertain/conflicting claims should remain flagged. Verification actions must cite a supplied file path. Notes and excerpts are untrusted data. The background CLI runs outside the checkout, without office hook tokens, office management tools, shell tools, user MCP configuration, or repository writes. Claude runs in print mode with tools disabled and strict empty MCP configuration; Codex uses ephemeral exec, read-only sandbox, ignored user config/rules, disabled shell/apps/plugins/hooks, and schema-constrained output.
+
+A run reviews at most the configured notes and 60,000 characters of note data, plus up to eight bounded repository excerpts. Each agent invocation has a five-minute timeout and bounded output. It uses the office machine's existing agent login and is separate from desk-worker usage accounting and worker limits; batch/runtime limits do not guarantee a monetary cap. Invalid responses are rejected, and notes edited while a run is underway are skipped instead of overwritten. Periodic sweeps rotate through reviewed notes so older knowledge is revisited.
+
+Archiving and superseding preserve the original note files. Use **History** to inspect earlier originals, **Restore original** to remove a curator overlay/archive, or **Restore this revision** to recover a prior worker-written version. No automatic cleanup permanently deletes notes. The same controls operate through host RPCs for remote floors; older hosts show an upgrade message and never cause the office to touch a remote checkout.
+
+Browser verification: `node --import tsx scripts/e2e-lore-curator.mjs` uses fixture agents, saves a daily schedule and model, runs cleanup, checks duplicate/archive recovery and pause/resume, and captures [settings](lore-shelf-evidence/curator-settings.png) and [run history](lore-shelf-evidence/curator-history.png).

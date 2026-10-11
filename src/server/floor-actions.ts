@@ -310,6 +310,7 @@ export interface FloorActions {
   readonly tv: FloorTv;
   readonly cinema?: import('./cinema/surface.js').FloorCinema;
   readonly lore?: FloorLore;
+  readonly curator?: import('./lore-curator/surface.js').CuratorSurface;
   /** Workers sent home and locked up, on a map that has one. */
   readonly jail: { state(): JailState };
 
