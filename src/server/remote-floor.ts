@@ -1,3 +1,4 @@
+import { RemoteResearch } from './trading-research/remote.js';
 import { RemoteCurator } from './lore-curator/surface.js';
 import { RemoteTeams } from './master-workers/remote.js';
 import { RemoteCinema } from './cinema/remote.js';
@@ -67,6 +68,7 @@ interface Pending {
  * that is worth measuring before designing (see docs/remote-agents-plan.md, "the gaps").
  */
 export class RemoteFloor implements FloorActions {
+  readonly research = new RemoteResearch((t, body) => this.call(t, body), () => this.announced.research === true);
   readonly dir: string;
   readonly masterWorkers = new RemoteTeams((t, body) => this.call(t, body), () => this.announced.masterWorkers === true);
   readonly cinema = new RemoteCinema((t, body) => this.call(t, body), () => this.reachable, () => this.announced.cinema === true);
@@ -100,7 +102,7 @@ export class RemoteFloor implements FloorActions {
     /** The floor's identity, as the host announced it. Named so refusals and the elevator can use it. */
     readonly def: { id: string; name: string; dir: string; repo?: string; palette: number; addedBy: string; addedAt: number },
     /** What the host's `ready` frame said, kept here so the office can describe the floor it is in. */
-    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean; cinema?: boolean; masterWorkers?: boolean; lore?: boolean; curator?: boolean } = { providers: [], forge: 'github' },
+    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean; cinema?: boolean; masterWorkers?: boolean; lore?: boolean; curator?: boolean; research?: boolean } = { providers: [], forge: 'github' },
   ) {
     // The office keeps this for identity, and must never use it: it is a path on the host.
     this.dir = '';
@@ -192,7 +194,7 @@ export class RemoteFloor implements FloorActions {
       // The same frame is where the host says which branch it is on and which agents it has, which is
       // what `project` and `officeDefault` answer from. Recorded here rather than in the constructor,
       // because the office registers a hosted floor from the building long before its machine pairs.
-      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true, cinema: msg.floor.cinema === true, masterWorkers: msg.floor.masterWorkers === true, lore: msg.floor.lore === true, curator: msg.floor.curator === true };
+      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true, cinema: msg.floor.cinema === true, masterWorkers: msg.floor.masterWorkers === true, lore: msg.floor.lore === true, curator: msg.floor.curator === true, research: msg.floor.research === true };
       return;
     }
     // An unaddressed refusal (no floor) is about the connection, not a call, so it never settles one.

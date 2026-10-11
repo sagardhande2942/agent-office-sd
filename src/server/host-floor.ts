@@ -199,7 +199,7 @@ export class HostFloors {
         workerBreaks: true,
         cinema: true,
         masterWorkers: true,
-        lore: true, curator: true,
+        lore: true, curator: true, research: true,
         projectsDir: this.projectsDir,
         workers: floor.workers.list().map((w) => ({ id: w.id, status: w.status, deskId: w.deskId })),
       },

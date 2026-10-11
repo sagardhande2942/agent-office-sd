@@ -1,3 +1,5 @@
+import type { ResearchClientMsg, ResearchServerMsg } from './trading-research.js';
+export * from './trading-research.js';
 import type { CuratorClientMsg, CuratorServerMsg } from './lore-curator.js';
 export * from './lore-curator.js';
 import type { CodingAgentsClientMsg, CodingAgentsServerMsg } from './protocol/coding-agents.js';
@@ -54,6 +56,7 @@ export * from './protocol/communications.js';
 export * from './protocol/cinema.js';
 
 export type ClientMsg =
+  | ResearchClientMsg
   | CuratorClientMsg
   | LoreClientMsg
   | CodingAgentsClientMsg
@@ -88,6 +91,7 @@ export type ClientMsg =
   | DogClientMsg;
 
 export type ServerMsg =
+  | ResearchServerMsg
   | CuratorServerMsg
   | LoreServerMsg
   | CodingAgentsServerMsg
