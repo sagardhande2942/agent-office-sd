@@ -2,26 +2,19 @@ import { featurePrompt, featureEvent } from './features.js';
 import { promptWorker } from './prompt.js';
 import { planningSeat, planningVersion, planningPrompt, promotePlanWorker } from './plan-review.js';
 import type { PlanReviewWorker } from '../../shared/plan-review.js';
-import { submitCompletion } from './completion.js';
-import { workerHandle } from './handle.js';
-import * as helperOps from './helpers.js';
-import { isHelperId } from '../../shared/helper.js';
-import type { DeskDef } from '../../shared/layout.js';
-import type { ForgeKind } from '../../shared/protocol.js';
-import { takeBreak, breakOver } from './breaks.js';
-import type { BossGuard } from '../../shared/boss.js';
+import { submitCompletion } from './completion.js'; import { workerHandle } from './handle.js'; import * as helperOps from './helpers.js';
+import { isHelperId } from '../../shared/helper.js'; import type { DeskDef } from '../../shared/layout.js'; import type { ForgeKind } from '../../shared/protocol.js';
+import { takeBreak, breakOver } from './breaks.js'; import type { BossGuard } from '../../shared/boss.js';
 import { WORKER_COORDINATION } from '../prompts.js';
 const FINDING_LINES = 180;
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import type { AgentChoice, AgentEffort, AgentProvider, TerminalHit, WorkerInfo, WorkerKind, WorkerRepo, WorkerStatus } from '../../shared/protocol.js';
-import { AGENT_PROVIDERS, takesEffort, takesModel } from '../../shared/providers.js';
+import { AGENT_PROVIDERS, providerMeta, takesEffort, takesModel } from '../../shared/providers.js';
 import { Worktrees, workspaceOf, type WorktreeCleanup, type WorktreeState } from '../worktrees.js';
-import { DESK_BY_ID, STATION_AGENT, deskBuilt } from '../../shared/layout.js';
-import { stationBrief } from '../stations.js';
-import type { PromptSource } from '../prompts.js';
-import type { GhAs } from '../signins.js';
-import type { ServiceOwner } from '../services.js';
+import { DESK_BY_ID, STATION_AGENT, deskBuilt } from '../../shared/layout.js'; import { stationBrief } from '../stations.js';
+import type { CodingAgents } from '../coding-agents.js'; import type { PromptSource } from '../prompts.js';
+import type { GhAs } from '../signins.js'; import type { ServiceOwner } from '../services.js';
 import { addUsage, newTracker, scanTracker, trackerUsage, zeroUsage, type Ledger } from '../usage.js';
 import { PtyHost, SCROLLBACK, type Adopted, type Pty } from '../ptys.js';
 import { configuredProvider, providerCommand, validateWorkerEffort, validateWorkerModel } from '../agents.js';
@@ -101,6 +94,7 @@ export class WorkerManager {
     private runAs?: RunAs,
     /** The DSH profile a DeepSeek Harness worker boots (default "acp"). */
     dshProfile: string = DSH_PROFILE_DEFAULT,
+    private codingAgents?: CodingAgents,
   ) {
     this.defaultProvider = configuredProvider(agentCmd);
     this.trees = new Worktrees(dir);
@@ -238,6 +232,11 @@ export class WorkerManager {
     // Nobody picked (a board agent, say): the office's default worker, model and effort included.
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
+    if (selectedProvider && this.codingAgents) {
+      if (!this.codingAgents.isProviderEnabled(selectedProvider)) return `${providerMeta(selectedProvider)?.label ?? selectedProvider} is disabled in office settings`;
+      if (!model) model = this.codingAgents.defaultModel(selectedProvider);
+      if (!effort) effort = this.codingAgents.defaultEffort(selectedProvider);
+    }
     const modelError = validateWorkerModel(kind, selectedProvider, model);
     if (modelError) return modelError;
     const effortError = validateWorkerEffort(kind, selectedProvider, effort);
@@ -678,6 +677,7 @@ export class WorkerManager {
     if (planLaunchError) { this.startFailed(w, planLaunchError); return; }
     // Its provider's command line, and anything it sets for this run (see ProviderAdapter.launch).
     const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), command: commandPath ?? command, args: base, prompt, resumeSessionId, station: DESK_BY_ID.get(info.deskId)?.station, cwd, setup: this.setups[adapter.id] }) : { args: base };
+    if (this.codingAgents && !isShell) this.codingAgents.applyLaunch(info.provider, plan, info);
     const { args } = plan;
     if (plan.rotateToken) w.hookToken = randomBytes(16).toString('hex');
     const env = childEnv();

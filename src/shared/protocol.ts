@@ -1,5 +1,7 @@
 import type { CuratorClientMsg, CuratorServerMsg } from './lore-curator.js';
 export * from './lore-curator.js';
+import type { CodingAgentsClientMsg, CodingAgentsServerMsg } from './protocol/coding-agents.js';
+export * from './protocol/coding-agents.js';
 import type { WorldsClientMsg, WorldsServerMsg } from './protocol/parallel-worlds.js';
 import type { PlacementClientMsg, PlacementServerMsg } from './protocol/object-placement.js';
 export * from './protocol/object-placement.js';
@@ -54,6 +56,7 @@ export * from './protocol/cinema.js';
 export type ClientMsg =
   | CuratorClientMsg
   | LoreClientMsg
+  | CodingAgentsClientMsg
   | PlacementClientMsg
   | WorldsClientMsg
   | MasterWorkersClientMsg
@@ -87,6 +90,7 @@ export type ClientMsg =
 export type ServerMsg =
   | CuratorServerMsg
   | LoreServerMsg
+  | CodingAgentsServerMsg
   | PlacementServerMsg
   | WorldsServerMsg
   | MasterWorkersServerMsg

@@ -57,6 +57,7 @@ export interface FloorContext {
   capacity: Capacity;
   /** The office's prompts and the worker everyone starts on, as set in ⚙️ Settings. */
   prompts: PromptSource;
+  codingAgents?: import('./coding-agents.js').CodingAgents;
   /** Workers hired by an account run on its own sign-ins (see signins.ts). */
   runAs?: RunAs;
   /** How to run a forge's CLI as an account: its own sign-in, the office's (undefined), or why it can't. */
@@ -244,6 +245,7 @@ export class Floor {
       ctx.prompts,
       ctx.runAs,
       ctx.dshProfile,
+      ctx.codingAgents,
     );
     this.workers.wing = () => this.plan.wing;
     // Which forge this floor is on, so PRs open on the right one and board agents are told the right CLI.

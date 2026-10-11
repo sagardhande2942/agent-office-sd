@@ -2,6 +2,7 @@ import { curatorHandlers } from './lore-curator.js';
 import { worldsHandlers } from './parallel-worlds.js';
 import { placementHandlers, placementHooks, placementView } from './object-placement.js';
 import { masterWorkersHandlers, masterWorkersView } from './master-workers.js';
+import { codingAgentsHandlers, codingAgentsView } from './coding-agents.js';
 
 import { appearanceHandlers, appearanceView } from './appearances.js';
 import { loreHandlers, loreView } from './lore.js';
@@ -39,6 +40,7 @@ import { communicationsView } from './communications.js';
 export const handlers: HandlerMap<ClientMsg> = {
   ...curatorHandlers,
   ...loreHandlers,
+  ...codingAgentsHandlers,
   ...placementHandlers,
   ...worldsHandlers,
   ...appearanceHandlers,
@@ -78,6 +80,7 @@ export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whi
 /** What someone arriving on a floor is sent (see office/views.ts): a piece from each feature, in the order it has always gone out. */
 export const views: ViewPieces = {
   lore: loreView,
+  codingAgents: codingAgentsView,
   placements: placementView,
   appearances: appearanceView,
   communications: communicationsView,
