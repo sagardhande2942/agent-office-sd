@@ -38,7 +38,7 @@ try {
   await p.evaluate(() => {
    const o = window.__office; window.__shots = []; window.__sent = [];
    o.ctx.messages.on('pingpong.hit', m => window.__shots.push(m));
-   const send = o.ctx.net.send.bind(o.ctx.net); o.ctx.net.send = m => { if (m.t === 'pingpong.serve' || m.t === 'pingpong.hit') window.__sent.push(structuredClone(m)); send(m); };
+   const send = o.ctx.net.send.bind(o.ctx.net); o.ctx.net.send = m => { if ((m.t === 'pingpong.serve' || m.t === 'pingpong.hit') && m.side === 'west') window.__sent.push(structuredClone(m)); send(m); };
   }); return p;
  };
  const page = await load(), observer = await load(); await page.bringToFront();
@@ -58,6 +58,7 @@ try {
  await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(500); await page.keyboard.up('ArrowLeft');
  const left = await page.evaluate(() => ({ feet: window.__office.player.pos.toArray(), target: window.__office.scene.getObjectByName('tabletennis-shot-target').position.toArray() }));
  assert.deepEqual(left.feet, feetBefore); assert.ok(left.target[2] < 15); check('Aim moves the landing target without moving the player');
+ await page.evaluate(() => { window.__originalRandom = Math.random; Math.random = () => 0.5; });
  await page.keyboard.down('Space'); await page.waitForTimeout(60);
  assert.equal(await page.evaluate(() => window.__sent.length), 0); check('Holding a shot does not fire it before release');
  await page.keyboard.up('Space'); await page.waitForFunction(() => window.__sent.length > 0 && window.__shots.length > 0);
@@ -66,6 +67,10 @@ try {
  const received = await observer.evaluate(() => window.__shots[0]);
  for (const k of ['vx', 'vy', 'vz']) assert.equal(received[k], tap[k]); assert.deepEqual(received.swing, tap.swing); assert.ok(received.vz < 0);
  check('A second connected browser receives the same angled velocity and spin');
+ await page.waitForFunction(() => window.__shots.some(m => m.side === 'east'));
+ await observer.waitForFunction(() => window.__shots.some(m => m.side === 'east'));
+ await page.evaluate(() => { Math.random = window.__originalRandom; });
+ check('Normal bot returns a bounced tap shot and the second browser receives the return');
  await leave(); await play();
  await page.keyboard.down('ArrowRight'); await page.waitForTimeout(500); await page.keyboard.up('ArrowRight');
  const right = await page.evaluate(() => window.__office.scene.getObjectByName('tabletennis-shot-target').position.z);

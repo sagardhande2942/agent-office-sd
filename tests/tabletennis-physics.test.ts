@@ -90,3 +90,21 @@ test('inactive or awaiting-join controllers cannot launch ghost bot serves', () 
   assert.equal(serves, 0); assert.equal(c.ballInPlay, false);
   c.start('west', 'bot'); c.update(2, { ...defaultPingPongState(), server: 'east' }); assert.equal(serves, 0);
 });
+
+for (const side of ['west', 'east'] as const) for (const dt of [1 / 60, 1 / 20, 0.12]) {
+  test(`bot returns short/deep bounced shots from ${side} at dt=${dt}`, () => {
+    const random = Math.random; Math.random = () => 0.5;
+    try {
+      for (const kind of ['drive', 'topspin', 'backspin', 'smash'] as const) for (const power of [0.25, 1]) for (const depth of [-1, 0, 1]) for (const aim of [-0.6, 0, 0.6]) {
+        const { c, hits } = controller(); c.start(side, 'bot', 'normal');
+        const from = { x: 6 + (side === 'west' ? -1.2 : 1.2), y: 0.98, z: 15 };
+        const shot = solveShot(from, shotTarget(side, aim, depth), kind, power);
+        c.ballPos.set(from.x, from.y, from.z); c.ballVel.set(shot.vx, shot.vy, shot.vz);
+        c.ballTops = shot.tops; c.ballSide = shot.side; c.ballInPlay = true; c.lastHitter = side; c.rally = 1;
+        for (let time = 0; time < 2 && hits.length === 0 && c.ballInPlay; time += dt) c.update(dt, { ...defaultPingPongState(), active: true, status: 'rally' });
+        assert.equal(hits.length, 1, `${kind}/${power}/${depth}/${aim}`);
+        assert.equal(Math.sign(hits[0][3]), side === 'west' ? -1 : 1);
+      }
+    } finally { Math.random = random; }
+  });
+}

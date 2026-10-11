@@ -343,7 +343,7 @@ export class TableTennisController {
       ? { x: this.ballPos.x, y: this.ballPos.y, z: this.ballPos.z, vx: this.ballVel.x, vy: this.ballVel.y, vz: this.ballVel.z, tops: this.ballTops, side: this.ballSide }
       : null;
     this.bot.look(flight ? this.rally : null, dt);
-    this.botPlan = this.bot.plan(flight, this.opponent, this.pos);
+    this.botPlan = this.bot.plan(flight, this.opponent, this.pos, this.lastBounceSide === this.opponent);
     this.bot.step(dt, this.botPlan.to);
 
     const toward = this.opponent === 'east' ? 1 : -1;

@@ -5,6 +5,7 @@
     "Aim moves the landing target without moving the player",
     "Holding a shot does not fire it before release",
     "A second connected browser receives the same angled velocity and spin",
+    "Normal bot returns a bounced tap shot and the second browser receives the return",
     "Both left and right landing directions are available",
     "Full charge produces greater shot pace than a tap",
     "Losing window focus cancels a held shot",
@@ -15,11 +16,11 @@
   ],
   "browserErrors": [],
   "tap": {
-    "vx": 2.5975141291708477,
-    "vz": -0.383875453365552
+    "vx": 2.5955147454711747,
+    "vz": -0.3834441938258042
   },
   "charged": {
-    "vx": 4.557873028521037,
-    "vz": 0.8104992420163759
+    "vx": 4.557906848092552,
+    "vz": 0.8103346725485773
   }
 }

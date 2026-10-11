@@ -7,6 +7,7 @@
  * has left open, and picks a stroke to suit the ball it is given — and it misses, as much as its
  * skill says it should.
  */
+import { BOT_BAT, botIntercept } from './bot-intercept';
 import {
   type BotDifficulty,
   type PingPongFlight,
@@ -17,7 +18,6 @@ import {
   PINGPONG_PHYSICS,
   PINGPONG_SPOTS,
   PINGPONG_STROKES,
-  meetPoint,
   onCourtSpot,
   shotTarget,
   solveShot,
@@ -85,19 +85,19 @@ export class TableTennisBot {
    * Works out where to stand for the ball in the air and what to play at it. `player` is where the
    * other player is standing, so it can go for the space they have left.
    */
-  plan(ball: PingPongFlight | null, side: PingPongSide, player: { x: number; z: number }): BotPlan {
+  plan(ball: PingPongFlight | null, side: PingPongSide, player: { x: number; z: number }, bounced = false): BotPlan {
     const spot = side === 'west' ? PINGPONG_SPOTS.west : PINGPONG_SPOTS.east;
     if (!ball) {
       // Between points: back to the middle, watching.
       const to = onCourtSpot(side, this.pos.x, spot.z * 0.6 + this.pos.z * 0.4);
       return { to, aim: { x: 0, z: PINGPONG_TABLE.z }, out: 0 };
     }
-    // Where the ball will cross the plane in front of its bat.
-    const meet = meetPoint(ball, side);
+    // Find a playable contact after its bounce, including short shots near the net.
+    const meet = botIntercept(ball, side, bounced);
     // Where it will be waiting for the ball, minus a little so its own reach error bites.
     const z = meet ? meet.z : PINGPONG_TABLE.z;
     const off = this.skill.reachError * (Math.sign(z - PINGPONG_TABLE.z) || 1) * (side === 'west' ? -1 : 1);
-    const to = onCourtSpot(side, spot.x, z + off);
+    const to = onCourtSpot(side, meet?.feet.x ?? spot.x, (meet?.feet.z ?? z) + off);
     const out = Math.hypot(this.pos.x - to.x, this.pos.z - to.z);
     const stroke = meet && this.waited >= this.skill.reaction ? this.choose(meet) : undefined;
     this.aimFor = shotTarget(side, this.aimAcross(player), stroke === 'smash' ? -0.6 : 0, (Math.random() - 0.5) * this.skill.aimError);
@@ -132,7 +132,9 @@ export class TableTennisBot {
   canMeet(ball: PingPongFlight, plan: BotPlan, random = Math.random()): boolean {
     if (!plan.stroke) return false;
     if (plan.out > PINGPONG_COURT.lunge) return false;
-    if (Math.hypot(ball.x - this.pos.x, ball.z - this.pos.z) > PINGPONG_COURT.lunge) return false;
+    const dir = ball.vx >= 0 ? -1 : 1;
+    if (Math.abs(ball.y - BOT_BAT.height) > 0.45) return false;
+    if (Math.hypot(ball.x - this.pos.x - dir * BOT_BAT.reach, ball.z - this.pos.z - dir * BOT_BAT.sideways) > PINGPONG_COURT.lunge) return false;
     return random >= this.skill.shank;
   }
 

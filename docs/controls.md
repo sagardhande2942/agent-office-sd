@@ -106,3 +106,5 @@ Shots use the same decaying-spin flight model for their target and actual trajec
 For development verification, run `node --import tsx scripts/e2e-tabletennis-shots.mjs`. It checks charging/release, both aim directions, focus cancellation, one-shot mouse input, matching shot values in a second browser, and names-only bot/PvP rendering with avatar restoration. [Desktop](tabletennis-evidence/charged-shot-desktop.png) and [mobile](tabletennis-evidence/charged-shot-mobile.png) captures show the power HUD.
 
 Table tennis uses a closer, elevated court camera with a 52° baseline field of view that widens only when needed for high shots and keeps the table and high balls in view, independently of shot aim. Only bats and one name per player are shown during a match; player bodies return when the match ends. Leaving the match restores your normal office view.
+
+The table tennis bot predicts reachable contacts after the table bounce and moves forward for short shots, rather than waiting at the end line. Difficulty still affects reaction, movement, accuracy and occasional misses.
