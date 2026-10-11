@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { CodingAgents } from '../coding-agents.js';
 import { Appearances } from '../appearances.js';
 import { childEnv, resolveCommand } from '../workers.js';
 import { SignIns } from '../signins.js';
@@ -41,6 +42,7 @@ export function createServices(ctx: Ctx): BuildingServices {
   // The prompts the office writes for workers by itself, and the worker everyone starts on (⚙️ Settings).
   const configured = configuredProvider(cfg.agentCmd);
   const prompts = new OfficePrompts(cfg.dataDir, { list: agentProviders(configured), configured }, (state) => ctx.broadcast({ t: 'prompts', state }));
+  const codingAgents = new CodingAgents(cfg.dataDir, (state) => ctx.broadcast({ t: 'codingAgents', state }));
   // Whether a worker whose pull request merged goes home by itself, on every floor (⚙️ Settings).
   const leaveOnMerge = new LeaveOnMerge(cfg.dataDir, (state) => ctx.broadcast({ t: 'leaveOnMerge', state }));
 
@@ -131,7 +133,7 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { appearances, sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  return { appearances, codingAgents, sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

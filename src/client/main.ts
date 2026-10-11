@@ -78,6 +78,7 @@ import { installWalking } from './features/walking';
 import { installWhiteboard } from './features/whiteboard';
 import { installWorkerActions } from './features/workers/actions';
 import { installAppearances } from './features/appearances';
+import { installCodingAgents } from './features/coding-agents';
 import { installFloorJoin } from './features/floor-join';
 import { installWorkerViews } from './features/workers/views';
 
@@ -210,6 +211,7 @@ installViewSelector(ctx);
 installTopdown(ctx, core, parts);
 installPerformance(ctx);
 installObjectPlacement(ctx);
+installCodingAgents(ctx);
 parts.hud = installHud(ctx, core, parts);
 
 // ---- Main loop ---------------------------------------------------------------------------------------

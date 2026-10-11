@@ -1,3 +1,5 @@
+import type { CodingAgentsClientMsg, CodingAgentsServerMsg } from './protocol/coding-agents.js';
+export * from './protocol/coding-agents.js';
 import type { WorldsClientMsg, WorldsServerMsg } from './protocol/parallel-worlds.js';
 import type { PlacementClientMsg, PlacementServerMsg } from './protocol/object-placement.js';
 export * from './protocol/object-placement.js';
@@ -48,6 +50,7 @@ export * from './protocol/communications.js';
 export * from './protocol/cinema.js';
 
 export type ClientMsg =
+  | CodingAgentsClientMsg
   | PlacementClientMsg
   | WorldsClientMsg
   | MasterWorkersClientMsg
@@ -79,6 +82,7 @@ export type ClientMsg =
   | DogClientMsg;
 
 export type ServerMsg =
+  | CodingAgentsServerMsg
   | PlacementServerMsg
   | WorldsServerMsg
   | MasterWorkersServerMsg

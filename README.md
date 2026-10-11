@@ -468,6 +468,8 @@ First-person hands render over the office without clearing it, so switching from
 
 Admins can choose Original and/or 20 code-built fictional characters in **Settings → Workers**. Select a roster and apply it immediately across all floors. Fictional characters never duplicate; extra workers use Original, and assignments survive restart. Each includes its signature outfit. See [worker appearances](docs/worker-appearances.md).
 
+Admins can configure permissions, autonomous / auto-approve modes, access control, and launch defaults for all coding agents (OpenCode, Claude Code, Codex, Antigravity, Cursor, and more) through **🤖 Coding Agents** in the ☰ menu or under **Settings → Workers**. Settings are office-scoped (stored in `.agent-office/coding-agents.json`) and apply to all launching workers across every floor. See [choosing an agent](docs/agents.md#office-scoped-coding-agents-configuration--permissions).
+
 ## Office interiors
 
 Keep the original warm office or switch to the futuristic graphite-and-blue design from

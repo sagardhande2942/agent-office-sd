@@ -133,3 +133,21 @@ Launch flags verified against Antigravity CLI **1.3.1** (`--help`); hook schema 
 Reproduce the browser check with `npm run build && node --import tsx scripts/e2e-antigravity.mjs`; it uses an isolated Git floor and saves a screenshot under `/tmp/agent-office-antigravity-evidence`. Provider tests exercise launch, token validation, root conversation isolation, hook cleanup and restart/resume with a fake CLI.
 
 On native Windows, Codex lifecycle hooks use an encoded PowerShell command to launch the office helper with literal paths. This works through both cmd.exe and PowerShell, including paths with spaces or apostrophes. Restart the office or floor host and restart existing Codex workers after updating so they receive the corrected hook overrides. WSL keeps the Unix hook command. See the [official hook configuration](https://learn.chatgpt.com/docs/hooks).
+
+## Office-scoped Coding Agents configuration & permissions
+
+Admins can configure permissions, access control, models, reasoning effort, and custom launch settings for all available coding agents (`Claude Code`, `OpenCode`, `Codex`, `Antigravity`, `Cursor`, `Grok`, `Muse`, `DeepSeek Harness`, `Pi`, and `Custom`) through **🤖 Coding Agents** in the ☰ menu, or under ⚙️ Settings → **🤖 Workers** → **🤖 Configure coding agents…**.
+
+### Office-scoped, not global
+These settings are stored inside the office building's `.agent-office/coding-agents.json`. They are not machine-global (they never modify your `~/.config`, `~/.claude.json`, or machine environment) and are not browser-local: every connected client on every floor in the office shares this live configuration.
+
+### Launch integration
+When any worker is spawned or resumed on any floor (from desks, issue and pull request boards, the task queue, meetings, the Boss Control Center, or helper assignments), it inherits these settings:
+- **Access control**: An agent disabled in office settings cannot be hired or assigned tasks on any floor in this office.
+- **Permission modes**:
+  - **🟢 Interactive (Default)**: Normal interactive CLI safety prompts.
+  - **⚡ Auto-approve**: Autonomous mode bypassing prompts (e.g. `--dangerously-skip-permissions` for Claude Code, `--ask-for-approval never` for Codex, `{ "*": "allow" }` for OpenCode).
+  - **🔒 Restricted**: Read-only exploration and planning (e.g. `--tools Read,Glob,Grep` for Claude, `--sandbox read-only` for Codex, `{ "*": "deny", read: "allow", ... }` for OpenCode).
+- **Granular tool permissions**: Configurable policies (`allow`, `ask`, `deny`) for shell execution (`bash`), file editing (`edit`), and web access (`web`).
+- **Defaults & Launch args**: Configured default model, reasoning effort, extra CLI arguments, and custom environment variables (`KEY=value`) injected directly into the worker's execution environment.
+

@@ -1724,6 +1724,7 @@ test('resolveCommand resolves through a login shell from a process group that is
   const agent = path.join(bin, 'office-probe-agent');
   writeFileSync(agent, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   writeFileSync(path.join(root, '.profile'), `export PATH=${JSON.stringify(bin)}:"$PATH"\n`);
+  writeFileSync(path.join(root, '.zprofile'), `export PATH=${JSON.stringify(bin)}:"$PATH"\n`);
   t.after(() => rmSync(root, { recursive: true, force: true }));
 
   // The real pty, and a real background process group, because that is the only way to reproduce
