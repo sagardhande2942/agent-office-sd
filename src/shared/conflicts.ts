@@ -57,6 +57,14 @@ export interface WorkerOverlap {
   capped?: boolean;
 }
 
+/** One worker's overlaps: the others it names, and how many more there are than it names. */
+export interface WorkerOverlapGroup {
+  /** At most OVERLAP_WORKERS_MAX of the workers that overlap, in the order they were found. */
+  others: WorkerOverlap[];
+  /** How many more overlap than are named, so a cut-short list says so instead of reading as all. */
+  moreWorkers: number;
+}
+
 /** How many other workers one worker's overlap list names, and how many files of each. */
 export const OVERLAP_WORKERS_MAX = 5;
 export const OVERLAP_FILES_MAX = 10;
@@ -65,33 +73,40 @@ export const OVERLAP_FILES_MAX = 10;
  * Which workers with open pull requests touch the same files, per worker: every other worker sharing
  * a path with it, and the paths they share. Reads only the changed-file lists workers submit with
  * their checklists, so a worker that hasn't submitted one contributes no signal at all. Exact paths
- * only, and the output is capped and says so, rather than quietly dropping the rest.
+ * only. Both lists are capped, and a group carries how many more workers it isn't naming, rather than
+ * dropping the rest quietly.
+ *
+ * Only workers with an open pull request belong here, so the caller resolves each worker's current
+ * pull request first (see workerPr) — a worker keeps its link and its checklist after the pull
+ * request merges, and naming a merged one as an open one is worse than naming none.
  */
-export function workerFileCollisions(workers: CollisionWorker[]): Map<string, WorkerOverlap[]> {
+export function workerFileCollisions(workers: CollisionWorker[]): Map<string, WorkerOverlapGroup> {
   const onBoard = workers.filter((w) => w.pr !== undefined && (w.files?.length ?? 0) > 0);
-  const out = new Map<string, WorkerOverlap[]>();
+  const out = new Map<string, WorkerOverlapGroup>();
   for (const w of onBoard) {
     const others: WorkerOverlap[] = [];
+    let overlapping = 0;
     for (const b of onBoard) {
       if (b.id === w.id) continue;
       const files = sharedFiles(w.files!, b.files!);
       if (!files.length) continue;
+      overlapping++;
+      // Keep counting past the cap, so `moreWorkers` is how many are really there and not how many fit.
+      if (others.length >= OVERLAP_WORKERS_MAX) continue;
       others.push({ worker: { id: b.id, name: b.name }, ...(b.pr !== undefined ? { pr: b.pr } : {}), files: files.slice(0, OVERLAP_FILES_MAX), ...(files.length > OVERLAP_FILES_MAX ? { capped: true } : {}) });
-      if (others.length === OVERLAP_WORKERS_MAX) break;
     }
-    if (others.length) out.set(w.id, others);
+    if (overlapping) out.set(w.id, { others, moreWorkers: overlapping - others.length });
   }
   return out;
 }
 
 /**
  * What one of these reads as a sentence, for a blocker's why and the merge prompt's `{{others}}`:
- * who else is landing on these files and which ones. Empty when there is nothing, so a caller can
- * pass it straight in and the prompt drops the line.
+ * who else is landing on these files and which ones, and how many more there are than are named.
+ * Empty when there is nothing, so a caller can pass it straight in and the prompt drops the line.
  */
-export function overlapLines(overlaps: WorkerOverlap[]): string {
-  if (!overlaps.length) return '';
-  return `Other open pull requests changing the same files: ${overlaps
-    .map((o) => `${o.pr !== undefined ? `PR #${o.pr} from ${o.worker.name}` : `${o.worker.name}'s pull request`} (${o.files.join(', ')}${o.capped ? ', and more' : ''})`)
-    .join('; ')}.`;
+export function overlapLines(group: WorkerOverlapGroup | undefined): string {
+  if (!group?.others.length) return '';
+  const named = group.others.map((o) => `${o.pr !== undefined ? `PR #${o.pr} from ${o.worker.name}` : `${o.worker.name}'s pull request`} (${o.files.join(', ')}${o.capped ? ', and more' : ''})`).join('; ');
+  return `Other open pull requests changing the same files: ${named}${group.moreWorkers ? `; and ${group.moreWorkers} more` : ''}.`;
 }

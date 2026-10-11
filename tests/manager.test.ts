@@ -2,6 +2,7 @@ import { startManagerClock } from '../src/server/manager.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STALL_MS, blockersOf, managerHash, managerReport, shouldNudge, taskBlocker, verdictOf } from '../src/shared/manager.js';
+import { OVERLAP_WORKERS_MAX } from '../src/shared/conflicts.js';
 import { workerRow } from '../src/server/office-workers.js';
 import type { GhPull, QueueTask, WorkerInfo, WorkerStatus } from '../src/shared/protocol.js';
 
@@ -304,4 +305,17 @@ test('overlap needs an open pull request and a filed checklist; without either t
   // A worker with no checklist reports no files, so it contributes nothing to another's overlap.
   const noFiles = report([prWorker('mochi', 4), prWorker('byte', 5, ['src/a.ts'])], [], [pull(4, 'pass'), pull(5, 'pass')]);
   assert.deepEqual(noFiles.workers[1].overlaps, undefined);
+});
+
+test('a worker overlapping more workers than the list names is told how many it left out', () => {
+  const many = Array.from({ length: OVERLAP_WORKERS_MAX + 2 }, (_, i) => prWorker(`w${i}`, 20 + i, ['src/a.ts']));
+  const r = report([prWorker('mochi', 11, ['src/a.ts']), ...many], [], [pull(11, 'pass'), ...Array.from({ length: OVERLAP_WORKERS_MAX + 2 }, (_, i) => pull(20 + i, 'pass'))]);
+  assert.equal(r.workers[0].overlaps?.length, OVERLAP_WORKERS_MAX);
+  assert.equal(r.workers[0].moreOverlaps, 2, 'the report says how many are not named, rather than reading as the lot');
+  assert.equal(r.workers[1].moreOverlaps, 2, 'a worker in the crowd overlaps mochi and the other six, and leaves out two of them');
+  // Exactly the cap and no more: nothing left out, so nothing claimed.
+  const exact = Array.from({ length: OVERLAP_WORKERS_MAX }, (_, i) => prWorker(`w${i}`, 20 + i, ['src/a.ts']));
+  const fits = report([prWorker('mochi', 11, ['src/a.ts']), ...exact], [], [pull(11, 'pass'), ...Array.from({ length: OVERLAP_WORKERS_MAX }, (_, i) => pull(20 + i, 'pass'))]);
+  assert.equal(fits.workers[0].overlaps?.length, OVERLAP_WORKERS_MAX);
+  assert.equal(fits.workers[0].moreOverlaps, undefined);
 });

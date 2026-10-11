@@ -6,7 +6,7 @@
 import type { GhPull, QueueTask, WorkerInfo } from './protocol.js';
 import type { Blocker, WorkerRow } from './status.js';
 import { alertDetail, workerPr } from './status.js';
-import { isConflicting, overlapLines, workerFileCollisions, type WorkerOverlap } from './conflicts.js';
+import { isConflicting, overlapLines, workerFileCollisions, type WorkerOverlap, type WorkerOverlapGroup } from './conflicts.js';
 
 export type { Blocker } from './status.js';
 
@@ -23,6 +23,8 @@ export interface ManagerWorker extends WorkerRow {
    * pull requests are still open. Empty when nothing is known (see workerFileCollisions).
    */
   overlaps?: WorkerOverlap[];
+  /** How many more workers overlap than the ones `overlaps` names, when the list was cut short. */
+  moreOverlaps?: number;
 }
 
 /** Where a finished task's work stands: a pull request with its checks, or nothing to show yet. */
@@ -198,7 +200,7 @@ export function managerReport(input: ManagerInput): ManagerReport {
     const task = seatOf.get(w.id);
     const overlaps = collisions.get(w.id);
     const blockers = blockersOf(w, task, now, stallMs, pulls);
-    return { ...(row ?? fallbackRow(w)), ...(task ? { taskId: task.id } : {}), ...(overlaps ? { overlaps } : {}), blockers: withOverlaps(blockers, overlaps) };
+    return { ...(row ?? fallbackRow(w)), ...(task ? { taskId: task.id } : {}), ...(overlaps?.others.length ? { overlaps: overlaps.others } : {}), ...(overlaps?.moreWorkers ? { moreOverlaps: overlaps.moreWorkers } : {}), blockers: withOverlaps(blockers, overlaps) };
   });
 
   const running = tasks.filter((t) => t.status === 'running').length;
@@ -261,8 +263,8 @@ function fallbackRow(w: WorkerInfo): WorkerRow {
  * The conflict blocker naming the other open pull requests on the same files: who else is landing there
  * is what tells a person whether to resolve and rebase, or wait for the other one to land first.
  */
-function withOverlaps(blockers: Blocker[], overlaps: WorkerOverlap[] | undefined): Blocker[] {
-  if (!overlaps?.length) return blockers;
+function withOverlaps(blockers: Blocker[], overlaps: WorkerOverlapGroup | undefined): Blocker[] {
+  if (!overlaps?.others.length) return blockers;
   return blockers.map((b) => (b.kind === 'conflicting' ? { ...b, why: `${b.why}; ${overlapLines(overlaps)}` } : b));
 }
 

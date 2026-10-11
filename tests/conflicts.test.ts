@@ -48,8 +48,8 @@ const worker = (id: string, pr: number | undefined, files?: string[]): Collision
 
 test('two workers whose open pull requests touch a file are both told about the other', () => {
   const map = workerFileCollisions([worker('mochi', 11, ['src/a.ts', 'docs/x.md']), worker('byte', 12, ['src/a.ts'])]);
-  assert.deepEqual(map.get('mochi'), [{ worker: { id: 'byte', name: 'byte' }, pr: 12, files: ['src/a.ts'] }]);
-  assert.deepEqual(map.get('byte'), [{ worker: { id: 'mochi', name: 'mochi' }, pr: 11, files: ['src/a.ts'] }]);
+  assert.deepEqual(map.get('mochi'), { others: [{ worker: { id: 'byte', name: 'byte' }, pr: 12, files: ['src/a.ts'] }], moreWorkers: 0 });
+  assert.deepEqual(map.get('byte'), { others: [{ worker: { id: 'mochi', name: 'mochi' }, pr: 11, files: ['src/a.ts'] }], moreWorkers: 0 });
 });
 
 test('workers on disjoint files, or with no pull request or no checklist, overlap nothing', () => {
@@ -65,20 +65,31 @@ test('a worker with no overlaps is left out of the map rather than given an empt
   assert.deepEqual([...map.keys()].sort(), ['kumo', 'mochi']);
 });
 
-test('the overlap list is capped, and says when it was capped rather than truncating quietly', () => {
+test('the overlap list is capped, and says how many it left out rather than truncating quietly', () => {
+  // More workers than fit: the group names five and says how many more are really there.
   const many = Array.from({ length: OVERLAP_WORKERS_MAX + 3 }, (_, i) => worker(`w${i}`, 20 + i, ['src/a.ts']));
-  const list = workerFileCollisions([...many, worker('mochi', 11, ['src/a.ts'])])!.get('mochi')!;
-  assert.equal(list.length, OVERLAP_WORKERS_MAX);
+  const group = workerFileCollisions([...many, worker('mochi', 11, ['src/a.ts'])])!.get('mochi')!;
+  assert.equal(group.others.length, OVERLAP_WORKERS_MAX);
+  assert.equal(group.moreWorkers, 3, 'the workers past the cap are counted, not dropped');
+  assert.match(overlapLines(group), /; and 3 more\.$/, 'and the sentence says so');
 
+  // Exactly as many as fit: nothing is left out, so nothing is claimed to be.
+  const exact = Array.from({ length: OVERLAP_WORKERS_MAX }, (_, i) => worker(`w${i}`, 20 + i, ['src/a.ts']));
+  const full = workerFileCollisions([...exact, worker('mochi', 11, ['src/a.ts'])])!.get('mochi')!;
+  assert.equal(full.others.length, OVERLAP_WORKERS_MAX);
+  assert.equal(full.moreWorkers, 0);
+  assert.doesNotMatch(overlapLines(full), /more/);
+
+  // Files are capped on each entry, and say so on their own.
   const manyFiles = Array.from({ length: OVERLAP_FILES_MAX + 4 }, (_, i) => `src/f${i}.ts`);
-  const [one] = workerFileCollisions([worker('mochi', 11, manyFiles), worker('byte', 12, manyFiles)])!.get('mochi')!;
+  const [one] = workerFileCollisions([worker('mochi', 11, manyFiles), worker('byte', 12, manyFiles)])!.get('mochi')!.others;
   assert.equal(one.files.length, OVERLAP_FILES_MAX);
   assert.equal(one.capped, true, 'more shared files than are named, and it says so');
-  assert.equal(workerFileCollisions([worker('mochi', 11, ['src/a.ts']), worker('byte', 12, ['src/a.ts'])])!.get('mochi')![0].capped, undefined);
+  assert.equal(workerFileCollisions([worker('mochi', 11, ['src/a.ts']), worker('byte', 12, ['src/a.ts'])])!.get('mochi')!.others[0].capped, undefined);
 });
 
 test('an overlap reads as a sentence naming the other pull request and the shared files', () => {
-  const list = workerFileCollisions([worker('mochi', 11, ['src/a.ts']), worker('byte', 12, ['src/a.ts'])])!.get('mochi')!;
-  assert.equal(overlapLines(list), 'Other open pull requests changing the same files: PR #12 from byte (src/a.ts).');
-  assert.equal(overlapLines([]), '', 'nothing to say, so the prompt drops the line');
+  const group = workerFileCollisions([worker('mochi', 11, ['src/a.ts']), worker('byte', 12, ['src/a.ts'])])!.get('mochi')!;
+  assert.equal(overlapLines(group), 'Other open pull requests changing the same files: PR #12 from byte (src/a.ts).');
+  assert.equal(overlapLines(undefined), '', 'nothing to say, so the prompt drops the line');
 });
