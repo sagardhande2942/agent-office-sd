@@ -28,6 +28,7 @@ import { AudioCore, type Hall, type Listener } from './core';
 import { bark, yip } from '../features/dog/sound';
 import { airlock, cellDoor, thud } from '../features/workers/sound';
 import { golf, type GolfSound } from '../features/golf/sound';
+import { playTableTennisSound, type TableTennisSound } from '../features/tabletennis/sound';
 import { gong } from '../features/gong/sound';
 import { Jukebox, type JukeboxPlay } from '../features/jukebox/sound';
 import { needsYou } from '../features/needsyou/sound';
@@ -211,6 +212,10 @@ export class OfficeSound {
 
   golf(kind: GolfSound, at?: Pos, speed = 5) {
     golf(this.a, kind, at, speed);
+  }
+
+  tableTennis(kind: TableTennisSound, at?: Pos) {
+    playTableTennisSound(this.a, kind, at);
   }
 
   toss(kind: TossSound, at: Pos) {

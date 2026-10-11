@@ -87,10 +87,10 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
   for (const p of [sw, se]) parts.add(mesh(new THREE.CylinderGeometry(0.035, 0.035, poleH - railH, 6), ink, p.x, (poleH + railH) / 2, p.z, false));
   const bulbs = ['#ffd166', '#ff8fa3', '#8ecae6', '#caffbf'].map((c): [string, THREE.Material] => [c, bulb(night, c, 0.4)]);
   parts.add(stringLights(sw, se, 0.35, bulbs, night));
-  parts.add(stringLights(sw, new THREE.Vector3(-6.5, 3.5, minZ + 0.02), 0.3, bulbs, night));
   parts.add(stringLights(new THREE.Vector3(-6.5, 3.5, minZ + 0.02), se, 0.35, bulbs, night));
-  // At night they light the deck, the table and whoever's out there.
-  for (const x of [cx - 3.2, cx + 3.2]) night.lamps.push({ x, y: 2.4, z: cz, reach: 5.5, color: '#ffc9a6', power: 2.4 });
+  parts.add(stringLights(new THREE.Vector3(6.5, 3.5, minZ + 0.02), se, 0.35, bulbs, night));
+  // At night they light the deck, the table, the table tennis board and whoever's out there.
+  for (const x of [-6.4, 0, 6.4]) night.lamps.push({ x, y: 2.4, z: cz, reach: 6, color: '#ffc9a6', power: 2.4 });
 
   // A bench under the window, a bistro table with two stools, and plants.
   const bench = new THREE.Group();
@@ -202,7 +202,8 @@ export const balcony: Fixture = (site) => {
 export function buildBalconyPosts(group: THREE.Group, colliders: Collider[]) {
   const { minX, maxX, maxZ } = BALCONY;
   const postH = -SLAB - STREET_Y;
-  for (const x of [minX + 0.25, maxX - 0.25]) {
+  const cx = (minX + maxX) / 2;
+  for (const x of [minX + 0.25, cx, maxX - 0.25]) {
     group.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, postH, 12), toon('#e6e8ee'), x, STREET_Y + postH / 2, maxZ - 0.25));
     colliders.push({ minX: x - 0.14, maxX: x + 0.14, minZ: maxZ - 0.39, maxZ: maxZ - 0.11, bottom: STREET_Y, top: -SLAB });
   }

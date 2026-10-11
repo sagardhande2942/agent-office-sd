@@ -11,6 +11,8 @@ export * from './protocol/master-workers.js';
 
 import type { AppearanceClientMsg, AppearanceServerMsg } from './protocol/appearances.js';
 export * from './protocol/appearances.js';
+import type { TableTennisClientMsg, TableTennisServerMsg } from './protocol/tabletennis.js';
+export * from './protocol/tabletennis.js';
 import type { PlanReviewClientMsg, PlanReviewServerMsg } from './protocol/plan-review.js';
 export * from './protocol/plan-review.js';
 import type { LoreClientMsg, LoreServerMsg } from './protocol/lore.js';
@@ -62,6 +64,7 @@ export type ClientMsg =
   | MasterWorkersClientMsg
 
   | AppearanceClientMsg
+  | TableTennisClientMsg
   | PlanReviewClientMsg
   | TvClientMsg
   | CinemaClientMsg
@@ -96,6 +99,7 @@ export type ServerMsg =
   | MasterWorkersServerMsg
 
   | AppearanceServerMsg
+  | TableTennisServerMsg
   | PlanReviewServerMsg
   | CommunicationsServerMsg
   | PresenceServerMsg
