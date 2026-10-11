@@ -571,4 +571,6 @@ While attached in `agent-office tui`, use the **mouse wheel** or **Page Up / Pag
 
 Curator evidence selection prioritizes referenced files, relevant implementation and tests, and matching passages within longer committed files. Missing context alone should leave a note unchanged rather than mark it as incorrect.
 
+Model selectors offer **Use office default** to copy the provider, model and effort saved in office Settings, and **Use agent default** to remove the model override for the selected provider. Plan comparison and Master / Workers accept agent defaults too. Duplicate candidate provider/model choices remain rejected; different providers’ defaults may resolve to the same underlying model. On remote floors, agent defaults come from the host’s configuration.
+
 The **☰ Office menu** has a bounded, scrollable action list. Search finds actions and display settings across all categories; **Open**, **Together**, **Office**, and **Display** narrow browsing. **Pinned** shows your saved favorites, and the pin beside each action adds it to the top bar. Clear search to return to your selected category. Arrow keys navigate results; **Tab**, **Esc**, or the top-right **✕** closes the menu and restores mouse-look.

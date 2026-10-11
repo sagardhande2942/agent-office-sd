@@ -12,12 +12,11 @@ export function planningChoice(v:unknown):AgentChoice {
   if(!isAgentProvider(c.provider)||!takesModel(c.provider))throw Error('Choose a coding agent with selectable models for planning');
   const bad=validateWorkerModel('agent',c.provider,c.model)??validateWorkerEffort('agent',c.provider,c.effort);
   if(bad)throw Error(bad);
-  if(takesModel(c.provider)&&!c.model)throw Error('Choose an explicit model for every planning worker and reviewer');
-  return {provider:c.provider,model:c.model,...(isAgentEffort(c.effort)?{effort:c.effort}:{})};
+  return {provider:c.provider,...(c.model?{model:c.model}:{}),...(isAgentEffort(c.effort)?{effort:c.effort}:{})};
 }
 export function readPlanRequest(value:unknown):PlanReviewRequest & {weights:PlanWeights;minutes:number;constraints:string} {
   const b=object(value,'activity'), candidates=list(b.candidates,'candidates',planningChoice,1,5);
-  if(new Set(candidates.map(c=>`${c.provider}:${c.model}`.toLowerCase())).size!==candidates.length)throw Error('Each candidate must use a different explicit model');
+  if(new Set(candidates.map(c=>`${c.provider}:${c.model}`.toLowerCase())).size!==candidates.length)throw Error('Each candidate must use a different provider/model choice');
   // Claude aliases and the matching OpenCode alias are also the same model choice.
   const identities=candidates.map(c=>planModelIdentity(c.provider,c.model));
   if(new Set(identities).size!==identities.length)throw Error('Candidate model aliases must be distinct');

@@ -2,7 +2,7 @@
 
 Open **Master / Workers** in the Lite header, the 3D/2D game menu, or the command palette. This is a separate activity from plan comparison: one master completes your task with a team rather than competing against other planners. It requires a Git floor and installed, signed-in coding agent CLIs on the machine hosting that floor. Local and remote floors use the same controls.
 
-Choose an explicit provider/model/effort for the master, add the models it may hire, and choose a worker limit of 1–5 (default 5). The master is additional to that limit, and everyone counts toward existing office capacity. Eligible models may be reused across workers. The master infers suitability from the task and model identities and records its reasoning; model names do not guarantee capability. All eight built-in providers are supported. Custom shell agents are excluded.
+Choose a provider and an explicit model/effort or configured defaults for the master, add the models it may hire, and choose a worker limit of 1–5 (default 5). The master is additional to that limit, and everyone counts toward existing office capacity. Eligible models may be reused across workers. The master infers suitability from the task and model identities and records its reasoning; model names do not guarantee capability. All eight built-in providers are supported. Custom shell agents are excluded.
 
 Give the activity a task brief, requirements, and constraints. It starts automatically: the master inspects the repository, publishes its plan and task graph, delegates suitable independent tasks, contributes its own work, reviews results, integrates changes, verifies the final branch, and creates one ready-for-review PR. No plan approval step is required. Repository instructions and provider permission prompts still apply.
 
@@ -112,3 +112,5 @@ Run `npm run typecheck`, `npm test`, and `npm run build`. Then run `node --impor
 Run `node --import tsx scripts/e2e-task-replay.mjs` for Replay browser checks and screenshots in `/tmp/agent-office-task-replay-evidence` (override with `REPLAY_ARTIFACTS`). This also uses fake agent sessions without paid model calls.
 
 For a live provider smoke test, load a small existing repository, select installed authenticated models, and ask for two independent small changes plus tests. Confirm each worker submits local commits, the master integrates them, the required checks pass, and only the master creates a PR. Live model behavior remains subject to provider availability and permissions.
+
+Model selectors offer **Use office default** to copy the provider, model and effort saved in office Settings, and **Use agent default** to remove the model override for the selected provider. Plan comparison and Master / Workers accept agent defaults too. Duplicate candidate provider/model choices remain rejected; different providers’ defaults may resolve to the same underlying model. On remote floors, agent defaults come from the host’s configuration.

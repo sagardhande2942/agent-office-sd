@@ -17,7 +17,7 @@ export function teamLines(view?:FloorView):string[] {
   const s=view?.masterWorkers,r=s?.current;
   return [
     'MASTER / WORKERS',s?.error??'',
-    ...(r?[`${r.phase}: ${r.brief}`,`Master: ${r.masterId??'not started'} (${r.master.provider}/${r.master.model})`,r.error??'',r.plan??'Planning...',...r.tasks.flatMap(t=>[`${t.id}: ${t.status} — ${t.title}`,t.reason??'',...t.attempts.map(a=>`${a.choice.provider}/${a.choice.model}: ${a.status} (${a.workerId}) ${a.summary??''}`),t.evidence??'']),r.pr??'']:['No activity yet.']),
+    ...(r?[`${r.phase}: ${r.brief}`,`Master: ${r.masterId??'not started'} (${r.master.provider}/${r.master.model??'configured default'})`,r.error??'',r.plan??'Planning...',...r.tasks.flatMap(t=>[`${t.id}: ${t.status} — ${t.title}`,t.reason??'',...t.attempts.map(a=>`${a.choice.provider}/${a.choice.model??'configured default'}: ${a.status} (${a.workerId}) ${a.summary??''}`),t.evidence??'']),r.pr??'']:['No activity yet.']),
     'PRESETS',...(s?.presets.map(p=>`${p.id}: ${p.name} (${p.maxWorkers} workers)`)??[]),
     'teams | team-start <JSON-file> | team-pause | team-resume | team-stop',
     'team-preset <JSON-file> | team-preset-delete <ID> | attach <worker>',

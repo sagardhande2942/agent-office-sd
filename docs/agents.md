@@ -150,3 +150,5 @@ When any worker is spawned or resumed on any floor (from desks, issue and pull r
   - **🔒 Restricted**: Read-only exploration and planning (e.g. `--tools Read,Glob,Grep` for Claude, `--sandbox read-only` for Codex, `{ "*": "deny", read: "allow", ... }` for OpenCode).
 - **Granular tool permissions**: Configurable policies (`allow`, `ask`, `deny`) for shell execution (`bash`), file editing (`edit`), and web access (`web`).
 - **Defaults & Launch args**: Configured default model, reasoning effort, extra CLI arguments, and custom environment variables (`KEY=value`) injected directly into the worker's execution environment.
+
+Model selectors offer **Use office default** to copy the provider, model and effort saved in office Settings, and **Use agent default** to remove the model override for the selected provider. Plan comparison and Master / Workers accept agent defaults too. Duplicate candidate provider/model choices remain rejected; different providers’ defaults may resolve to the same underlying model. On remote floors, agent defaults come from the host’s configuration.

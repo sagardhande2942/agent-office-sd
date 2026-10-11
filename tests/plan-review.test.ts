@@ -72,3 +72,10 @@ test('no eligible plan cleans all candidates and starts no implementation',async
 test('planning deadline includes missing plans; reviewer timeout cleans without implementing',async()=>{
  const f=fixture();try{f.table.start(request,'test');let state=f.table.state();state.current!.deadline=Date.now()-1000;writeFileSync(path.join(f.dir,'plan-review.json'),JSON.stringify(state));f.restart();await (f.table as any).tick();assert.equal(f.table.state().current!.phase,'reviewing');state=f.table.state();state.current!.reviewDeadline=Date.now()-1000;writeFileSync(path.join(f.dir,'plan-review.json'),JSON.stringify(state));f.restart();await (f.table as any).tick();assert.equal(f.table.state().current!.phase,'error');assert.equal(f.workers.length,0);assert.equal(f.promoted.length,0);}finally{f.dispose();}
 });
+
+test('plan comparison accepts configured defaults and still rejects duplicate or invalid choices', () => {
+ const value=readPlanRequest({...request,candidates:[{provider:'claude'},{provider:'codex'}],reviewer:{provider:'codex'}});
+ assert.equal(value.candidates[0].model,undefined);assert.equal(value.reviewer.model,undefined);
+ assert.throws(()=>readPlanRequest({...request,candidates:[{provider:'claude'},{provider:'claude'}]}),/different|distinct/);
+ assert.throws(()=>readPlanRequest({...request,candidates:[{provider:'claude',model:'--invalid'}]}));
+});

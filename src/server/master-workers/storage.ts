@@ -12,10 +12,10 @@ export function text(value: unknown, label: string, max = 20000): string {
 }
 export function choice(value: unknown): AgentChoice {
   const a = value as AgentChoice;
-  if (!a || !isAgentProvider(a.provider) || a.provider === 'custom' || !a.model) throw Error('Choose a built-in provider and explicit model');
+  if (!a || !isAgentProvider(a.provider) || a.provider === 'custom') throw Error('Choose a built-in provider and a valid model or configured default');
   const error = validateWorkerModel('agent', a.provider, a.model) ?? validateWorkerEffort('agent', a.provider, a.effort);
   if (error) throw Error(error);
-  return { provider: a.provider, model: a.model, ...(a.effort ? { effort: a.effort } : {}) };
+  return { provider: a.provider, ...(a.model ? { model: a.model } : {}), ...(a.effort ? { effort: a.effort } : {}) };
 }
 export function config(raw: unknown): TeamConfig {
   const c = raw as TeamConfig;
