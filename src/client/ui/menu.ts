@@ -1,4 +1,5 @@
 import './menu.css';
+import { menuBrowser } from './menu-browser';
 import { store, type HudPanel, type Settings, type Topic } from '../state';
 import { waitingOnSomeone } from '../notify';
 import { DESK_BY_ID } from '../../shared/layout';
@@ -181,6 +182,7 @@ export function mountHud(actions: HudAction[], settings: Settings, save: () => v
       pin.addEventListener('click', () => {
         togglePin(a);
         paintPin();
+        browser.refresh();
       });
       return h('div.menu-row', {}, item, pin);
     };
@@ -200,14 +202,16 @@ export function mountHud(actions: HudAction[], settings: Settings, save: () => v
       });
       return item;
     };
-    const section = (name: string, rows: HTMLElement[]) => (rows.length ? [h('div.menu-sec', {}, name), ...rows] : []);
-    const rows = (s: HudAction['section']) => actions.filter((a) => a.section === s && offered(a)).map(row);
-    const el = h(
-      'div.hud-menu',
-      { role: 'menu', 'aria-label': 'Menu' },
-      h('div.menu-col', {}, ...section('Open', rows('Open')), ...section('Together', rows('Together'))),
-      h('div.menu-col', {}, ...section('Show on screen', PANELS.map(toggle)), ...section('Office', rows('Office'))),
-      h('p.menu-foot', {}, 'Pin what you use most to keep it on the top bar. ', h('kbd', {}, 'Tab'), ' opens and closes this menu.'),
+    const browser = menuBrowser([
+      ...actions.filter(offered).map(a => ({
+        section: a.section, label: () => labelOf(a), pinned: () => pinned(a), element: row(a),
+      })),
+      ...PANELS.map(p => ({ section: 'Display', label: () => `${p.label} ${p.what}`, pinned: () => false, element: toggle(p) })),
+    ]);
+    const el = h('div.hud-menu', { role: 'dialog', 'aria-label': 'Office menu' },
+      h('header.menu-header', {}, h('strong', {}, 'Office menu')),
+      browser.controls, browser.list,
+      h('p.menu-foot', {}, 'Pin your favorites to the top bar. ', h('kbd', {}, 'Tab'), ' or Esc closes.'),
     );
     // On the window, so the keys work wherever focus is while the menu is up.
     const onKey = (e: KeyboardEvent) => menuKey(el, e);
@@ -218,26 +222,32 @@ export function mountHud(actions: HudAction[], settings: Settings, save: () => v
         menu = null;
         menuBtn.setAttribute('aria-expanded', 'false');
         window.removeEventListener('keydown', onKey, true);
+        window.removeEventListener('resize', position);
       },
     });
     window.addEventListener('keydown', onKey, true);
     menu.backdrop.classList.add('menu-backdrop');
     menuBtn.setAttribute('aria-expanded', 'true');
     // Hangs under the ☰ button.
-    const r = menuBtn.getBoundingClientRect();
-    el.style.top = `${r.bottom + 8}px`;
-    el.style.right = `${Math.max(8, window.innerWidth - r.right)}px`;
-    el.style.maxHeight = `${window.innerHeight - r.bottom - 20}px`;
-    el.querySelector<HTMLElement>('.menu-item')?.focus();
+    function position() {
+      const r = menuBtn.getBoundingClientRect();
+      el.style.top = `${r.bottom + 8}px`;
+      el.style.right = `${Math.max(8, window.innerWidth - r.right)}px`;
+      el.style.maxHeight = `${Math.max(0, Math.min(560, window.innerHeight - r.bottom - 20))}px`;
+    }
+    position();
+    window.addEventListener('resize', position);
+    browser.search.focus();
   }
 
   /** Arrows walk the menu, → reaches a row's pin, and Tab closes it like Esc. */
   function menuKey(el: HTMLElement, e: KeyboardEvent) {
-    const items = [...el.querySelectorAll<HTMLElement>('.menu-item')];
+    const items = [...el.querySelectorAll<HTMLElement>('.menu-item')].filter(item => !item.closest('[hidden]'));
     const at = document.activeElement as HTMLElement | null;
     const onPin = !!at?.classList.contains('menu-pin');
     const i = items.indexOf((onPin ? at!.previousElementSibling : at) as HTMLElement);
     let next: Element | null | undefined;
+    if (at instanceof HTMLInputElement && !['ArrowDown', 'ArrowUp', 'Tab'].includes(e.key)) return;
     switch (e.key) {
       case 'ArrowDown':
         next = items[(i + 1) % items.length];

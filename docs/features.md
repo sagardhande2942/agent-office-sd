@@ -136,3 +136,7 @@ The west-wall plant beside the basketball, at (-17.2, 8.5), uses src/client/mode
 The animated peace lily model is about 266 KB and is preloaded with the office assets. Its embedded animation clips repeat continuously through the fixture's animation mixer, in both 3D and 2D views. Animation pauses while the model is hidden by the Christmas theme. Draco-compressed GLBs are supported through a locally bundled decoder from Three.js; its worker and WebAssembly assets load only when a compressed model needs them. Keep future replacements small to reduce the initial download.
 
 - **Automatic knowledge curator:** per-floor schedule and timezone, Claude Code/Codex model choice, completion-triggered cleanup, bounded runs, pause/resume, exact and semantic duplicate consolidation, conflict verification, reversible archives and original revision history. See [Lore](lore.md#automatic-knowledge-curator).
+
+The **☰ Office menu** has a bounded, scrollable action list. Search finds actions and display settings across all categories; **Open**, **Together**, **Office**, and **Display** narrow browsing. **Pinned** shows your saved favorites, and the pin beside each action adds it to the top bar. Clear search to return to your selected category. Arrow keys navigate results; **Tab**, **Esc**, or the top-right **✕** closes the menu and restores mouse-look.
+
+Menu browser checks: after `npm run build`, run `node --import tsx scripts/e2e-menu.mjs`. Screenshots and checks are saved to `/tmp/agent-office-menu-evidence` (override with `MENU_ARTIFACTS`).
