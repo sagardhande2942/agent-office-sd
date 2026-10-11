@@ -14,6 +14,7 @@ import { EYE_HEIGHT } from '../player';
 import { store } from '../state';
 import { modalOpen, toast } from '../ui/dom';
 import type { Interactable } from '../world/types';
+import { withinInteractionReach } from './reach';
 
 export type PointerParts = Pick<Parts, 'worlds' | 'rooftop' | 'place' | 'you' | 'boards' | 'cards' | 'seating' | 'hoops' | 'emotes' | 'hanging' | 'telescope' | 'hintbar'>;
 
@@ -100,7 +101,7 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
       if (!shown) continue;
       if (!it || it.off) return null; // a wall, the floor, a plant… is in the way
       // How close you must be to use it is each kind's own (see ctx.interactions).
-      return { it, near: hit.point.distanceTo(eye) <= ctx.interactions.reach(it.kind) + slack, hit };
+      return { it, near: withinInteractionReach(it, hit.point, eye, player.pos, ctx.interactions.reach(it.kind) + slack), hit };
     }
     return null;
   }
