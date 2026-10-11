@@ -6,10 +6,10 @@ export const LORE_CONTENT_MAX = 10_000;
 export const LORE_TAG_MAX = 32;
 export const LORE_TAGS_MAX = 8;
 
-/** The 3D Lore Shelf fixture position against the south wall facing into the office. */
+/** The 3D Lore Shelf fixture position beside the basketball hoop on the west wall facing into the office. */
 export const LORE_SHELF = {
-  x: -4.3,
-  z: FLOOR.maxZ - 0.21,
+  x: FLOOR.minX + 0.21,
+  z: 9,
   width: 1.6,
   depth: 0.36,
   height: 2.1,
