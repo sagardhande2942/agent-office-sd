@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { TableTennisMatch } from '../src/server/tabletennis.js';
 import { TableTennisController } from '../src/client/features/tabletennis/controller.js';
 import { TableTennisWatch } from '../src/client/features/tabletennis/watch.js';
+import { TableTennisBot } from '../src/client/features/tabletennis/bot.js';
 import type { PlayerController } from '../src/client/player/index.js';
 
 test('bot exhibition keeps an operator, two difficulties and non-controlling watchers', () => {
@@ -40,10 +41,12 @@ test('two bots automatically serve, return bounced balls from both sides, score 
     const watch = new TableTennisWatch(c, () => { match.reset(); resets++; }); watch.start('pro');
     for (let i = 0; i < 1800; i++) { watch.update(1 / 60, match.state(), 'host'); c.update(1 / 60, match.state()); }
     assert.deepEqual([...sides].sort(), ['east', 'west']);
-    Math.random = () => 0; // Force an intentional bot miss to exercise automatic scoring.
-    for (let i = 0; i < 600 && points === 0; i++) { watch.update(1 / 60, match.state(), 'host'); c.update(1 / 60, match.state()); }
+    const beforePoints = points;
+    let seed = 12345;
+    Math.random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+    for (let i = 0; i < 18000 && points < beforePoints + 10; i++) { watch.update(1 / 60, match.state(), 'host'); c.update(1 / 60, match.state()); }
     Math.random = () => 0.5;
-    assert.ok(points > 0, 'exhibition scores automatically');
+    assert.ok(points >= beforePoints + 10, 'pro bots must finish ten points naturally within five simulated minutes');
     // Complete a match to exercise the restart without waiting through three full games.
     while (match.state().status !== 'ended') {
       const state = match.state();
@@ -66,4 +69,18 @@ test('a spectator never operates either bot', () => {
   c.start('west', 'bots'); const watch = new TableTennisWatch(c, () => {});
   for (let i = 0; i < 300; i++) { watch.update(1 / 60, match.state(), 'viewer'); c.update(1 / 60, match.state()); }
   assert.equal(serves, 0); assert.equal(c.automatesOpponent, false);
+});
+
+
+test('a bot commits to one miss decision until the next incoming shot', () => {
+  const bot = new TableTennisBot('pro'); bot.reset('east');
+  const pos = bot.where;
+  const ball = { x: pos.x - 0.46, z: pos.z - 0.26, y: 1.04, vx: 1, vy: 0, vz: 0, tops: 0, side: 0 };
+  const plan = { to: pos, stroke: 'topspin' as const, aim: pos, out: 0, depth: 0, power: 0.5 };
+  bot.look(1, 0);
+  assert.equal(bot.canMeet(ball, plan, 0), false);
+  for (let i = 0; i < 100; i++) assert.equal(bot.canMeet(ball, plan, 1), false);
+  bot.look(2, 0);
+  assert.equal(bot.canMeet(ball, plan, 1), true);
+  assert.equal(bot.canMeet(ball, plan, 0), true);
 });

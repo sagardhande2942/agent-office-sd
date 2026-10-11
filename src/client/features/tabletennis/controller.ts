@@ -358,7 +358,7 @@ export class TableTennisController {
     if (!this.batCanReach(bat)) return;
     this.oppSwinging = true;
     this.oppSwingProgress = 0;
-    this.hit(this.opponent, this.botPlan.stroke ?? 'topspin', this.botPlan.aim ? (this.botPlan.aim.z - PINGPONG_TABLE.z) / (PINGPONG_TABLE.width / 2 - PINGPONG_PHYSICS.edgeMargin) : 0, 0, this.difficulty === 'pro' ? 0.85 : this.difficulty === 'easy' ? 0.3 : 0.55);
+    this.hit(this.opponent, this.botPlan.stroke ?? 'topspin', this.botPlan.aim ? (this.botPlan.aim.z - PINGPONG_TABLE.z) / (PINGPONG_TABLE.width / 2 - PINGPONG_PHYSICS.edgeMargin) : 0, this.botPlan.depth, this.botPlan.power);
   }
 
   /**

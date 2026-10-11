@@ -54,10 +54,15 @@ export interface BotPlan {
   aim: { x: number; z: number };
   /** How far from its ideal spot it is, so the caller can know whether it will get there. */
   out: number;
+  depth: number;
+  power: number;
 }
 
 export class TableTennisBot {
   private pos: { x: number; z: number } = { x: PINGPONG_SPOTS.east.x, z: PINGPONG_SPOTS.east.z };
+  private missed: boolean | undefined;
+  private depth = 0;
+  private power = 0.5;
   private seen = -1;
   private waited = 0;
   private planFor: PingPongShotKind | undefined;
@@ -78,6 +83,8 @@ export class TableTennisBot {
   reset(side: PingPongSide) {
     this.pos = { x: side === 'west' ? PINGPONG_SPOTS.west.x : PINGPONG_SPOTS.east.x, z: PINGPONG_SPOTS.east.z };
     this.planFor = undefined;
+    this.missed = undefined;
+    this.seen = -1;
     this.waited = 0;
   }
 
@@ -90,7 +97,7 @@ export class TableTennisBot {
     if (!ball) {
       // Between points: back to the middle, watching.
       const to = onCourtSpot(side, this.pos.x, spot.z * 0.6 + this.pos.z * 0.4);
-      return { to, aim: { x: 0, z: PINGPONG_TABLE.z }, out: 0 };
+      return { to, aim: { x: 0, z: PINGPONG_TABLE.z }, out: 0, depth: 0, power: 0.5 };
     }
     // Find a playable contact after its bounce, including short shots near the net.
     const meet = botIntercept(ball, side, bounced);
@@ -99,9 +106,14 @@ export class TableTennisBot {
     const off = this.skill.reachError * (Math.sign(z - PINGPONG_TABLE.z) || 1) * (side === 'west' ? -1 : 1);
     const to = onCourtSpot(side, meet?.feet.x ?? spot.x, (meet?.feet.z ?? z) + off);
     const out = Math.hypot(this.pos.x - to.x, this.pos.z - to.z);
-    const stroke = meet && this.waited >= this.skill.reaction ? this.choose(meet) : undefined;
-    this.aimFor = shotTarget(side, this.aimAcross(player), stroke === 'smash' ? -0.6 : 0, (Math.random() - 0.5) * this.skill.aimError);
-    return { to, stroke, aim: this.aimFor, out };
+    if (meet && this.waited >= this.skill.reaction && !this.planFor) {
+      this.planFor = this.choose(meet);
+      this.depth = (Math.random() - 0.5) * 1.2;
+      const basePower = this.difficulty === 'pro' ? 0.75 : this.difficulty === 'easy' ? 0.35 : 0.55;
+      this.power = Math.max(0.1, Math.min(1, basePower + (Math.random() - 0.5) * 0.3));
+      this.aimFor = shotTarget(side, this.aimAcross(player), this.depth, (Math.random() - 0.5) * this.skill.aimError);
+    }
+    return { to, stroke: meet ? this.planFor : undefined, aim: this.aimFor, out, depth: this.depth, power: this.power };
   }
 
   /**
@@ -109,6 +121,10 @@ export class TableTennisBot {
    * shot resets its clock). It only starts moving once its reaction has passed.
    */
   look(stamp: number | null, dt: number) {
+    if (this.seen !== (stamp ?? -1)) {
+      this.planFor = undefined;
+      this.missed = undefined;
+    }
     this.waited = stamp !== null && this.seen === stamp ? this.waited + dt : 0;
     this.seen = stamp ?? -1;
   }
@@ -129,13 +145,15 @@ export class TableTennisBot {
    * the ball (not still waiting out its reaction), be within its own reach, and not be one of the
    * misses its skill allows.
    */
-  canMeet(ball: PingPongFlight, plan: BotPlan, random = Math.random()): boolean {
+  canMeet(ball: PingPongFlight, plan: BotPlan, random?: number): boolean {
     if (!plan.stroke) return false;
     if (plan.out > PINGPONG_COURT.lunge) return false;
     const dir = ball.vx >= 0 ? -1 : 1;
     if (Math.abs(ball.y - BOT_BAT.height) > 0.45) return false;
     if (Math.hypot(ball.x - this.pos.x - dir * BOT_BAT.reach, ball.z - this.pos.z - dir * BOT_BAT.sideways) > PINGPONG_COURT.lunge) return false;
-    return random >= this.skill.shank;
+    // A missed ball stays missed: retrying the probability every frame made bots almost infallible.
+    this.missed ??= (random ?? Math.random()) < this.skill.shank;
+    return !this.missed;
   }
 
   /** How it plays the ball it is given: a short high ball is a smash, a deep low one is cut back. */
@@ -149,7 +167,7 @@ export class TableTennisBot {
   /** Goes for the table the player has walked away from. */
   private aimAcross(player: { x: number; z: number }): number {
     const away = Math.sign(PINGPONG_TABLE.z - player.z) || 1;
-    return away * 0.55;
+    return away * (0.3 + Math.random() * 0.35);
   }
 
   /** The shot it plays from where it stands, aimed where it decided. */

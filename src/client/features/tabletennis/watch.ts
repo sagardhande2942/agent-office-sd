@@ -30,7 +30,7 @@ export class TableTennisWatch {
     this.bot.step(dt, plan.to); c.automateAt(this.bot.where);
     if (!c.automatesOpponent || !flight || c.lastHitter !== 'east' || c.lastBounceSide !== 'west' || c.swinging || !this.bot.canMeet(flight, plan)) return;
     c.aim = (plan.aim.z - PINGPONG_TABLE.z) / (PINGPONG_TABLE.width / 2 - PINGPONG_PHYSICS.edgeMargin);
-    c.depth = 0;
-    c.swing(plan.stroke, difficulty === 'pro' ? 0.85 : difficulty === 'easy' ? 0.3 : 0.55);
+    c.depth = plan.depth;
+    c.swing(plan.stroke, plan.power);
   }
 }
