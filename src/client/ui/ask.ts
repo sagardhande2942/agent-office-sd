@@ -3,7 +3,7 @@ import type { AgentEffort, AgentProvider, WorkerStatus } from '../../shared/prot
 import { h, openModal, STATUS_LABEL } from './dom';
 import { store } from '../state';
 import { providerPicker, type ProviderPicker } from './provider';
-import { repoPicker } from './prompt';
+import { rememberWorktreePref, repoPicker, worktreePref } from './prompt';
 import { dictateField } from './dictate';
 import { promptTools } from './prompt-tools';
 
@@ -37,20 +37,13 @@ export interface AskOptions {
   onSubmit(prompt: string, to: string | null, worktree: boolean, provider?: AgentProvider, model?: string, effort?: AgentEffort, repos?: string[]): void;
 }
 
-// Shared with the hire prompt, so the choice sticks either way.
-const WT_KEY = 'agent-office.worktree';
-
 export function openAsk(opts: AskOptions) {
   let to: string | null = opts.newDesk ? null : (opts.workers[0]?.id ?? null);
   const ta = h('textarea', { rows: opts.initial ? 9 : 5, placeholder: opts.placeholder ?? 'What should the worker do?', 'aria-label': 'Prompt' }) as HTMLTextAreaElement;
   ta.value = opts.initial ?? '';
   const tools = promptTools(ta, Math.max(0, 20_000 - (opts.context ? opts.context.length + 2 : 0)), opts.context);
   const wtBox = h('input', { type: 'checkbox', id: 'ask-wt' }) as HTMLInputElement;
-  try {
-    wtBox.checked = localStorage.getItem(WT_KEY) === '1';
-  } catch {
-    // storage blocked
-  }
+  wtBox.checked = worktreePref();
   const wtRow = h('label.ask-wt', { for: 'ask-wt', title: 'Isolate the new worker on its own branch so parallel workers never collide' }, wtBox, '🌿 Work in its own git worktree & branch');
   const repos = repoPicker(opts.worktreeOption ? opts.repoOptions : undefined, wtBox);
   const provider: ProviderPicker | null = opts.providerOption ? providerPicker(store.project, 'ask-provider') : null;
@@ -104,13 +97,7 @@ export function openAsk(opts: AskOptions) {
     }
     if (!to && provider && !provider.valid()) return;
     modal.close();
-    if (!to && opts.worktreeOption) {
-      try {
-        localStorage.setItem(WT_KEY, wtBox.checked ? '1' : '0');
-      } catch {
-        // storage blocked
-      }
-    }
+    if (!to && opts.worktreeOption) rememberWorktreePref(wtBox.checked);
     opts.onSubmit(
       opts.context ? `${opts.context}\n\n${text}` : text,
       to,
