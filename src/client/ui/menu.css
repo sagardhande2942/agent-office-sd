@@ -1,8 +1,8 @@
 /* ---------- The ☰ menu (ui/menu.ts): it hangs under its button, and the office stays in view ---------- */
 .backdrop.menu-backdrop { background: none; display: block; padding: 0; animation: none; }
 .hud-menu {
-  position: absolute; width: min(560px, calc(100vw - 16px)); overflow: auto;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; padding: 42px 10px 6px;
+  position: absolute; width: min(560px, calc(100vw - 16px)); overflow: hidden; max-height: min(560px, calc(100dvh - 80px));
+  display: flex; flex-direction: column; padding: 12px 10px 6px;
   background: var(--paper); border: 3px solid var(--ink); border-radius: 18px; box-shadow: 0 5px 0 var(--ink);
   animation: menu-in .14s ease-out; transform-origin: top right;
 }
@@ -39,3 +39,17 @@
 .menu-toggle[aria-checked=true] .switch::after { transform: translateX(14px); }
 .menu-foot { grid-column: 1 / -1; margin: 8px 0 0; padding: 8px 8px 2px; border-top: 2px dashed rgba(43, 45, 66, .18); font-size: 12px; font-weight: 700; color: var(--muted); }
 @media (max-width: 600px) { .hud-menu { grid-template-columns: 1fr; } }
+
+.menu-header { display: flex; align-items: center; justify-content: space-between; padding: 0 8px 8px; flex: none; }
+.menu-header .close { position: static; }
+.menu-controls { flex: none; padding: 0 8px 10px; }
+.menu-search { width: 100%; min-width: 0; padding: 10px 12px; border: 2px solid var(--ink); border-radius: 10px; background: white; color: var(--ink); font: inherit; }
+.menu-filters { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.menu-filter { padding: 5px 9px; border: 1.5px solid transparent; border-radius: 8px; background: var(--paper-2); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+.menu-filter[aria-pressed=true] { border-color: var(--ink); background: var(--accent); font-weight: 800; }
+.menu-filter:focus-visible, .menu-search:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.menu-results { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.menu-results [hidden] { display: none; }
+.menu-empty { padding: 18px 8px; color: var(--muted); font-size: 14px; }
+.menu-foot { flex: none; }
+.menu-pin { opacity: .45; }
