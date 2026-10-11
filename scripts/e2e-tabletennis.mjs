@@ -261,16 +261,18 @@ try {
   // The opponent is visible; the local avatar stays out of the court camera.
   const east = { x: PINGPONG_SPOTS.east.x, z: PINGPONG_SPOTS.east.z };
   const players = await page.evaluate((east) => {
-    const bodies = window.__office.scene.children.filter((o) => o.visible && o.position && Math.hypot(o.position.x - east.x, o.position.z - east.z) < 0.6);
+    const bodies = window.__office.scene.children.filter((o) => o.visible && o.isGroup && o.position && Math.hypot(o.position.x - east.x, o.position.z - east.z) < 0.6);
+    const names = window.__office.scene.children.filter(o => o.name.startsWith('tabletennis-name-'));
     const court = window.__office.office.tableTennis;
     return {
       atEast: bodies.length,
+      names: names.length,
       meVisible: window.__office.me.root.visible,
       myBat: court.westPaddle.position.clone().add(court.group.position).toArray(),
       theirBat: court.eastPaddle.position.clone().add(court.group.position).toArray(),
     };
   }, east);
-  check('opponent-on-show', players.atEast >= 1, `${players.atEast} body/bodies standing at the far end of the table (the worker bot).`);
+  check('names-without-bodies', players.atEast === 0 && players.names === 2, 'Two player names and no bot body at the table.');
   check('court-view-unobstructed', players.meVisible === false, 'The local avatar cannot obscure incoming balls.');
   check(
     'bats-in-hand',

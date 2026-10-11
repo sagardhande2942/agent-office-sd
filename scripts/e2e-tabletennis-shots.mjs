@@ -53,6 +53,7 @@ try {
  const leave = async () => { await page.keyboard.press('KeyE'); await page.waitForFunction(() => !window.__office.store.pingpong.active); };
  await play();
  assert.ok(await page.evaluate(() => window.__office.camera.fov >= 75 && window.__office.camera.position.y >= 2.5)); check('Table tennis uses a wide elevated court view');
+ await page.waitForFunction(() => window.__office.scene.children.filter(o => o.name.startsWith('tabletennis-name-')).length === 2); check('Bot match shows exactly two names without a bot avatar');
  const feetBefore = await page.evaluate(() => window.__office.player.pos.toArray());
  await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(500); await page.keyboard.up('ArrowLeft');
  const left = await page.evaluate(() => ({ feet: window.__office.player.pos.toArray(), target: window.__office.scene.getObjectByName('tabletennis-shot-target').position.toArray() }));
@@ -83,6 +84,24 @@ try {
  await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2); await page.mouse.down(); await page.waitForTimeout(300); await page.mouse.up();
  await page.waitForFunction(() => window.__sent.length >= 3); assert.equal(await page.evaluate(() => window.__sent.length), 3); check('Mouse release sends one shot without duplicate click handlers');
  await leave(); await page.waitForTimeout(100); assert.ok(await page.evaluate(() => window.__office.camera.fov < 70)); check('Leaving restores normal office field of view'); assert.deepEqual(errors, []);
+ await page.evaluate(() => window.__office.ctx.net.send({ t: 'pingpong.join', side: 'west', mode: 'pvp' }));
+ await observer.evaluate(() => window.__office.ctx.net.send({ t: 'pingpong.join', side: 'east', mode: 'pvp' }));
+ await page.waitForFunction(() => window.__office.store.pingpong.eastPlayer && window.__office.store.pingpong.mode === 'pvp');
+ await observer.waitForFunction(() => window.__office.scene.children.filter(o => o.name.startsWith('tabletennis-name-')).length === 2);
+ const bodies = await page.evaluate(() => {
+   const o = window.__office, peer = o.store.peers.get(o.store.pingpong.eastPlayer.id);
+   return o.scene.children.filter(root => root.isGroup && root.children.some(c => c.isSprite) && Math.hypot(root.position.x - peer.x, root.position.z - peer.z) < 0.01).map(root => root.visible);
+ });
+ assert.ok(bodies.length > 0 && bodies.every(v => !v)); check('PvP participant avatars are hidden while both names remain');
+ await page.evaluate(() => window.__office.ctx.net.send({ t: 'pingpong.leave' }));
+ await observer.evaluate(() => window.__office.ctx.net.send({ t: 'pingpong.leave' }));
+ await page.waitForFunction(() => !window.__office.store.pingpong.active);
+ await page.waitForTimeout(100);
+ const restored = await page.evaluate(() => {
+   const o = window.__office;
+   return o.scene.children.filter(root => root.isGroup && root.children.some(c => c.isSprite)).every(root => root.visible);
+ });
+ assert.ok(restored); check('Leaving PvP restores office avatars');
  writeFileSync(path.join(output, 'checks.json'), JSON.stringify({ checks, browserErrors: errors, tap: { vx: tap.vx, vz: tap.vz }, charged: { vx: hard.vx, vz: hard.vz } }, null, 2));
  console.log(`Evidence: ${output}`);
 } finally { await browser?.close(); office.shutdown(); }
