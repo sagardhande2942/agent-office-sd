@@ -107,6 +107,7 @@ export interface FloorView {
   lore?: import('./lore.js').LoreNote[];
   placements?: import('./object-placement.js').PlacementView;
   appearances?: import('../appearances.js').AppearanceState;
+  codingAgents?: import('../coding-agents.js').CodingAgentsState;
   /** The floor you're on; null while the building has none. */
   floor: string | null;
   project: ProjectInfo | null;
