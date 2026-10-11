@@ -49,3 +49,5 @@ When an agent finishes a shift or a teammate signs off, the Lore Shelf provides 
 4. **Multiplayer Sync & Persistence:**
    - Live updates: When someone adds, edits, or deletes a note, every teammate on the floor sees it update immediately without reloading.
    - File persistence: Notes are stored in `.agent-office/lore/<id>.json` on the floor's disk. Notes survive server restarts, crashes, and branch switching.
+   - Note IDs contain 1–128 letters, digits, underscores, or hyphens. A persisted note's ID must match its filename; unsafe IDs and mismatched files are ignored on load.
+   - If disk deletion fails, the note stays on the shelf and a warning appears. Restore access to the file and retry deleting it.

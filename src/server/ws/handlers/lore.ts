@@ -33,6 +33,8 @@ export const loreHandlers = {
     const ok = floor.lore.delete(msg.id);
     if (ok) {
       ctx.toFloor(floor, { t: 'lore.deleted', id: msg.id });
+    } else {
+      ctx.warn(c, 'Lore note could not be deleted. It may be missing or its file may be unavailable.');
     }
   },
 } satisfies HandlerMap<LoreClientMsg>;

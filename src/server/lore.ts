@@ -3,6 +3,10 @@ import path from 'node:path';
 import type { LoreNote } from '../shared/protocol/lore.js';
 import { cleanLoreContent, cleanLoreTitle, parseLoreTags } from '../shared/lore.js';
 
+function validId(id: unknown): id is string {
+  return typeof id === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(id);
+}
+
 /**
  * A floor's repository lore & shift handover notes, kept in `.agent-office/lore/<id>.json`.
  */
@@ -11,8 +15,15 @@ export class LoreStore {
   private readonly notes = new Map<string, LoreNote>();
 
   constructor(floorDataDir: string) {
-    this.dir = path.join(floorDataDir, 'lore');
+    this.dir = path.resolve(floorDataDir, 'lore');
     this.load();
+  }
+
+  private fileFor(id: string): string {
+    if (!validId(id)) throw new Error('Invalid lore note ID');
+    const file = path.resolve(this.dir, `${id}.json`);
+    if (path.dirname(file) !== this.dir) throw new Error('Invalid lore note path');
+    return file;
   }
 
   private load() {
@@ -23,7 +34,7 @@ export class LoreStore {
       for (const file of files) {
         try {
           const raw = JSON.parse(readFileSync(path.join(this.dir, file), 'utf8')) as Partial<LoreNote>;
-          if (typeof raw?.id === 'string' && typeof raw?.title === 'string' && typeof raw?.content === 'string') {
+          if (validId(raw?.id) && file === `${raw.id}.json` && typeof raw?.title === 'string' && typeof raw?.content === 'string') {
             const note: LoreNote = {
               id: raw.id,
               title: cleanLoreTitle(raw.title),
@@ -66,7 +77,8 @@ export class LoreStore {
     tags?: string[];
   }): LoreNote {
     const now = Date.now();
-    const id = draft.id?.trim() || `lore-${now}-${Math.random().toString(36).slice(2, 7)}`;
+    const id = draft.id === undefined ? `lore-${now}-${Math.random().toString(36).slice(2, 7)}` : draft.id;
+    const file = this.fileFor(id);
     const existing = this.notes.get(id);
     const note: LoreNote = {
       id,
@@ -85,7 +97,6 @@ export class LoreStore {
       mkdirSync(this.dir, { recursive: true, mode: 0o700 });
     }
 
-    const file = path.join(this.dir, `${id}.json`);
     const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 6)}.tmp`;
     writeFileSync(tmp, JSON.stringify(note, null, 2), { mode: 0o600 });
     renameSync(tmp, file);
@@ -95,15 +106,15 @@ export class LoreStore {
   }
 
   delete(id: string): boolean {
+    if (!validId(id)) return false;
     const existing = this.notes.get(id);
     if (!existing) return false;
-    this.notes.delete(id);
-    const file = path.join(this.dir, `${id}.json`);
     try {
-      if (existsSync(file)) unlinkSync(file);
-      return true;
-    } catch {
-      return false;
+      unlinkSync(this.fileFor(id));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return false;
     }
+    this.notes.delete(id);
+    return true;
   }
 }
