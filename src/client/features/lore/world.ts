@@ -75,22 +75,22 @@ export function buildLoreShelf(): LoreShelfModel {
   sign.position.set(0, H + 0.26, 0.02);
   group.add(sign);
 
-  // Built facing +z, positioned against south wall facing into the room (-z)
+  // Built facing +z, rotated from the west wall into the room (+x)
   group.position.set(LORE_SHELF.x, 0, LORE_SHELF.z);
-  group.rotation.y = Math.PI;
+  group.rotation.y = Math.PI / 2;
 
   const collider: Collider = {
-    minX: LORE_SHELF.x - W / 2 - 0.04,
-    maxX: LORE_SHELF.x + W / 2 + 0.04,
-    minZ: LORE_SHELF.z - D / 2 - 0.03,
-    maxZ: FLOOR.maxZ,
+    minX: FLOOR.minX,
+    maxX: LORE_SHELF.x + D / 2 + 0.03,
+    minZ: LORE_SHELF.z - W / 2 - 0.04,
+    maxZ: LORE_SHELF.z + W / 2 + 0.04,
     top: H + 0.06,
   };
 
   const interactable: Interactable = {
     kind: 'lore',
-    x: LORE_SHELF.x,
-    z: LORE_SHELF.z - 1.2,
+    x: LORE_SHELF.x + 1.2,
+    z: LORE_SHELF.z,
     radius: 1.6,
   };
 
@@ -100,6 +100,6 @@ export function buildLoreShelf(): LoreShelfModel {
 
 export const loreShelf: Fixture = (site) => {
   const built = buildLoreShelf();
-  site.wall('south', LORE_SHELF.x, (LORE_SHELF.height + 0.55) / 2, LORE_SHELF.width + 0.2, LORE_SHELF.height + 0.55);
+  site.wall('west', LORE_SHELF.z, (LORE_SHELF.height + 0.55) / 2, LORE_SHELF.width + 0.2, LORE_SHELF.height + 0.55);
   return { group: built.group, colliders: [built.collider], interactables: [built.interactable] };
 };

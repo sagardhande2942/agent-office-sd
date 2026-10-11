@@ -44,7 +44,7 @@ When an agent finishes a shift or a teammate signs off, the Lore Shelf provides 
 ## Using the Lore Shelf
 
 ### In the 3D Office
-- Walk up to the **wooden shelf against the south wall** (beside the project bookshelf) and press **E**.
+- Walk up to the **wooden shelf beside the basketball hoop on the west wall** and press **E**.
 - The hint bar shows how many notes are on the shelf.
 
 ### From the Menu & Top Bar
