@@ -1,6 +1,6 @@
 {
   "checks": [
-    "Table tennis uses a wide elevated court view",
+    "Table tennis uses a closer court view with a narrower field of view",
     "Bot match shows exactly two names without a bot avatar",
     "Aim moves the landing target without moving the player",
     "Holding a shot does not fire it before release",
@@ -15,11 +15,11 @@
   ],
   "browserErrors": [],
   "tap": {
-    "vx": 2.595014899550911,
-    "vz": -0.3833363656385971
+    "vx": 2.5975141291708477,
+    "vz": -0.383875453365552
   },
   "charged": {
-    "vx": 4.5634406067041136,
-    "vz": 0.7829142030567653
+    "vx": 4.557873028521037,
+    "vz": 0.8104992420163759
   }
 }

@@ -22,20 +22,20 @@ export class TableTennisCamera {
     const points = [c.ballPos];
     for (const x of [-(table.length / 2), (table.length / 2)]) for (const z of [-(table.width / 2), (table.width / 2)])
       points.push(new THREE.Vector3(table.x + x, table.height, table.z + z));
-    let required = 75;
-    for (let back = 2.4; back <= 8; back += 0.4) {
-      camera.position.set(c.where.x - dir * back, 4.6, c.where.z);
+    let required = 52;
+    for (let back = 1.2; back <= 8; back += 0.3) {
+      camera.position.set(c.where.x - dir * back, 2.8, c.where.z);
       camera.lookAt(this.target); camera.updateMatrixWorld();
-      required = 75;
+      required = 52;
       for (const point of points) {
         this.local.copy(point).applyMatrix4(camera.matrixWorldInverse);
         const depth = Math.max(0.1, -this.local.z);
         const tangent = Math.max(Math.abs(this.local.y) / depth, Math.abs(this.local.x) / (depth * camera.aspect));
         required = Math.max(required, THREE.MathUtils.radToDeg(2 * Math.atan(tangent * 1.2)));
       }
-      if (required <= 95) break;
+      if (required <= 70) break;
     }
-    const fov = Math.min(100, required);
+    const fov = Math.min(80, required);
     if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
   }
 }

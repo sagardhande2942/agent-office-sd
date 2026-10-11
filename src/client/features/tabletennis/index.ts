@@ -67,6 +67,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
   ctx.ticks.add('aim', () => {
     names.update(store.pingpong, store.peers, store.you, ctx.player.pos);
     camera.update();
+    names.resize(ctx.camera);
     if (controller.active) ctx.me.root.visible = false; // Hats must not hide the near court or incoming ball.
   });
 

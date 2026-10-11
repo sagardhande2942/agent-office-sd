@@ -52,7 +52,7 @@ try {
  };
  const leave = async () => { await page.keyboard.press('KeyE'); await page.waitForFunction(() => !window.__office.store.pingpong.active); };
  await play();
- assert.ok(await page.evaluate(() => window.__office.camera.fov >= 75 && window.__office.camera.position.y >= 2.5)); check('Table tennis uses a wide elevated court view');
+ assert.ok(await page.evaluate(() => window.__office.camera.fov >= 52 && window.__office.camera.fov < 65 && window.__office.camera.position.y >= 2.5)); check('Table tennis uses a closer court view with a narrower field of view');
  await page.waitForFunction(() => window.__office.scene.children.filter(o => o.name.startsWith('tabletennis-name-')).length === 2); check('Bot match shows exactly two names without a bot avatar');
  const feetBefore = await page.evaluate(() => window.__office.player.pos.toArray());
  await page.keyboard.down('ArrowLeft'); await page.waitForTimeout(500); await page.keyboard.up('ArrowLeft');

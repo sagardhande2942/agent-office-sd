@@ -508,7 +508,7 @@ Drag to orbit and scroll to zoom. See [Maps](docs/maps.md#office-interiors) for 
 | Esc | Close any window |
 | Ctrl + [ | Send Esc to a terminal, to close a menu like Claude's `/skills` or interrupt Claude (or **⎋ Esc** in its header) |
 
-Table tennis uses a wide, elevated court camera that keeps the table and high balls in view, independently of shot aim. Only bats and one name per player are shown during a match; player bodies return when the match ends. Leaving the match restores your normal office view.
+Table tennis uses a closer, elevated court camera with a 52° baseline field of view that widens only when needed for high shots and keeps the table and high balls in view, independently of shot aim. Only bats and one name per player are shown during a match; player bodies return when the match ends. Leaving the match restores your normal office view.
 
 The full list is in [docs/controls.md](docs/controls.md).
 
