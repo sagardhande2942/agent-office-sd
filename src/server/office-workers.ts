@@ -59,7 +59,7 @@ export function workerRow(w: WorkerInfo, view: PullsView, me?: string, at = Date
     merged: !!landed,
     ...(staying ? { staying } : {}),
     ...(w.lastOutputAt ? { lastOutputAt: w.lastOutputAt } : {}),
-    blockers: blockersOf(w, view.tasks.find((t) => t.workerId === w.id), at),
+    blockers: blockersOf(w, view.tasks.find((t) => t.workerId === w.id), at, undefined, view.pulls),
   };
 }
 

@@ -46,6 +46,8 @@ article.gh-card > header { display: flex; align-items: center; gap: 8px; padding
 .gh-quiet { text-align: center; color: var(--muted); font-weight: 700; margin: 4px 0; }
 .gh-mergebox { background: #fff; border: 2px solid var(--ink); border-radius: 14px; box-shadow: 0 3px 0 var(--ink); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .gh-mergebox-go { display: flex; justify-content: flex-end; }
+/* Which other open pull requests change the same files, under the button that resolves the conflicts. */
+.gh-others { margin: 0; color: var(--muted); font-size: 13px; }
 /* The redrawn part of a conversation; its cards still space out in .gh-col's gap. */
 .gh-items { display: contents; }
 .gh-compose .seg { gap: 4px; }

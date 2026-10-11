@@ -1,6 +1,8 @@
 import type { AgentEffort, AgentProvider, GhIssue, GhMergeMethod, GhPull } from '../../../shared/protocol';
-import { store } from '../../state';
+import { store, workerForPull } from '../../state';
 import { repoOf } from '../../../shared/forgeweb';
+import { workerPr } from '../../../shared/status';
+import { overlapLines, workerFileCollisions } from '../../../shared/conflicts';
 import type { MeetingPreset } from '../meeting';
 import { officePrompt } from '../prompts';
 
@@ -49,6 +51,29 @@ function mergeCommand(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) 
   return `gh pr merge ${it.number} --${method}${deleteBranch ? ' --delete-branch' : ''} --repo ${nameWithOwner(it.url)}`;
 }
 
+/**
+ * The other open pull requests changing the same files as this one, as the fix-conflicts prompt's
+ * `{{others}}`: the one thing a worker resolving conflicts doesn't know, and can't see from the PR
+ * alone — several workers merge at once, and the ones landing on these files decide what the conflict
+ * actually means. Empty when the office knows of no overlap, and the prompt drops the line.
+ *
+ * Each worker's pull request is resolved through the same workerPr the floor report uses, against
+ * the board's list, and only an open one counts: a worker keeps its link and its checklist after its
+ * pull request merges, so trusting the stored link would name a merged pull request as an open one,
+ * and trusting only the link would miss one known by its worktree branch or its queue task.
+ */
+export function othersOf(it: GhPull): string {
+  const mine = workerForPull(store.workers.values(), it);
+  if (!mine) return '';
+  const workers = [...store.workers.values()];
+  const board = workers.map((w) => {
+    const pr = workerPr(w, store.pulls.items, store.queue.tasks);
+    const open = pr?.state === 'open' ? pr.number : undefined;
+    return { id: w.id, name: w.name, ...(open !== undefined ? { pr: open } : {}), ...(w.completion?.files ? { files: w.completion.files } : {}) };
+  });
+  return overlapLines(workerFileCollisions(board).get(mine.id));
+}
+
 function mergeVars(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) {
   return { ...pullVars(it), repo: nameWithOwner(it.url), merge: mergeCommand(it, method, deleteBranch) };
 }
@@ -58,7 +83,7 @@ export function fixAndMergePrompt(it: GhPull, method: GhMergeMethod, deleteBranc
 }
 
 export function fixConflictsPrompt(it: GhPull, method: GhMergeMethod, deleteBranch: boolean) {
-  return officePrompt('pull.fixConflicts', mergeVars(it, method, deleteBranch));
+  return officePrompt('pull.fixConflicts', { ...mergeVars(it, method, deleteBranch), others: othersOf(it) });
 }
 
 export function pullContext(it: GhPull) {

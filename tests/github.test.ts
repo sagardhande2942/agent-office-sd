@@ -5,7 +5,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { originRepo, repoArgs, saidOf, workRepo } from '../src/server/forge.js';
-import { Claims, closesIn } from '../src/server/github.js';
+import { Claims, PULL_FIELDS, closesIn, pullOf } from '../src/server/github.js';
+import { isConflicting } from '../src/shared/conflicts.js';
 
 // A floor works on the repository its origin points at, so a fork's boards and pull requests are its
 // own. The gong, which both forges share, is tested in tests/bitbucket.test.ts.
@@ -134,4 +135,37 @@ test('handed over twice, the first answer failing leaves the second one standing
   assert.deepEqual(taken(c.mark([issue(7)])), [7]);
   second(true, 3000);
   assert.deepEqual(taken(c.mark([issue(7, ['octocat'])], 3500)), []);
+});
+
+// The board's pull request list carries the merge state, so the office can say a PR conflicts without
+// a person opening it. `gh pr list --json` is asked for those fields by name (PULL_FIELDS).
+
+const raw = (more: Record<string, unknown> = {}) => ({ number: 7, title: 'T', state: 'OPEN', isDraft: false, url: 'https://github.com/o/r/pull/7', author: { login: 'ada' }, labels: [], reviewDecision: '', headRefName: 'office/mochi', headRefOid: 'abc', baseRefName: 'main', createdAt: '', updatedAt: '', additions: 2, deletions: 1, statusCheckRollup: [], body: 'closes #3', ...more });
+
+test('the pull request list is asked for the merge state gh exports', () => {
+  for (const field of ['mergeable', 'mergeStateStatus']) {
+    assert.ok(PULL_FIELDS.split(',').includes(field), `${field} is asked for, or a conflicting PR can never be seen`);
+  }
+  assert.equal(pullOf(raw()).mergeable, undefined, 'a field gh did not send is left out, not guessed');
+  assert.equal(pullOf(raw()).mergeStateStatus, undefined);
+});
+
+test('a pull request GitHub says conflicts is conflicting on the list, with no window opened', () => {
+  const dirty = pullOf(raw({ mergeable: 'CONFLICTING', mergeStateStatus: 'DIRTY' }));
+  assert.equal(dirty.mergeable, 'CONFLICTING');
+  assert.equal(isConflicting(dirty), true);
+  const clean = pullOf(raw({ mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN' }));
+  assert.equal(isConflicting(clean), false);
+  const unknown = pullOf(raw({ mergeable: 'UNKNOWN', mergeStateStatus: 'UNKNOWN' }));
+  assert.equal(isConflicting(unknown), false, 'Bitbucket says UNKNOWN, and UNKNOWN is not a conflict');
+  assert.equal(pullOf(raw({ state: 'MERGED', mergeable: 'CONFLICTING' })).mergeable, 'CONFLICTING', 'the value still comes through; isConflicting decides what it means');
+});
+
+test('the rest of a pull request maps as it always did', () => {
+  const p = pullOf(raw());
+  assert.equal(p.author, 'ada');
+  assert.equal(p.headRefOid, 'abc');
+  assert.deepEqual(p.closes, [3]);
+  assert.equal(p.checks, 'none');
+  assert.equal(pullOf(raw({ statusCheckRollup: [{ conclusion: 'FAILURE' }] })).checks, 'fail');
 });

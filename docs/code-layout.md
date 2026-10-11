@@ -79,7 +79,7 @@ The rest of `src/server/` is a module per service or per thing a floor keeps (`d
 - **`protocol.ts`** is the wire protocol. It puts the domain files in `protocol/<domain>.ts` back together (`export *`) and makes the `ClientMsg` and `ServerMsg` unions every frame is one of. Keep `import type` between domain files: some name each other's types (`floors.ts` and `presence.ts` do), which only type imports can do without a cycle at run time.
 - **`providers.ts`** is the provider table: every agent a worker can run, and what the office knows about each.
 
-The rest is data and pure code both sides use: the floor's layout, maps (`shared/maps/`), the sun, the garage and so on.
+The rest is data and pure code both sides use: the floor's layout, maps (`shared/maps/`), the sun, the garage and so on. A rule both the server and the browser must agree on lives in its own module and nowhere else, so the two cannot drift: `shared/conflicts.ts` holds the one definition of a conflicting pull request, and both `server/manager.ts`'s blockers and the client's PR window read it.
 
 ## Adding a feature
 

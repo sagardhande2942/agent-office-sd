@@ -523,8 +523,8 @@ export const TOOLS = [
     name: 'floor_status',
     title: 'Floor status',
     description:
-      "The floor as a manager sees it, as one object: every worker with its desk, provider/model, status, task, pull request and typed blockers " +
-      "(needs_input, failed, stalled, worktree_deleted, no_desk, over_limit, hiring_paused); every queue task with the agent and model it runs on, " +
+      "The floor as a manager sees it, as one object: every worker with its desk, provider/model, status, task, pull request, the other workers whose open pull requests change the same files (overlaps, with moreOverlaps saying how many were left out) and typed blockers " +
+      "(needs_input, conflicting, failed, stalled, worktree_deleted, no_desk, over_limit, hiring_paused); every queue task with the agent and model it runs on, " +
       'what it waits on, and its verification (verified with a pull request whose checks passed or none to run, needs-review, or unverified with no pull request); ' +
       "plus completed, ongoing, attention (worst first) and decisions (what needs a person). Read it before you say what has become of anything, and never call a task " +
       'done when its verdict is not verified.',

@@ -5,7 +5,8 @@
 
 import type { GhPull, QueueTask, WorkerInfo } from './protocol.js';
 import type { Blocker, WorkerRow } from './status.js';
-import { alertDetail } from './status.js';
+import { alertDetail, workerPr } from './status.js';
+import { isConflicting, overlapLines, workerFileCollisions, type WorkerOverlap, type WorkerOverlapGroup } from './conflicts.js';
 
 export type { Blocker } from './status.js';
 
@@ -16,6 +17,14 @@ export const STALL_MS = 10 * 60_000;
 export interface ManagerWorker extends WorkerRow {
   /** The queue task it was seated for, when it holds one. */
   taskId?: string;
+  /**
+   * The other workers whose open pull requests change the same files as this one's, and the files they
+   * share: two parallel workers on the same file will fight when they land, and this says so while both
+   * pull requests are still open. Empty when nothing is known (see workerFileCollisions).
+   */
+  overlaps?: WorkerOverlap[];
+  /** How many more workers overlap than the ones `overlaps` names, when the list was cut short. */
+  moreOverlaps?: number;
 }
 
 /** Where a finished task's work stands: a pull request with its checks, or nothing to show yet. */
@@ -98,20 +107,31 @@ export interface ManagerInput {
 /** How bad each kind of stop is, worst first: what a manager should hear about first. */
 const RANK: Record<Blocker['kind'], number> = {
   needs_input: 0,
-  failed: 1,
-  worktree_deleted: 2,
-  stalled: 3,
-  over_limit: 4,
-  no_desk: 5,
-  hiring_paused: 6,
+  conflicting: 1,
+  failed: 2,
+  worktree_deleted: 3,
+  stalled: 4,
+  over_limit: 5,
+  no_desk: 6,
+  hiring_paused: 7,
 };
 
-/** What's stopping a worker, worst first; empty when nothing is. */
-export function blockersOf(w: WorkerInfo, task: QueueTask | undefined, now: number, stallMs = STALL_MS): Blocker[] {
+/**
+ * What's stopping a worker, worst first; empty when nothing is. With `pulls` — the floor's pull request
+ * list — a worker whose open pull request conflicts with its base is stopped too, so a conflict reaches
+ * the manager as a blocker instead of waiting for someone to open the PR window and notice.
+ */
+export function blockersOf(w: WorkerInfo, task: QueueTask | undefined, now: number, stallMs = STALL_MS, pulls?: GhPull[]): Blocker[] {
   const out: Blocker[] = [];
   if (w.status === 'needs_input') out.push({ kind: 'needs_input', why: alertDetail(w) ?? 'it is waiting on an answer', since: w.waitingSince });
   if (task && task.outcome && task.outcome !== 'done') out.push({ kind: 'failed', why: task.error ?? `it ${task.outcome}`, since: task.finishedAt });
   else if (w.status === 'exited') out.push({ kind: 'failed', why: w.exitCode === undefined ? 'its process exited' : `its process exited with code ${w.exitCode}` });
+  // Its pull request cannot merge until someone resolves it, and nothing on a quiet terminal is about to.
+  if (pulls) {
+    const pr = workerPr(w, pulls, task ? [task] : []);
+    const pull = pr && pulls.find((p) => p.number === pr.number);
+    if (pull && isConflicting(pull)) out.push({ kind: 'conflicting', why: `PR #${pull.number} conflicts with ${pull.baseRefName} and cannot merge until it is resolved`, since: Date.parse(pull.updatedAt) || undefined });
+  }
   // A worker whose terminal has gone quiet while it says it's working: its last output, or when it started.
   const quiet = w.lastOutputAt ?? (w.status === 'working' ? w.workingSince : undefined);
   if (w.status === 'working' && quiet !== undefined && now - quiet > stallMs) {
@@ -168,11 +188,19 @@ export function managerReport(input: ManagerInput): ManagerReport {
   const { workers, rows, tasks, pulls, now, stallMs = STALL_MS } = input;
   const byId = new Map(tasks.map((t) => [t.id, t]));
   const seatOf = new Map(tasks.filter((t) => t.workerId).map((t) => [t.workerId!, t]));
+  // Which open pull requests share a file, worked out once for the floor from the checklists workers filed.
+  const collisions = workerFileCollisions(
+    workers.map((w) => {
+      const pr = openPrOf(w, pulls, tasks);
+      return { id: w.id, name: w.name, ...(pr !== undefined ? { pr } : {}), ...(w.completion?.files ? { files: w.completion.files } : {}) };
+    }),
+  );
   const crew: ManagerWorker[] = workers.map((w) => {
     const row = rows.find((r) => r.id === w.id);
     const task = seatOf.get(w.id);
-    const blockers = blockersOf(w, task, now, stallMs);
-    return { ...(row ?? fallbackRow(w)), ...(task ? { taskId: task.id } : {}), blockers };
+    const overlaps = collisions.get(w.id);
+    const blockers = blockersOf(w, task, now, stallMs, pulls);
+    return { ...(row ?? fallbackRow(w)), ...(task ? { taskId: task.id } : {}), ...(overlaps?.others.length ? { overlaps: overlaps.others } : {}), ...(overlaps?.moreWorkers ? { moreOverlaps: overlaps.moreWorkers } : {}), blockers: withOverlaps(blockers, overlaps) };
   });
 
   const running = tasks.filter((t) => t.status === 'running').length;
@@ -231,6 +259,21 @@ function fallbackRow(w: WorkerInfo): WorkerRow {
   return { id: w.id, name: w.name, kind: w.kind, desk: w.deskId, status: w.status, hiredBy: w.createdBy, hiredAt: new Date(w.createdAt).toISOString(), merged: false, blockers: [] };
 }
 
+/**
+ * The conflict blocker naming the other open pull requests on the same files: who else is landing there
+ * is what tells a person whether to resolve and rebase, or wait for the other one to land first.
+ */
+function withOverlaps(blockers: Blocker[], overlaps: WorkerOverlapGroup | undefined): Blocker[] {
+  if (!overlaps?.others.length) return blockers;
+  return blockers.map((b) => (b.kind === 'conflicting' ? { ...b, why: `${b.why}; ${overlapLines(overlaps)}` } : b));
+}
+
+/** Its open pull request's number, when it has one; what two workers would collide over. */
+function openPrOf(w: WorkerInfo, pulls: GhPull[], tasks: QueueTask[]): number | undefined {
+  const pr = workerPr(w, pulls, tasks);
+  return pr?.state === 'open' ? pr.number : undefined;
+}
+
 /** The two kinds of stop a person has to settle: a question asked, and work not verified. */
 function isDecision(a: Attention): boolean {
   return a.kind === 'needs_input' || (!!a.verdict && a.verdict !== 'verified');
@@ -239,6 +282,7 @@ function isDecision(a: Attention): boolean {
 /** What the office would ask a person to decide about one of these. */
 function askOf(a: Attention): string {
   if (a.kind === 'needs_input') return 'answer the question it asked';
+  if (a.kind === 'conflicting') return 'send a worker to resolve the conflicts on its pull request';
   if (a.verdict === 'unverified') return 'read the work, or requeue the task with office-queue retry';
   return 'read the pull request and its checks before calling the task done';
 }
