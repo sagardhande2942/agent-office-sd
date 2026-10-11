@@ -28,12 +28,24 @@ export interface PromptOptions {
 }
 
 const WT_KEY = 'agent-office.worktree';
-/** Whether the last hire asked for its own git worktree (the Ask window shares the choice). */
+/**
+ * Whether a new worker gets a git worktree of its own: ticked unless someone has unticked it (the Ask
+ * window shares the choice), so parallel workers never share a checkout by accident.
+ */
 export function worktreePref(): boolean {
   try {
-    return localStorage.getItem(WT_KEY) === '1';
+    return localStorage.getItem(WT_KEY) !== '0';
   } catch {
-    return false;
+    return true;
+  }
+}
+
+/** Remembers the choice for the next hire, so it opens the way this one was left. */
+export function rememberWorktreePref(on: boolean): void {
+  try {
+    localStorage.setItem(WT_KEY, on ? '1' : '0');
+  } catch {
+    // storage blocked
   }
 }
 
@@ -95,13 +107,7 @@ export function openPrompt(opts: PromptOptions) {
     }
     if (provider && !provider.valid()) return;
     modal.close();
-    if (opts.worktreeOption) {
-      try {
-        localStorage.setItem(WT_KEY, wtBox.checked ? '1' : '0');
-      } catch {
-        // storage blocked
-      }
-    }
+    if (opts.worktreeOption) rememberWorktreePref(wtBox.checked);
     const worktree = !!opts.worktreeOption && wtBox.checked;
     opts.onSubmit(text, { worktree, provider: provider?.value(), model: provider?.model(), effort: provider?.effort(), picked: !!provider?.picked(), repos: worktree ? repos.value() : [] });
   };
