@@ -259,3 +259,23 @@ test('failed settings and restore writes preserve the current schedule and archi
     assert.equal(new CuratorMemory(f.dir).get('one')?.curation?.status, 'archived');
   } finally { f.close(); }
 });
+
+test('completion evidence includes core validation and tests despite a referenced integration test and crowded filenames', async () => {
+  const f = fixture();
+  try {
+    execFileSync('git', ['init'], { cwd: f.dir, stdio: 'ignore' });
+    mkdirSync(path.join(f.dir, 'src/server'), { recursive: true }); mkdirSync(path.join(f.dir, 'tests'));
+    writeFileSync(path.join(f.dir, 'src/server/completion.ts'), "if (!Array.isArray(body.files)) throw Error('files must be an array');\nif (!body.files.length && !body.filesNote) throw Error('Explain no changes');");
+    writeFileSync(path.join(f.dir, 'tests/completion.test.ts'), '// filler header\n'.repeat(400) + "assert.throws(() => readCompletion({filesNote: 'No edits'}));\nreadCompletion({files: [], filesNote: 'No edits'});\n");
+    writeFileSync(path.join(f.dir, 'tests/completion-server.test.ts'), 'submitCompletion({files: ["src/api.ts"]});');
+    for (let i = 0; i < 12; i++) writeFileSync(path.join(f.dir, `tests/completion-server-adapter-${i}.test.ts`), '// unrelated lifecycle fixture');
+    execFileSync('git', ['add', '.'], { cwd: f.dir });
+    execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '-m', 'fixture'], { cwd: f.dir, stdio: 'ignore' });
+    const note = save(f.memory, 'one', 'Completion CLI rejects omitted files; use files: [] and filesNote for no changes. Earlier evidence: tests/completion-server.test.ts', 'Completion files-array requirement');
+    const e = await repositoryEvidence(f.dir, [note]);
+    assert.ok(e.files.some(x => x.path === 'src/server/completion.ts' && x.excerpt.includes('Array.isArray')));
+    const unit = e.files.find(x => x.path === 'tests/completion.test.ts'); assert.ok(unit);
+    assert.ok(unit.excerpt.includes('filesNote')); assert.ok(unit.excerpt.includes('assert.throws'));
+    assert.ok(e.files.length <= 8); assert.ok(e.files.every(x => x.excerpt.length <= 4000));
+  } finally { f.close(); }
+});

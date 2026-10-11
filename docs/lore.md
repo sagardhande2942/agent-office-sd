@@ -100,3 +100,5 @@ A run reviews at most the configured notes and 60,000 characters of note data, p
 Archiving and superseding preserve the original note files. Use **History** to inspect earlier originals, **Restore original** to remove a curator overlay/archive, or **Restore this revision** to recover a prior worker-written version. No automatic cleanup permanently deletes notes. The same controls operate through host RPCs for remote floors; older hosts show an upgrade message and never cause the office to touch a remote checkout.
 
 Browser verification: `node --import tsx scripts/e2e-lore-curator.mjs` uses fixture agents, saves a daily schedule and model, runs cleanup, checks duplicate/archive recovery and pause/resume, and captures [settings](lore-shelf-evidence/curator-settings.png) and [run history](lore-shelf-evidence/curator-history.png).
+
+Curator evidence selection prioritizes referenced files, relevant implementation and tests, and matching passages within longer committed files. Missing context alone should leave a note unchanged rather than mark it as incorrect.
