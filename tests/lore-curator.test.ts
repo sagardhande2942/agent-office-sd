@@ -8,7 +8,7 @@ import { LoreCurator } from '../src/server/lore-curator/service.js';
 import { CuratorMemory } from '../src/server/lore-curator/memory.js';
 import { nextCuratorRun } from '../src/server/lore-curator/schedule.js';
 import { repositoryEvidence } from '../src/server/lore-curator/evidence.js';
-import { createCuratorAgent } from '../src/server/lore-curator/agent.js';
+import { createCuratorAgent, curatorSchema } from '../src/server/lore-curator/agent.js';
 import { applyActions, parseActions } from '../src/server/lore-curator/actions.js';
 import { DEFAULT_CURATOR_SETTINGS, validateCuratorSettings } from '../src/shared/lore-curator.js';
 import { selectWorkerLore } from '../src/shared/worker-lore.js';
@@ -64,11 +64,31 @@ test('invalid actions are rejected as a batch; verification requires supplied ev
     const one = save(f.memory, 'one', 'Observed pool');
     const action = { action: 'verify', id: 'one', target: '', reason: 'Checked', evidence: [] };
     assert.throws(() => parseActions({ summary: 'ok', actions: [action] }, [one], evidence), /requires/);
-    assert.throws(() => parseActions({ summary: 'ok', actions: [{ ...action, evidence: ['secret.env'] }] }, [one], evidence), /unsupported/);
+    assert.throws(() => parseActions({ summary: 'ok', actions: [{ ...action, evidence: ['secret.env'] }] }, [one], evidence), /unsupported/i);
     assert.throws(() => parseActions({ summary: 'ok', actions: [{ ...action, id: '../other-floor' }] }, [one], evidence));
     const handover = f.memory.save({ id: 'handover', title: 'Handover', content: 'Reported pool test', author: 'Other worker', tags: ['handover'] });
     const result = applyActions(f.memory, [one, handover], [{ action: 'merge', id: handover.id, target: one.id, reason: 'same', evidence: [] }], evidence, Date.now());
     assert.equal(result.skipped, 1); assert.equal(f.memory.get(handover.id)?.curation?.status, 'active');
+  } finally { f.close(); }
+});
+test('run schemas constrain note IDs, merge targets and exact evidence paths', async () => {
+  const schema = curatorSchema(['one', 'two'], ['src/database.ts']);
+  const properties = schema.properties.actions.items.properties;
+  assert.deepEqual((properties.id as any).enum, ['one', 'two']);
+  assert.deepEqual((properties.target as any).enum, ['', 'one', 'two']);
+  assert.deepEqual((properties.evidence.items as any).enum, ['src/database.ts']);
+  assert.equal((properties.evidence as any).maxItems, 1);
+  assert.equal((curatorSchema(['one'], []).properties.actions.items.properties.evidence as any).maxItems, 0);
+  const f = fixture(async (_settings, prompt, _signal, suppliedSchema) => {
+    const notes = JSON.parse(prompt.slice(prompt.indexOf('\n') + 1)).notes;
+    assert.deepEqual(suppliedSchema, curatorSchema(notes.map((n: any) => n.id), ['src/database.ts']));
+    return { summary: 'Verified', actions: [{ action: 'verify', id: 'one', target: '', reason: 'Pool limit matches excerpt', evidence: ['src/database.ts'] }] };
+  });
+  try {
+    const one = save(f.memory, 'one', 'Pool maximum is 20');
+    await f.service.run(); assert.equal(f.service.state().runs[0].status, 'completed');
+    assert.throws(() => parseActions({ summary: 'Wrong citation', actions: [{ action: 'verify', id: 'one', target: '', reason: 'Checked', evidence: ['src/database.ts:1'] }] }, [one], evidence), /Unsupported evidence.*exact supplied/);
+    assert.throws(() => parseActions({ summary: 'Wrong note', actions: [{ action: 'archive', id: 'unknown', target: '', reason: 'Old', evidence: [] }] }, [one], evidence), /note ID.*supplied batch/);
   } finally { f.close(); }
 });
 test('only relevant active knowledge is injected; unrelated notes cannot fill remaining slots', () => {
@@ -145,11 +165,11 @@ test('background CLI adapters forward models over stdin, disable tools/hooks, an
   const dir = mkdtempSync(path.join(os.tmpdir(), 'curator-agent-test-'));
   try {
     const command = path.join(dir, 'fake-agent'), log = path.join(dir, 'log.json');
-    writeFileSync(command, `#!${process.execPath}\nconst fs=require('fs');let prompt='';process.stdin.on('data',c=>prompt+=c);process.stdin.on('end',()=>{fs.writeFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),prompt,token:process.env.AGENT_OFFICE_HOOK_TOKEN}));const body={summary:'Fixture',actions:[]};const i=process.argv.indexOf('--output-last-message');if(i>=0)fs.writeFileSync(process.argv[i+1],JSON.stringify(body));else console.log(JSON.stringify({structured_output:body}));});`, { mode: 0o755 });
+    writeFileSync(command, `#!${process.execPath}\nconst fs=require('fs');let prompt='';process.stdin.on('data',c=>prompt+=c);process.stdin.on('end',()=>{fs.writeFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),cwd:process.cwd(),prompt,schema:JSON.parse(process.argv.includes('--json-schema')?process.argv[process.argv.indexOf('--json-schema')+1]:fs.readFileSync(process.argv[process.argv.indexOf('--output-schema')+1],'utf8')),token:process.env.AGENT_OFFICE_HOOK_TOKEN}));const body={summary:'Fixture',actions:[]};const i=process.argv.indexOf('--output-last-message');if(i>=0)fs.writeFileSync(process.argv[i+1],JSON.stringify(body));else console.log(JSON.stringify({structured_output:body}));});`, { mode: 0o755 });
     const agent = createCuratorAgent({ claude: command, codex: command });
     for (const provider of ['claude', 'codex'] as const) {
-      await agent({ ...DEFAULT_CURATOR_SETTINGS, provider, model: provider === 'claude' ? 'sonnet' : 'gpt-5.5' }, 'Untrusted note data', new AbortController().signal);
-      const launch = JSON.parse(readFileSync(log, 'utf8')); assert.equal(launch.prompt, 'Untrusted note data'); assert.notEqual(launch.cwd, dir); assert.equal(launch.token, undefined);
+      await agent({ ...DEFAULT_CURATOR_SETTINGS, provider, model: provider === 'claude' ? 'sonnet' : 'gpt-5.5' }, 'Untrusted note data', new AbortController().signal, curatorSchema(['one'], ['src/database.ts']));
+      const launch = JSON.parse(readFileSync(log, 'utf8')); assert.deepEqual(launch.schema, curatorSchema(['one'], ['src/database.ts'])); assert.equal(launch.prompt, 'Untrusted note data'); assert.notEqual(launch.cwd, dir); assert.equal(launch.token, undefined);
       assert.ok(launch.args.includes('--model')); assert.ok(launch.args.includes(provider === 'claude' ? '--strict-mcp-config' : '--ignore-user-config'));
     }
   } finally { rmSync(dir, { recursive: true, force: true }); }

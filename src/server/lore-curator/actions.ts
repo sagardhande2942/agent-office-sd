@@ -13,7 +13,9 @@ export function parseActions(body: unknown, notes: LoreNote[], evidence: Reposit
   const actions: Action[] = [];
   for (const raw of b.actions) {
     const a = raw as Action;
-    if (!a || !['merge', 'archive', 'verify', 'flag'].includes(a.action) || !ids.has(a.id) || typeof a.reason !== 'string' || !a.reason.trim() || a.reason.length > 1500 || !Array.isArray(a.evidence) || a.evidence.length > 8 || a.evidence.some(p => typeof p !== 'string' || !paths.has(p)) || typeof a.target !== 'string') throw Error('Invalid curator action or unsupported evidence');
+    if (!a || !['merge', 'archive', 'verify', 'flag'].includes(a.action) || typeof a.reason !== 'string' || !a.reason.trim() || a.reason.length > 1500 || !Array.isArray(a.evidence) || a.evidence.length > 8 || typeof a.target !== 'string') throw Error('Invalid curator action: expected action, id, string target, nonempty reason and at most 8 evidence paths');
+    if (!ids.has(a.id)) throw Error(`Invalid curator action: note ID ${JSON.stringify(a.id)} is not in the supplied batch`);
+    if (a.evidence.some(p => typeof p !== 'string' || !paths.has(p))) throw Error(`Unsupported evidence for note ${JSON.stringify(a.id)}: cite only exact supplied repository paths, without line numbers or prose`);
     if (a.action === 'verify' && !a.evidence.length) throw Error('Verification requires supplied repository evidence');
     if (a.action === 'merge' && (!ids.has(a.target) || a.target === a.id)) throw Error('A merge requires two different notes in this batch');
     const affected = a.action === 'merge' ? [a.id, a.target] : [a.id];

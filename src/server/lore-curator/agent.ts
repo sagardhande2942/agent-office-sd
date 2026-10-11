@@ -6,25 +6,36 @@ import type { CuratorProvider, CuratorSettings } from '../../shared/lore-curator
 import { CURATOR_PROVIDERS } from '../../shared/lore-curator.js';
 import { providerCommand } from '../agents.js';
 import { resolveCommand } from '../workers/process.js';
-export type CuratorAgent = (settings: CuratorSettings, prompt: string, signal: AbortSignal) => Promise<unknown>;
+export type CuratorAgent = (settings: CuratorSettings, prompt: string, signal: AbortSignal, schema?: typeof CURATOR_SCHEMA) => Promise<unknown>;
 export const CURATOR_SCHEMA = { type: 'object', additionalProperties: false, required: ['summary', 'actions'], properties: {
   summary: { type: 'string' }, actions: { type: 'array', items: { type: 'object', additionalProperties: false,
     required: ['action', 'id', 'target', 'reason', 'evidence'], properties: { action: { type: 'string', enum: ['merge', 'archive', 'verify', 'flag'] },
       id: { type: 'string' }, target: { type: 'string' }, reason: { type: 'string' }, evidence: { type: 'array', items: { type: 'string' } } } } } } };
+/** Bind structured output to the same batch and evidence accepted by the server. */
+export function curatorSchema(ids: string[], paths: string[]): typeof CURATOR_SCHEMA {
+  const schema = structuredClone(CURATOR_SCHEMA);
+  const properties = schema.properties.actions.items.properties;
+  Object.assign(schema.properties.actions, { maxItems: ids.length });
+  Object.assign(properties.id, { enum: ids });
+  Object.assign(properties.target, { enum: ['', ...ids] });
+  Object.assign(properties.evidence, { maxItems: Math.min(8, paths.length) });
+  if (paths.length) Object.assign(properties.evidence.items, { enum: paths });
+  return schema;
+}
 export function curatorCommands(agentCmd: string): Partial<Record<CuratorProvider, string>> {
   return Object.fromEntries(CURATOR_PROVIDERS.map(p => [p, resolveCommand(providerCommand(p, agentCmd))]).filter(([, cmd]) => !!cmd));
 }
 /** Noninteractive adapters are deliberately isolated from office management tools and hooks. */
 export function createCuratorAgent(commands: Partial<Record<CuratorProvider, string>>): CuratorAgent {
-  return async (settings, prompt, signal) => {
+  return async (settings, prompt, signal, outputSchema = CURATOR_SCHEMA) => {
     const command = commands[settings.provider];
     if (!command) throw Error(`${settings.provider} is not installed on this floor's machine`);
     const temp = mkdtempSync(path.join(os.tmpdir(), 'office-curator-'));
     try {
       const result = path.join(temp, 'result.json'), schema = path.join(temp, 'schema.json');
-      writeFileSync(schema, JSON.stringify(CURATOR_SCHEMA), { mode: 0o600 });
+      writeFileSync(schema, JSON.stringify(outputSchema), { mode: 0o600 });
       const args = settings.provider === 'claude'
-        ? ['--print', '--output-format', 'json', '--json-schema', JSON.stringify(CURATOR_SCHEMA), '--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--setting-sources', '', '--settings', '{"disableAllHooks":true}', '--disable-slash-commands', '--no-session-persistence', '--max-turns', '2']
+        ? ['--print', '--output-format', 'json', '--json-schema', JSON.stringify(outputSchema), '--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--setting-sources', '', '--settings', '{"disableAllHooks":true}', '--disable-slash-commands', '--no-session-persistence', '--max-turns', '2']
         : ['exec', '--ignore-user-config', '--ignore-rules', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only', '-c', 'approval_policy="never"', '-c', 'web_search="disabled"', ...['shell_tool', 'unified_exec', 'apps', 'plugins', 'hooks'].flatMap(f => ['--disable', f]), '--output-schema', schema, '--output-last-message', result];
       if (settings.model) args.push('--model', settings.model);
       if (settings.provider === 'codex') args.push('-');
