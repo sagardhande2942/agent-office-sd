@@ -173,6 +173,40 @@ test("a worker's server opens on the same port here, for anything on this comput
   }
 });
 
+for (const stop of ['close', 'removed'] as const) {
+  test(`active upgraded connections close when the tunnel is ${stop}`, { timeout: 5000 }, async () => {
+    const t = await setup();
+    let socket: import('node:stream').Duplex | undefined;
+    try {
+      await t.office.signIn('', 'hunter2');
+      const items: Forward[] = [{ port: t.port, title: 'Vite', command: 'vite' }];
+      await t.forwarder.sync(items);
+      socket = await new Promise<import('node:stream').Duplex>((resolve, reject) => {
+        const req = http.request({ host: '127.0.0.1', port: t.port,
+          headers: { host: `localhost:${t.port}`, connection: 'Upgrade', upgrade: 'echo' } });
+        req.on('upgrade', (_res, upgraded) => resolve(upgraded));
+        req.on('error', reject);
+        req.end();
+      });
+      socket.resume();
+      const closed = new Promise<void>((resolve) => socket!.once('close', resolve));
+      if (stop === 'close') t.forwarder.close();
+      else await t.forwarder.sync([]);
+      await closed;
+      assert.deepEqual(t.forwarder.ports(), []);
+      await assert.rejects(get(t.port, '/'), /ECONNREFUSED/);
+      if (stop === 'close') {
+        await t.forwarder.sync(items);
+        assert.deepEqual(t.events, [`opened ${t.port}`]);
+        assert.deepEqual(t.forwarder.ports(), []);
+      }
+    } finally {
+      socket?.destroy();
+      t.close();
+    }
+  });
+}
+
 test("a request the client sends never gets the office's own pages", async () => {
   const t = await setup();
   const item = (port: number): Forward => ({ port, title: 'x', command: 'x' });

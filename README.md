@@ -179,7 +179,7 @@ agent-office tunnel                       # while `deploy/aws.sh open` (or a tea
 agent-office tunnel office@203.0.113.7    # or by itself: it opens the tunnel to the office too
 ```
 
-It works with every way of running the office on a server, and needs the `agent-office` command on your computer: [docs/tunnel.md](docs/tunnel.md).
+Ctrl-C closes the forwarded ports and their active connections, including hot-reload WebSockets. It works with every way of running the office on a server, and needs the `agent-office` command on your computer: [docs/tunnel.md](docs/tunnel.md).
 
 ## Deploy to Azure
 
