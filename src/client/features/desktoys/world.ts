@@ -31,6 +31,8 @@ export interface SeatToy {
   readonly spinner: THREE.Object3D;
   /** What its worker is up to, which the toy answers (see toyMood). installDeskToys keeps it current. */
   mood: ToyMood;
+  /** Whether the floor is set to reduce motion, which takes the movement out but not the news. */
+  calm: boolean;
   /** How hard it's wound up, 0 at rest, 1 the moment it's wound (a merge winds the whole floor up). */
   energy: number;
   /** The surface it stands on, which it bobs around rather than sinking into. */
@@ -67,7 +69,7 @@ function toyAt(def: DeskDef, spot: ToySpot, index: number): SeatToy {
   toy.group.position.set(spot.t, spot.y, spot.s);
   // The toy is part of the desk as far as clicking is concerned, so it never takes a desk key away.
   toy.group.userData.interact = { kind: 'desk', deskId: def.id };
-  return { deskId: def.id, kind: toy.kind, group: toy.group, spinner: toy.spinner, restY: spot.y, mood: 'idle', energy: 0 };
+  return { deskId: def.id, kind: toy.kind, group: toy.group, spinner: toy.spinner, restY: spot.y, mood: 'idle', calm: false, energy: 0 };
 }
 
 declare module '../../world/types' {
@@ -106,7 +108,7 @@ export const deskToys: Fixture<'deskToys'> = (site) => {
     update: (t, dt) => {
       for (const toy of toys.values()) {
         if (toy.energy > 0) toy.energy = Math.max(0, toy.energy - dt / WIND_SECONDS);
-        const m = toyMotion(toy.kind, toy.energy, toy.mood, t);
+        const m = toyMotion(toy.kind, toy.energy, toy.mood, t, toy.calm);
         toy.group.rotation.set(m.tip, 0, m.lean);
         toy.group.position.y = toy.restY + m.bob;
         toy.spinner.rotation.y = m.turn;

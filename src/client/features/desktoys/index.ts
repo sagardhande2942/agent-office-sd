@@ -16,15 +16,19 @@ import { toyMood, windToys } from './world';
 const CHEER = new Set<GongWhy>(['merged', 'queue']);
 
 /**
- * Keeps every toy's mood current from the floor's workers, and winds the whole floor's toys up when
- * a pull request merges or the queue empties.
+ * Keeps every toy's mood current from the floor's workers, tells them when the floor is set to
+ * reduce motion, and winds the whole floor's toys up when a pull request merges or the queue empties.
  *
  * How long each toy has been wound is the fixture's to wind down and to draw (see deskToys): this
  * only says what each toy is answering, and when to wind them.
  */
 export function installDeskToys(ctx: Ctx) {
   ctx.ticks.add('world', () => {
-    for (const toy of ctx.office.deskToys.values()) toy.mood = toyMood(store.workerAtDesk(toy.deskId)?.status);
+    const calm = ctx.reduceMotion.matches;
+    for (const toy of ctx.office.deskToys.values()) {
+      toy.mood = toyMood(store.workerAtDesk(toy.deskId)?.status);
+      toy.calm = calm;
+    }
   });
 
   /** A merge, or the queue emptying: every toy on the floor goes at once. */

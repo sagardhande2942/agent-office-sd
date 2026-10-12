@@ -147,14 +147,20 @@ const TEMPO: Record<ToyKind, { spin: number; rock: number; pitch: number; bounce
 /**
  * What one toy is doing right now. `mood` only adds to the wind-up, never takes from it: a toy on an
  * empty desk still spins when you wind it, it just has nothing of its own to do.
+ *
+ * `calm` is the office's *reduce motion* setting, which the floor's other moving things honour. It
+ * takes the movement out without taking the news with it: a toy that would be turning, rocking and
+ * bobbing holds one fixed pose instead, and a worker waiting on an answer still has its toy leaning
+ * over, only steadily rather than shivering.
  */
-export function toyMotion(kind: ToyKind, energy: number, mood: ToyMood, clock: number): ToyMotion {
+export function toyMotion(kind: ToyKind, energy: number, mood: ToyMood, clock: number, calm = false): ToyMotion {
   const tempo = TEMPO[kind];
   const e = Math.max(0, Math.min(1, energy));
   // A worker waiting on an answer is the one thing that reaches across the room, so its toy
   // shivers; one in the middle of a turn keeps its toy turning slowly, and one that has finished
   // sets it going.
   const shiver = mood === 'waiting' ? 1 : 0;
+  if (calm) return { turn: 0, lean: shiver * 0.09, tip: 0, bob: 0 };
   const haste = mood === 'working' ? 1.4 : mood === 'done' ? 6 : 0;
   const spin = tempo.spin * e + haste;
   return {

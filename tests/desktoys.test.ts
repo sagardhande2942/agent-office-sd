@@ -197,6 +197,36 @@ test('a wind-up runs out on its own, never goes past full, and leaves the toy st
   }
 });
 
+test('with reduce motion on a toy holds one fixed pose, and still says its worker is waiting', () => {
+  const { toys, frame } = site([DESKS[0]]);
+  const toy = toys.get(DESKS[0].id)!;
+  toy.calm = true;
+  toy.mood = 'waiting';
+  toy.energy = 1;
+
+  // It stands still wherever the frame falls: nothing turns, rocks, tips or bobs.
+  for (const clock of [0, 1.7, 12.5, 900.25]) {
+    frame(clock, 1 / 60);
+    assert.equal(toy.spinner.rotation.y, 0, `it turned at ${clock}`);
+    assert.equal(toy.group.rotation.x, 0, `it tipped at ${clock}`);
+    assert.equal(toy.group.position.y, toy.restY, `it bobbed at ${clock}`);
+    assert.equal(toy.group.rotation.z, toyMotion('top', 1, 'waiting', clock, true).lean);
+  }
+  // And the pose is not a shrug: a worker waiting on an answer still has its toy leaning over.
+  assert.ok(Math.abs(toy.group.rotation.z) > 0.05, 'a waiting toy no longer leans over with motion off');
+
+  // A worker that isn't waiting stands it up, rather than leaving it at somebody else's lean.
+  toy.mood = 'working';
+  frame(4, 1 / 60);
+  assert.equal(toy.group.rotation.z, 0, 'a working toy leans over with motion off');
+  assert.equal(toy.group.position.y, toy.restY, 'and it does not bob');
+
+  // Turning it back off brings the movement straight back.
+  toy.calm = false;
+  frame(4, 1 / 60);
+  assert.notEqual(toy.group.rotation.z, 0);
+});
+
 test('a wind gives every toy the same wind-up, so a merge sets the whole floor off together', () => {
   const { toys } = site([...DESKS, ...BEANBAGS]);
   windToys(toys);
