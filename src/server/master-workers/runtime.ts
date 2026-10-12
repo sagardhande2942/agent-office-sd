@@ -5,7 +5,7 @@ import { nextFreeSeat } from '../../shared/layout.js';
 import { TeamCoordinator, type TeamAdapter } from './coordinator.js';
 import { TeamPresets } from './storage.js';
 const git=(dir:string,args:string[])=>execFileSync('git',args,{cwd:dir,encoding:'utf8',timeout:20000,env:{...process.env,GIT_TERMINAL_PROMPT:'0'},stdio:['ignore','pipe','pipe']}).trim();
-export function createTeam(floor: Floor, presets: TeamPresets, changed: () => void, beforeSpawn: () => void = () => {}) {
+export function teamAdapter(floor: Floor, changed: () => void, beforeSpawn: () => void = () => {}): TeamAdapter {
   const checkout=(id:string)=>{
     const w=floor.workers.get(id); if(!w?.worktree) throw Error('Participant worktree is missing');
     return {w,dir:path.resolve(floor.dir,w.worktree.path)};
@@ -67,5 +67,9 @@ export function createTeam(floor: Floor, presets: TeamPresets, changed: () => vo
     },
     changed,
   };
-  return new TeamCoordinator(path.join(floor.dir,'.agent-office','master-workers.json'),presets,adapter);
+  return adapter;
+}
+
+export function createTeam(floor: Floor, presets: TeamPresets, changed: () => void, beforeSpawn: () => void = () => {}) {
+  return new TeamCoordinator(path.join(floor.dir,'.agent-office','master-workers.json'),presets,teamAdapter(floor,changed,beforeSpawn));
 }

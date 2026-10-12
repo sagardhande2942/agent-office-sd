@@ -113,6 +113,8 @@ For a terminal-only client, start `agent-office /path/to/project --no-open` in o
 
 The terminal dashboard and attached worker view repaint changed rows and skip identical frames, so live updates do not repeatedly clear the screen.
 
+The terminal dashboard and attached worker view repaint changed rows and skip identical frames, so live updates do not repeatedly clear the screen.
+
 The plant beside the basketball uses an animated peace lily in the 266 KB `src/client/models/basketball-plant.glb`. Its idle animation loops continuously. Replace that file and rebuild to change this single plant; Draco-compressed GLBs use a locally bundled decoder. See [custom plant models](docs/features.md#custom-plant-model).
 
 Every option is in [docs/configuration.md](docs/configuration.md). Choosing models and providers per worker is in [docs/agents.md](docs/agents.md).
@@ -416,7 +418,7 @@ Press **J** or choose **Smartphone** in the menu to find workers and helpers, op
 
 The garage uses Blender-built Lambo and Ferrari models with wheel arches, detailed wheels and roof-off cockpits. Drive them with the existing E/WASD controls. If the model asset fails to load, the original cars remain available. The build includes the models; Blender is only needed to regenerate them (see [Blender models](blender/README.md)).
 
-Open **Boss Control Center** from the menu or the Workers panel’s **Boss** button, or sit in the boss chair and press E. It shows live worker status and reported spend, opens terminals/helper reports, reviews agent broadcast or auto-assign prompts, and exports a local floor report. Send-home uses the existing worktree choices. **Play Minesweeper** remains available. See [features](docs/features.md) and the [PR295 security review](docs/security/pr-295.md).
+Open **Boss Office** from the upstairs monitor (E), boss character, menu, or Lite header. Configure a standing mission, boss agent, and up to **10 workers** using a model pool or explicit slots. Turn it ON for continuous discovery, planning, implementation, independent checks, and PR delivery; OFF finishes the current initiative before stopping. Monitor and steer everything in one console. The boss visits workers and sits on its office sofa when idle. Every hired worker, including discovery and team coordinators, keeps its visible desk avatar alongside the mobile Boss. The monitor is dedicated to Boss mode; Minesweeper has been removed. See [Boss mode](docs/boss-mode.md).
 
 TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
 
@@ -454,7 +456,7 @@ Remote floor reconnects retain the saved machine identity even when the original
 
 ### Playable 2D Game
 
-Open **`/2d`** for the complete office in a desktop, top-down view. It uses the same artwork, rooms, furniture, characters, collisions and feature modules as 3D. **Tab** opens the same menu: boards, Queue, Plan Comparison, Boss Control Center, Smartphone, meetings, messages, services, whiteboard, settings and the other office actions.
+Open **`/2d`** for the complete office in a desktop, top-down view. It uses the same artwork, rooms, furniture, characters, collisions and feature modules as 3D. **Tab** opens the same menu: boards, Queue, Plan Comparison, Boss Office, Smartphone, meetings, messages, services, whiteboard, settings and the other office actions.
 
 Walk with **WASD / arrows**, click the floor to walk there, click a worker to open its existing terminal, and use **E** beside a fixture. Scroll to zoom; the Manager uses its existing kiosk. The physical **elevator** and its menu provide all floors, project management, the rooftop bar and the garage. Castle, Station and custom maps work too. Golf, cars, arcade and the other activities keep their existing controls and aiming cameras, returning to the flat office view when finished.
 

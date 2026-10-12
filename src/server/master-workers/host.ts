@@ -1,3 +1,4 @@
+import { workerTeamSession } from '../team-sessions.js';
 import path from 'node:path';
 import type http from 'node:http';
 import type { Floor } from '../floor.js';
@@ -69,7 +70,7 @@ export class HostTeams {
     const actor = floor?.workers.authenticate(id, (req.headers.authorization ?? '').replace(/^Bearer\s+/i, ''));
     const endpoint = url.pathname === '/office/team';
     if (!actor || !floor) { if (endpoint) { send(res, 401, { error: 'Send your worker ID and hook token' }); return true; } return false; }
-    const run = this.team(floor), role = run.member(id) ?? actor.masterWorkers?.role;
+    const run = workerTeamSession(floor,id) ?? this.team(floor), role = run.member(id) ?? actor.masterWorkers?.role;
     if (endpoint) {
       try {
         if (!role) throw Error('Not a participant in this activity');

@@ -18,7 +18,7 @@ Typecheck and build passed. All **976 tests** passed, including size, structure,
 - **jump camera stability**: Real Space jump lifts the character while camera height and projection remain unchanged.
 - **movement and shared collision physics**: Arrows/WASD, ground click-to-walk and collision against the original desk geometry work in the orthographic scene.
 - **complete office dialogs**: Shared Issues/PR/Queue, Boss, Smartphone, Services, Whiteboard, Meeting, Search, Settings, view controls and Plan Comparison open from the same menu with close/Esc focus recovery.
-- **real arcade interaction**: Boss Control Center launches playable Minesweeper with its original camera and canvas; closing restores the orthographic view and controls.
+- **Boss Office command center**: the dedicated monitor opens the same console used by 3D and Lite; closing restores the orthographic view and controls.
 - **menu and palette recovery**: The full menu and command palette have top-right close buttons and restore controls immediately.
 - **shared worker terminal**: Clicking the rendered worker opens the existing terminal and real shell input without a replacement worker/session.
 - **office visual and zoom**: Two screenshots show the actual 3D office artwork in a flat cutaway projection, original HUD, elevator and fixtures; wheel zoom updates pointer projection.

@@ -31,6 +31,8 @@ export interface WorkerTask {
 }
 
 export interface WorkerInfo {
+  /** Terminal deliberately stopped; resume explicitly rather than waking on server startup. */
+  suspended?: boolean;
   id: string;
   /** On a break since then (the office's clock): up from its desk, wandering the office until there's work for it (see features/breaks). */
   resting?: number;

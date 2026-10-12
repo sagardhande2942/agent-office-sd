@@ -5,7 +5,7 @@
  * order they register in, and a part can reach one installed after it. Each part names the ones it
  * reaches for (a `Pick` of these). Types only.
  */
-import type { installBoss } from '../features/boss';
+import type { installBossMode } from '../features/boss-mode';
 import type { Net } from '../net';
 import type { DesktopNotifier } from '../notify';
 import type { PlayerController } from '../player';
@@ -16,7 +16,6 @@ import type { Person } from '../world/character';
 import type { Confetti } from '../world/confetti';
 import type { Hands } from '../world/hands';
 import type { Smoke } from '../world/smoke';
-import type { installArcade } from '../features/arcade';
 import type { installBar } from '../features/bar';
 import type { installBarGames } from '../features/bargames';
 import type { installBasketball } from '../features/basketball';
@@ -99,7 +98,6 @@ export interface Parts {
   boards: Made<typeof installBoards>;
   gallery: Made<typeof installGallery>;
   tv: Made<typeof installTv>;
-  arcade: Made<typeof installArcade>;
   rooftop: Made<typeof installRooftop>;
   telescope: Made<typeof installTelescope>;
   dog: Made<typeof installDog>;
@@ -118,7 +116,7 @@ export interface Parts {
   waiting: Made<typeof installWaiting>;
   needsYou: Made<typeof installNeedsYou>;
   meeting: Made<typeof installMeeting>;
-  boss: Made<typeof installBoss>;
+  boss: Made<typeof installBossMode>;
   smartphone: Made<typeof installSmartphone>;
   bookshelf: Made<typeof installBookshelf>;
   bar: Made<typeof installBar>;

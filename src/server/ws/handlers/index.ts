@@ -1,3 +1,4 @@
+import { bossModeHandlers, bossModeView } from './boss-mode.js';
 import { curatorHandlers } from './lore-curator.js';
 import { worldsHandlers } from './parallel-worlds.js';
 import { placementHandlers, placementHooks, placementView } from './object-placement.js';
@@ -60,6 +61,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...jukeboxHandlers,
   ...meetingHandlers,
   ...masterWorkersHandlers,
+  ...bossModeHandlers,
   ...planReviewHandlers,
   ...planHandlers,
   ...presenceHandlers,
@@ -105,6 +107,7 @@ export const views: ViewPieces = {
   whiteboard: whiteboardView,
   meeting: meetingView,
   masterWorkers: masterWorkersView,
+  bossMode: bossModeView,
   planReview: planReviewView,
   cabinet: cabinetView,
   cinema: cinemaView,

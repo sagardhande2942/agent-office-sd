@@ -125,3 +125,7 @@ Worker appearance factories register through `client/world/character/appearance.
 ### Knowledge curation
 
 `server/lore-curator/` owns the persistent journal and note overlays, scheduler, bounded repository evidence reader, schema-validated recommendations, and isolated noninteractive agent adapters. `CuratorMemory` preserves original lore files while exposing lifecycle metadata; worker prompt selection excludes archived, superseded, unverified, and nonmatching notes. The service joins worker lifecycle hooks through `worker-features.ts`, and its host calls/snapshots join the same registry. `ws/handlers/lore-curator.ts` supplies floor-scoped controls; `lore-curator/surface.ts` supplies the remote RPC facade. `client/features/lore-curator/` installs its menu action and Workers settings extension without adding logic to the HUD, settings shell or state store. Types and validation live in `shared/lore-curator.ts`.
+
+## Continuous Boss mode
+
+`src/server/boss-mode/` owns the persisted scheduler, worker lifecycle, independent checks, delivery monitoring, and floor-host bridge. It registers through worker features, WebSocket handlers, hooks, and TUI commands. `team-sessions.ts` lets its initiatives reuse the team coordinator without changing the regular Master / Workers feature. Shared configuration and protocol types live in `src/shared/boss-mode/`; the client state slice, `features/boss-mode/`, and shared console register alongside other modules. See [Boss mode](boss-mode.md) for operation and recovery.

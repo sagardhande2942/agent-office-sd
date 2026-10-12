@@ -17,18 +17,18 @@ export function choice(value: unknown): AgentChoice {
   if (error) throw Error(error);
   return { provider: a.provider, ...(a.model ? { model: a.model } : {}), ...(a.effort ? { effort: a.effort } : {}) };
 }
-export function config(raw: unknown): TeamConfig {
+export function config(raw: unknown, maxWorkers = 5): TeamConfig {
   const c = raw as TeamConfig;
   if (!c || !Array.isArray(c.models) || !c.models.length || c.models.length > 20) throw Error('Choose 1–20 eligible models');
-  if (!Number.isInteger(c.maxWorkers) || c.maxWorkers < 1 || c.maxWorkers > 5) throw Error('Worker limit must be 1–5');
+  if (!Number.isInteger(c.maxWorkers) || c.maxWorkers < 1 || c.maxWorkers > maxWorkers) throw Error('Worker limit must be 1–' + maxWorkers);
   const models = c.models.map(choice);
-  if (new Set(models.map(modelKey)).size !== models.length) throw Error('Eligible model choices must be distinct');
+  if (new Set(models.map(m=>maxWorkers > 5 ? JSON.stringify([m.provider,m.model,m.effort]) : modelKey(m))).size !== models.length) throw Error('Eligible model choices must be distinct');
   return { master: choice(c.master), models, maxWorkers: c.maxWorkers };
 }
-export function request(raw: unknown): TeamRequest {
+export function request(raw: unknown, maxWorkers = 5): TeamRequest {
   const r = raw as TeamRequest;
   if (!Array.isArray(r?.requirements) || !r.requirements.length || r.requirements.length > 100) throw Error('Provide 1–100 requirements');
-  return { ...config(r), brief: text(r.brief, 'task brief'), requirements: r.requirements.map(v => text(v, 'requirement', 2000)), constraints: r.constraints === undefined || r.constraints === '' ? '' : text(r.constraints, 'constraints') };
+  return { ...config(r, maxWorkers), brief: text(r.brief, 'task brief'), requirements: r.requirements.map(v => text(v, 'requirement', 2000)), constraints: r.constraints === undefined || r.constraints === '' ? '' : text(r.constraints, 'constraints') };
 }
 export function modelKey(a: AgentChoice): string { return planModelIdentity(a.provider,a.model); }
 export function save(file: string, value: unknown) {
@@ -59,11 +59,11 @@ export class TeamPresets {
     save(this.file, next); this.presets = next;
   }
 }
-export function restored(raw: unknown): { current: TeamRun | null; past: TeamRun[] } {
+export function restored(raw: unknown, maxWorkers = 5): { current: TeamRun | null; past: TeamRun[] } {
   const value = raw as { current: TeamRun | null; past: TeamRun[] };
   if (!value || !Array.isArray(value.past)) throw Error('Invalid activity file');
   for (const r of [...value.past, ...(value.current ? [value.current] : [])]) {
-    request(r); text(r.id, 'activity ID', 80);
+    request(r, maxWorkers); text(r.id, 'activity ID', 80);
     r.replay = normalizeLog(r.replay, r.id);
     if (!Array.isArray(r.tasks) || !Array.isArray(r.workers) || !r.notifications || !Number.isInteger(r.revision) || !['starting','running','paused','stopped','done'].includes(r.phase)) throw Error('Invalid saved activity');
     if (r.tasks.length>100 || r.workers.length>1000 || value.past.length>10) throw Error('Invalid saved activity limits');

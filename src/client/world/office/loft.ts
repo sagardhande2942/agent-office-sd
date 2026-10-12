@@ -123,7 +123,7 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   for (const sx of [-1, 1]) desk.add(mesh(box(0.1, 0.72, 1.0), toon('#8a5a3b'), sx * 1.15, 0.37, 0));
   desk.add(mesh(roundedBox(0.9, 0.55, 0.06, 0.03), toon(PALETTE.ink), 0, 1.18, -0.2));
   desk.add(mesh(box(0.08, 0.2, 0.08), toon(PALETTE.ink), 0, 0.93, -0.2));
-  // Minesweeper plays on it (features/arcade/ui.ts).
+  // The Boss Office command center displays live progress here.
   const screen = mesh(new THREE.PlaneGeometry(0.8, 0.45), new THREE.MeshBasicMaterial({ color: '#4cc9f0' }), 0, 1.18, -0.165, false);
   desk.add(screen);
   desk.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 10), toon('#ffd166'), 0.9, 0.89, 0.15));
@@ -137,7 +137,7 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   bossChair.position.set(0, 0, 1.0);
   desk.add(bossChair);
   seatable(bossChair, 'boss-chair', 1.2, interactables);
-  // Clicking the screen is using the chair: sit down, then play.
+  // Clicking the screen is using the chair: open the command center.
   screen.userData.interact = bossChair.userData.interact;
   desk.position.set(deskX, floorY, deskZ);
   group.add(desk);
@@ -219,7 +219,7 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
 
 declare module '../types' {
   interface OfficeHandles {
-    /** The monitor on the boss's desk upstairs, where Minesweeper plays (features/arcade/ui.ts). */
+    /** The monitor on the boss's desk upstairs, showing Boss Office progress. */
     bossScreen: THREE.Mesh;
   }
 }

@@ -58,6 +58,7 @@ export interface FloorReady {
   masterWorkers?: boolean;
   lore?: boolean;
   curator?: boolean;
+  bossMode?: boolean;
   /**
    * The branch this host's checkout is on, and the agent CLIs it has installed.
    *
@@ -86,9 +87,10 @@ export interface FloorReady {
  * `/api/search` over HTTP, and two it calls itself while handling another message. A hosted floor has
  * to round-trip them like the rest, so they travel, and nothing else about them changes.
  */
-export const HOST_CALLS = ['worker.search', 'queue.dropIssue', 'gh.claim', 'cinema.shot', 'master-workers.capacity'] as const;
+export const HOST_CALLS = ['worker.search', 'queue.dropIssue', 'gh.claim', 'cinema.shot', 'master-workers.capacity', 'boss.capacity'] as const;
 
 export const FLOOR_CASES = [
+  'boss.get', 'boss.control',
   'lore.list', 'lore.save', 'lore.delete',
   'curator.get', 'curator.configure', 'curator.pause', 'curator.run', 'curator.restore', 'curator.history',
   'master-workers.start', 'master-workers.control',
