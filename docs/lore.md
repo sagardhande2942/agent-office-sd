@@ -4,6 +4,8 @@ Back to the [README](../README.md).
 
 The **Lore Shelf** is persistent worker memory for each project floor. Coding workers receive relevant notes automatically and are instructed to record reusable discoveries themselves. The office saves a shift handover whenever a worker submits its completion checklist. You do not need to write notes or copy them into each worker's prompt.
 
+For how the code actually works — file paths, ranking, limits, the curator's run loop and its trust boundary — see [How the Knowledge center works](lore-architecture.md).
+
 ## Automatic worker memory
 
 - **Starting, resuming, or assigning a task:** The office adds memory instructions and up to five relevant notes to coding-worker prompts. Title/tag matches rank ahead of content matches, with recent discoveries ahead of unrelated handovers. Injected context is bounded to 6,000 characters and at most 1,000 content characters per note. Workers can read more through their tools.
