@@ -1,3 +1,4 @@
+import { TuiFrame } from './tui/frame.js';
 import { TuiTerminal, MOUSE_OFF } from './tui-terminal.js';
 import { teamCommand } from './master-workers/tui.js';
 import { readFileSync } from 'node:fs';
@@ -97,11 +98,14 @@ function session(ws: WebSocket): Promise<number> {
     let inputFlush: ReturnType<typeof setTimeout> | undefined;
     const dashboard: Dashboard = { floors, selected: 0, panel: 'office', offset: 0, notice: 'Connecting to the office...' };
     const send = (message: ClientMsg) => { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(message)); };
+    const frame = new TuiFrame();
     const draw = () => {
       if (attached || finished || !active) return;
       dashboard.view = view; dashboard.floors = floors;
       dashboard.selected = Math.max(0, Math.min(dashboard.selected, seats(view).length - 1));
-      process.stdout.write('\x1b[?25l\x1b[H\x1b[2J' + renderDashboard(dashboard, process.stdout.columns || 80, process.stdout.rows || 24));
+      const cols = process.stdout.columns || 80, rows = process.stdout.rows || 24;
+      const output = frame.paint(renderDashboard(dashboard, cols, rows).split('\r\n'), cols, rows);
+      if (output) process.stdout.write(output);
     };
     const print = (text: string) => { dashboard.notice = plain(text); draw(); };
     const panel = (next: Panel) => { dashboard.panel = next; dashboard.offset = 0; dashboard.thread = undefined; draw(); };
@@ -122,7 +126,7 @@ function session(ws: WebSocket): Promise<number> {
       clearTimeout(inputFlush);
       terminal?.dispose(); terminal = undefined;
       process.stdout.write('\x1b[0m\x1b[?25l');
-      draw();
+      frame.reset(); draw();
     };
     const input = (chunk: Buffer) => {
       if (!attached) return;
