@@ -111,6 +111,8 @@ agent-office setup                          # the first-start walkthrough again 
 
 For a terminal-only client, start `agent-office /path/to/project --no-open` in one terminal and leave it running; join with `agent-office tui` in a second terminal. Use the password printed at server startup. From a source checkout, run `npm ci` and `npm run build`, then use `node bin/agent-office.js` in place of `agent-office` for both commands. The TUI connects to the server; it does not start one. Both processes must use the same build for feature commands. Press `?` for help, or `:` once and type `hire codex Fix the failing tests`. See [docs/cli.md](docs/cli.md) for the full walkthrough and [cmd.txt](cmd.txt) for copyable commands.
 
+The terminal dashboard and attached worker view repaint changed rows and skip identical frames, so live updates do not repeatedly clear the screen.
+
 The plant beside the basketball uses an animated peace lily in the 266 KB `src/client/models/basketball-plant.glb`. Its idle animation loops continuously. Replace that file and rebuild to change this single plant; Draco-compressed GLBs use a locally bundled decoder. See [custom plant models](docs/features.md#custom-plant-model).
 
 Every option is in [docs/configuration.md](docs/configuration.md). Choosing models and providers per worker is in [docs/agents.md](docs/agents.md).
