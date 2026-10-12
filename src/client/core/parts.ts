@@ -26,6 +26,7 @@ import type { installCarrying } from '../features/carrying';
 import type { installCars } from '../features/cars';
 import type { installClimbing } from '../features/climbing';
 import type { installCoffee } from '../features/coffee';
+import type { installDeskToys } from '../features/desktoys';
 import type { installDog } from '../features/dog';
 import type { installEmotes } from '../features/emotes';
 import type { installGolf } from '../features/golf';
@@ -100,6 +101,8 @@ export interface Parts {
   tv: Made<typeof installTv>;
   rooftop: Made<typeof installRooftop>;
   telescope: Made<typeof installTelescope>;
+  /** The desk toys, which show what each worker at a desk is up to. */
+  toys: Made<typeof installDeskToys>;
   dog: Made<typeof installDog>;
   jukebox: Made<typeof installJukebox>;
   cabinet: Made<typeof installCabinet>;

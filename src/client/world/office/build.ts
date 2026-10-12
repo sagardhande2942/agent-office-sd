@@ -31,6 +31,7 @@ import { balcony } from './balcony';
 import { downstairs } from './ground';
 import { wing } from './wing';
 import { beanbags, desks, kiosks } from './seats';
+import { deskToys } from '../../features/desktoys/world';
 import { meetingRoom } from './meeting-room';
 import { loft } from './loft';
 import type { Fixture, Gives, Site } from './fixture';
@@ -73,6 +74,7 @@ function floorPlan() {
     lamps,
     wing,
     signs,
+    deskToys,
     loft,
     meetingRoom,
     screeningRoom,
