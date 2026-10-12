@@ -53,15 +53,19 @@ test('wheel and split page gestures stay local; ordinary keys and application cl
 });
 
 test('snapshots replace old history and resize safely', async t => {
-  let output = '';
-  const viewer = new TuiTerminal(40, 6, data => { output += data; });
-  t.after(() => viewer.dispose());
-  await viewer.write('OLD WORKER\r\n');
-  await viewer.write('NEW SNAPSHOT\r\n', true, 30, 8);
-  output = ''; viewer.input('\x1b[5~');
-  assert.ok(output.includes('NEW SNAPSHOT'));
-  assert.ok(!output.includes('OLD WORKER'));
-  viewer.resize(20, 4);
+  const host = new headless.Terminal({ cols: 30, rows: 8, allowProposedApi: true });
+  const pending: Promise<void>[] = []; let output = '';
+  const viewer = new TuiTerminal(40, 6, data => { output += data; pending.push(new Promise(resolve => host.write(data, resolve))); });
+  const settle = async () => { await Promise.all(pending); pending.length = 0; };
+  t.after(() => { viewer.dispose(); host.dispose(); });
+  await viewer.write('OLD WORKER\r\n'); await settle();
+  await viewer.write('NEW SNAPSHOT\r\n', true, 30, 8); await settle();
+  output = ''; viewer.input('\x1b[5~'); await settle();
+  assert.ok(text(host).includes('NEW SNAPSHOT'));
+  assert.ok(!text(host).includes('OLD WORKER'));
+  assert.ok(!output.includes('\x1b[2J'), 'scrolling beyond retained history does not clear the view');
+  host.resize(20, 4); viewer.resize(20, 4); await settle();
+  assert.ok(text(host).includes('NEW SNAPSHOT'));
 });
 
 

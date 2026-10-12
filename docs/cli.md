@@ -68,3 +68,7 @@ Press `:` in the dashboard. `plans` opens plan comparison status, detailed plans
 ### Scrolling worker terminals in the CLI
 
 While attached in `agent-office tui`, use the **mouse wheel** or **Page Up / Page Down** to review up to 5,000 lines of worker history. These gestures stay local rather than being typed into the worker. Page Down or scrolling down returns to live output; typing also returns to live output and sends your input normally. Ctrl+] returns to the dashboard. History is kept only for the attached worker and released on detach; full-screen workers are mirrored into a buffer that retains scrollback.
+
+## Live rendering
+
+Dashboard updates and attached-worker output repaint only changed rows; identical dashboard frames produce no output. Full clears occur when taking over the screen, returning from a worker, or resizing. Scrollback, colors, cursor position, and application input modes remain supported. Restart the TUI after rebuilding to load rendering fixes; leaving the client keeps the server and workers running.

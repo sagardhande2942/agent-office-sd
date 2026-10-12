@@ -60,13 +60,17 @@ test('dashboard navigation, terminal input, floor switching and cleanup over a P
     child.resize(32, 12); await expect('AGENT OFFICE');
     child.resize(120, 30); await expect('AGENT OFFICE');
     child.write('x'); await expect('Keep both');
-    child.write('\x1b'); await expect('AGENT OFFICE');
+    child.write('\x1b'); await expect('Send home cancelled.');
     assert.equal(messages.filter((m) => m.t === 'worker.kill').length, 0);
     child.write(':home w1 --cleanup invalid\r'); await expect('Usage: home');
     assert.equal(messages.filter((m) => m.t === 'worker.kill').length, 0);
     child.write('x'); await expect('Keep both');
     child.write('2\r'); await expect('Sending Ada home');
-    child.write(':home Ada --cleanup keep\r'); await expect('Sending Ada home');
+    child.write(':home Ada --cleanup keep\r');
+    const deadline = Date.now() + 5000;
+    while (messages.filter(m => m.t === 'worker.kill').length < 2 && Date.now() < deadline) await new Promise(r => setTimeout(r, 10));
+    assert.equal(messages.filter(m => m.t === 'worker.kill').length, 2);
+    assert.ok(!output.includes('\x1b[2J'), 'unchanged command feedback does not clear the dashboard');
     child.write('q'); assert.equal(await exited, 0);
     assert.deepEqual(messages.filter((m) => m.t === 'worker.kill'), [
       { t: 'worker.kill', workerId: 'w1', cleanup: 'worktree' },
