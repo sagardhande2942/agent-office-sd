@@ -1,5 +1,5 @@
 import { flyStep, netContact } from './tabletennis-ballistics.js';
-export { flyStep, solveShot } from './tabletennis-ballistics.js';
+export { flyStep, solveShot, solveServe } from './tabletennis-ballistics.js';
 /**
  * Table tennis (ping pong) on the balcony: dimensions, court geometry, physics constants,
  * and game state shared between client and server.
@@ -60,7 +60,7 @@ export const PINGPONG_SPOTS = {
 } as const;
 
 export const PINGPONG_PHYSICS = {
-  ballRadius: 0.035,
+  ballRadius: 0.02,
   gravity: 9.8,
   restitution: 0.86,
   pointsToWin: 11,
@@ -334,8 +334,9 @@ export function afterPoint(state: PingPongState, winner: PingPongSide): { score:
   const score = { ...state.score, [winner]: state.score[winner] + 1 };
   const games = { ...state.games };
   // Two serves each, alternating: the point about to be played decides whose it is.
-  const next = score.west + score.east + 1;
-  const server: PingPongSide = Math.floor((next - 1) / 2) % 2 === 0 ? state.server : otherSide(state.server);
+  const total = score.west + score.east;
+  const switchServe = total >= 20 || total % 2 === 0;
+  const server: PingPongSide = switchServe ? otherSide(state.server) : state.server;
   const gameWon = score[winner] >= PINGPONG_MATCH.points && score[otherSide(winner)] <= score[winner] - PINGPONG_MATCH.winBy;
   if (gameWon) {
     games[winner]++;

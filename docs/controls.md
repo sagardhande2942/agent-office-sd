@@ -109,4 +109,6 @@ Table tennis uses a closer, elevated court camera with a 52° baseline field of 
 
 The table tennis bot predicts reachable contacts after the table bounce and moves forward for short shots, rather than waiting at the end line. Difficulty affects reaction, movement, accuracy and occasional misses. Bots choose a consistent response per incoming ball, vary shot depth and power, and commit to misses so exhibitions advance through points naturally.
 
+Serves bounce first on your own half, then cross the net and bounce on the receiver’s half. Returns must land on the opposite half. The 40 mm ball follows gravity and spin; service changes every two points, then every point from 10–10.
+
 At the balcony table, press **E → Watch bots play** and choose a difficulty for each side. Both bots serve, rally and score automatically; finished matches restart after three seconds. Others can choose **Watch current bot match** to spectate. **E / Esc** leaves the view. The starter’s browser runs the simulation and must keep the office tab open and visible; when the starter leaves or disconnects, the exhibition stops for everyone.

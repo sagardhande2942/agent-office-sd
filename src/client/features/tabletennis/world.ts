@@ -3,7 +3,7 @@
  * net, colliders, and fixture definition.
  */
 import * as THREE from 'three';
-import { PINGPONG_TABLE } from '../../../shared/tabletennis';
+import { PINGPONG_PHYSICS, PINGPONG_TABLE } from '../../../shared/tabletennis';
 import { mesh, roundedBox, textPlane, toon } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
@@ -112,7 +112,7 @@ export function buildTableTennisTable(): TableTennisCourt3D {
 
   // Ping pong ball
   const ballMat = toon('#fffbf0');
-  const ball = mesh(new THREE.SphereGeometry(0.035, 16, 12), ballMat, 0, height + 0.04, 0, false);
+  const ball = mesh(new THREE.SphereGeometry(PINGPONG_PHYSICS.ballRadius, 16, 12), ballMat, 0, height + 0.04, 0, false);
   group.add(ball);
 
   // Scoreboard sign mounted beside the table (facing south into court)

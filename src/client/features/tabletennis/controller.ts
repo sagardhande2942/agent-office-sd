@@ -27,6 +27,7 @@ import {
   PINGPONG_TABLE,
   shotTarget,
   solveShot,
+  solveServe,
   tableBounce,
 } from '../../../shared/tabletennis';
 import type { PlayerController } from '../../player';
@@ -80,6 +81,7 @@ export class TableTennisController {
   /** The server's clock for the shot in flight, so a ball struck by the other player is taken once. */
   private seenAt = 0;
   private netHold = 0;
+  private serveFlight = false;
   private breakT = 0;
   private readonly ballPrev = new THREE.Vector3();
   private bot = new TableTennisBot();
@@ -221,6 +223,7 @@ export class TableTennisController {
     this.breakT = 0;
 
     this.cb.playSound('paddle');
+    this.serveFlight = false;
     this.cb.sendHit(side, from.x, from.y, from.z, shot.vx, shot.vy, shot.vz, { tops: shot.tops, side: shot.side, kind });
   }
 
@@ -228,9 +231,9 @@ export class TableTennisController {
   private serveBot(kind: PingPongShotKind) {
     const reach = 1.2;
     const from = this.opponent === 'west'
-      ? { x: PINGPONG_TABLE.x - reach, y: PINGPONG_TABLE.height + 0.22, z: this.bot.where.z }
-      : { x: PINGPONG_TABLE.x + reach, y: PINGPONG_TABLE.height + 0.22, z: this.bot.where.z };
-    const shot = solveShot(from, shotTarget(this.opponent, (Math.random() - 0.5) * 0.4, -0.2), kind);
+      ? { x: PINGPONG_TABLE.x - reach, y: PINGPONG_TABLE.height + 0.22, z: Math.max(PINGPONG_TABLE.z - 0.55, Math.min(PINGPONG_TABLE.z + 0.55, this.bot.where.z)) }
+      : { x: PINGPONG_TABLE.x + reach, y: PINGPONG_TABLE.height + 0.22, z: Math.max(PINGPONG_TABLE.z - 0.55, Math.min(PINGPONG_TABLE.z + 0.55, this.bot.where.z)) };
+    const shot = solveServe(from, shotTarget(this.opponent, (Math.random() - 0.5) * 0.4, -0.2), kind);
     this.ballInPlay = true;
     this.ballPos.set(from.x, from.y, from.z);
     this.ballVel.set(shot.vx, shot.vy, shot.vz);
@@ -242,16 +245,17 @@ export class TableTennisController {
     this.rally = 1;
     this.breakT = 0;
     this.cb.playSound('paddle');
+    this.serveFlight = true;
     this.cb.sendServe(this.opponent, shot.vx, shot.vy, shot.vz, { tops: shot.tops, side: shot.side, kind }, from);
   }
 
   private serve(kind: PingPongShotKind, power = 0.5) {
     const reach = 1.2;
     const from = this.side === 'west'
-      ? { x: PINGPONG_TABLE.x - reach, y: PINGPONG_TABLE.height + 0.22, z: this.pos.z }
-      : { x: PINGPONG_TABLE.x + reach, y: PINGPONG_TABLE.height + 0.22, z: this.pos.z };
+      ? { x: PINGPONG_TABLE.x - reach, y: PINGPONG_TABLE.height + 0.22, z: Math.max(PINGPONG_TABLE.z - 0.55, Math.min(PINGPONG_TABLE.z + 0.55, this.pos.z)) }
+      : { x: PINGPONG_TABLE.x + reach, y: PINGPONG_TABLE.height + 0.22, z: Math.max(PINGPONG_TABLE.z - 0.55, Math.min(PINGPONG_TABLE.z + 0.55, this.pos.z)) };
     const spot = shotTarget(this.side, this.aim, this.depth);
-    const shot = solveShot(from, spot, kind, power, this.aim * 0.45);
+    const shot = solveServe(from, spot, kind, power);
 
     this.ballInPlay = true;
     this.ballPos.set(from.x, from.y, from.z);
@@ -265,6 +269,7 @@ export class TableTennisController {
     this.breakT = 0;
 
     this.cb.playSound('paddle');
+    this.serveFlight = true;
     this.cb.sendServe(this.side, shot.vx, shot.vy, shot.vz, { tops: shot.tops, side: shot.side, kind }, from);
   }
 
@@ -272,9 +277,10 @@ export class TableTennisController {
    * Takes the ball as the floor has it, when the other player struck it: both players fly the same
    * ball from the same state, so a rally looks the same from either end of the table.
    */
-  adopt(ball: PingPongBallState | undefined) {
+  adopt(ball: PingPongBallState | undefined, rally = this.state.rally) {
     if (!ball || ball.t <= this.seenAt) return;
     this.seenAt = ball.t;
+    this.serveFlight = rally <= 1;
     this.ballPos.set(ball.x, ball.y, ball.z);
     this.ballVel.set(ball.vx, ball.vy, ball.vz);
     this.ballTops = ball.tops ?? 0;
@@ -412,11 +418,21 @@ export class TableTennisController {
           this.ballSide = flight.side;
           this.cb.playSound('table');
           if (this.lastBounceSide === side) {
-            // Bounced twice on the far side without being returned: the striker loses the point.
+            // Two bounces on one half: the player on that half loses the point.
             this.ballInPlay = false;
             this.ballPos.set(flight.x, flight.y, flight.z);
             this.cb.playSound('point');
             this.cb.awardPoint(otherSide(side), 'Double bounce');
+            return;
+          }
+          if (this.lastBounceSide === null && side === this.lastHitter && !this.serveFlight) {
+            this.ballInPlay = false;
+            this.cb.awardPoint(otherSide(side), 'Return bounced on your own half');
+            return;
+          }
+          if (this.serveFlight && this.lastBounceSide === null && side !== this.lastHitter) {
+            this.ballInPlay = false;
+            this.cb.awardPoint(otherSide(this.lastHitter!), 'Serve missed the first bounce');
             return;
           }
           this.lastBounceSide = side;

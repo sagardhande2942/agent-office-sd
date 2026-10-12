@@ -72,8 +72,8 @@ try {
  await page.evaluate(() => { Math.random = () => 0; });
  await page.waitForFunction(() => window.__office.store.pingpong.score.west + window.__office.store.pingpong.score.east > 0);
  await page.evaluate(() => { Math.random = window.__originalRandom; window.__drawFrames = true; });
- await page.waitForTimeout(1200); await page.screenshot({ path: path.join(output, 'watch-bots-desktop.png') });
- await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(1200); await page.screenshot({ path: path.join(output, 'watch-bots-mobile.png') });
+ await page.waitForTimeout(1200); await page.evaluate(() => { window.__drawFrames = false; }); await page.screenshot({ path: path.join(output, 'watch-bots-desktop.png') });
+ await page.setViewportSize({ width: 390, height: 844 }); await page.evaluate(() => { window.__drawFrames = true; }); await page.waitForTimeout(1200); await page.evaluate(() => { window.__drawFrames = false; }); await page.screenshot({ path: path.join(output, 'watch-bots-mobile.png') });
  await page.evaluate(() => { window.__drawFrames = false; });
  check('Points score automatically and the next serve starts without user input');
  await observer.bringToFront(); await observer.keyboard.press('KeyE');

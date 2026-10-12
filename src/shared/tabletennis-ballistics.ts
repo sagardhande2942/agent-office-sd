@@ -1,4 +1,4 @@
-import { PINGPONG_PHYSICS, PINGPONG_SPIN, PINGPONG_STROKES, PINGPONG_TABLE, type PingPongFlight, type PingPongShot, type PingPongShotKind } from './tabletennis.js';
+import { PINGPONG_PHYSICS, PINGPONG_SPIN, PINGPONG_STROKES, PINGPONG_TABLE, tableBounce, type PingPongFlight, type PingPongShot, type PingPongShotKind } from './tabletennis.js';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 /** Displacement caused by exponentially decaying spin; shared by solver and flight. */
@@ -42,4 +42,37 @@ export function netContact(before: { x: number; y: number; z: number }, after: {
   if (!Number.isFinite(t) || t < 0 || t > 1) return false;
   const y = before.y + (after.y - before.y) * t, z = before.z + (after.z - before.z) * t;
   return y >= PINGPONG_TABLE.height - radius && y <= PINGPONG_TABLE.height + PINGPONG_TABLE.netHeight + radius && Math.abs(z - PINGPONG_TABLE.z) <= PINGPONG_TABLE.width / 2 + 0.08 + radius;
+}
+
+/** A serve bounces on the server's half before crossing the net. */
+export function solveServe(from: { x: number; y: number; z: number }, to: { x: number; z: number }, kind: PingPongShotKind = 'drive', power = 0.5): PingPongShot {
+  const dir = Math.sign(to.x - from.x), top = PINGPONG_TABLE.height + PINGPONG_PHYSICS.ballRadius;
+  const tops = PINGPONG_STROKES[kind].tops;
+  let best!: PingPongShot, error = Infinity;
+  // Search legal first-bounce positions; favour the requested pace while keeping the landing accurate.
+  for (let inset = 0.35; inset <= 1.1; inset += 0.1) {
+    const firstX = PINGPONG_TABLE.x - dir * inset;
+    for (let t = 0.08; t <= 0.5; t += 0.002) {
+      const vx = (firstX - from.x) / t;
+      if (Math.abs(vx) > 8) continue;
+      const vy = (top - from.y + 0.5 * PINGPONG_PHYSICS.gravity * t * t + PINGPONG_SPIN.magnus * tops * spinIntegral(t)) / t;
+      const b = { ...from, vx, vy, vz: 0, tops, side: 0 };
+      flyStep(b, t);
+      if (b.vy >= 0) continue;
+      b.y = top; tableBounce(b);
+      let elapsed = t, blocked = false;
+      while (elapsed < 2) {
+        const before = { ...b }; flyStep(b, 1 / 240); elapsed += 1 / 240;
+        if (netContact(before, b)) { blocked = true; break; }
+        if (b.y <= top && b.vy < 0) break;
+      }
+      const landingError = Math.abs(b.x - to.x);
+      const miss = landingError + 0.04 * Math.abs(Math.abs(vx) - (2 + clamp(power, 0, 1) * 2.5));
+      if (!blocked && landingError < 0.04 && miss < error) {
+        error = miss;
+        best = { vx, vy, vz: (to.z - from.z) / elapsed, tops, side: 0, kind, t };
+      }
+    }
+  }
+  return best;
 }

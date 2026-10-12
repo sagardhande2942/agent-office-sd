@@ -7,7 +7,7 @@
     "A second connected browser receives the same angled velocity and spin",
     "Normal bot returns a bounced tap shot and the second browser receives the return",
     "Both left and right landing directions are available",
-    "Full charge produces greater shot pace than a tap",
+    "Full charge sends a legal serve with an own-half first bounce",
     "Losing window focus cancels a held shot",
     "Mouse release sends one shot without duplicate click handlers",
     "Leaving restores normal office field of view",
@@ -16,11 +16,11 @@
   ],
   "browserErrors": [],
   "tap": {
-    "vx": 2.5955147454711747,
-    "vz": -0.3834441938258042
+    "vx": 2.6639344262295084,
+    "vz": -0.5119067446797806
   },
   "charged": {
-    "vx": 4.557906848092552,
-    "vz": 0.8103346725485773
+    "vx": 3.1250000000000004,
+    "vz": 0.5832045989965955
   }
 }

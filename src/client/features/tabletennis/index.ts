@@ -178,7 +178,7 @@ export function installTableTennis(ctx: Ctx, deps: TableTennisDeps = {}) {
     court()?.updateScore(`🏓 ${scoreLine(s)}`);
     // The other player struck it: fly the same ball from where the floor has it, so a rally is the
     // same rally from both ends of the table.
-    controller.adopt(s.ball);
+    controller.adopt(s.ball, s.rally);
   });
 
   ctx.messages.on('pingpong.hit', (m) => {

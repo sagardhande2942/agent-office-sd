@@ -108,3 +108,53 @@ for (const side of ['west', 'east'] as const) for (const dt of [1 / 60, 1 / 20, 
     } finally { Math.random = random; }
   });
 }
+
+test('serves bounce on both halves in order for every stroke, charge and aim', async () => {
+  const { solveServe, tableBounce, PINGPONG_PHYSICS } = await import('../src/shared/tabletennis.js');
+  for (const side of ['west', 'east'] as const) for (const kind of ['drive', 'topspin', 'backspin', 'smash'] as const)
+    for (const power of [0, 0.5, 1]) for (const aim of [-1, 0, 1]) for (const depth of [-1, 0, 1]) {
+      const from = { x: 6 + (side === 'west' ? -1.2 : 1.2), y: 0.98, z: 15 + aim * 0.55 };
+      const target = shotTarget(side, aim, depth), shot = solveServe(from, target, kind, power);
+      assert.ok(shot, `${side}/${kind}/${power}/${aim}/${depth}`);
+      const first = flyBall(from, shot, 1, shot);
+      assert.equal(first.where, 'bounce'); assert.ok(inTableHalf(side, first.at.x, first.at.z));
+      const ball = { ...from, ...shot }; flyStep(ball, shot.t);
+      ball.y = PINGPONG_TABLE.height + PINGPONG_PHYSICS.ballRadius; tableBounce(ball);
+      const second = flyBall(ball, ball, 2, ball);
+      assert.equal(second.where, 'bounce', `${side}/${kind}/${power}/${aim}/${depth}`);
+      assert.ok(inTableHalf(otherSide(side), second.at.x, second.at.z));
+      assert.ok(Math.abs(second.at.x - target.x) < 0.08);
+    }
+});
+
+test('service stays with each player for two points and alternates every point at deuce', async () => {
+  const { afterPoint } = await import('../src/shared/tabletennis.js');
+  let state = defaultPingPongState();
+  const expected = ['west', 'east', 'east', 'west', 'west', 'east', 'east', 'west'];
+  for (const server of expected) { const next = afterPoint(state, 'west'); assert.equal(next.server, server); state = { ...state, ...next }; }
+  state = { ...defaultPingPongState(), score: { west: 10, east: 10 }, server: 'east' };
+  let next = afterPoint(state, 'west'); assert.equal(next.server, 'west');
+  next = afterPoint({ ...state, ...next }, 'east'); assert.equal(next.server, 'east');
+});
+
+test('a return landing on the striker’s half immediately loses the point', () => {
+  const points: string[] = [];
+  const player = { pos: new THREE.Vector3(), facing: 0, camYaw: 0, lookPitch: 0 } as unknown as PlayerController;
+  const c = new TableTennisController(player, () => ({ setBall() {} }) as any, {
+    sendServe() {}, sendHit() {}, awardPoint(winner) { points.push(winner); }, playSound() {}, onDone() {},
+  });
+  c.start('west', 'pvp');
+  c.adopt({ x: 5.2, y: 0.8, z: 15, vx: 1, vy: -1, vz: 0, tops: 0, side: 0, kind: 'drive', t: 1 }, 2);
+  c.update(0.05, { ...defaultPingPongState(), active: true, status: 'rally', rally: 2 });
+  assert.deepEqual(points, ['east']); assert.equal(c.ballInPlay, false);
+});
+
+test('charging a serve increases pace while preserving the same landing target', async () => {
+  const { solveServe } = await import('../src/shared/tabletennis.js');
+  for (const side of ['west', 'east'] as const) {
+    const from = { x: 6 + (side === 'west' ? -1.2 : 1.2), y: 0.98, z: 15 };
+    const target = shotTarget(side);
+    const tap = solveServe(from, target, 'topspin', 0.25), full = solveServe(from, target, 'topspin', 1);
+    assert.ok(Math.abs(full.vx) > Math.abs(tap.vx) * 1.05);
+  }
+});
