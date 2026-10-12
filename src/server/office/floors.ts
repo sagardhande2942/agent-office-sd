@@ -91,6 +91,8 @@ export function floorHelpers(ctx: Ctx): FloorHelpers {
 export async function openFloors(ctx: Ctx, hookPort: number): Promise<FloorsOpen> {
   const { cfg, floors, clients } = ctx;
   const floorContext: FloorContext = {
+    mayAct: owner => ctx.meOf(owner).admin && (!owner || !!ctx.accounts.get(owner)),
+    navigation: () => ctx.maps.plan(),
     planTableAvailable: () => ctx.maps.pick() === OFFICE_MAP,
     helperReport: (floor, helper, host, text) => {
       const meeting = floor.meetings.state().current;

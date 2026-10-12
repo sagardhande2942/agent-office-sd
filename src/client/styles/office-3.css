@@ -340,7 +340,7 @@
 .wb-host { flex: 1; min-height: 0; position: relative; background: #fff; }
 .wb-loading { display: grid; place-items: center; height: 100%; padding: 16px; text-align: center; font-weight: 800; font-size: 16px; color: var(--muted); }
 
-/* Minesweeper on the boss's monitor (ui/arcade.ts): the office stays in view around the game, which sits right over the screen. */
+/* Shared in-world arcade cabinet overlay. */
 .backdrop.clear { background: none; padding: 0; animation: none; }
 /* The game would cut through the HUD's panels, so they step aside while you play. */
 #app:has(.backdrop.clear) :is(.topbar, .side, .chat) { visibility: hidden; }

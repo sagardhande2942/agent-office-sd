@@ -46,6 +46,7 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     meeting: info.meeting,
     planReview: info.planReview,
     masterWorkers: info.masterWorkers,
+    bossMode: info.bossMode, suspended: info.suspended,
     resting: info.resting,
     workedMs: workedMs(info),
     tracker: info.kind === 'agent' ? tracker : undefined,
@@ -112,6 +113,8 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         viewerIds: [],
         planReview: DESK_BY_ID.get(s.deskId)?.review && s.planReview && typeof s.planReview.id === 'string' && ['candidate','reviewer'].includes(s.planReview.role) && typeof s.planReview.locked === 'boolean' ? s.planReview : undefined,
         masterWorkers: restoreTeamRole(s.masterWorkers),
+        suspended: s.suspended === true,
+        bossMode: s.bossMode?.role === 'boss' || s.bossMode?.role === 'worker' ? s.bossMode : undefined,
         meeting: typeof s.meeting === 'string' && DESK_BY_ID.get(s.deskId)?.room ? s.meeting : undefined,
         workedMs: typeof s.workedMs === 'number' && Number.isFinite(s.workedMs) && s.workedMs > 0 ? s.workedMs : undefined,
       };

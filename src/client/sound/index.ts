@@ -16,7 +16,7 @@ import { soda, fridgeDoor } from '../features/fridge/sound';
  */
 import type { GongWhy } from '../../shared/protocol';
 import { birdsong, Fridge, nightCrickets, startRoomTone, startWind } from './ambience';
-import { intercom } from '../features/boss/sound';
+import { intercom } from './intercom';
 import { ding } from './alerts';
 import { arcade } from '../features/cabinet/sound';
 import { ball, type BallSound } from '../features/basketball/sound';

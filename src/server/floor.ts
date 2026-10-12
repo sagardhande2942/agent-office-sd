@@ -29,7 +29,7 @@ import { Garage } from './garage.js';
 import { Jukebox } from './jukebox.js';
 import { CuratorMemory } from './lore-curator/memory.js';
 import { LoreCurator } from './lore-curator/service.js';
-import { floorWorkerFeatures } from './worker-features.js';
+import { floorWorkerFeatures, closeFloorWorkerFeatures } from './worker-features.js';
 import { Cinema } from './cinema.js';
 import { Tv } from './tv.js';
 import { Whiteboard } from './whiteboard.js';
@@ -47,6 +47,8 @@ export interface FloorContext {
   communications?(floor: Floor): CommunicationsState;
   helperReport?(floor: Floor, helper: WorkerInfo, host: WorkerInfo, text: string): string;
   helperReportDelivery?(floor: Floor, workerId: string, messageId: string, phase: 'claim' | 'complete' | 'release'): string | undefined;
+  mayAct?(owner: string | undefined): boolean;
+  navigation?(): import('../shared/maps/types.js').MapPlan;
   agentCmd: string;
   agentArgs: string[];
   /** The DSH profile DeepSeek Harness workers boot (see server/dsh.ts). */
@@ -212,7 +214,7 @@ export class Floor {
       ctx.agentArgs,
       ctx.hook,
       {
-        features: floorWorkerFeatures(this, msg => ctx.emit(this, msg)),
+        features: floorWorkerFeatures(this, msg => ctx.emit(this, msg), ctx),
         update: (worker) => {
           ctx.emit(this, { t: 'worker.update', worker });
           // Still being built: the first updates come from waking the workers already at their desks.
@@ -548,6 +550,7 @@ export class Floor {
   shutdown(keep = false) {
     clearInterval(this.timer);
     this.curator.shutdown();
+    closeFloorWorkerFeatures(this);
     clearTimeout(this.landedTimer);
     this.dog.stop();
     this.queue.shutdown();

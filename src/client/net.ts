@@ -35,6 +35,7 @@ export class Net {
 
   onStatus(h: (up: boolean) => void) {
     this.statusHandlers.push(h);
+    return () => { this.statusHandlers = this.statusHandlers.filter(handler => handler !== h); };
   }
 
   connect() {

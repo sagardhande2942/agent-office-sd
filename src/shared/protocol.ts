@@ -1,3 +1,5 @@
+import type { BossClientMsg, BossServerMsg } from './boss-mode/types.js';
+export * from './boss-mode/types.js';
 import type { CuratorClientMsg, CuratorServerMsg } from './lore-curator.js';
 export * from './lore-curator.js';
 import type { CodingAgentsClientMsg, CodingAgentsServerMsg } from './protocol/coding-agents.js';
@@ -55,7 +57,7 @@ export * from './protocol/workers.js';
 export * from './protocol/communications.js';
 export * from './protocol/cinema.js';
 
-export type ClientMsg =
+export type ClientMsg = BossClientMsg
   | CuratorClientMsg
   | LoreClientMsg
   | CodingAgentsClientMsg
@@ -90,7 +92,7 @@ export type ClientMsg =
   | CarClientMsg
   | DogClientMsg;
 
-export type ServerMsg =
+export type ServerMsg = BossServerMsg
   | CuratorServerMsg
   | LoreServerMsg
   | CodingAgentsServerMsg

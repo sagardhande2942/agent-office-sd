@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { analytics, dispatchTargets, eligible, findMostIdleWorker, MAX_PROMPT, planDispatch } from '../src/client/features/boss/logic.js';
-import { floorReport, reportLink } from '../src/client/features/boss/report.js';
+import { analytics, dispatchTargets, eligible, findMostIdleWorker, MAX_PROMPT, planDispatch } from '../src/client/shared/boss-controls/logic.js';
+import { floorReport, reportLink } from '../src/client/shared/boss-controls/report.js';
 import { validBossGuard, validBossPrompt, type BossGuard } from '../src/shared/boss.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
 import { WorkerManager } from '../src/server/workers.js';

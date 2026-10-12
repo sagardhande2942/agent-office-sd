@@ -1,3 +1,4 @@
+import { authenticated, suspendWorker, wakeEligible } from './suspend.js';
 import { featurePrompt, featureEvent } from './features.js';
 import { promptWorker } from './prompt.js';
 import { planningSeat, planningVersion, planningPrompt, promotePlanWorker } from './plan-review.js';
@@ -329,6 +330,7 @@ export class WorkerManager {
     const w = this.workers.get(id);
     if (!w) return 'No such worker';
     if (w.pty || w.dsh) return 'Worker is already running';
+    delete w.info.suspended;
     if (this.worktrees.checkLost(w, true)) return lostMessage(w.info);
     clockWork(w.info, 'starting');
     w.info.status = 'starting';
@@ -369,17 +371,13 @@ export class WorkerManager {
   }
   /** The worker whose terminal holds this hook token: how a worker proves it's asking for itself. */
   authenticate(id: string, token: string): WorkerInfo | undefined {
-    const w = this.workers.get(id);
-    return (w?.pty || w?.dsh) && token && safeEq(token, w.hookToken) ? w.info : undefined;
+    return authenticated(this.workers.get(id),token);
   }
 
-  /** Starts every worker that isn't running: nobody should be found asleep at their desk. */
-  wakeAll() {
-    // A DeepSeek Harness worker has no PTY but is still running: only the ones that are gone wake up.
-    // A worker on a floor whose host is away stays asleep too, or the boot relaunches it and it
-    // refuses to seat, exits, and is relaunched again.
-    for (const w of this.workers.values()) if (!w.pty && !w.dsh && !this.remoteAbsent(w.info)) this.resume(w.info.id);
-  }
+  suspend(id:string):string|undefined { const w=this.workers.get(id); return suspendWorker(w,()=>{this.persist();this.emitUpdate(w!);}); }
+
+  /** Starts unsuspended workers without a running terminal. */
+  wakeAll() { wakeEligible(this.workers.values(), id=>this.resume(id), info=>!this.remoteAbsent(info)); }
 
   /**
    * Whether this worker's floor runs on a machine that is not currently reachable. A no-op for an

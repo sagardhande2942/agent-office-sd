@@ -1,12 +1,11 @@
 /**
  * Sitting down: on a chair, a stool, the couch, the throne. Sitting there already, E gets you up, or
- * does what the seat's for (the TV from the couch, Minesweeper from the boss's chair, the bar's menu).
+ * does what the seat's for (the TV from the couch, Boss Office from the boss's chair, the bar's menu).
  */
 import { seatPlace, type SeatDef, type SeatPlace } from '../../../shared/layout';
 import type { Ctx } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { store } from '../../state';
-import type { Arcade } from '../arcade/ui';
 import { toast } from '../../ui/dom';
 import type { Interactable } from '../../world/types';
 
@@ -22,8 +21,6 @@ export interface SeatingDeps {
   shares(): [string, MediaStream][];
   /** Watches what's on the TV full screen (see features/voice). */
   watchShare(): void;
-  /** The boss's monitor (see features/arcade). */
-  arcade: Arcade;
   showBoss?(): void;
   /** The bar's menu (see features/bar). */
   showBar(): void;
@@ -62,7 +59,7 @@ export function installSeating(ctx: Ctx, deps: SeatingDeps) {
     const player = ctx.player;
     if (player.seat?.seatId === seatId) {
       if (seat.tv && tvShowing()) deps.watchShare();
-      else if (seat.game) { if (deps.showBoss) deps.showBoss(); else deps.arcade.play(); }
+      else if (seat.boss) deps.showBoss?.();
       else if (seat.bar) deps.showBar();
       else standUp();
       return;
@@ -113,11 +110,11 @@ export function installSeating(ctx: Ctx, deps: SeatingDeps) {
       if (!seat) return { k: '', parts: [] };
       if (ctx.player.seat?.seatId === seat.id) {
         const tv = !!seat.tv && tvShowing();
-        const use = tv ? 'Watch the TV' : seat.game ? 'Open Boss System / Minesweeper' : seat.bar ? 'Order a drink' : '';
+        const use = tv ? 'Watch the TV' : seat.boss ? 'Open Boss Office' : seat.bar ? 'Order a drink' : '';
         return { k: `${seat.id}|sitting|${tv}`, parts: [hintTitle(seat.label), aside('sitting'), ...(use ? [key('E', use), key('W A S D', 'Get up')] : [key('E', 'Get up')])] };
       }
       const full = !freePlace(seat);
-      return { k: `${seat.id}|${full}`, parts: [hintTitle(seat.label), seat.game ? aside('👔 Boss system and Minesweeper on the monitor') : '', full ? aside('no room') : key('E', 'Sit down')] };
+      return { k: `${seat.id}|${full}`, parts: [hintTitle(seat.label), seat.boss ? aside('👔 Boss Office command center') : '', full ? aside('no room') : key('E', 'Sit down')] };
     },
     use: onE((it) => {
       if (it.seatId) useSeat(it.seatId);

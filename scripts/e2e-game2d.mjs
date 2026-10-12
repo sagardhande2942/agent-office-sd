@@ -102,19 +102,17 @@ try {
   await page.keyboard.down('KeyD'); await page.waitForTimeout(900); await page.keyboard.up('KeyD');
   assert.ok(await page.evaluate(() => window.__game2d.ctx.player.pos.x) < -12.5);
   check('movement and shared collision physics', 'Arrows/WASD, ground click-to-walk and collision against the original desk geometry work in the orthographic scene.');
-  for (const label of [/Issues/, /Pull requests/, /Task queue/, /Boss Control Center/, /Smartphone/, /Services/, /Whiteboard/, /Meeting room/, /Search/, /Settings/, /2D view controls/, /Compare plans/i]) {
+  for (const label of [/Issues/, /Pull requests/, /Task queue/, /Boss Office/, /Smartphone/, /Services/, /Whiteboard/, /Meeting room/, /Search/, /Settings/, /2D view controls/, /Compare plans/i]) {
     await menu(label);
     if(label.test('Compare plans')) { await page.waitForTimeout(250); await page.screenshot({path:path.join(output,'plans.png')}); }
     await close();
   }
   check('complete office dialogs', 'Shared Issues/PR/Queue, Boss, Smartphone, Services, Whiteboard, Meeting, Search, Settings, view controls and Plan Comparison open from the same menu with close/Esc focus recovery.');
-  await menu(/Boss Control Center/); await page.getByRole('button',{name:'Play Minesweeper',exact:true}).click();
-  await page.getByRole('dialog',{name:'Minesweeper',exact:true}).waitFor();
-  await page.waitForFunction(()=>window.__game2d.camera.perspective);
-  await page.getByLabel('Minesweeper board').click({position:{x:30,y:80}});
-  await page.screenshot({path:path.join(output,'arcade.png')}); await close('close');
-  await page.waitForFunction(()=>window.__game2d.camera.isOrthographicCamera);
-  check('real arcade interaction','Boss Control Center launches playable Minesweeper with its original camera and canvas; closing restores the orthographic view and controls.');
+  await menu(/Boss Office/);
+  await page.getByRole('dialog',{name:'Boss Office',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Overview',exact:true}).click();
+  await page.screenshot({path:path.join(output,'boss-office.png')}); await close('close');
+  check('Boss Office command center','Dedicated monitor console replaces Minesweeper; closing restores controls.');
   await page.keyboard.press('Tab'); assert.ok(await page.locator('.hud-menu .close').count()); await close('close');
   await page.keyboard.press('Control+k'); await page.getByLabel('Find anything in the office').waitFor(); await close('close');
   check('menu and palette recovery','The full menu and command palette have top-right close buttons and restore controls immediately.');
@@ -214,7 +212,7 @@ try {
   assert.ok(!sent.slice(boundary).some(m=>['worker.spawn','worker.resume'].includes(m.t)));
   check('direct view toggle', 'Visible HUD buttons switch 2D to 3D and back, preserving floor and worker sessions.');
   assert.deepEqual(errors, []); check('browser runtime','No page errors across Office, rooftop, garage, alternate maps and view switching.');
-  writeFileSync(path.join(output,'checks.json'),JSON.stringify({checks,screenshots:['office-1440.png','office-1120.png','terminal.png','rooftop.png','garage.png','castle.png','station.png','plans.png','arcade.png']},null,2));
+  writeFileSync(path.join(output,'checks.json'),JSON.stringify({checks,screenshots:['office-1440.png','office-1120.png','terminal.png','rooftop.png','garage.png','castle.png','station.png','plans.png','boss-office.png']},null,2));
 } catch (error) {
   console.error('Page errors:', errors);
   if (page && !page.isClosed()) { console.error('State:', await page.evaluate(() => { const g=window.__game2d; return g && {floor:g.store.floor,enabled:g.ctx.player.enabled,position:g.ctx.player.pos,trip:g.core.trip,activities:g.ctx.activities.all().filter(a=>a.active()).map(a=>a.id)}; }).catch(()=>null)); await page.screenshot({path:path.join(output,'failure.png')}).catch(()=>{}); }
