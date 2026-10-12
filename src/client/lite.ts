@@ -1,3 +1,4 @@
+import { openBossConsole } from './shared/boss-mode/console';
 import { viewSelector, switchView } from './shared/view-selector';
 import { openMasterWorkers } from './ui/master-workers';
 import { openPlanReview } from './ui/plan-review';
@@ -328,6 +329,7 @@ function showMeeting(preset?: MeetingPreset) {
 
 $('btn-issues').addEventListener('click', () => openBoard('issues', net, boardActions()));
 $('btn-pulls').addEventListener('click', () => openBoard('pulls', net, boardActions()));
+$('btn-boss-office').addEventListener('click',()=>openBossConsole(net,openWorker));
 $('btn-master-workers').addEventListener('click',()=>openMasterWorkers(net,openWorker));
 $('btn-plans').addEventListener('click',()=>openPlanReview(net,openWorker));
 $('btn-meeting').addEventListener('click', () => showMeeting());

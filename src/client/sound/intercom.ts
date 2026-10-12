@@ -1,4 +1,4 @@
-import type { AudioCore } from '../../sound/core';
+import type { AudioCore } from './core';
 
 /** Uses the existing alerts bus and mute controls; never creates a separate AudioContext. */
 export function intercom(a: AudioCore) {

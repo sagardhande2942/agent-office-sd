@@ -1,3 +1,4 @@
+import { bossCommand } from './boss-mode/tui.js';
 import { TuiTerminal, MOUSE_OFF } from './tui-terminal.js';
 import { teamCommand } from './master-workers/tui.js';
 import { readFileSync } from 'node:fs';
@@ -169,7 +170,8 @@ function session(ws: WebSocket): Promise<number> {
           print('Welcome. Select a desk with arrows; Enter opens its terminal.');
         }
         dashboard.selected = 0; dashboard.offset = 0; draw();
-      } else if (msg.t === 'master-workers' && view) view.masterWorkers=msg.state;
+      } else if (msg.t === 'boss.state' && view && view.floor === msg.floor) view.bossMode=msg.state;
+      else if (msg.t === 'master-workers' && view) view.masterWorkers=msg.state;
       else if (msg.t === 'plan-review' && view) view.planReview=msg.state;
       else if (msg.t === 'floors') floors = msg.floors;
       else if (msg.t === 'worker.update' && view) {
@@ -267,6 +269,7 @@ function session(ws: WebSocket): Promise<number> {
     function command(line: string) {
       const [cmd, key = '', ...tail] = line.split(/\s+/), text = tail.join(' ');
       if (!cmd) return;
+      if (bossCommand(line, send, () => panel('boss'))) return;
       if (teamCommand(line, send, () => panel('teams'))) return;
       if (cmd === 'quit' || cmd === 'exit') return done(0);
       if (cmd === 'help') return panel('help');

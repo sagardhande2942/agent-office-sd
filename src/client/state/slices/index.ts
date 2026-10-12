@@ -1,3 +1,4 @@
+import { bossMode } from './boss-mode';
 import { lore } from './lore';
 import { masterWorkers } from './master-workers';
 import { objectPlacement } from './object-placement';
@@ -82,4 +83,5 @@ export const SLICES: readonly Slice[] = [
   objectPlacement,
   lore,
   codingAgents,
+  bossMode,
 ];

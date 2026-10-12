@@ -1,3 +1,4 @@
+import { startBossOfficeClock } from '../boss-mode/office.js';
 import { startTeamClock } from '../master-workers/service.js';
 import { startPlacementClock } from '../object-placement/service.js';
 import { startManagerClock } from '../manager.js';
@@ -8,6 +9,7 @@ import { startCommunicationClock } from './communications.js';
 /** The office's own clocks: terminals re-sent to viewers who fell behind, and the heartbeat. Returns what stops them. */
 export function startTimers(ctx: Ctx): () => void {
   const stopPlacements = startPlacementClock(ctx);
+  const stopBoss = startBossOfficeClock(ctx);
   const stopTeams = startTeamClock(ctx);
   const stopManager = startManagerClock(ctx);
   const stopCommunications = startCommunicationClock(ctx);
@@ -42,6 +44,7 @@ export function startTimers(ctx: Ctx): () => void {
   return () => {
     stopPlacements();
     stopTeams();
+    stopBoss();
     stopManager();
     stopCommunications();
     clearInterval(heartbeat);

@@ -1204,7 +1204,7 @@ test("every Claude worker gets the office's MCP server, and office-workers on it
   assert.deepEqual(server.args.slice(1), ['mcp']);
   assert.ok(server.args[0].endsWith(path.join('bin', 'office-workers.js')));
   // Looking is allowed without asking; hiring and sending home aren't.
-  assert.deepEqual(JSON.parse(readFileSync(path.join(f.data, 'claude-hooks.json'), 'utf8')).permissions, { allow: ['mcp__agent-office__list_workers', 'mcp__agent-office__floor_status', 'mcp__agent-office__worker_lore', 'mcp__agent-office__save_worker_lore'] });
+  assert.deepEqual(JSON.parse(readFileSync(path.join(f.data, 'claude-hooks.json'), 'utf8')).permissions, { allow: ['mcp__agent-office__list_workers', 'mcp__agent-office__floor_status', 'mcp__agent-office__worker_lore', 'mcp__agent-office__boss_state', 'mcp__agent-office__save_worker_lore', 'mcp__agent-office__boss_action'] });
 
   const desk = workers.spawn('desk-2', 'Ada', 'Fix login');
   assert.equal(typeof desk, 'object');
@@ -1724,6 +1724,9 @@ test('resolveCommand resolves through a login shell from a process group that is
   const agent = path.join(bin, 'office-probe-agent');
   writeFileSync(agent, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
   writeFileSync(path.join(root, '.profile'), `export PATH=${JSON.stringify(bin)}:"$PATH"\n`);
+  // Cloud Shell may append its own .bashrc loader to .profile; use Bash's preferred
+  // login profile so this fixture still tests the intended login-only PATH.
+  writeFileSync(path.join(root, '.bash_profile'), `export PATH=${JSON.stringify(bin)}:"$PATH"\n`);
   writeFileSync(path.join(root, '.zprofile'), `export PATH=${JSON.stringify(bin)}:"$PATH"\n`);
   t.after(() => rmSync(root, { recursive: true, force: true }));
 

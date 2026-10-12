@@ -27,7 +27,7 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, p
   if (seat) {
     // "🛋️ Couch" -> "🛋️ on the couch".
     const [icon, ...name] = seat.label.split(' ');
-    return `${icon} ${seat.game ? 'in' : 'on'} the ${name.join(' ').toLowerCase()}`;
+    return `${icon} ${seat.boss ? 'in' : 'on'} the ${name.join(' ').toLowerCase()}`;
   }
   // The roof is the office's size, but none of its rooms are up there.
   if (p.floor === ROOF) return onTheRoof(p);

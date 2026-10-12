@@ -24,9 +24,9 @@ export class TeamCoordinator {
   private past: TeamRun[] = [];
   error?: string;
   private busy = false;
-  constructor(private file: string, readonly presets: TeamPresets, private io: TeamAdapter) {
+  constructor(private file: string, readonly presets: TeamPresets, private io: TeamAdapter, private maxWorkers = 5) {
     try {
-      const stored = restored(load(file, { current: null, past: [] })); this.current = stored.current; this.past = stored.past;
+      const stored = restored(load(file, { current: null, past: [] }), maxWorkers); this.current = stored.current; this.past = stored.past;
       if (this.current && ['starting','running','paused'].includes(this.current.phase)) {
         const r=this.current, roster=this.io.list().filter(w=>w.masterWorkers?.id===r.id);
         r.masterId ??= roster.find(w=>w.masterWorkers?.role==='master')?.id;
@@ -52,7 +52,7 @@ export class TeamCoordinator {
   start(raw: TeamRequest, owner?: string) {
     if (this.error) throw Error(this.error);
     if (this.current && !['done','stopped'].includes(this.current.phase)) throw Error('Close or stop the current team first');
-    const req = request(raw);
+    const req = request(raw, this.maxWorkers);
     if (this.current) this.past = [...this.past, this.current].slice(-10);
     const r: TeamRun = { ...req, id: randomUUID(), owner, createdAt: Date.now(), revision: 0, phase: 'starting', workers: [], tasks: [], notifications: {} };
     const started = recordStart(r, req);
@@ -100,6 +100,21 @@ export class TeamCoordinator {
         if(error){a.status='failed';a.summary=error;t.status='pending';recordBlocker(r, { task: t, workerId: w.id, summary: `Task ${t.id} could not resume`, message: error });this.notify(r,`task ${t.id} could not resume`);this.update();}
       }
     }
+  }
+  /** Reopen retained work explicitly, preserving its commits, task graph and original branch. */
+  continue(message: string) {
+    const r = this.current;
+    if (!r) throw Error('No retained activity');
+    if (['done','stopped'].includes(r.phase)) { r.phase = 'paused'; this.update(); }
+    this.control('resume', r.owner);
+    this.enqueue(message);
+  }
+  /** Coordinator notices are delivered between terminal operations. */
+  enqueue(message: string) {
+    const r = this.current;
+    if (!r?.masterId) throw Error('Master is unavailable');
+    r.notifications[r.masterId] = (r.notifications[r.masterId] ?? '') + '\n' + message;
+    this.update();
   }
   private run(actor: string, b: TeamAction): TeamRun {
     const r = this.current;
