@@ -23,6 +23,9 @@
 .boss-state[data-phase="blocked"] { background: #4b2832; color: #ffb0b4; }
 .boss-power { border: 1px solid #59626f; border-radius: 22px; min-width: 66px; padding: 9px 16px; background: #242c38; color: #b8c2d1; font-weight: bold; cursor: pointer; }
 .boss-power[aria-checked="true"] { border-color: #e8c547; background: #e8c547; color: #17191e; }
+.boss-connection { padding: 13px 28px; background: #23354a; color: #d7e9ff; border-bottom: 1px solid #40556c; }
+.boss-connection[hidden] { display: none; }
+.boss-office button:disabled { opacity: .5; cursor: wait; }
 .boss-nav { display: flex; gap: 4px; padding: 0 22px; border-bottom: 1px solid #303a49; flex-shrink: 0; overflow-x: auto; }
 .boss-nav button { padding: 15px 20px; background: none; border: 0; border-bottom: 2px solid transparent; color: #9daabd; font: inherit; white-space: nowrap; cursor: pointer; }
 .boss-nav button[aria-current="page"] { border-color: #e8c547; color: #f0d976; }

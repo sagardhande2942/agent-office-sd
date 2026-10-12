@@ -78,3 +78,9 @@ The latest explicit user direction takes priority over inferred improvements and
 Changing the mission or sending steering returns queued initiatives to suggestions for reconsideration. Active work, commits and PRs are preserved; its master receives the new direction at a safe checkpoint and reconciles pending tasks. Changing agent/model settings alone does not reset queued work.
 
 Discovery receives outstanding instructions when its terminal becomes idle. Failed delivery remains retryable, including after restart. Discovery must apply and acknowledge the current direction before the server accepts proposals. Multiple instructions are delivered in order with explicit precedence for newer conflicting instructions; receipt is not the same as the agent acknowledging application.
+
+## Host connection readiness
+
+Hosted Boss mode shows **Connecting to floor host…** or **Reconnecting to floor host…** while the host connects and supplies its live Boss snapshot. The switch shows WAIT and write controls remain disabled; steering drafts and cached work remain available. Controls recover automatically when state arrives. The update-host message appears only when a connected host explicitly lacks Boss support. Refreshing the browser does not speed up host startup; a genuinely old host needs updated code and a restart.
+
+Verify the readiness UI with `node --import tsx scripts/e2e-boss-connection.mjs` after building. Set `CHROMIUM_PATH` and optionally `BOSS_CONNECTION_ARTIFACTS`; the fixture captures connecting and unsupported states and checks automatic recovery without starting agent jobs.

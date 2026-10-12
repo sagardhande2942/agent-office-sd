@@ -27,6 +27,8 @@ export interface BossPresence {
 }
 export interface BossPreset { id: string; name: string; config: BossConfig; }
 export interface BossState {
+  /** Transport metadata supplied by the office proxy; not persisted host lifecycle state. */
+  connection?: 'connecting' | 'ready' | 'unsupported';
   version: 1; revision: number; config: BossConfig; enabled: boolean; draining: boolean; owner?: string;
   phase: 'off' | 'discovering' | 'planning' | 'working' | 'verifying' | 'waiting' | 'draining' | 'blocked';
   message: string; backlog: BossItem[]; events: BossEvent[]; steering: BossSteering[]; checks: BossCheck[];

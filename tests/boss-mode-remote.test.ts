@@ -22,3 +22,19 @@ test('remote boss surfaces unsupported hosts and host rejection without changing
   await assert.rejects(denied.control({action:'on'}),/Admin permission/);
   assert.equal(denied.state().enabled,false);
 });
+
+test('unknown and disconnected host capabilities produce connecting state, not an upgrade error',async()=>{
+  let supported:boolean|undefined,reachable=false,calls=0;
+  const boss=new RemoteBoss(async()=>{calls++;return bossInitial();},()=>supported,()=>reachable);
+  assert.equal(boss.state().connection,'connecting');
+  await assert.rejects(boss.control({action:'on'}),/Connecting to floor host/);
+  reachable=true;await assert.rejects(boss.control({action:'on'}),/Connecting to floor host/);
+  supported=true;assert.equal(boss.state().connection,'connecting','wait for initial Boss snapshot');
+  boss.receive({...bossInitial(),enabled:true,config:{...bossInitial().config,mission:'Add a car'}});
+  assert.equal(boss.state().connection,'ready');
+  reachable=false;boss.reset();assert.equal(boss.state().connection,'connecting');
+  assert.equal(boss.state().config.mission,'Add a car');
+  supported=false;await assert.rejects(boss.control({action:'on'}),/Connecting to floor host/);
+  reachable=true;await assert.rejects(boss.control({action:'on'}),/Update the floor host/);
+  assert.equal(boss.state().connection,'unsupported');assert.equal(calls,0);
+});

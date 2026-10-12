@@ -71,7 +71,7 @@ export class RemoteFloor implements FloorActions {
   readonly dir: string;
   readonly masterWorkers = new RemoteTeams((t, body) => this.call(t, body), () => this.announced.masterWorkers === true);
   readonly cinema = new RemoteCinema((t, body) => this.call(t, body), () => this.reachable, () => this.announced.cinema === true);
-  readonly bossMode = new RemoteBoss((t, body) => this.call(t, body), () => this.announced.bossMode === true);
+  readonly bossMode = new RemoteBoss((t, body) => this.call(t, body), () => this.announced.bossMode, () => this.reachable);
   readonly curator = new RemoteCurator((t, body) => this.call(t, body), () => this.announced.curator === true);
   readonly lore = new RemoteLore((t, body) => this.call(t, body), () => this.announced.lore === true);
   readonly helpers = { states: () => (this.mirror.get('helper') ?? []) as import('../shared/helper.js').HelperState[] };
@@ -163,6 +163,7 @@ export class RemoteFloor implements FloorActions {
 
   private dropPending() {
     this.gone = true;
+    this.bossMode.reset();
     for (const [n, p] of this.pending) {
       clearTimeout(p.timer);
       p.reject(new HostGone(p.floorId, this.machine));
@@ -186,6 +187,7 @@ export class RemoteFloor implements FloorActions {
       if (msg.floor.floorId !== this.id) return;
       this.gone = false;
       this.cinema.reset();
+      this.bossMode.reset();
       this.lore.reset();
       // Ids only, so this is a roster and not a description. A worker the host has not described yet
       // is not listed: better an incomplete list than one invented from an id.
