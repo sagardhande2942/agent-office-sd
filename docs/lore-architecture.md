@@ -24,6 +24,7 @@ rather than something the code or a test states, it says so.
 - [What the tests actually cover](#what-the-tests-actually-cover)
 - [Known gaps and sharp edges](#known-gaps-and-sharp-edges)
 - [Where the docs and the code disagree](#where-the-docs-and-the-code-disagree)
+- [What I would change, in priority order](#what-i-would-change-in-priority-order)
 
 ## The ten-second version
 
@@ -1217,6 +1218,95 @@ current implementation, not as proposals.
   pull request numbers when available") but does not say that **`pr` is only ever set by the
   browser save path** — neither `saveWorkerKnowledge` nor the handover code populates it, so
   worker-written discoveries never carry a PR link on the card.
+
+## What I would change, in priority order
+
+The gaps above are observations. This is the order I would fix them in, and why. Each number is
+the gap it answers; none of it is implemented here.
+
+### P1 — the feature quietly gives a worker half a fact
+
+**Assemble the injected block note by note instead of slicing the finished string (gap 1, and the
+same class of bug at gap 5).** `workerLoreContext` builds all five sections and then
+`.slice(0, WORKER_LORE_CONTEXT_MAX)` cuts the result, so the fifth note can stop mid-sentence with
+nothing marking the cut. The handover path has the same shape: `cleanLoreContent` truncates at
+`LORE_CONTENT_MAX` and the per-check evidence budget floors at 60 characters once a checklist
+passes roughly 34 checks — past that point `Files:`, `PR:`, `Branch:` and `Commit:` are the first
+things to go. A worker reading the injected memory cannot tell a truncated fact from a whole one.
+The fix is in one place each: keep whole notes while the budget holds, drop the last one whole and
+say so in the preamble (`…and 2 more notes did not fit`), and put the per-check budget *before*
+`Files:`/`PR:` in the handover so the identifying fields are the last thing sacrificed, not the
+first. Both are testable without a browser: assert the block never ends mid-note and that a
+34-check handover still carries its PR line.
+
+**Make a note's curation state visible where a person looks (gap 7).** `needs-verification` notes
+appear on the Lore Shelf and are excluded from injection. Nothing on the card says so, so a person
+reads a shelf that over-promises what the next worker will actually be told. One badge, and one
+sentence in `docs/lore.md` saying the shelf shows more than injection does.
+
+**Fix the delete path the curator inherits (gap 9).** `CuratorMemory` does not override
+`LoreStore.delete`, so deleting a note leaves its journal record — including every revision —
+behind. `history(id)` then serves revisions that `restore(id, revision)` cannot apply, because
+restore needs a file that no longer exists. Overriding `delete` in the curator to drop or mark
+`records[id]` closes both the dangling-history path and the unbounded journal.
+
+### P2 — retrieval finds the wrong notes, or none
+
+**Stop dropping short tokens (gap 3).** `/[a-z0-9_-]{3,}/` cannot produce a one- or two-character
+token, so `ci`, `js`, `db` and `ui` score nothing — words this repository uses constantly. A task
+titled "Fix CI" matches only "fix". Adding a small stop-word complement (common two-character
+words like "on", "to", "in", "it") and allowing two-character tokens would fix it without flooding
+the score.
+
+**Rank by age as well as overlap (gap 2).** `updatedAt` is only a tie-break after score and
+handover status, so a stale note that names the task's words outranks a fresh one. Half-decayed
+recency — a score divided by note age — is a small change to `selectWorkerLore`.
+
+**Use one search for both readers (gap 16).** The shelf window does raw substring matching and the
+prompt does scored token overlap, so a note can be trivially findable by a person and invisible to
+the worker whose task it answers. Sharing one ranking between the window and the injection is the
+fix that removes the disagreement rather than documenting it.
+
+### P3 — correctness of the record itself
+
+- **Record corrections rather than overwriting authors (gap 4).** A note's ID is keyed on its
+  title, so a correction by a different worker rewrites `author`, `workerId` and `desk` of the
+  original. Keeping a `supersededBy`/contributor trail is the smallest change that stops a silent
+  loss of attribution.
+- **Do not let a UI edit reset curation (gap 8).** `CuratorMemory.observe()` writes a fresh
+  `needs-verification` record with `sources: [n.id]` on any real edit, which un-archives an archived
+  note and drops a superseded note's `sources`. Preserving `archivedAt` and the existing `sources`
+  on a human edit keeps the curator's view consistent with the shelf's.
+- **Enforce what the prompt only asks for (gap 10).** `applyActions` refuses `merge` on a handover
+  but accepts `archive`, `verify` and `flag` on one, relying on the model to cooperate. The same
+  guard, in code, would do.
+- **Keep handovers out of the lifecycle panel (gap 11).** `state().notes` maps every note, and the
+  window renders the first 100, so the curator's panel is mostly handovers. Filtering
+  `tags.includes('handover')` out of `state().notes` restores the panel's meaning.
+
+### P4 — cost and housekeeping
+
+- **Bound the handovers (gap 6).** One file per worker per submission, never compacted, and
+  `list()` sorts over every note on the floor. Ageing them out — or folding a worker's superseded
+  handovers into its latest one — keeps the store flat.
+- **Spend the evidence budget where the answer is (gap 12).** Keyword ranking picks one `src/` and
+  one test file; a note describing a behaviour without naming a file usually cites the wrong one.
+  Weighting by whether the excerpt actually contains the note's tokens is cheap and measurably better.
+- **Bound the curator's cost (gaps 13, 14).** `docs/lore.md` already says there is no monetary cap.
+  A character budget over the excerpts and a cap on files read per run would make the 5-minute
+  timeout less of a surprise, and `git show` with a windowed read would stop one run pulling tens
+  of megabytes.
+- **Housekeeping on the 1-second timer and the dead length guard (gaps 15, 17).** The curator's
+  tick runs whether or not the curator is enabled, and `floorWorkerLore`'s default branch slices
+  to 2,000 characters *before* the check that rejects anything longer, so that check can only ever
+  reject an explicit `?query=`. Both are a few lines to remove or to make mean what they say.
+
+### Also, cheap and worth doing now
+
+- The in-game help row's "south wall next to the bookshelf" should say the west wall beside the
+  basketball hoop, to match the code and the other three docs.
+- `docs/lore.md` should say that `pr` is set only by a person saving from the browser, so a
+  worker-written discovery without one is not a bug.
 
 ## Verifying this page
 
