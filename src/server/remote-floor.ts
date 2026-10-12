@@ -1,3 +1,4 @@
+import { RemoteKnowledge } from './knowledge/surface.js';
 import { RemoteBoss } from './boss-mode/surface.js';
 import { RemoteCurator } from './lore-curator/surface.js';
 import { RemoteTeams } from './master-workers/remote.js';
@@ -73,6 +74,7 @@ export class RemoteFloor implements FloorActions {
   readonly cinema = new RemoteCinema((t, body) => this.call(t, body), () => this.reachable, () => this.announced.cinema === true);
   readonly bossMode = new RemoteBoss((t, body) => this.call(t, body), () => this.announced.bossMode, () => this.reachable);
   readonly curator = new RemoteCurator((t, body) => this.call(t, body), () => this.announced.curator === true);
+  readonly knowledge = new RemoteKnowledge((t, body) => this.call(t, body));
   readonly lore = new RemoteLore((t, body) => this.call(t, body), () => this.announced.lore === true);
   readonly helpers = { states: () => (this.mirror.get('helper') ?? []) as import('../shared/helper.js').HelperState[] };
   private seq = 0;

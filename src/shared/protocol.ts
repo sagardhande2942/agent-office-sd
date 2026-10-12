@@ -1,3 +1,5 @@
+import type { KnowledgeClientMsg, KnowledgeServerMsg } from './protocol/knowledge.js';
+export * from './protocol/knowledge.js';
 import type { BossClientMsg, BossServerMsg } from './boss-mode/types.js';
 export * from './boss-mode/types.js';
 import type { CuratorClientMsg, CuratorServerMsg } from './lore-curator.js';
@@ -57,7 +59,7 @@ export * from './protocol/workers.js';
 export * from './protocol/communications.js';
 export * from './protocol/cinema.js';
 
-export type ClientMsg = BossClientMsg
+export type ClientMsg = KnowledgeClientMsg | BossClientMsg
   | CuratorClientMsg
   | LoreClientMsg
   | CodingAgentsClientMsg
@@ -92,7 +94,7 @@ export type ClientMsg = BossClientMsg
   | CarClientMsg
   | DogClientMsg;
 
-export type ServerMsg = BossServerMsg
+export type ServerMsg = KnowledgeServerMsg | BossServerMsg
   | CuratorServerMsg
   | LoreServerMsg
   | CodingAgentsServerMsg

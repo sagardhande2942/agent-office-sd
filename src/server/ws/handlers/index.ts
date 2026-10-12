@@ -1,3 +1,4 @@
+import { knowledgeHandlers } from './knowledge.js';
 import { bossModeHandlers, bossModeView } from './boss-mode.js';
 import { curatorHandlers } from './lore-curator.js';
 import { worldsHandlers } from './parallel-worlds.js';
@@ -40,6 +41,7 @@ import { communicationsView } from './communications.js';
 
 /** Each domain's handlers put together, in alphabetical order. */
 export const handlers: HandlerMap<ClientMsg> = {
+  ...knowledgeHandlers,
   ...curatorHandlers,
   ...loreHandlers,
   ...codingAgentsHandlers,

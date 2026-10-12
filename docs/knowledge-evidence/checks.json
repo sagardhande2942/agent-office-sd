@@ -1,0 +1,7 @@
+{
+  "tree": true,
+  "statusBadges": true,
+  "editPreservesStatus": true,
+  "editPreservesSources": true,
+  "closeAndEscape": true
+}

@@ -58,6 +58,8 @@ jobs:
 
       - run: npm run typecheck
 
+      - run: node --import tsx src/server/cli.ts knowledge lint
+
       - run: npm test
 
       - name: Pack the release

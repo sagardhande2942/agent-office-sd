@@ -1,3 +1,4 @@
+import { knowledge } from './knowledge';
 import { bossMode } from './boss-mode';
 import { lore } from './lore';
 import { masterWorkers } from './master-workers';
@@ -86,4 +87,5 @@ export const SLICES: readonly Slice[] = [
   codingAgents,
   tableTennis,
   bossMode,
+  knowledge,
 ];

@@ -55,9 +55,9 @@ Features can add a menu action to `HUD_ACTIONS` in `ui/menu.ts` during installat
 
 ### Worker lifecycle features
 
-Server features register in `server/worker-features.ts`. `workers/features.ts` supplies prompt, update, and removal hooks; features receive the actual floor services and publish their own events. `lore/worker.ts` uses this seam to inject bounded repository context and save completion handovers without putting lore logic in the worker manager. The shared terminal/ACP prompt-delivery module is `workers/prompt.ts`.
+Server features register in `server/worker-features.ts`. `workers/features.ts` supplies prompt, completion, update, and removal hooks; features receive the actual floor services and publish their own events. `knowledge/worker.ts` uses this seam to inject bounded index navigation, gate knowledge review and save full completion journals without putting lore logic in the worker manager. The shared terminal/ACP prompt-delivery module is `workers/prompt.ts`.
 
-Worker HTTP extensions register in `hooks/worker-features.ts`, used by both office and floor-host listeners after role checks. Host RPCs and snapshots register through `worker-features.ts`; remote services keep their own mirrors. CLI/MCP extensions register in `bin/office-worker-extensions.js`, supplying their own parser, commands, tools, HTTP paths, and help. The lore extension lives in `bin/office-lore-tools.js`.
+Worker HTTP extensions register in `hooks/worker-features.ts`, used by both office and floor-host listeners after role checks. Host RPCs and snapshots register through `worker-features.ts`; remote services keep their own mirrors. CLI/MCP extensions register in `bin/office-worker-extensions.js`, supplying their own parser, commands, tools, HTTP paths, and help. The Knowledge extension lives in `bin/office-knowledge-tools.js`; Lore remains an explicit migration compatibility extension.
 
 `style.css` is the 3D office's sheet. It pulls in `styles/base.css` (the colors, the reset, panels, buttons and the window frame, which the 2D view's `lite.css` loads too), `styles/hud.css` and `styles/loading.css`. Every other sheet sits next to its module and comes in with it. A module's sheet loads in no fixed order against `base.css`, so a module rule that overrides a base rule of the same specificity has to be more specific, or live at the end of `base.css` with the others there.
 
@@ -124,7 +124,7 @@ Worker appearance factories register through `client/world/character/appearance.
 
 ### Knowledge curation
 
-`server/lore-curator/` owns the persistent journal and note overlays, scheduler, bounded repository evidence reader, schema-validated recommendations, and isolated noninteractive agent adapters. `CuratorMemory` preserves original lore files while exposing lifecycle metadata; worker prompt selection excludes archived, superseded, unverified, and nonmatching notes. The service joins worker lifecycle hooks through `worker-features.ts`, and its host calls/snapshots join the same registry. `ws/handlers/lore-curator.ts` supplies floor-scoped controls; `lore-curator/surface.ts` supplies the remote RPC facade. `client/features/lore-curator/` installs its menu action and Workers settings extension without adding logic to the HUD, settings shell or state store. Types and validation live in `shared/lore-curator.ts`.
+`server/knowledge/` owns the Markdown tree, indexes, authenticated tools, journals, review gate, lint/migration, and branch curation. The curator reuses isolated agent adapters, scheduling and repository evidence readers from `server/lore-curator/`, then commits and publishes a review branch. `knowledge/surface.ts` and `knowledge/host.ts` keep local and hosted human actions equivalent. The dedicated protocol, handler, state slice and `client/features/knowledge/` window join their registries. Legacy Lore modules remain behind the transition switch. See [Knowledge architecture](knowledge-architecture.md).
 
 ## Continuous Boss mode
 

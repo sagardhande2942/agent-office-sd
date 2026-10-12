@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { chromium } from 'playwright-core';
+import { KnowledgeStore } from '../src/server/knowledge/store.ts';
+import { knowledgeFixture, browserPath } from './support/knowledge-fixture.mjs';
+const f = await knowledgeFixture({ reviewPolicy: 'off' }); const artifacts = process.env.KNOWLEDGE_ARTIFACTS ?? '/tmp/agent-office-knowledge-evidence'; fs.mkdirSync(artifacts, { recursive: true });
+let browser;
+try {
+  const store = new KnowledgeStore(f.project); store.write('project/test.md', { title: 'Run the test suite', summary: 'Use npm test to verify changes', status: 'needs-verification', sources: ['PR #123'], tags: ['testing', 'ci'] }, '# Tests\n\nRun `npm test`.\n', 'worker:fixture');
+  store.write('gotchas/old.md', { title: 'Old deployment command', summary: 'Retained for history', status: 'archived' }, 'Old command', 'worker:fixture');
+  browser = await chromium.launch({ executablePath: browserPath(), headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage', '--use-gl=angle', '--use-angle=swiftshader'] });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await context.addInitScript(() => { localStorage.setItem('agent-office.profile', JSON.stringify({ name: 'Knowledge tester', color: '#06d6a0', look: { skin: 0, hair: 0, style: 0 } })); localStorage.setItem('agent-office.lite-declined', '1'); });
+  assert.ok((await context.request.post(f.base + '/api/login', { data: { password: 'knowledge-fixture' } })).ok());
+  const page = await context.newPage(); page.setDefaultTimeout(30000);
+  await page.goto(f.base + '/2d?floor=local'); await page.waitForFunction(() => window.__game2d?.ctx.net.up && window.__game2d.store.floor === 'local' && !window.__game2d.core.trip);
+  await page.locator('#loading').waitFor({ state: 'hidden' }); await page.keyboard.press('Tab'); await page.locator('button:has-text("Knowledge base")').first().click();
+  const modal = page.getByRole('dialog', { name: 'Knowledge', exact: true }); await modal.waitFor();
+  await modal.locator('.knowledge-row').filter({ hasText: 'Run the test suite' }).click(); await modal.locator('h3').filter({ hasText: 'Run the test suite' }).waitFor();
+  assert.ok(await modal.locator('.knowledge-badge.needs-verification').count()); assert.ok(await modal.locator('.knowledge-badge.archived').count());
+  await modal.getByRole('button', { name: 'Edit', exact: true }).click(); const editor = page.getByRole('dialog', { name: 'Edit knowledge', exact: true });
+  await editor.getByLabel('Markdown body').fill('# Tests\n\nRun `npm test` before opening a PR.\n'); await editor.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.waitForFunction(() => window.__game2d.store.knowledge.uncommitted);
+  const parsed = (await import('../src/shared/knowledge-index.ts')).parseKnowledgeNote(store.read('project/test.md').text);
+  assert.equal(parsed.frontmatter.status, 'needs-verification'); assert.deepEqual(parsed.frontmatter.sources, ['PR #123']);
+  await modal.locator('.knowledge-row').filter({ hasText: 'Run the test suite' }).click(); await modal.locator('.md').filter({ hasText: 'before opening a PR' }).waitFor();
+  await page.screenshot({ path: path.join(artifacts, 'knowledge-shelf.png') });
+  await modal.getByRole('button', { name: 'Close', exact: true }).click(); await modal.waitFor({ state: 'detached' });
+  await page.keyboard.press('Tab'); await page.locator('button:has-text("Knowledge base")').first().click(); await page.keyboard.press('Escape'); await modal.waitFor({ state: 'detached' });
+  fs.writeFileSync(path.join(artifacts, 'checks.json'), JSON.stringify({ tree: true, statusBadges: true, editPreservesStatus: true, editPreservesSources: true, closeAndEscape: true }, null, 2));
+  console.log(`PASS: knowledge shelf; screenshot ${artifacts}/knowledge-shelf.png`);
+} finally { await browser?.close(); await f.close(); }

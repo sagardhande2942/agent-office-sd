@@ -3,6 +3,7 @@ import type { WorkerEvents } from './types.js';
 
 /** Floor features join worker prompts and lifecycle notifications through this registry. */
 export interface WorkerFeature {
+  completion?(worker: WorkerInfo, report: import('../../shared/completion.js').CompletionReport): string | undefined;
   prompt?(worker: WorkerInfo, text: string | undefined): string | undefined;
   update?(worker: WorkerInfo): void;
   remove?(worker: WorkerInfo): void;

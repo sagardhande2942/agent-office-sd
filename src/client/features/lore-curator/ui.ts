@@ -72,7 +72,7 @@ export function openCurator(ui: CuratorUI): Modal {
       list.replaceChildren();
       for (const n of state.notes.filter(n => filter.value === 'all' || n.status === filter.value).slice(0, 100)) {
         const inspect = h('button.btn', { type: 'button', onclick: () => send({ t: 'curator.history', id: n.id }) }, 'History');
-        const restore = h('button.btn', { type: 'button', disabled: !admin, onclick: () => send({ t: 'curator.restore', id: n.id }) }, 'Restore original');
+        const restore = h('button.btn', { type: 'button', disabled: !admin, onclick: () => send({ t: 'curator.restore', id: n.id }) }, 'Revert latest commit');
         list.append(h('article.curator-note', {}, h('strong', {}, n.title), h('span.curator-badge', {}, n.status), h('p', {}, n.reason),
           h('small', {}, `Sources: ${n.sources.join(', ')} · ${n.revisions} revisions`), h('div.curator-actions', {}, inspect, ...(n.status !== 'active' ? [restore] : []))));
       }
@@ -82,9 +82,9 @@ export function openCurator(ui: CuratorUI): Modal {
   const offState = ui.listen(paint);
   const offHistory = ui.history((id, revisions) => {
     const title = latest?.notes.find(n => n.id === id)?.title ?? id;
-    history.replaceChildren(h('h3', {}, `Original revisions: ${title}`));
+    history.replaceChildren(h('h3', {}, `Git history: ${title}`));
     for (const { note, revision } of [...revisions].reverse()) history.append(h('article.curator-note', {}, h('strong', {}, `Revision ${revision + 1} · ${note.author}`),
-      h('small', {}, new Date(note.updatedAt).toLocaleString()), h('pre', {}, note.content), h('button.btn', { type: 'button', disabled: !admin, onclick: () => send({ t: 'curator.restore', id, revision }) }, 'Restore this revision')));
+      h('small', {}, new Date(note.updatedAt).toLocaleString()), h('pre', {}, note.content), h('button.btn', { type: 'button', disabled: !admin, onclick: () => send({ t: 'curator.restore', id, revision }) }, 'Revert this commit')));
     history.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
   const modal = openModal(root, { doing: 'managing knowledge curator', onClose: () => { offState(); offHistory(); } });

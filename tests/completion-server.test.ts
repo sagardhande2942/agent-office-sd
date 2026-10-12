@@ -23,6 +23,8 @@ test('worker checklist is authenticated, survives persistence, clears on new wor
   assert.deepEqual(await hook('Stop',{stop_hook_active:true}),{});
   const report={revision,summary:'API implemented',checks:[{name:'Tests',status:'failed',evidence:'One failing contract test'}],files:['src/api.ts'],prNote:'Not ready to publish'};
   assert.equal((await call('complete',{...report,revision:revision-1})).status,400);
+  assert.equal((await call('complete',report)).status,400,'required knowledge review holds first submission');
+  assert.equal((await call('knowledge',{action:'review_done',changed:[],none_reason:'Fixture completion test; no durable project facts changed'})).status,200);
   assert.equal((await call('complete',report)).body.report.status,'needs-attention');
   const updated={...report,checks:[{name:'Tests',status:'passed',evidence:'42 tests pass'}]};
   assert.equal((await call('complete',updated)).body.report.status,'ready');

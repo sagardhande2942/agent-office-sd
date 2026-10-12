@@ -1,11 +1,14 @@
 import os from 'node:os';
 import path from 'node:path';
 import { loadConfig, ensureSelfSigned } from './config.js';
-import { startServer } from './server.js';
 import { tildify } from './building.js';
 import { openBrowser } from './browser.js';
 
 const argv = process.argv.slice(2);
+if (argv[0] === 'knowledge') {
+  const { knowledgeCommand } = await import('./knowledge/cli.js');
+  process.exit(knowledgeCommand(argv.slice(1)));
+}
 if (argv[0] === 'tui') {
   const { tuiCommand } = await import('./tui.js');
   process.exit(await tuiCommand(argv.slice(1)));
@@ -42,6 +45,7 @@ const atTerminal = interactive();
 // A new office started in a terminal: where projects go, GitHub, and the first floor, before it opens.
 if (!cfg.project && atTerminal) await welcome(cfg);
 
+const { startServer } = await import('./server.js');
 let office: Awaited<ReturnType<typeof startServer>>;
 try {
   office = await startServer(cfg);
