@@ -1,3 +1,4 @@
+import { installTradingResearch } from './features/trading-research';
 import { installPerformance } from './features/performance';
 import { installObjectPlacement } from './features/object-placement';
 import { installTopdown, isTopdownRoute } from './features/topdown';
@@ -176,6 +177,7 @@ parts.boss = installBoss(ctx, parts);
 parts.bookshelf = installBookshelf(ctx);
 installLore(ctx);
 installLoreCurator(ctx);
+installTradingResearch(ctx);
 installHerald(ctx, parts);
 
 parts.bar = installBar(ctx, { roof: parts.rooftop.roof, djAt: parts.rooftop.djAt, reach });

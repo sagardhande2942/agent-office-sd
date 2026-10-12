@@ -58,6 +58,7 @@ export interface FloorReady {
   masterWorkers?: boolean;
   lore?: boolean;
   curator?: boolean;
+  research?: boolean;
   /**
    * The branch this host's checkout is on, and the agent CLIs it has installed.
    *
@@ -89,6 +90,7 @@ export interface FloorReady {
 export const HOST_CALLS = ['worker.search', 'queue.dropIssue', 'gh.claim', 'cinema.shot', 'master-workers.capacity'] as const;
 
 export const FLOOR_CASES = [
+  'research.get', 'research.configure', 'research.action', 'research.dispatch',
   'lore.list', 'lore.save', 'lore.delete',
   'curator.get', 'curator.configure', 'curator.pause', 'curator.run', 'curator.restore', 'curator.history',
   'master-workers.start', 'master-workers.control',

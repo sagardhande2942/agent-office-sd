@@ -4,7 +4,8 @@
   "description": "A cartoon 3D multiplayer office where your team spawns Claude Code workers at desks, shares live terminals, talks over voice, and tracks GitHub issues and PRs.",
   "type": "module",
   "bin": {
-    "agent-office": "bin/agent-office.js"
+    "agent-office": "bin/agent-office.js",
+    "office-research": "bin/office-research.js"
   },
   "imports": {
     "#tests/css": "./tests/support/css.mjs"
@@ -22,6 +23,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "start": "node bin/agent-office.js",
+    "research": "node bin/office-research.js",
     "prepare": "npm run build",
     "e2e:floor-host": "node --import tsx scripts/e2e-floor-host.mjs",
     "e2e:floor-ride": "node --import tsx scripts/e2e-floor-ride.mjs",

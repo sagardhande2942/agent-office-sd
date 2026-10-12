@@ -1,0 +1,26 @@
+{
+  "fixture": "Synthetic evaluator results; real Office, coordinator, worker hooks and Python adapter",
+  "checks": [
+    {
+      "name": "Floor connection works; token is cleared from the form",
+      "status": "passed"
+    },
+    {
+      "name": "Worker submission launches the real adapter against a deterministic evaluator fixture and queues review",
+      "status": "passed"
+    },
+    {
+      "name": "A second connected browser sees the same measured experiment",
+      "status": "passed"
+    },
+    {
+      "name": "Mobile layout stays within the viewport",
+      "status": "passed"
+    },
+    {
+      "name": "Esc and top-right close restore mouse-look without another click",
+      "status": "passed"
+    }
+  ],
+  "browserErrors": []
+}

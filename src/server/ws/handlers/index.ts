@@ -1,3 +1,4 @@
+import { researchHandlers } from './trading-research.js';
 import { curatorHandlers } from './lore-curator.js';
 import { worldsHandlers } from './parallel-worlds.js';
 import { placementHandlers, placementHooks, placementView } from './object-placement.js';
@@ -39,6 +40,7 @@ import { communicationsView } from './communications.js';
 
 /** Each domain's handlers put together, in alphabetical order. */
 export const handlers: HandlerMap<ClientMsg> = {
+  ...researchHandlers,
   ...curatorHandlers,
   ...loreHandlers,
   ...codingAgentsHandlers,

@@ -1,0 +1,22 @@
+.modal.research-panel { width: min(1000px, 96vw); max-height: 90vh; display: flex; flex-direction: column; }
+.research-panel > header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px; border-bottom: 3px solid var(--ink, #303047); }
+.research-panel h2, .research-panel h3 { margin: 0 0 8px; }
+.research-panel p { overflow-wrap: anywhere; margin: 8px 0; }
+.research-scroll { padding: 20px; overflow: auto; }
+.research-connection, .research-campaign-form, .research-campaign { display: grid; gap: 12px; border: 2px solid #b9b5ad; border-radius: 14px; padding: 16px; margin: 12px 0 20px; }
+.research-field { display: grid; gap: 6px; min-width: 0; }
+.research-panel input:not([type=checkbox]), .research-panel textarea, .research-panel select, .research-details textarea { width: 100%; min-width: 0; box-sizing: border-box; border: 2px solid #8c8994; border-radius: 8px; padding: 10px; color: #303047; background: #fff; font: inherit; }
+.research-panel textarea, .research-details textarea { resize: vertical; }
+.research-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.research-assignment, .research-experiment { border-top: 1px solid #b9b5ad; padding: 14px 0 0; }
+.research-assignment .btn, .research-experiment .btn { margin: 8px 8px 0 0; }
+.research-next { display: grid; gap: 8px; }
+.research-status { font-weight: 700; }
+.research-error { color: #a32945; }
+.modal.research-details { width: min(900px, 95vw); max-height: 85vh; overflow: auto; padding: 20px; }
+.research-details > header { display: flex; justify-content: space-between; align-items: center; }
+.research-details pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.research-details form { display: grid; gap: 14px; }
+@media (max-width: 600px) { .research-grid { grid-template-columns: 1fr; } .research-scroll { padding: 10px; } .research-panel > header { padding: 14px; } }
+
+.research-panel > header .close, .research-details > header .close { flex: 0 0 38px; height: 38px; padding: 0; display: grid; place-items: center; }
