@@ -94,3 +94,7 @@ Team and plan commands read files on the machine running the TUI, including when
 ![Scrollable terminal help, including JSON path and feature-build guidance](cli-help.png)
 
 To reproduce the real PTY checks and a headless help screenshot, run `node --import tsx scripts/e2e-tui-guidance.mjs`. Artifacts go to `/tmp/agent-office-tui-guidance-evidence` (override with `TUI_GUIDANCE_ARTIFACTS`).
+
+## Live rendering
+
+Dashboard updates and attached-worker output repaint only changed rows; identical dashboard frames produce no output. Full clears occur when taking over the screen, returning from a worker, or resizing. Scrollback, colors, cursor position, and application input modes remain supported. Restart the TUI after rebuilding to load rendering fixes; leaving the client keeps the server and workers running.

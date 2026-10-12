@@ -1,3 +1,4 @@
+import { TuiFrame } from './tui/frame.js';
 import headless from '@xterm/headless';
 import serialize from '@xterm/addon-serialize';
 import { screenSnapshot, withoutFullScreen } from './screen.js';
@@ -8,6 +9,7 @@ export const MOUSE_OFF = '\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l';
 /** Local scrollback while the dashboard owns the host terminal's alternate screen. */
 export class TuiTerminal {
   private readonly term: InstanceType<typeof headless.Terminal>;
+  private readonly frame = new TuiFrame();
   private readonly ser = new serialize.SerializeAddon();
   private offset = 0;
   private pending = '';
@@ -95,10 +97,11 @@ export class TuiTerminal {
     if (this.disposed) return;
     const buf = this.term.buffer.normal;
     const start = Math.max(0, buf.baseY - this.offset);
-    const screen = this.ser.serialize({ range: { start, end: start + this.term.rows - 1 }, excludeModes: true, excludeAltBuffer: true });
+    const rows = Array.from({ length: this.term.rows }, (_, i) => this.ser.serialize({ range: { start: start + i, end: start + i }, excludeModes: true, excludeAltBuffer: true }));
+    const screen = this.frame.paint(rows, this.term.cols, this.term.rows);
     const cursor = this.offset ? '' : `\x1b[${buf.cursorY + 1};${buf.cursorX + 1}H`;
     const modes = `\x1b[?1${this.term.modes.applicationCursorKeysMode ? 'h' : 'l'}\x1b[?2004${this.term.modes.bracketedPasteMode ? 'h' : 'l'}`;
-    this.output('\x1b[0m\x1b[H\x1b[2J' + screen + cursor + modes + (this.offset ? '\x1b[?25l' : '\x1b[?25h') + MOUSE_ON);
+    this.output(screen + cursor + modes + (this.offset ? '\x1b[?25l' : '\x1b[?25h') + MOUSE_ON);
   }
 
   dispose() { if (this.disposed) return; this.disposed = true; this.term.dispose(); this.output(MOUSE_OFF + '\x1b[?1l\x1b[?2004l'); }

@@ -37,8 +37,8 @@ test('dashboard navigation, terminal input, floor switching and cleanup over a P
   const child = spawn(process.execPath, ['--import', 'tsx', path.resolve('src/server/cli.ts'), 'tui', '--office', `http://localhost:${port}`], {
     name: 'xterm-256color', cols: 120, rows: 30, cwd: process.cwd(), env: { ...process.env, AGENT_OFFICE_PASSWORD: 'test' },
   });
-  let output = '';
-  child.onData((data) => { output += data; });
+  let output = '', transcript = '';
+  child.onData((data) => { output += data; transcript += data; });
   const exited = new Promise<number>((resolve) => child.onExit((event) => resolve(event.exitCode)));
   const expect = async (text: string) => {
     const deadline = Date.now() + 5000;
@@ -60,17 +60,21 @@ test('dashboard navigation, terminal input, floor switching and cleanup over a P
     child.resize(32, 12); await expect('AGENT OFFICE');
     child.resize(120, 30); await expect('AGENT OFFICE');
     child.write('x'); await expect('Keep both');
-    child.write('\x1b'); await expect('AGENT OFFICE');
+    child.write('\x1b'); await expect('Send home cancelled.');
     assert.equal(messages.filter((m) => m.t === 'worker.kill').length, 0);
     child.write(':home w1 --cleanup invalid\r'); await expect('Usage: home');
     assert.equal(messages.filter((m) => m.t === 'worker.kill').length, 0);
     child.write('x'); await expect('Keep both');
     child.write('2\r'); await expect('Sending Ada home');
-    child.write(':home Ada --cleanup keep\r'); await expect('Sending Ada home');
+    child.write(':home Ada --cleanup keep\r');
+    const deadline = Date.now() + 5000;
+    while (messages.filter(m => m.t === 'worker.kill').length < 2 && Date.now() < deadline) await new Promise(r => setTimeout(r, 10));
+    assert.equal(messages.filter(m => m.t === 'worker.kill').length, 2);
+    assert.ok(!output.includes('\x1b[2J'), 'unchanged command feedback does not clear the dashboard');
     child.write('::help\r'); await expect('QUICK START');
-    child.write('\x1b[B'.repeat(26)); const help = await expect('JSON paths refer to this machine');
-    if (process.env.TUI_HELP_EVIDENCE) writeFileSync(process.env.TUI_HELP_EVIDENCE, help);
-    child.write('\x1b'); await expect('AGENT OFFICE');
+    child.write('\x1b[B'.repeat(26)); await expect('JSON paths refer to this machine');
+    if (process.env.TUI_HELP_EVIDENCE) writeFileSync(process.env.TUI_HELP_EVIDENCE, transcript);
+    child.write('\x1b'); await expect('[OFFICE]');
     child.write(':npm run build\r'); await expect('Run shell commands in another terminal');
     child.write('::teams\r'); await expect('MASTER / WORKERS');
     for (const ws of wss.clients) ws.send(JSON.stringify({t:'master-workers',state:{presets:[],current:{phase:'running',brief:'Live team',master:{provider:'codex'},plan:'LIVE_PLAN_REFRESH',tasks:Array.from({length:24},(_,i)=>({id:'task-'+i,title:'Task '+i,status:'queued',attempts:[],evidence:i===23?'FINAL_TASK_EVIDENCE':''}))}}}));
