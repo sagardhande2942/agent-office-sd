@@ -142,6 +142,12 @@ export function blendStance(acts: Map<Act, number>, act: Act, dt: number, t: num
     for (const key of STANCE_KEYS) out[key] += s[key] * w;
     total += w;
   }
+  // The first admitted frame (and a resumed clock) can have dt=0. Establish
+  // a real pose rather than dividing zero weights by zero and poisoning transforms.
+  if (total === 0) {
+    acts.set(act, 1);
+    return stanceOf(act, t, out);
+  }
   for (const key of STANCE_KEYS) out[key] /= total;
   return out;
 }
