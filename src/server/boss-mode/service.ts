@@ -17,6 +17,7 @@ import { nextFreeSeat } from '../../shared/layout.js';
 import { verifyChecks } from './checks.js';
 import { presenceFor } from './presence.js';
 import { feedback } from './delivery.js';
+import { promptDiscovery } from './steering.js';
 export class BossService {
   readonly engine: BossEngine;
   private runs = new Map<string,TeamCoordinator>();
@@ -39,7 +40,7 @@ export class BossService {
       },
       suspend:id=>{const error=floor.workers.suspend(id);if(error)throw Error(error);},
       stop:async id=>{if(floor.workers.get(id)){const result=await floor.workers.kill(id,'keep');if(result.error)throw Error(result.error);}},
-      prompt:(id,message)=>floor.workers.prompt(id,message,'Boss mode'),
+      prompt:(id,message)=>promptDiscovery(this.engine.state(),floor.workers,id,message),
       team:(item,config,owner)=>this.createTeam(item,config,owner),
       fetch:async()=>{await floor.workers.fetchBase();},openPrs:()=>this.engine.state().backlog.filter(i=>i.pr&&floor.forge.pulls.items.some(p=>p.url===i.pr&&p.state==='OPEN')).length,
       feedback:items=>feedback(this,items),changed:state=>publish({t:'boss.state',floor:floor.id,state}),

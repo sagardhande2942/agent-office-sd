@@ -105,3 +105,66 @@ test('independent checks report failures and interruption against the real commi
     await assert.rejects(pending,/failed|interrupted/);assert.equal(records.at(-1)?.exitCode,-1);
   }finally{rmSync(dir,{recursive:true,force:true});}
 });
+
+test('discovery steering reaches the worker at an idle checkpoint and blocks stale direction',async()=>{
+  const f=fixture();try{
+    await f.engine.control({action:'configure',config:f.config});await f.engine.control({action:'on'});await f.engine.tick();
+    const id=f.engine.state().discovery!.workerId!;
+    await f.engine.control({action:'steer',text:'Add a new car, not a Boss steering repair.'});
+    await f.engine.tick();assert.equal(f.messages.length,0,'do not type into a busy terminal');
+    await assert.rejects(f.engine.worker(id,{action:'propose',revision:f.engine.state().revision,items:[proposed],summary:'Old repair'}),/latest user direction/);
+    f.workers.find(w=>w.id===id)!.status='idle';await f.engine.tick();
+    assert.match(f.messages.at(-1)!,/Add a new car/);assert.match(f.messages.at(-1)!,/priority over your selected initiative/);
+    assert.equal(f.engine.state().steering[0].status,'pending');
+    await f.engine.tick();assert.equal(f.messages.length,1);
+    await f.engine.worker(id,{action:'ack-steering',ids:f.engine.state().steering.map(s=>s.id)});
+    await f.engine.worker(id,{action:'propose',revision:f.engine.state().revision,items:[],summary:'Applied direction; need car acceptance criteria'});
+  }finally{f.dispose();}
+});
+
+test('mission changes reconsider queued ideas and reach the active master without deleting work',async()=>{
+  const f=fixture();try{
+    await select(f);const active=f.engine.state().active!,master=f.engine.state().team!.current!.masterId!;
+    f.engine.mutate(s=>s.backlog.push({...proposed,id:'old-queued',title:'Unrelated repair',status:'queued',createdAt:0,attempts:0}));
+    await f.engine.control({action:'configure',config:{...f.config,mission:'Add a new car'}});
+    assert.equal(f.engine.state().backlog.find(i=>i.id==='old-queued')!.status,'suggested');
+    assert.equal(f.engine.state().active,active);assert.equal(f.engine.state().team!.current!.masterId,master);
+    f.workers.find(w=>w.id===master)!.status='idle';await f.engine.tick();
+    assert.match(f.messages.at(-1)!,/Current mission: Add a new car/);assert.match(f.messages.at(-1)!,/Preserve existing commits and PRs/);
+  }finally{f.dispose();}
+});
+
+test('failed discovery instruction delivery remains retryable across restart',async()=>{
+  const f=fixture();try{
+    await f.engine.control({action:'configure',config:f.config});await f.engine.control({action:'on'});await f.engine.tick();
+    const id=f.engine.state().discovery!.workerId!;
+    await f.engine.control({action:'steer',text:'Build the car feature first'});
+    f.workers.find(w=>w.id===id)!.status='idle';const prompt=f.io.prompt;f.io.prompt=()=> 'Temporarily unavailable';
+    await f.engine.tick();assert.equal(f.engine.state().steering[0].status,'acknowledged');
+    f.io.prompt=prompt;f.restart();await f.engine.tick();
+    assert.match(f.messages.at(-1)!,/Build the car feature first/);assert.equal(f.engine.state().steering[0].status,'pending');
+  }finally{f.dispose();}
+});
+
+test('new user direction reopens selection instead of starting a previously queued repair',async()=>{
+  const f=fixture();try{
+    await f.engine.control({action:'configure',config:f.config});await f.engine.control({action:'on'});await f.engine.tick();
+    let s=f.engine.state();await f.engine.worker(s.discovery!.workerId!,{action:'propose',revision:s.revision,items:[proposed],summary:'Repair proposed'});
+    await f.engine.tick();
+    await f.engine.control({action:'steer',text:'Only add the requested car now'});await f.engine.tick();
+    s=f.engine.state();assert.equal(s.active,undefined);assert.ok(s.discovery);assert.equal(s.backlog[0].status,'suggested');
+  }finally{f.dispose();}
+});
+
+test('active steering retries unacknowledged delivery at a later safe checkpoint',async()=>{
+  const f=fixture();try{
+    await select(f);const master=f.engine.state().team!.current!.masterId!;
+    await f.engine.control({action:'steer',text:'Add the car first'});
+    f.workers.find(w=>w.id===master)!.status='idle';await f.engine.tick();
+    assert.equal(f.engine.state().steering[0].status,'pending');const count=f.messages.length;
+    f.workers.find(w=>w.id===master)!.status='idle';await f.engine.tick();
+    assert.equal(f.messages.length,count+1);assert.match(f.messages.at(-1)!,/Add the car first/);
+    await f.engine.worker(master,{action:'ack-steering',ids:f.engine.state().steering.map(s=>s.id)});
+    f.workers.find(w=>w.id===master)!.status='idle';await f.engine.tick();assert.equal(f.messages.length,count+1);
+  }finally{f.dispose();}
+});

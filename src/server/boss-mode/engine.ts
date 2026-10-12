@@ -4,6 +4,7 @@ import { bossInitial, validateBossConfig } from '../../shared/boss-mode/config.j
 import { BOSS_CATEGORIES, type BossConfig, type BossControl, type BossItem, type BossState, type BossWorkerAction } from '../../shared/boss-mode/types.js';
 import type { TeamCoordinator } from '../master-workers/coordinator.js';
 import { load, save, text } from '../master-workers/storage.js';
+import { recordSteering, steeringMessage } from './steering.js';
 export interface BossIO {
   now(): number; workers(): WorkerInfo[];
   allowed(config: BossConfig, owner?: string): string | undefined;
@@ -72,7 +73,14 @@ export class BossEngine {
     switch(command.action) {
       case 'configure': {
         const config=validateBossConfig(command.config),error=this.io.allowed(config,owner??this.data.owner);if(error)throw Error(error);
-        this.data.config=config;this.event('settings','Configuration saved; active work retains its selected models.');break;
+        const missionChanged=config.mission!==this.data.config.mission,hadMission=!!this.data.config.mission;
+        this.data.config=config;
+        if(missionChanged) {
+          for(const item of this.data.backlog) if(item.status==='queued')item.status='suggested';
+          if(hadMission)recordSteering(this.data,'Mission changed to: '+config.mission+'. Reconsider existing suggestions against this mission; unrelated improvements must not replace it.',this.io.now());
+          this.data.nextAt=undefined;
+        }
+        this.event('settings',missionChanged?'Mission updated; previous queued initiatives need reconsideration and active work will receive the new direction.':'Configuration saved; active work retains its selected models.');break;
       }
       case 'on': {
         text(this.data.config.mission,'mission'); if(!this.data.config.checks.length)throw Error('Configure independent verification commands'); const error=this.io.allowed(this.data.config,owner);if(error)throw Error(error);
@@ -82,8 +90,7 @@ export class BossEngine {
       }
       case 'steer': {
         const value=text(command.text,'steering instruction',8000);
-        this.data.steering.push({id:randomUUID(),at:this.io.now(),text:value,status:'acknowledged'});
-        this.data.steering=this.data.steering.slice(-100);this.event('steering',value);break;
+        recordSteering(this.data,value,this.io.now());this.event('steering',value);break;
       }
       case 'idea': {
         const category=command.category;if(!BOSS_CATEGORIES.includes(category)) throw Error('Invalid category');
@@ -120,6 +127,7 @@ export class BossEngine {
     if(action.action==='propose') {
       if(actor!==discovery?.workerId||discovery.replied)throw Error('Not an active discovery session');
       if(action.revision!==this.data.revision)throw Error('Stale Boss revision: read state and resubmit');
+      if(this.data.steering.some(s=>s.status!=='applied'))throw Error('Apply and acknowledge the latest user direction before proposing initiatives; read Boss state.');
       if(!Array.isArray(action.items)||action.items.length>20)throw Error('At most 20 proposals');
       for(const item of action.items){this.validateItem(item);if(!this.data.config.categories.includes(item.category))throw Error('Category is disabled');}
       const before=structuredClone(this.data.backlog);
@@ -140,7 +148,7 @@ export class BossEngine {
     return 'You are the BOSS of this project. Research and prioritize valuable improvements. Do not edit, commit, push, merge or publish during discovery. Follow repository instructions.\nMISSION: '+this.data.config.mission+
       '\nCONFIG: '+JSON.stringify(this.data.config)+'\nBACKLOG: '+JSON.stringify(this.data.backlog.map(({id,title,status,pr})=>({id,title,status,pr})))+
       '\nSTEERING: '+JSON.stringify(this.data.steering.filter(s=>s.status!=='applied'))+
-      '\nRead office-workers boss state, then submit office-workers boss action with JSON stdin: {action:"propose",revision:<current revision>,items:[{title,problem,evidence,benefit,acceptance:[...],category,priority:1..100,dependencies:[existing initiative IDs]}],summary}. Use evidence and repository goals, avoid duplicate or speculative work. Propose zero items when no useful work exists. In roadmap mode only propose features explicitly requested in the roadmap and quote their exact roadmap line in evidence; maintain enabled maintenance categories. Acknowledge applied steering with {action:"ack-steering",ids:[...]}. Stop after submitting.';
+      '\nThe latest explicit user direction takes priority. In mission mode propose work that directly fulfills the mission; only propose a repair first when it is a concrete prerequisite and explain that dependency in evidence. Do not replace a requested feature with unrelated maintenance or treat the mission as background context. Apply and acknowledge outstanding steering before proposing.\nRead office-workers boss state, then submit office-workers boss action with JSON stdin: {action:"propose",revision:<current revision>,items:[{title,problem,evidence,benefit,acceptance:[...],category,priority:1..100,dependencies:[existing initiative IDs]}],summary}. Use evidence and repository goals, avoid duplicate or speculative work. Propose zero items when no useful work exists. In roadmap mode only propose features explicitly requested in the roadmap and quote their exact roadmap line in evidence; maintain enabled maintenance categories. Acknowledge applied steering with {action:"ack-steering",ids:[...]}. Stop after submitting.';
   }
   async tick() {
     if(this.busy||this.error||(!this.data.enabled&&!this.data.draining))return;
@@ -168,7 +176,7 @@ export class BossEngine {
         if(item.followup && this.run.state().current) this.run.continue(item.followup);
         else this.run.start({master:config.boss,models:[...new Map(config.models.map(m=>[JSON.stringify([m.provider,m.model??'',m.effort??'']),m])).values()],maxWorkers:config.maxWorkers,
           brief:item.title+'\n'+item.problem+'\nEvidence: '+item.evidence+'\nBenefit: '+item.benefit,requirements:item.acceptance,
-          constraints:config.constraints+'\nStanding mission: '+config.mission+'\nDo not merge. Follow repository instructions and preserve other work.'},this.data.owner);
+          constraints:config.constraints+'\nUser mission: '+config.mission+'\nLatest explicit user instructions take priority over this initiative. Reconcile pending tasks at a safe checkpoint when direction changes; do not keep doing an unrelated task merely because it was assigned earlier.\nDo not merge. Follow repository instructions and preserve other work.'},this.data.owner);
         this.event('initiative','Started '+item.title,item.id);this.status('working','Working on '+item.title);return;
       }
       const token=randomUUID();this.data.discovery={id:token,startedAt:at};this.event('discovery','Inspecting the project for the next useful initiative.');this.persist();
@@ -187,9 +195,16 @@ export class BossEngine {
     const w=this.io.workers().find(w=>w.id===d.workerId);
     if(d.replied){if(d.workerId)await this.io.stop(d.workerId);this.data.discovery=undefined;this.data.nextAt=this.data.backlog.some(i=>i.status==='queued')?undefined:at+this.data.config.discoveryMinutes*60000;this.persist();return;}
     if(at-d.startedAt>this.data.config.runtimeMinutes*60000||(!running(w)&&w?.status!=='idle')) {
+      for(const s of this.data.steering)if(s.status==='pending')s.status='acknowledged';
       if(d.workerId)await this.io.stop(d.workerId);this.data.discovery=undefined;this.data.nextAt=at+this.data.config.discoveryMinutes*60000;this.event('blocked','Discovery ended without proposals; work preserved.');this.persist();return;
     }
-    if(w?.status==='idle')this.io.prompt(w.id,'Read office-workers boss state and submit evidence-backed proposals or an empty proposal set before ending discovery.');
+    if(w?.status==='idle') {
+      const outstanding=this.data.steering.filter(s=>s.status!=='applied');
+      const error=this.io.prompt(w.id,outstanding.length?steeringMessage(this.data,outstanding):'Read office-workers boss state and submit evidence-backed proposals or an empty proposal set before ending discovery.');
+      if(error){this.event('blocked','Discovery instruction delivery failed: '+error);this.persist();return;}
+      for(const s of outstanding)s.status='pending';
+      if(outstanding.length)this.persist();
+    }
   }
   private async work(at:number) {
     const item=this.data.backlog.find(i=>i.id===this.data.active);if(!item)throw Error('Active initiative missing');
@@ -202,9 +217,12 @@ export class BossEngine {
       if(this.data.recovery>=this.data.config.recoveryAttempts){await this.abandon(r.error??'Recovery attempts exhausted.');return;}
       this.data.recovery++;this.persist();this.run.continue('Reconcile existing tasks, commits and PR before continuing. Preserve unfinished work.');this.event('recovery','Resuming retained initiative.');
     }
-    for(const s of this.data.steering.filter(s=>s.status==='acknowledged')){
-      const current=this.run.state().current;if(current?.masterId&&current.notifications[current.masterId])break;
-      this.run.enqueue('USER STEERING '+s.id+': '+s.text+'\nApply at a safe checkpoint, preserve completed work, update pending tasks, and report office-workers boss action {action:"ack-steering",ids:["'+s.id+'"]}.');s.status='pending';this.persist();
+    const outstanding=this.data.steering.filter(s=>s.status!=='applied'),current=this.run.state().current!;
+    const master=this.io.workers().find(w=>w.id===current.masterId);
+    const checkpoint=master&&['idle','done'].includes(master.status)&&!current.notifications[master.id];
+    if(outstanding.length&&(checkpoint||outstanding.some(s=>s.status==='acknowledged'))){
+      this.run.enqueue(steeringMessage(this.data,outstanding));
+      for(const s of outstanding)s.status='pending';this.persist();
     }
     await this.run.tick();
     const run=this.run.state().current!;item.run=run;item.branch=run.masterWorktree?.branch;

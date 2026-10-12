@@ -70,3 +70,11 @@ Boss participants use `office-workers boss state` and `office-workers boss actio
 Run `npm run typecheck`, `npm test`, and `npm run build`. Run `node --import tsx scripts/e2e-boss-mode.mjs` for desktop/mobile console, game focus, physical monitor and character screenshots in `/tmp/agent-office-boss-evidence` (override with `BOSS_ARTIFACTS`). The harness uses fake agent executables and isolated Git repositories; it makes no paid agent calls.
 
 Run `node --import tsx scripts/e2e-worker-avatars.mjs` for an isolated headless check that hired avatars remain visible with Boss mode on and after coordinator roles clear. Set `CHROMIUM_PATH` to a Chromium executable and optionally `AVATAR_ARTIFACTS` for the screenshot directory. The fixture injects worker protocol messages and launches no agents.
+
+## Mission and steering priority
+
+The latest explicit user direction takes priority over inferred improvements and an earlier initiative. In mission mode, discovery should propose work that directly fulfills the mission; a repair may come first only when it is a concrete prerequisite, explained in the proposal evidence.
+
+Changing the mission or sending steering returns queued initiatives to suggestions for reconsideration. Active work, commits and PRs are preserved; its master receives the new direction at a safe checkpoint and reconciles pending tasks. Changing agent/model settings alone does not reset queued work.
+
+Discovery receives outstanding instructions when its terminal becomes idle. Failed delivery remains retryable, including after restart. Discovery must apply and acknowledge the current direction before the server accepts proposals. Multiple instructions are delivered in order with explicit precedence for newer conflicting instructions; receipt is not the same as the agent acknowledging application.
