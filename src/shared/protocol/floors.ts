@@ -141,6 +141,7 @@ export interface FloorView {
   /** Workers sent home and locked up in the dungeon, on a map that has one. */
   jail: JailState;
   helpers?: HelperState[];
+  pingpong?: import('../tabletennis.js').PingPongState;
 }
 
 export type FloorClientMsg =

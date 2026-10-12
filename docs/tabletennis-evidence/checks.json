@@ -1,0 +1,26 @@
+{
+  "checks": [
+    "Table tennis uses a closer court view with a narrower field of view",
+    "Bot match shows exactly two names without a bot avatar",
+    "Aim moves the landing target without moving the player",
+    "Holding a shot does not fire it before release",
+    "A second connected browser receives the same angled velocity and spin",
+    "Normal bot returns a bounced tap shot and the second browser receives the return",
+    "Both left and right landing directions are available",
+    "Full charge sends a legal serve with an own-half first bounce",
+    "Losing window focus cancels a held shot",
+    "Mouse release sends one shot without duplicate click handlers",
+    "Leaving restores normal office field of view",
+    "PvP participant avatars are hidden while both names remain",
+    "Leaving PvP restores office avatars"
+  ],
+  "browserErrors": [],
+  "tap": {
+    "vx": 2.6639344262295084,
+    "vz": -0.5119067446797806
+  },
+  "charged": {
+    "vx": 3.1250000000000004,
+    "vz": 0.5832045989965955
+  }
+}

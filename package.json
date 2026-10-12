@@ -28,7 +28,8 @@
     "reel:record": "node --import tsx scripts/record-reel.mjs",
     "e2e:cinema": "node --import tsx scripts/e2e-cinema.mjs",
     "e2e:worktree-default": "node --import tsx scripts/e2e-worktree-default.mjs",
-    "e2e:live-view-toggle": "node --import tsx scripts/e2e-live-view-toggle.mjs"
+    "e2e:live-view-toggle": "node --import tsx scripts/e2e-live-view-toggle.mjs",
+    "e2e:tabletennis": "node --import tsx scripts/e2e-tabletennis.mjs"
   },
   "engines": {
     "node": ">=20"

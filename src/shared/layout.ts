@@ -435,8 +435,8 @@ export const WAKE_UP = { x: 24, z: 10, rotY: -Math.PI / 2 } as const;
 
 /** Glass doors out to the balcony, on the south wall. They slide apart into the wall on either side. */
 export const BALCONY_DOOR: Opening = { wall: 'south', u: -4, width: 3, y0: 0, y1: 2.5 };
-/** The smoking balcony, hanging over the garage entrance. */
-export const BALCONY = { minX: -10.5, maxX: 2.5, minZ: FLOOR.maxZ + WALL_T, maxZ: FLOOR.maxZ + WALL_T + 3.4 } as const;
+/** The balcony, hanging over the garage entrance, extended horizontally to host table tennis. */
+export const BALCONY = { minX: -10.5, maxX: 10.5, minZ: FLOOR.maxZ + WALL_T, maxZ: FLOOR.maxZ + WALL_T + 3.4 } as const;
 /** The ashtray on the balcony, where a smoke break starts. */
 export const ASHTRAY = { x: -8.2, z: BALCONY.maxZ - 0.55 } as const;
 /**

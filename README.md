@@ -492,7 +492,8 @@ Drag to orbit and scroll to zoom. See [Maps](docs/maps.md#office-interiors) for 
 | W A S D | Walk (hold Shift to run) |
 | Space | Jump |
 | Mouse drag / wheel | Orbit / zoom the camera |
-| E | Interact: hire a worker, open its terminal, read a board, sit down, ride the elevator |
+| Hold Space / left click | At table tennis: charge power, then release to shoot; mouse / arrows aim independently of WASD footwork |
+| E | Interact: hire a worker, open its terminal, read a board, sit down, ride the elevator, play table tennis |
 | P | Give a task to a new worker, or to the one at this desk |
 | C | See a worker's changes: diff, commit, open a PR |
 | N | Go to the next worker that's waiting on you |
@@ -506,6 +507,12 @@ Drag to orbit and scroll to zoom. See [Maps](docs/maps.md#office-interiors) for 
 | Tab | The ☰ menu: every window |
 | Esc | Close any window |
 | Ctrl + [ | Send Esc to a terminal, to close a menu like Claude's `/skills` or interrupt Claude (or **⎋ Esc** in its header) |
+
+Table tennis uses a closer, elevated court camera with a 52° baseline field of view that widens only when needed for high shots and keeps the table and high balls in view, independently of shot aim. Only bats and one name per player are shown during a match; player bodies return when the match ends. Leaving the match restores your normal office view. The table tennis bot predicts reachable contacts after the table bounce and moves forward for short shots, rather than waiting at the end line. Difficulty affects reaction, movement, accuracy and occasional misses. Bots choose a consistent response per incoming ball, vary shot depth and power, and commit to misses so exhibitions advance through points naturally.
+
+Serves bounce first on your own half, then cross the net and bounce on the receiver’s half. Returns must land on the opposite half. The 40 mm ball follows gravity and spin; service changes every two points, then every point from 10–10.
+
+At the balcony table, press **E → Watch bots play** and choose a difficulty for each side. Both bots serve, rally and score automatically; finished matches restart after three seconds. Others can choose **Watch current bot match** to spectate. **E / Esc** leaves the view. The starter’s browser runs the simulation and must keep the office tab open and visible; when the starter leaves or disconnects, the exhibition stops for everyone.
 
 The full list is in [docs/controls.md](docs/controls.md).
 

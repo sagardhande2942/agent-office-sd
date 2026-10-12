@@ -2,6 +2,7 @@ import { lore } from './lore';
 import { masterWorkers } from './master-workers';
 import { objectPlacement } from './object-placement';
 import { codingAgents } from './coding-agents';
+import { tableTennis } from './tabletennis';
 
 import { appearances } from './appearances';
 import { planReview } from './plan-review';
@@ -82,4 +83,5 @@ export const SLICES: readonly Slice[] = [
   objectPlacement,
   lore,
   codingAgents,
+  tableTennis,
 ];

@@ -13,6 +13,7 @@ import { forkHandlers, tvView, helpersView } from './fork.js';
 import type { ClientMsg } from '../../../shared/protocol.js';
 import { accountsHandlers } from './accounts.js';
 import { ballHandlers, ballHooks, ballView } from './ball.js';
+import { tableTennisHandlers, tableTennisHooks, tableTennisView } from './tabletennis.js';
 import { cabinetHandlers, cabinetHooks, cabinetView } from './cabinet.js';
 import { carHandlers, carHooks, carsView } from './car.js';
 import { changesHandlers, changesHooks } from './changes.js';
@@ -47,6 +48,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...forkHandlers,
   ...accountsHandlers,
   ...ballHandlers,
+  ...tableTennisHandlers,
   ...cabinetHandlers,
   ...carHandlers,
   ...changesHandlers,
@@ -75,7 +77,7 @@ export const handlers: HandlerMap<ClientMsg> = {
  * The features that keep something per person on a floor, in the order they let go of it when
  * someone leaves the floor or the office (see FeatureHooks): the order the office has always done it in.
  */
-export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whiteboardHooks, ballHooks, carHooks, cabinetHooks, placementHooks];
+export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whiteboardHooks, ballHooks, carHooks, cabinetHooks, placementHooks, tableTennisHooks];
 
 /** What someone arriving on a floor is sent (see office/views.ts): a piece from each feature, in the order it has always gone out. */
 export const views: ViewPieces = {
@@ -96,6 +98,7 @@ export const views: ViewPieces = {
   services: servicesView,
   dog: dogView,
   ball: ballView,
+  pingpong: tableTennisView,
   cars: carsView,
   jail: jailView,
   jukebox: jukeboxView,

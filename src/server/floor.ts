@@ -23,6 +23,7 @@ import { FloorPlanStore } from './floorplan.js';
 import { Docs } from './docs.js';
 import { Dog } from './dog.js';
 import { Court } from './court.js';
+import { TableTennisMatch } from './tabletennis.js';
 import { Jail } from './jail.js';
 import { Garage } from './garage.js';
 import { Jukebox } from './jukebox.js';
@@ -157,6 +158,8 @@ export class Floor {
   readonly dog: Dog;
   /** The basketball by the hoop: who has it, or how it was last thrown. */
   readonly court = new Court();
+  /** Table tennis on the balcony. */
+  readonly pingpong = new TableTennisMatch();
   /** The cars in the garage: who's in which, and where their drivers have left them. */
   readonly garage = new Garage();
   /** Workers sent home on a map that locks them up (see MapPlan.sendHome). */

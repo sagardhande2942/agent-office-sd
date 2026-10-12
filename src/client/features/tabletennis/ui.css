@@ -1,0 +1,193 @@
+.modal.tabletennis-modal {
+  width: min(580px, 94vw);
+  max-height: min(680px, 90vh);
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg, #fdfbf7);
+  border: 2px solid var(--ink, #2b2d42);
+  border-radius: 12px;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.24);
+}
+
+.tabletennis-header {
+  padding: 16px 20px 12px;
+  border-bottom: 2px solid var(--line, #e0ded8);
+  position: relative;
+  background: #fffaf0;
+}
+
+.tabletennis-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tabletennis-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted, #666);
+  line-height: 1.4;
+}
+
+.tabletennis-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tabletennis-card {
+  background: #fff;
+  border: 2px solid var(--line, #e2e0db);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tabletennis-card-title {
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tabletennis-desc {
+  font-size: 13px;
+  color: var(--muted, #555);
+  line-height: 1.35;
+}
+
+.tabletennis-options {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.tabletennis-btn-group {
+  display: flex;
+  border: 2px solid var(--line, #d0cec8);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tabletennis-diff-btn {
+  border: none;
+  background: #f7f5f0;
+  padding: 6px 12px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tabletennis-diff-btn.active {
+  background: var(--accent, #118ab2);
+  color: #fff;
+}
+
+.tabletennis-play-btn {
+  background: var(--accent, #118ab2);
+  color: #fff;
+  border: 2px solid var(--ink, #2b2d42);
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+
+.tabletennis-play-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.tabletennis-play-btn:active {
+  transform: translateY(1px);
+}
+
+.tabletennis-pvp-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.tabletennis-slot {
+  background: #fcfbfa;
+  border: 2px dashed var(--line, #ccc);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.tabletennis-slot.taken {
+  border-style: solid;
+  border-color: #06d6a0;
+  background: #f0fdf4;
+}
+
+.tabletennis-slot-label {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--muted, #666);
+}
+
+.tabletennis-slot-name {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.tabletennis-scoreboard-banner {
+  background: #2b2d42;
+  color: #fff;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  font-family: monospace;
+}
+
+.tabletennis-score-val {
+  font-size: 24px;
+  font-weight: 900;
+  color: #ffd166;
+}
+
+.tabletennis-controls-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  font-size: 12px;
+  background: #f7f5f0;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.tabletennis-key {
+  font-weight: 800;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 2px 6px;
+  text-align: center;
+}
