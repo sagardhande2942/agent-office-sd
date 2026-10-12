@@ -112,3 +112,5 @@ The table tennis bot predicts reachable contacts after the table bounce and move
 Serves bounce first on your own half, then cross the net and bounce on the receiver’s half. Returns must land on the opposite half. The 40 mm ball follows gravity and spin; service changes every two points, then every point from 10–10.
 
 At the balcony table, press **E → Watch bots play** and choose a difficulty for each side. Both bots serve, rally and score automatically; finished matches restart after three seconds. Others can choose **Watch current bot match** to spectate. **E / Esc** leaves the view. The starter’s browser runs the simulation and must keep the office tab open and visible; when the starter leaves or disconnects, the exhibition stops for everyone.
+
+The Issues, PR, Queue and Manager bots stand visibly at their kiosks before any worker is hired. Their names and cards belong to those avatars. After updating a running client, reload the page to rebuild any avatar transforms left invalid by the old animation code.
