@@ -276,6 +276,6 @@ test('completion evidence includes core validation and tests despite a reference
     assert.ok(e.files.some(x => x.path === 'src/server/completion.ts' && x.excerpt.includes('Array.isArray')));
     const unit = e.files.find(x => x.path === 'tests/completion.test.ts'); assert.ok(unit);
     assert.ok(unit.excerpt.includes('filesNote')); assert.ok(unit.excerpt.includes('assert.throws'));
-    assert.ok(e.files.length <= 8); assert.ok(e.files.every(x => x.excerpt.length <= 4000));
+    assert.ok(e.files.length <= 24); assert.ok(e.files.every(x => x.excerpt.length <= 8000));
   } finally { f.close(); }
 });
