@@ -62,6 +62,7 @@ import { installHud } from './features/hud';
 import { installCommunications } from './features/communications';
 import { installParallelWorlds } from './features/parallel-worlds';
 import { installJukebox } from './features/jukebox';
+import { installSpeaker } from './features/speaker';
 import { installMeeting } from './features/meeting';
 import { installNeedsYou } from './features/needsyou';
 import { installPalette } from './features/palette';
@@ -144,6 +145,7 @@ parts.sound = makeSound(parts.settings);
 parts.toys = installDeskToys(ctx);
 parts.dog = installDog(ctx);
 parts.jukebox = installJukebox(ctx, { showSettings: (pane) => parts.hud.showSettings(pane) });
+parts.speaker = installSpeaker(ctx);
 parts.cabinet = installCabinet(ctx, { openTerminal: (id) => parts.waiting.openWorkerTerminal(id) });
 parts.cinema = installCinema(ctx, { floor: () => store.floor ?? '', prUrl: (pr) => store.pulls.items.find((p) => p.number === pr)?.url ?? '' });
 parts.notifier = new DesktopNotifier(() => parts.settings.notify, (id) => parts.waiting.answerWorker(id));
@@ -278,7 +280,7 @@ void whoami().then(() => {
 
 // Debug handle for quick checks from the console / headless screenshots.
 const { worlds, views, rooftop, bar, coffee, golf, bargames, hanging, climbing, cars, emotes, hoops } = parts;
-(window as any).__office = { ctx, world: () => worlds.world(), court: () => worlds.court(), sendoffs: views.sendoffs, jail: views.jail, adrift: views.adrift, plan: worlds.plan, applyMap: parts.maps.applyMap, roof: rooftop.roof, booze: bar.booze, dj: () => djFrame(rooftop.djAt()), store, player: parts.player, caffeine: coffee.caffeine, camera: ctx.camera, cabinet: parts.cabinet, workerViews: views.workerViews, departures: views.departures, arrivals: views.arrivals, scene: ctx.scene, net: parts.net, renderer: ctx.renderer, hands: parts.hands, me: parts.me, remotes: parts.peers.remotes, settings: parts.settings, gallery: parts.gallery, hanger: hanging.hanger, office: ctx.office, ride: parts.travel.ride, switchFloor: parts.travel.switchFloor, climber: climbing.climber, driver: cars.driver, getIn: cars.getIn, getOut: cars.getOut, golf: golf.golf, balls: golf.balls, thrower: bargames.thrower, elevatorPanelOpen, confetti: parts.confetti, dog: parts.dog, sky: ctx.sky, holiday: parts.stage.holiday, carried: () => core.carrying, emoteWheel: emotes.emoteWheel, emote: emotes.emote, ball: hoops.ball };
+(window as any).__office = { ctx, world: () => worlds.world(), court: () => worlds.court(), sendoffs: views.sendoffs, jail: views.jail, adrift: views.adrift, plan: worlds.plan, applyMap: parts.maps.applyMap, roof: rooftop.roof, booze: bar.booze, dj: () => djFrame(rooftop.djAt()), store, player: parts.player, caffeine: coffee.caffeine, camera: ctx.camera, cabinet: parts.cabinet, workerViews: views.workerViews, departures: views.departures, arrivals: views.arrivals, scene: ctx.scene, net: parts.net, renderer: ctx.renderer, hands: parts.hands, me: parts.me, remotes: parts.peers.remotes, settings: parts.settings, gallery: parts.gallery, hanger: hanging.hanger, office: ctx.office, ride: parts.travel.ride, switchFloor: parts.travel.switchFloor, climber: climbing.climber, driver: cars.driver, getIn: cars.getIn, getOut: cars.getOut, golf: golf.golf, balls: golf.balls, thrower: bargames.thrower, elevatorPanelOpen, confetti: parts.confetti, dog: parts.dog, sky: ctx.sky, holiday: parts.stage.holiday, carried: () => core.carrying, emoteWheel: emotes.emoteWheel, emote: emotes.emote, ball: hoops.ball, speaker: parts.speaker };
 (window as any).__voice = parts.voice;
 (window as any).__sound = parts.sound;
 (window as any).__notify = parts.notifier;

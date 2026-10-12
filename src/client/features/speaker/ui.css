@@ -1,0 +1,64 @@
+/* The smart speaker's window (see ui.ts): the now-playing row, the transport keys and the progress
+   row. The volume row, the link box and the notes are the office's own shared pieces. */
+
+.modal.speaker .sp-now {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+.modal.speaker .sp-art {
+  flex: none;
+  font-size: 32px;
+  line-height: 1;
+}
+.sp-art.spin {
+  animation: sp-spin 3s linear infinite;
+}
+@keyframes sp-spin {
+  50% {
+    transform: scale(1.15) rotate(-8deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sp-art.spin {
+    animation: none;
+  }
+}
+
+/* The transport: previous, play/pause, stop, next, restart. */
+.sp-transport {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.sp-transport .btn {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+
+.sp-progress {
+  margin-top: 12px;
+  gap: 10px;
+}
+.sp-time {
+  flex: none;
+  font: 800 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 440px) {
+  .sp-transport .btn {
+    flex: 1 1 40%;
+    padding: 6px 8px;
+    font-size: 13px;
+  }
+  .modal.speaker .sp-art {
+    font-size: 26px;
+  }
+}

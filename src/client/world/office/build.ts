@@ -11,6 +11,7 @@ import { toon, toonUnique } from '../toon';
 import { elevator, garageLift } from '../elevator';
 import { gong } from '../../features/gong/world';
 import { jukebox } from '../../features/jukebox/world';
+import { speaker } from '../../features/speaker/world';
 import { bookshelf } from '../../features/bookshelf/world';
 import { loreShelf } from '../../features/lore/world';
 import { cabinet } from '../../features/cabinet/world';
@@ -65,6 +66,7 @@ function floorPlan() {
     machineMonitor,
     lounge,
     jukebox,
+    speaker,
     cabinet,
     bookshelf,
     loreShelf,

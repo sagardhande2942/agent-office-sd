@@ -33,6 +33,7 @@ import type { installGolf } from '../features/golf';
 import type { installGallery, installHanging } from '../features/hanging';
 import type { installHud } from '../features/hud';
 import type { installJukebox } from '../features/jukebox';
+import type { installSpeaker } from '../features/speaker';
 import type { installMeeting } from '../features/meeting';
 import type { installNeedsYou } from '../features/needsyou';
 import type { installPeers } from '../features/peers';
@@ -105,6 +106,8 @@ export interface Parts {
   toys: Made<typeof installDeskToys>;
   dog: Made<typeof installDog>;
   jukebox: Made<typeof installJukebox>;
+  /** The smart speaker's music player (see features/speaker). */
+  speaker: Made<typeof installSpeaker>;
   cabinet: Made<typeof installCabinet>;
   cinema: Made<typeof installCinema>;
   golf: Made<typeof installGolf>;
