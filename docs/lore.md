@@ -102,3 +102,5 @@ Archiving and superseding preserve the original note files. Use **History** to i
 Browser verification: `node --import tsx scripts/e2e-lore-curator.mjs` uses fixture agents, saves a daily schedule and model, runs cleanup, checks duplicate/archive recovery and pause/resume, and captures [settings](lore-shelf-evidence/curator-settings.png) and [run history](lore-shelf-evidence/curator-history.png).
 
 Curator evidence selection prioritizes referenced files, relevant implementation and tests, and matching passages within longer committed files. Missing context alone should leave a note unchanged rather than mark it as incorrect.
+
+A completed run with zero changed notes is a successful review, not an agent error. The curator leaves uncertain claims unchanged and does not treat a reported checklist as proof that checks ran. Evidence is ranked separately for each note, prioritizes cited implementation and test files, and supplies up to 24 committed files, 8,000 characters per file and 96,000 characters total. Larger files are marked as truncated; unreadable candidates do not discard usable evidence from other files. Uncommitted work is not evidence.
