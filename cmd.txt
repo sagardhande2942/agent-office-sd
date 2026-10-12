@@ -3,37 +3,23 @@ AGENT OFFICE COMMAND REFERENCE
 Commands from the CLI office setup and troubleshooting conversation.
 Shell commands run in Bash; dashboard commands run inside the TUI after pressing :.
 
-1. USE THE CLI WORKTREE
-----------------------
-The feature branch is checked out in a separate worktree, not in the main checkout:
+1. BUILD AND RUN YOUR CHECKOUT
+-----------------------------
+Use the checkout containing the features you want. Run both the server and TUI
+from that same build; released packages do not include an unmerged feature branch.
 
-  cd /tmp/agent-office-cli
-
-You do not need to run git checkout feat/terminal-office in ~/agent-office-sd.
-Git refuses that checkout while the branch is already used by this worktree.
-The /tmp path is specific to this development session, not a permanent installation.
-
-Inspect your checkout and worktrees:
-
-  git branch
-  git worktree list
-  git status --short
-
-If dependencies or compiled files are missing in your feature checkout:
-
-  npm install
+  cd /path/to/agent-office-sd
+  npm ci
   npm run build
 
-Run through Node without installing a global command:
+Use Node directly without needing a globally installed command:
 
-  node bin/agent-office.js tui
+  node bin/agent-office.js --help
+  node bin/agent-office.js tui --help
 
-Optional: install the command on your PATH from the feature checkout:
-
-  npm install -g .
-  agent-office tui
-
-If Bash says "agent-office: command not found", use the Node command above.
+The TUI connects to an existing server. Follow sections 2 and 3 in two terminals.
+If Bash says "agent-office: command not found", use the Node commands above.
+If compiled files are missing, build this checkout and retry.
 
 2. START THE OFFICE SERVER
 -------------------------
@@ -42,7 +28,7 @@ open the TUI in another. Start the server only if port 4600 is free.
 
 Start locally; do not open a browser automatically:
 
-  cd /tmp/agent-office-cli
+  cd /path/to/agent-office-sd
   node bin/agent-office.js --no-open
 
 Choose a password explicitly:
@@ -88,7 +74,7 @@ Read the complete server flag reference:
 --------------------
 Default connection is http://localhost:4600. A hidden password prompt appears:
 
-  cd /tmp/agent-office-cli
+  cd /path/to/agent-office-sd
   node bin/agent-office.js tui
 
 Sign in with your own account:
@@ -321,3 +307,11 @@ plan-stop
 plan-retry
   Retry failed rejected-worker cleanup; implementation waits until cleanup succeeds.
   See docs/plan-comparison.md for full configuration, restrictions and MCP schemas.
+
+TUI COMMAND INPUT
+-----------------
+Press : once, type a dashboard command, then Enter. Pasted leading : is accepted.
+Run node/npm/npx/git commands in your shell, not inside the dashboard.
+Press ? for help; arrows scroll all help, team and plan lines.
+JSON paths are local to the TUI machine. Quoted paths and ~/ paths are supported.
+Missing files, malformed JSON and unknown commands leave the dashboard usable.

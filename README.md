@@ -109,7 +109,7 @@ agent-office tui                            # join the running office from your 
 agent-office setup                          # the first-start walkthrough again (office stopped)
 ```
 
-For a terminal-only client, start the office with `agent-office --no-open`, then run `agent-office tui` in another terminal. Its live desk grid shares floors, workers and terminals with the 3D and lite views: use arrows to select a desk, Enter to open it, and Tab for boards. See [docs/cli.md](docs/cli.md) for commands and remote connections, or [cmd.txt](cmd.txt) for a copyable command and flag reference.
+For a terminal-only client, start `agent-office /path/to/project --no-open` in one terminal and leave it running; join with `agent-office tui` in a second terminal. Use the password printed at server startup. From a source checkout, run `npm ci` and `npm run build`, then use `node bin/agent-office.js` in place of `agent-office` for both commands. The TUI connects to the server; it does not start one. Both processes must use the same build for feature commands. Press `?` for help, or `:` once and type `hire codex Fix the failing tests`. See [docs/cli.md](docs/cli.md) for the full walkthrough and [cmd.txt](cmd.txt) for copyable commands.
 
 The plant beside the basketball uses an animated peace lily in the 266 KB `src/client/models/basketball-plant.glb`. Its idle animation loops continuously. Replace that file and rebuild to change this single plant; Draco-compressed GLBs use a locally bundled decoder. See [custom plant models](docs/features.md#custom-plant-model).
 

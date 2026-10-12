@@ -1,34 +1,17 @@
 import { TuiTerminal, MOUSE_OFF } from './tui-terminal.js';
 import { teamCommand } from './master-workers/tui.js';
-import { readFileSync } from 'node:fs';
+import { commandLine, readTuiJson, unknownCommand } from './tui/commands.js';
+import { TUI_HELP, TUI_HELP_LINES } from './tui/help.js';
+import { connectionFailure, signInFailure } from './tui/connection.js';
+import { planLines } from './tui/plans.js';
+import { teamLines } from './master-workers/tui.js';
 import readline from 'node:readline';
 import { WebSocket } from 'ws';
 import { PANELS, communicationLines, gridColumns, plain, renderDashboard, seats, type Dashboard, type Panel } from './tui-dashboard.js';
 export { plain } from './tui-dashboard.js';
 import { isAgentProvider, type ClientMsg, type FloorInfo, type FloorView, type ServerMsg, type WorkerInfo } from '../shared/protocol.js';
 
-const HELP = `Usage: agent-office tui [--office http://localhost:4600] [--name NAME] [--floor ID]
 
-Join a running office from your terminal. Password: AGENT_OFFICE_PASSWORD, or a hidden prompt.
-Use --name for an account login; omit it for the shared office password.
-
-Live dashboard: arrows select desks, Enter opens a worker, Tab changes panels.
-Press : for the command prompt; Ctrl+] leaves an attached terminal.
-While attached, use the mouse wheel or Page Up/Page Down to scroll history.
-
-Commands:
-  workers / floors / go <floor ID or name>
-  hire <provider> [prompt]     Hire at the first empty desk
-  attach <worker ID or name>  Live terminal; Ctrl+] returns to the office
-  prompt <worker> <text> / resume <worker> / pr <worker>
-  home <worker> [--cleanup auto|keep|worktree|all]  Send a worker home
-  messages [request-id]       Read tracked worker requests and replies
-  issues / pulls / queue / enqueue <prompt> / chat <text>
-  teams / team-start <JSON-file> / team-pause / team-resume / team-stop
-  team-preset <JSON-file> / team-preset-delete <ID>
-  help / quit
-
-The office keeps running when you leave. Requires an interactive terminal.`;
 
 async function passwordPrompt(): Promise<string> {
   process.stdout.write('Office password: ');
@@ -57,7 +40,7 @@ async function passwordPrompt(): Promise<string> {
 export async function tuiCommand(argv: string[]): Promise<number> {
   let office = 'http://localhost:4600', name = '', floor = '';
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--help' || argv[i] === '-h') { console.log(HELP); return 0; }
+    if (argv[i] === '--help' || argv[i] === '-h') { console.log(TUI_HELP); return 0; }
     if (!['--office', '--name', '--floor'].includes(argv[i]) || !argv[i + 1] || argv[i + 1].startsWith('--')) {
       console.error(`agent-office tui: unknown option or missing value: ${argv[i]}`); return 1;
     }
@@ -77,7 +60,7 @@ export async function tuiCommand(argv: string[]): Promise<number> {
       method: 'POST', headers: { 'content-type': 'application/json', origin: base.origin },
       body: JSON.stringify({ name, password }), redirect: 'error', signal: AbortSignal.timeout(15_000),
     });
-    if (!response.ok) throw new Error(`Sign-in failed (${response.status})`);
+    if (!response.ok) throw new Error(signInFailure(response.status));
     const cookie = response.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
     if (!cookie) throw new Error('The office did not issue a session');
     const url = new URL('/ws', base);
@@ -85,7 +68,7 @@ export async function tuiCommand(argv: string[]): Promise<number> {
     url.search = new URLSearchParams({ name: name || 'CLI', color: '#06d6a0', lite: '1', ...(floor ? { floor } : {}) }).toString();
     return await session(new WebSocket(url, { headers: { Cookie: cookie, Origin: base.origin }, handshakeTimeout: 15_000 }));
   } catch (err) {
-    console.error(`agent-office tui: ${(err as Error).message}`); return 1;
+    console.error(`agent-office tui: ${connectionFailure(err, office)}`); return 1;
   }
 }
 
@@ -174,7 +157,7 @@ function session(ws: WebSocket): Promise<number> {
       else if (msg.t === 'floors') floors = msg.floors;
       else if (msg.t === 'worker.update' && view) {
         view.workers = [...view.workers.filter((w) => w.id !== msg.worker.id), msg.worker];
-        print(`${msg.worker.name}: ${msg.worker.status}`);
+        draw();
       } else if (msg.t === 'worker.remove' && view) {
         if (attached === msg.workerId) detach();
         if (dashboard.home?.worker.id === msg.workerId) dashboard.home = undefined;
@@ -189,7 +172,7 @@ function session(ws: WebSocket): Promise<number> {
       else if (msg.t === 'plan' && view) view.plan = msg.plan;
       else if (msg.t === 'toast') print(`${msg.level}: ${msg.text}`);
       else if (msg.t === 'chat') print(`${msg.name}: ${msg.text}`);
-      if (['communications', 'floors', 'worker.remove', 'gh.issues', 'gh.pulls', 'queue', 'plan'].includes(msg.t)) draw();
+      if (['master-workers', 'plan-review', 'communications', 'floors', 'worker.remove', 'gh.issues', 'gh.pulls', 'queue', 'plan'].includes(msg.t)) draw();
     });
     function keypress(text: string | undefined, key: readline.Key) {
       if (attached || finished) return;
@@ -226,7 +209,7 @@ function session(ws: WebSocket): Promise<number> {
         const direction = key.name === 'up' || key.name === 'left' ? -1 : 1;
         if (dashboard.panel === 'office') dashboard.selected = Math.max(0, Math.min(all.length - 1, dashboard.selected + direction * (key.name === 'up' || key.name === 'down' ? gridColumns(process.stdout.columns || 80) : 1)));
         else {
-          const count = dashboard.panel === 'floors' ? floors.length : dashboard.panel === 'issues' ? view?.issues.items.length : dashboard.panel === 'pulls' ? view?.pulls.items.length : dashboard.panel === 'queue' ? view?.queue.tasks.length : dashboard.panel === 'messages' ? (dashboard.thread ? communicationLines({ ...dashboard, view }, process.stdout.columns || 80).length : view?.communications?.messages.filter((m) => m.kind === 'request').length) : 13;
+          const count = dashboard.panel === 'floors' ? floors.length : dashboard.panel === 'issues' ? view?.issues.items.length : dashboard.panel === 'pulls' ? view?.pulls.items.length : dashboard.panel === 'queue' ? view?.queue.tasks.length : dashboard.panel === 'messages' ? (dashboard.thread ? communicationLines({ ...dashboard, view }, process.stdout.columns || 80).length : view?.communications?.messages.filter((m) => m.kind === 'request').length) : dashboard.panel === 'teams' ? teamLines(view).length : dashboard.panel === 'help' ? TUI_HELP_LINES.length : planLines(view, process.stdout.columns || 80).length;
           dashboard.offset = Math.max(0, Math.min(Math.max(0, (count ?? 0) - 1), dashboard.offset + direction));
         }
         return draw();
@@ -265,6 +248,7 @@ function session(ws: WebSocket): Promise<number> {
       }
     }
     function command(line: string) {
+      line = commandLine(line);
       const [cmd, key = '', ...tail] = line.split(/\s+/), text = tail.join(' ');
       if (!cmd) return;
       if (teamCommand(line, send, () => panel('teams'))) return;
@@ -272,7 +256,7 @@ function session(ws: WebSocket): Promise<number> {
       if (cmd === 'help') return panel('help');
       if (cmd === 'messages') { panel('messages'); dashboard.thread = key || undefined; return draw(); }
       if (cmd === 'plans') return panel('plans');
-      if (cmd === 'plan-start') {if(!key)throw new Error('Usage: plan-start <JSON-file>');return send({t:'plan-review.start',request:JSON.parse(readFileSync(line.slice(cmd.length).trim(),'utf8'))});}
+      if (cmd === 'plan-start') {if(!key)throw new Error('Usage: plan-start <JSON-file>');return send({t:'plan-review.start',request:readTuiJson(line.slice(cmd.length),cmd) as import('../shared/plan-review.js').PlanReviewRequest});}
       if (cmd === 'plan-stop') return send({t:'plan-review.stop'});
       if (cmd === 'plan-retry') return send({t:'plan-review.retry'});
       if (cmd === 'workers') return workers();
@@ -283,6 +267,7 @@ function session(ws: WebSocket): Promise<number> {
         if (found.length !== 1) throw new Error('Use a unique floor ID or name from floors');
         return send({ t: 'floor.go', floor: found[0].id });
       }
+      if (!['hire','chat','enqueue','issues','pulls','queue','home','attach','prompt','resume','pr'].includes(cmd)) throw new Error(unknownCommand(cmd));
       if (!view?.floor) throw new Error('Add a project in the browser, then select it with go');
       if (cmd === 'hire') {
         if (!isAgentProvider(key)) throw new Error('Provider: claude, codex, opencode, grok, muse, dsh, pi, cursor, antigravity or custom');
@@ -318,7 +303,7 @@ function session(ws: WebSocket): Promise<number> {
         if (cmd === 'prompt') { if (!text) throw new Error('Provide a prompt'); return send({ t: 'worker.prompt', workerId: w.id, prompt: text }); }
         return send({ t: cmd === 'pr' ? 'worker.pr' : 'worker.resume', workerId: w.id });
       }
-      throw new Error('Unknown command. Type help.');
+      throw new Error(unknownCommand(cmd));
     }
   });
 }

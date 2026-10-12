@@ -1,12 +1,12 @@
-import { readFileSync } from 'node:fs';
+import { readTuiJson } from '../tui/commands.js';
 import type { ClientMsg, FloorView } from '../../shared/protocol.js';
 export function teamCommand(line:string,send:(msg:ClientMsg)=>void,open:()=>void):boolean {
   const [cmd,...rest]=line.split(/\s+/),arg=rest.join(' ');
   if(cmd==='teams'){open();return true;}
   if(cmd==='team-start'||cmd==='team-preset') {
     if(!arg)throw Error(`Usage: ${cmd} <JSON-file>`);
-    const value=JSON.parse(readFileSync(arg,'utf8'));
-    send(cmd==='team-start'?{t:'master-workers.start',request:value}:{t:'master-workers.preset',preset:value});return true;
+    const value=readTuiJson(arg,cmd);
+    send(cmd==='team-start'?{t:'master-workers.start',request:value as import('../../shared/master-workers.js').TeamRequest}:{t:'master-workers.preset',preset:value as import('../../shared/master-workers.js').TeamPreset});return true;
   }
   if(cmd==='team-preset-delete'){if(!arg)throw Error('Provide preset ID');send({t:'master-workers.preset',remove:arg});return true;}
   const actions={'team-pause':'pause','team-resume':'resume','team-stop':'stop'} as const;
