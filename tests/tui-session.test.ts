@@ -67,6 +67,15 @@ test('dashboard navigation, terminal input, floor switching and cleanup over a P
     child.write('x'); await expect('Keep both');
     child.write('2\r'); await expect('Sending Ada home');
     child.write(':home Ada --cleanup keep\r'); await expect('Sending Ada home');
+    child.write('::help\r'); await expect('QUICK START');
+    child.write('\x1b[B'.repeat(26)); const help = await expect('JSON paths refer to this machine');
+    if (process.env.TUI_HELP_EVIDENCE) writeFileSync(process.env.TUI_HELP_EVIDENCE, help);
+    child.write('\x1b'); await expect('AGENT OFFICE');
+    child.write(':npm run build\r'); await expect('Run shell commands in another terminal');
+    child.write('::teams\r'); await expect('MASTER / WORKERS');
+    for (const ws of wss.clients) ws.send(JSON.stringify({t:'master-workers',state:{presets:[],current:{phase:'running',brief:'Live team',master:{provider:'codex'},plan:'LIVE_PLAN_REFRESH',tasks:Array.from({length:24},(_,i)=>({id:'task-'+i,title:'Task '+i,status:'queued',attempts:[],evidence:i===23?'FINAL_TASK_EVIDENCE':''}))}}}));
+    await expect('LIVE_PLAN_REFRESH');
+    child.write('\x1b[B'.repeat(60)); await expect('FINAL_TASK_EVIDENCE');
     child.write('q'); assert.equal(await exited, 0);
     assert.deepEqual(messages.filter((m) => m.t === 'worker.kill'), [
       { t: 'worker.kill', workerId: 'w1', cleanup: 'worktree' },

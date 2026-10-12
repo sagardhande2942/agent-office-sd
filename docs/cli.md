@@ -2,13 +2,27 @@
 
 For shell commands, flags, dashboard keys and Cloud Shell restart instructions, see [cmd.txt](../cmd.txt).
 
-The CLI is a third view of the same office, alongside 3D and `/lite`. Run the server first, then join it in another terminal:
+The CLI is a third view of the same office, alongside 3D and `/lite`. Run the server first, keep it running, then join it in another terminal:
 
 ```sh
-agent-office --no-open
-# In another terminal:
+agent-office /path/to/your/project --no-open
+# In a second terminal:
 agent-office tui
 ```
+
+From a source checkout, use the same checkout/build for both processes:
+
+```sh
+cd /path/to/agent-office-sd
+npm ci
+npm run build
+# Terminal 1 (leave running):
+node bin/agent-office.js /path/to/your/project --no-open
+# Terminal 2, from the same checkout:
+node bin/agent-office.js tui
+```
+
+`agent-office tui` connects to a server; it does not start one. Use `--office http://localhost:4700` if you started the server on port 4700. A missing compiled CLI asks you to build; a refused connection tells you to start the server. Feature-branch commands require a build containing that feature in both processes. Installing or running a released package does not pick up an unmerged branch.
 
 Enter the office password at the hidden prompt. If `AGENT_OFFICE_PASSWORD` is set, the client uses it instead. Passwords and session cookies are never saved by the client. With an individual account, use `agent-office tui --name ada` and enter that account's password.
 
@@ -33,6 +47,10 @@ After login, the office fills your terminal with a live desk grid. Workers are c
 
 ![Example terminal desk grid with sample workers](cli-dashboard.png)
 
+Press `:` **once**, type a dashboard command, then Enter. For example, type `hire codex Fix the failing tests`. Do not run `node`, `npm`, or `agent-office` inside this prompt; those belong in your shell. Pasting an example with a leading `:` is accepted.
+
+`?` opens scrollable help with setup hints and examples. Team and plan panels refresh as results arrive. Arrow keys can scroll the entire help, plan, or team output.
+
 Type commands after pressing `:`:
 
 | Command | Action |
@@ -51,7 +69,7 @@ Type commands after pressing `:`:
 | `chat <text>` | Send chat to teammates |
 | `help`, `quit` | Show help or leave the client |
 
-Worker commands accept an exact ID or a single-word name. Use IDs for names with spaces or duplicate names. The hire providers are `claude`, `codex`, `opencode`, `grok`, `muse`, `dsh` and `custom`. Hiring uses the floor's shared checkout; queue tasks follow the office's existing queue rules.
+Worker commands accept an exact ID or a single-word name. Use IDs for names with spaces or duplicate names. The hire providers are `claude`, `codex`, `opencode`, `grok`, `muse`, `dsh` and `custom`. New Git-project workers use an isolated worktree by default; queue tasks follow the office's existing queue rules.
 
 Workers using a shared checkout show deletion choices as unavailable and keep the checkout and branch when sent home. Meeting checkout cleanup is managed by the meeting.
 
@@ -68,3 +86,11 @@ Press `:` in the dashboard. `plans` opens plan comparison status, detailed plans
 ### Scrolling worker terminals in the CLI
 
 While attached in `agent-office tui`, use the **mouse wheel** or **Page Up / Page Down** to review up to 5,000 lines of worker history. These gestures stay local rather than being typed into the worker. Page Down or scrolling down returns to live output; typing also returns to live output and sends your input normally. Ctrl+] returns to the dashboard. History is kept only for the attached worker and released on detach; full-screen workers are mirrored into a buffer that retains scrollback.
+
+## JSON files and errors
+
+Team and plan commands read files on the machine running the TUI, including when connecting to a remote office. Absolute paths are clearest; relative paths use the directory where you launched the TUI. Home paths such as `~/plans/task.json` and quoted paths such as `plan-start "/home/ada/My Plans/task.json"` work. Missing files and malformed JSON produce a retryable message in the dashboard.
+
+![Scrollable terminal help, including JSON path and feature-build guidance](cli-help.png)
+
+To reproduce the real PTY checks and a headless help screenshot, run `node --import tsx scripts/e2e-tui-guidance.mjs`. Artifacts go to `/tmp/agent-office-tui-guidance-evidence` (override with `TUI_GUIDANCE_ARTIFACTS`).
