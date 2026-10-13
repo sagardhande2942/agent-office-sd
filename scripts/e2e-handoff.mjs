@@ -54,6 +54,13 @@ try {
   assert.equal(await dialog.getByRole('button', { name: /^accept/i }).count(), 0);
   assert.equal((await tool(recipient, 'read', { id: handoff.id })).handoff.state, 'offered');
   await page.screenshot({ path: path.join(output, 'station-lite-offered.png'), animations: 'disabled' });
+  await dialog.locator('.body').evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await page.screenshot({ path: path.join(output, 'station-lite-context.png'), animations: 'disabled' });
+  await dialog.locator('.body').evaluate(el => { el.scrollTop = 0; });
+  const modalBox = await dialog.boundingBox(), closeBox = await dialog.getByRole('button', { name: 'Close Handoff station' }).boundingBox();
+  const refreshBox = await dialog.getByRole('button', { name: /Refresh/ }).boundingBox();
+  assert.ok(refreshBox.x + refreshBox.width < closeBox.x, 'Refresh stays clear of the close control');
+  assert.ok(closeBox.x > modalBox.x + modalBox.width - 70 && closeBox.x + closeBox.width < modalBox.x + modalBox.width && closeBox.y < modalBox.y + 60, 'X sits in the modal top-right corner');
   check('Lite packet evidence', 'Real API packet shows goal, progress, files, checks, questions, source context; viewing remains offered.');
   const accepted = (await tool(recipient, 'accept', { id: handoff.id })).handoff;
   assert.equal(accepted.continuationOwner.id, recipient.id);
@@ -61,6 +68,7 @@ try {
   await dialog.locator('.handoff-state[data-state="accepted"]').waitFor();
   await dialog.locator('.handoff-packet summary').click();
   await dialog.getByText(`Continuation owner: ${recipient.name}.`, { exact: true }).waitFor();
+  await dialog.locator('.body').evaluate(el => { el.scrollTop = el.scrollHeight; });
   await page.screenshot({ path: path.join(output, 'station-lite-accepted.png'), animations: 'disabled' });
   await dialog.getByRole('button', { name: 'Close Handoff station' }).click();
   await page.waitForFunction(() => !document.querySelector('.handoff-station'));

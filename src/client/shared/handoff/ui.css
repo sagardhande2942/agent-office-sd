@@ -1,7 +1,7 @@
 /* The Handoff station window, in the 3D office and Lite alike (see ui.ts). */
 
-.handoff-station { width: min(880px, 100%); }
-.handoff-station header { flex-wrap: wrap; padding-right: 58px; }
+.modal.handoff-station { position: relative; width: min(880px, 100%); }
+.modal.handoff-station > header { flex-wrap: wrap; padding-right: 58px; }
 .handoff-floor { font-size: 12px; font-weight: 800; color: var(--muted); overflow-wrap: anywhere; }
 .handoff-station select { max-width: 40%; }
 .handoff-status { font-size: 13px; font-weight: 700; color: var(--muted); margin: 0 0 10px; }
