@@ -46,7 +46,7 @@ export interface Config {
   publicHost?: string;
   /** The office's name on a Tailscale network, e.g. agent-office.tail1234.ts.net (set by deploy/provision.sh --tailscale). */
   tailnet?: string;
-  /** Daily tracked Claude Code spend budget, USD. OpenCode/Codex/Grok/Muse spend is excluded. */
+  /** Daily known spend budget, USD. Unavailable costs are excluded. */
 
   budget?: number;
   /** Refuse new hires for the rest of the day once the budget is spent. */
@@ -138,7 +138,7 @@ Options:
       --turn <url>        Add a TURN server for voice (repeatable), e.g.
                           turn:user:pass@turn.example.com:3478 (env
                           AGENT_OFFICE_TURN, several separated by spaces)
-      --budget <usd>      Daily budget for tracked Claude Code spend (env
+      --budget <usd>      Daily budget for known provider spend (env
                           AGENT_OFFICE_BUDGET). Everyone is warned when the
                           day's spend passes it. OpenCode/Codex/Grok/Muse spend is excluded
       --budget-pause      ...and no new workers can be hired until the next

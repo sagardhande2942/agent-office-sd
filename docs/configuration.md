@@ -29,7 +29,7 @@ agent-office [dir] [options]
       --trust-proxy       Trust X-Forwarded-* (behind Caddy/nginx)
       --turn <url>        Add a TURN server for voice, e.g. turn:user:pass@host:3478
                           (env AGENT_OFFICE_TURN, several separated by spaces)
-      --budget <usd>      Daily tracked Claude Code budget (OpenCode/Codex/Grok/Muse/DSH excluded)
+      --budget <usd>      Daily known spend budget (Claude + reported provider costs)
       --budget-pause      ...and nobody can hire a new worker until the next day
       --max-workers <n>   Run at most n workers at once, across every floor (env AGENT_OFFICE_MAX_WORKERS)
       --webhook <url>     Post to this Slack / Discord webhook when a worker needs input or finishes
@@ -67,3 +67,7 @@ agent-office tunnel [office@address | url] [--port <n>] [--office-port <n>] [--n
 ## Terminal office client
 
 `agent-office tui` joins a running office with a live terminal desk grid, worker details and board panels. Arrow keys select a desk, Enter opens its terminal, and `:` opens a command prompt. Use `--office <http(s) origin>` for a remote server, `--name <account>` for account login, and `--floor <id>` for the initial floor. See [cli.md](cli.md) for commands and password handling.
+
+Provider usage accounting keeps Codex root-session and OpenCode cumulative token reports in `provider-usage.json`, alongside daily and all-time known cost totals. Session baselines prevent duplicate booking after repeat reports or restarts, and totals remain after workers are removed. Existing Claude totals remain in `usage.json`.
+
+`--budget` and `--budget-pause` include Claude estimates plus known OpenCode/DeepSeek reported costs. Unknown costs are excluded, not counted as free: Codex root sessions are tracked in tokens only, subagents remain outside its reported scope, and agents without usage reports remain unmetered. DeepSeek context occupancy is displayed as context and is never accumulated as tokens spent. Incomplete provider history is excluded until a complete snapshot arrives. Initial adoption books available cumulative sessions on the day observed; it cannot reconstruct older daily usage.
