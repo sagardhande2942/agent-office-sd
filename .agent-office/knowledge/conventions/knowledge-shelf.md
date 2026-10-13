@@ -1,9 +1,9 @@
 ---
 summary: "How to read, write, move and finish reviewing notes on the floor knowledge shelf under .agent-office/knowledge."
 title: "The knowledge shelf: tools, versioning and house rules"
-author: "human:inferno"
+author: "curator"
 updated: "2026-10-13"
-status: "active"
+status: "needs-verification"
 tags: []
 ---
 The floor knowledge shelf lives in `.agent-office/knowledge/` in the repository and is edited through the knowledge tools, not by hand:
