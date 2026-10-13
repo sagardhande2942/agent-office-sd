@@ -6,3 +6,11 @@ dist
 pw.txt
 __pycache__/
 reel-staged.json
+
+# Agent Office knowledge (committed); journals and telemetry stay local
+!/.agent-office/
+/.agent-office/*
+!/.agent-office/knowledge/
+!/.agent-office/knowledge/**
+/.agent-office/knowledge/_meta/state/
+/.agent-office/handovers/
