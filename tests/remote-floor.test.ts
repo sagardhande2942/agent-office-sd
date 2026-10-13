@@ -331,6 +331,45 @@ test('the hosted theatre switch returns booleans and follows the TV state mirror
   assert.equal(floor.tv.state().theatre, true);
 });
 
+test('the hosted light switch reaches a capable host, falls back for an older one, and names one that can do neither', async () => {
+  const host = fakeHost();
+  const floor = make(host);
+  const ready = { floorId: 'f1', name: 'API', seats: 2, accepting: false, workers: [], forge: 'github' as const };
+  // A host that announced the three settings gets `tv.lights` with the setting itself.
+  floor.deliver({ t: 'ready', floor: { ...ready, lights: true } });
+  const dim = floor.tv.lights('dim', 'Alice');
+  assert.equal(host.sent[0].t, 'tv.lights');
+  assert.equal(host.sent[0].light, 'dim');
+  assert.equal(host.sent[0].by, 'Alice');
+  floor.deliver({ t: 'result', floorId: 'f1', seq: host.sent[0].seq as number, value: true });
+  assert.equal(await dim, true);
+  // A refusal is a `false`, not a silent success.
+  const refused = floor.tv.lights('off', 'Alice');
+  floor.deliver({ t: 'refused', floorId: 'f1', seq: host.sent[1].seq as number, reason: 'no tv' });
+  assert.equal(await refused, false);
+  // An older host announced no `lights`: its own one-position switch still answers, and only
+  // lights-out is ever asked of it, so a warm dim leaves its lights up rather than going dark.
+  floor.deliver({ t: 'ready', floor: ready });
+  const warm = floor.tv.lights('dim', 'Bob');
+  assert.equal(host.sent[2].t, 'tv.theatre', 'an older host hears its own switch');
+  assert.equal(host.sent[2].on, false, 'warm dim is not lights-out, and an older host has nothing between');
+  floor.deliver({ t: 'result', floorId: 'f1', seq: host.sent[2].seq as number, value: true });
+  assert.equal(await warm, true);
+  // A host that can do neither is named rather than left silently unlit.
+  const neither = floor.tv.lights('off', 'Bob');
+  assert.equal(host.sent[3].t, 'tv.theatre');
+  assert.equal(host.sent[3].on, true, 'lights out is the one thing asked of the older switch');
+  floor.deliver({ t: 'refused', floorId: 'f1', seq: host.sent[3].seq as number, reason: 'this machine does not serve tv.theatre' });
+  assert.match((await neither) as string, /Update the floor host/);
+  // A `tv` event carrying only the old boolean still leaves the mirror dark for it.
+  floor.deliver({ t: 'event', floorId: 'f1', seq: 1, msg: { t: 'tv', state: { on: false, playing: false, position: 0, at: 0, theatre: true } } });
+  assert.equal(floor.tv.state().theatre, true);
+  // A value that is not one of the three is refused before anything crosses the wire.
+  const sent = host.sent.length;
+  assert.equal(await floor.tv.lights('mid', 'Bob'), false);
+  assert.equal(host.sent.length, sent);
+});
+
 test('a hosted helper request uses the floor action and returns the hired worker', async () => {
   const host = fakeHost();
   const floor = make(host);

@@ -421,7 +421,7 @@ The garage uses Blender-built Lambo and Ferrari models with wheel arches, detail
 
 Open **Boss Office** from the upstairs monitor (E), boss character, menu, or Lite header. Configure a standing mission, boss agent, and up to **10 workers** using a model pool or explicit slots. Turn it ON for continuous discovery, planning, implementation, independent checks, and PR delivery; OFF finishes the current initiative before stopping. Monitor and steer everything in one console. Your latest explicit direction takes priority; mission changes and steering reach discovery and active teams at safe checkpoints, and earlier queued ideas return to suggestions for reconsideration. The boss visits workers and sits on its office sofa when idle. Every hired worker, including discovery and team coordinators, keeps its visible desk avatar alongside the mobile Boss. The monitor is dedicated to Boss mode; Minesweeper has been removed. During host startup or reconnection, the console shows a connecting state until live Boss data arrives. See [Boss mode](docs/boss-mode.md).
 
-TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
+TV playback controls and the room's lighting setting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
 
 At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
 

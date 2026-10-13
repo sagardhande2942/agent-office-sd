@@ -3,6 +3,49 @@
 // browser, which plays the link itself (see client/tvscreen.ts). Same idea as the jukebox in
 // shared/jukebox.ts, with pause, seek and a link instead of a tune.
 
+/**
+ * How much of the office's own light is on: all of it, a dim warm white in between, or nothing but
+ * the picture on the TV. The switch beside the TV walks through the three for everyone on the floor,
+ * and the setting stays how it was left (see client/features/tv/lighting.ts).
+ */
+export type TvLight = 'bright' | 'dim' | 'off';
+
+/** The three settings, in the order the switch and the window list them. */
+export const TV_LIGHT_ORDER = ['bright', 'dim', 'off'] as const satisfies readonly TvLight[];
+
+/** What each one is called, everywhere it's picked: the wall switch, the TV window, the hint bar. */
+export const TV_LIGHTS: Record<TvLight, { label: string; icon: string; note: string }> = {
+  bright: { label: 'Lights up', icon: '💡', note: 'the office lit as usual' },
+  dim: { label: 'Warm dim', icon: '🕯️', note: 'lamps turned down to a warm glow — the desks, the walkways and everybody at them are all still there to see' },
+  off: { label: 'Lights out', icon: '🎬', note: "the room's own light goes out and the picture on the TV is the brightest thing in it" },
+};
+
+/** The next one along at the switch: up, dim, out, and round again. */
+export function nextTvLight(mode: TvLight): TvLight {
+  const i = TV_LIGHT_ORDER.indexOf(mode);
+  return TV_LIGHT_ORDER[(i + 1) % TV_LIGHT_ORDER.length];
+}
+
+/** The three, as a set, so checking a setting allocates nothing on the frames that check it. */
+const LIGHT_SET: ReadonlySet<string> = new Set(TV_LIGHT_ORDER);
+
+/**
+ * A setting off the wire, if it is one: anything else — an older floor that only had the boolean
+ * switch, a nonsense value, `'constructor'`, nothing at all — is left out rather than guessed at.
+ * Only the three exact strings are settings; nothing is coerced and no prototype key is one.
+ */
+export function checkTvLight(raw: unknown): TvLight | undefined {
+  return typeof raw === 'string' && LIGHT_SET.has(raw) ? (raw as TvLight) : undefined;
+}
+
+/**
+ * The setting in a state that may predate the three of them: `light` where it has one, else the
+ * older boolean switch (`true` was the lights-out mode, and is still read as it), else lit.
+ */
+export function tvLightOf(state: { light?: unknown; theatre?: unknown } | undefined): TvLight {
+  return checkTvLight(state?.light) ?? (state?.theatre === true ? 'off' : 'bright');
+}
+
 export interface TvState {
   /** Whether something is meant to be on: a link on the screen, playing or paused. */
   on: boolean;
@@ -20,12 +63,17 @@ export interface TvState {
    * Theatre mode: the room's own light is down, so the picture on the wall is the brightest thing in
    * it. The switch beside the TV turns it on and off for everyone on the floor, and it stays how it
    * was left (see client/world/theatre.ts, and the `tv.theatre` message).
+   *
+   * Optional, and read through `tvLightOf`: an office from before the three settings only ever sends
+   * this, and one that has them answers the lights-out mode with it too.
    */
-  theatre: boolean;
+  theatre?: boolean;
+  /** Which of the three settings the room's light is in. Optional for the same reason: see `theatre`. */
+  light?: TvLight;
 }
 
 /** The TV in a building with no floors, or on a floor nobody has put anything on. */
-export const TV_OFF: TvState = { on: false, playing: false, position: 0, at: 0, theatre: false };
+export const TV_OFF: TvState = { on: false, playing: false, position: 0, at: 0, theatre: false, light: 'bright' };
 
 /** How a link gets played: through YouTube's player, as a plain media file, or in an iframe. */
 export type TvKind = 'youtube' | 'media' | 'embed';

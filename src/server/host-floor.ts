@@ -21,6 +21,7 @@ import type {
   WorkerInfo,
 } from '../shared/protocol.js';
 import type { FromFloor, ToOffice } from '../shared/floorhost.js';
+import { checkTvLight } from '../shared/tv.js';
 
 /**
  * The host machine's side of the connection: a real `Floor` per floor the office asked for, and the
@@ -200,6 +201,7 @@ export class HostFloors {
         cinema: true,
         masterWorkers: true,
         lore: true, curator: true, bossMode: true,
+        lights: true,
         projectsDir: this.projectsDir,
         workers: floor.workers.list().map((w) => ({ id: w.id, status: w.status, deskId: w.deskId })),
       },
@@ -434,6 +436,10 @@ export class HostFloors {
         return await floor.tv.stop(s('by'));
       case 'tv.theatre':
         return await floor.tv.theatre(m.on === true, s('by'));
+      case 'tv.lights':
+        // Coerced here as the office does for `tv.theatre`, so the office and its host agree on what
+        // a setting is rather than the host quietly accepting something the office would not.
+        return await floor.tv.lights(checkTvLight(m.light), s('by'));
 
       case 'meeting.start':
       case 'meeting.stop':

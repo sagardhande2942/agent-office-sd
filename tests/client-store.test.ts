@@ -259,7 +259,7 @@ test('a new store starts every field where it always has', async () => {
       dog: null, dogStart: 0, jukebox: { on: false, track: JUKEBOX_TUNES[0].id, startedAt: 0, elapsed: 0, since: 0 }, clock: '<undefined>',
       whiteboard: [], drawing: [], cabinet: { player: null, scores: [] }, cabinetFrame: null, cinema: { reels: [], on: false, frame: 0, playing: false, at: 0 }, ball: {},
       cars: parked(), carsAt: [], jail: { prisoners: [], bones: 0 },
-      appearances: { config: { categories: ['original'], characters: ['naruto','pikachu','goku','mario','luigi','sonic','totoro','spongebob','luffy','doraemon','kirby','link','yoshi','stitch','baymax','shrek','batman','spider-man','deadpool','darth-vader'] }, assignments: {} }, team: null, accounts: null, signins: null, smartphone: {threads:{}, recents:[]}, helpers:[], helperStart:0, tv:{on:false,playing:false,position:0,at:0,theatre:false},
+      appearances: { config: { categories: ['original'], characters: ['naruto','pikachu','goku','mario','luigi','sonic','totoro','spongebob','luffy','doraemon','kirby','link','yoshi','stitch','baymax','shrek','batman','spider-man','deadpool','darth-vader'] }, assignments: {} }, team: null, accounts: null, signins: null, smartphone: {threads:{}, recents:[]}, helpers:[], helperStart:0, tv:{on:false,playing:false,position:0,at:0,theatre:false,light:'bright'},
     },
   );
 });
@@ -291,6 +291,25 @@ test('shared placement snapshots reset per floor and updates cannot leak across 
   s.apply(msg(update)); assert.deepEqual(s.placements.items['plant-5'], transform);
   s.apply(msg({ t: 'floor.enter', peers: [], ...floorView('f2'), placements: { map: 'office', items: {} } }));
   assert.deepEqual(s.placements.items, {});
+});
+
+test("a floor's light setting off the wire is one of the three, whatever it sent", async () => {
+  const { Store } = await import('../src/client/state/store.js');
+  const { SLICES } = await import('../src/client/state/slices/index.js');
+  const s = new Store(SLICES);
+  const tv = (state: object) => s.apply(msg({ t: 'tv', state }));
+  // The wire is the trust boundary: the plate indexes its own tables with whatever ends up here, so a
+  // nonsense setting has to be turned into a real one on the way in.
+  tv({ light: 'constructor', theatre: 'yes' });
+  assert.equal(s.tv.light, 'bright', 'a nonsense setting is left out rather than guessed at');
+  tv({ light: ['dim'] });
+  assert.equal(s.tv.light, 'bright');
+  // An office from before the three settings sends only the boolean switch, and is read as it was.
+  tv({ theatre: true });
+  assert.equal(s.tv.light, 'off');
+  // Both present: `light` wins over the older boolean.
+  tv({ light: 'dim', theatre: false });
+  assert.equal(s.tv.light, 'dim');
 });
 
 test("a slice's topics fire in its place in the list; a floor's after the message's own, bar the ones the floor hangs on", async () => {

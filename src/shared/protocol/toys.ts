@@ -1,4 +1,4 @@
-import type { TvState } from '../tv.js';
+import type { TvLight, TvState } from '../tv.js';
 import type { JukeboxSpot } from '../jukebox.js';
 // The toys on every floor: pictures, the jukebox, the arcade, the whiteboard, the ball, the cars and the dog.
 
@@ -105,4 +105,7 @@ export type TvClientMsg =
  | { t: 'tv.pause'; position?: number }
  | { t: 'tv.seek'; position: number }
  | { t: 'tv.stop' }
+ /** The switch by the TV: which of the three settings the room's light is in (see shared/tv.ts). */
+ | { t: 'tv.lights'; light: TvLight }
+ /** The older one-position switch, still answered: `on` is lights out or lights up. */
  | { t: 'tv.theatre'; on: boolean };
