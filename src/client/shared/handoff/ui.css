@@ -1,0 +1,41 @@
+/* The Handoff station window, in the 3D office and Lite alike (see ui.ts). */
+
+.handoff-station { width: min(880px, 100%); }
+.handoff-station header { flex-wrap: wrap; }
+.handoff-floor { font-size: 12px; font-weight: 800; color: var(--muted); overflow-wrap: anywhere; }
+.handoff-station select { max-width: 40%; }
+.handoff-status { font-size: 13px; font-weight: 700; color: var(--muted); margin: 0 0 10px; }
+.handoff-acceptance { border: 2px solid var(--ink); border-radius: 10px; background: var(--paper-2); padding: 10px 12px; margin-bottom: 12px; }
+.handoff-acceptance summary { cursor: pointer; font-weight: 800; }
+.handoff-acceptance p { margin: 8px 0 0; font-size: 13px; line-height: 1.5; }
+.handoff-list { display: flex; flex-direction: column; gap: 12px; }
+.handoff-packet { border: 2px solid var(--ink); border-radius: 10px; background: var(--paper); padding: 12px; }
+.handoff-packet[open] { padding-bottom: 14px; }
+.handoff-packet summary { cursor: pointer; font-weight: 800; overflow-wrap: anywhere; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.handoff-packet summary strong { flex: 1 1 240px; min-width: 0; }
+.handoff-state { display: inline-block; border-radius: 6px; padding: 3px 8px; font-size: 12px; background: #fff0bd; }
+.handoff-state[data-state="accepted"] { background: #cef5d8; }
+.handoff-state[data-state="cancelled"] { background: #e7e7e7; }
+.handoff-state[data-state="offered"] { background: #cdeafa; }
+.handoff-section { border-top: 1px solid var(--muted); margin-top: 12px; padding-top: 6px; }
+.handoff-section h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.handoff-section p { margin: 4px 0; line-height: 1.5; }
+.handoff-section .pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
+.handoff-files, .handoff-checks { margin: 4px 0; padding-left: 20px; }
+.handoff-files code, .handoff-packet-foot code { overflow-wrap: anywhere; font-size: 12px; }
+.handoff-checks li { margin-bottom: 8px; }
+.handoff-checks p { margin: 2px 0 0; font-size: 13px; }
+.handoff-check { display: inline-block; border-radius: 6px; padding: 2px 7px; margin-right: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; background: #e7e7e7; }
+.handoff-check[data-status="passed"] { background: #cef5d8; }
+.handoff-check[data-status="failed"] { background: #ffd6d6; }
+.handoff-context { font-size: 13px; overflow-wrap: anywhere; }
+.handoff-packet-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; border-top: 1px solid var(--muted); padding-top: 10px; }
+.handoff-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.handoff-error { color: var(--danger, #b00020); font-weight: 800; overflow-wrap: anywhere; }
+.handoff-station footer { font-size: 12px; line-height: 1.5; text-align: left; }
+@media (max-width: 560px) {
+  .handoff-station header { align-items: flex-start; }
+  .handoff-station header h2 { flex-basis: 100%; white-space: normal; }
+  .handoff-station select { max-width: 100%; }
+  .handoff-actions { margin-left: 0; }
+}

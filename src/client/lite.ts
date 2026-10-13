@@ -4,6 +4,7 @@ import { openMasterWorkers } from './ui/master-workers';
 import { openPlanReview } from './ui/plan-review';
 import { completionLabel } from '../shared/completion';
 import { openCommunications } from './ui/communications';
+import { openHandoffStation } from './shared/handoff/ui';
 // The 2D view (/lite): the office without the 3D, for a phone or a computer the 3D office is too
 // much for. Every worker on the floor and how it's doing, the ones waiting on someone first; its
 // terminal, with the keys a phone's keyboard hasn't got and a box to send it a prompt; and the boards
@@ -334,6 +335,7 @@ $('btn-master-workers').addEventListener('click',()=>openMasterWorkers(net,openW
 $('btn-plans').addEventListener('click',()=>openPlanReview(net,openWorker));
 $('btn-meeting').addEventListener('click', () => showMeeting());
 $('btn-messages').addEventListener('click', () => openCommunications(openWorker));
+$('btn-handoffs').addEventListener('click', () => openHandoffStation(openWorker));
 $('btn-queue').addEventListener('click', () => openQueue(net, { openTerminal: openWorker }));
 $('btn-new').addEventListener('click', () => sendToWorker('✨ New task'));
 
