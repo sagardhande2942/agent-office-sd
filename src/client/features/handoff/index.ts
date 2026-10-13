@@ -5,7 +5,7 @@ import { openHandoffStation } from '../../shared/handoff/ui';
 import { HUD_ACTIONS } from '../../ui/menu';
 
 // The handoff station: the console on the floor and the office menu's window onto it, where a worker's
-// finished-with-this-task packet is read before someone continues from it (see shared/handoff/).
+// unfinished-task packet is read before someone continues from it (see shared/handoff/).
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
 declare module '../../world/types' {

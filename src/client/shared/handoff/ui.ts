@@ -46,7 +46,7 @@ export function openHandoffStation(openWorker: (workerId: string) => void) {
   ) as HTMLSelectElement;
   const floorName = h('span.handoff-floor');
   const refresh = h('button.btn', { type: 'button', title: 'Fetch the packets again', onclick: () => void load() }, '↻ Refresh');
-  const close = h('button.btn.close', { type: 'button', 'aria-label': 'Close Handoff station', title: 'Close (Esc)' }, '✕');
+  const close = h('button.btn.close.corner', { type: 'button', 'aria-label': 'Close Handoff station', title: 'Close (Esc)' }, '✕');
   const status = h('p.handoff-status', { role: 'status', 'aria-live': 'polite' });
   const acceptance = h('details.handoff-acceptance', { open: true }, h('summary', {}, 'What accepting means here'), h('p', {}, HANDOFF_ACCEPTANCE_NOTE));
   const list = h('div.handoff-list');

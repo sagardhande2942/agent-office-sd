@@ -21,7 +21,7 @@ export const HANDOFF_EVIDENCE_NOTE =
 
 /** What reading this window can and cannot do, said next to the packets it shows. */
 export const HANDOFF_ACCEPTANCE_NOTE =
-  'Only the named recipient worker can accept a packet, through its own authenticated office tools; nothing in this window accepts one, and viewing it is a separate receipt. Acceptance records the continuation owner and timestamp: it does not move files, reset a worktree, replace or complete the source task, or apply changes. It also does not replace the recipient\'s own current task — that worker decides when to continue from it. The packet stays where the work is — read the recorded branch and worktree, reconcile current assignments at a safe checkpoint, and preserve needed commits before the source departs.';
+  'Only the named recipient worker can accept a packet, through its own authenticated office tools; nothing in this window accepts one, and viewing it does not record acceptance. Acceptance records the continuation owner and timestamp: it does not move files, reset a worktree, replace or complete the source task, or apply changes. It also does not replace the recipient\'s own current task — that worker decides when to continue from it. The work remains in the recorded source checkout — read the branch and worktree, reconcile current assignments at a safe checkpoint, and preserve needed commits before the source departs.';
 
 export function stateLabel(state: HandoffState): string {
   return HANDOFF_STATE_LABEL[state] ?? state;
