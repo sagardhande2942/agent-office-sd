@@ -25,6 +25,8 @@ function fakeClaude(dir: string) {
 test('real workers receive lore, own authenticated discoveries, broadcast handovers and preserve them on departure', { timeout: 30000 }, async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'office-worker-lore-'));
   const { command, log } = fakeClaude(dir);
+  mkdirSync(path.join(dir, '.agent-office'), { recursive: true });
+  writeFileSync(path.join(dir, '.agent-office/knowledge.json'), JSON.stringify({ legacyLore: true, reviewPolicy: 'off' }));
   const cfg = loadConfig([dir, '--password', 'worker-lore-test', '--no-open', '--agent', command]); cfg.port = 0;
   const office = await startServer(cfg);
   let ws: WebSocket | undefined;
@@ -86,6 +88,8 @@ test('floor-host workers save discoveries and completion handovers on host-local
   const sent: FromFloor[] = [];
   const hooks = await startHooks(id => host?.workersOf(id), { floorOf: id => host?.floorOf(id), changed: () => {}, publish: (floor, msg) => host?.reportWorkerFeature(floor.id, msg) });
   try {
+    mkdirSync(path.join(project, '.agent-office'), { recursive: true });
+    writeFileSync(path.join(project, '.agent-office/knowledge.json'), JSON.stringify({ legacyLore: true, reviewPolicy: 'off' }));
     host = new HostFloors(hostParts({ dataDir: path.join(dir, 'host-data'), agentCmd: command, agentArgs: [], dshProfile: 'acp' }, msg => sent.push(msg), hooks.url, 2));
     await host.open([{ id: 'hosted', name: 'Hosted', dir: project }]);
     // The host routes worker lookup through its ordinary lifecycle updates.

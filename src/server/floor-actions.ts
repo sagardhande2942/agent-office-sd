@@ -309,6 +309,7 @@ export interface FloorActions {
   readonly meetings: FloorMeetings;
   readonly tv: FloorTv;
   readonly cinema?: import('./cinema/surface.js').FloorCinema;
+  readonly knowledge?: import('./knowledge/surface.js').KnowledgeSurface;
   readonly lore?: FloorLore;
   readonly bossMode?: import('./boss-mode/surface.js').BossSurface;
   readonly curator?: import('./lore-curator/surface.js').CuratorSurface;

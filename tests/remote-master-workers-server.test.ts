@@ -28,7 +28,7 @@ test('remote mixed-provider team uses host-local worktrees, authenticated tools 
  writeFileSync(path.join(cfg.dataDir,'floors.json'),JSON.stringify([{id:'remote-team',name:'Remote team project',dir,palette:0,addedBy:'Tester',addedAt:Date.now(),host:(paired as any).host.id}]));
  const office=await startServer(cfg);let ws:WebSocket|undefined,state:TeamState|undefined;
  let host:HostFloors|undefined,hostWs:WebSocket|undefined;
- const hooks=await startHooks(id=>host?.workersOf(id),undefined,(req,res,url)=>host?.teams.hook(req,res,url,id=>host?.floorOf(id))??Promise.resolve(false));
+ const hooks=await startHooks(id=>host?.workersOf(id),{floorOf:id=>host?.floorOf(id),changed:()=>{}},(req,res,url)=>host?.teams.hook(req,res,url,id=>host?.floorOf(id))??Promise.resolve(false));
  const wait=async(check:()=>boolean)=>{const end=Date.now()+10000;while(!check()&&Date.now()<end)await new Promise(r=>setTimeout(r,20));assert.ok(check(),'condition timed out');};
  try {
   const base=`http://127.0.0.1:${(office.server.address() as any).port}`;
@@ -38,7 +38,7 @@ test('remote mixed-provider team uses host-local worktrees, authenticated tools 
   hostWs.on('open',()=>send({t:'hello',hostId:(paired as any).host.id,token:(paired as any).token,protocol:FLOORHOST_PROTOCOL}));
   hostWs.on('message',raw=>{const msg=JSON.parse(String(raw));if(msg.t==='welcome')void host!.open(msg.floors);else void host!.call(msg);});
   await wait(()=>!!host!.floors.get('remote-team')?.project);
-  const floor=host.floors.get('remote-team')!;await floor.ready;assert.ok(floor.project.agentProviders.includes('codex'));
+  const floor=host.floors.get('remote-team')!;await floor.ready;git(dir,'add','.gitignore','.agent-office/knowledge');git(dir,'-c','user.name=Test','-c','user.email=test@example.test','commit','-qm','seed knowledge');assert.ok(floor.project.agentProviders.includes('codex'));
 
   const login=await fetch(base+'/api/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:'team-test'})});assert.equal(login.status,200);
   const cookie=login.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');
@@ -83,6 +83,7 @@ test('remote mixed-provider team uses host-local worktrees, authenticated tools 
   writeFileSync(pulls,JSON.stringify([{number:1,title:'API',state:'OPEN',isDraft:false,url,headRefName:master.worktree!.branch,headRefOid:commit,baseRefName:'main',labels:[],author:{login:'tester'},body:'Verified API',statusCheckRollup:[]} ]));
   await floor.forge.pulls.refresh();
   assert.equal((await act(m,{action:'finish',pr:url,summary:'Done',checks:'Final validation passed'})).status,400,'checklist is required');
+  assert.equal((await call(m,'/office/workers/knowledge',{action:'review_done',changed:[],none_reason:'Fixture team integration; no durable project facts changed'})).status,200);
   const completion=(await call(m,'/office/workers/completion')).body;
   assert.equal((await call(m,'/office/workers/complete',{revision:completion.revision,summary:'Verified all requirements',checks:[{name:'API export',status:'passed',evidence:'Read and verified merged api.ts'}],files:['api.ts','contract.ts'],pr:url,commit})).status,200);
   const finished=await act(m,{action:'finish',pr:url,summary:'Completed API and integration',checks:'Verified merged fixture and final commit'});assert.equal(finished.status,200,JSON.stringify(finished.body));assert.equal(finished.body.current.phase,'done');assert.equal(finished.body.current.pr,url);

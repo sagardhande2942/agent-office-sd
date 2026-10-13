@@ -1,0 +1,29 @@
+.modal.knowledge-window { width: min(1100px, 96vw); height: min(850px, calc(100dvh - 32px)); }
+.knowledge-window > header { flex-shrink: 0; }
+.knowledge-window > .body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.knowledge-toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.knowledge-toolbar { flex-shrink: 0; }
+.knowledge-toolbar input { flex: 1; min-width: 160px; max-width: 100%; box-sizing: border-box; }
+.knowledge-columns { display: grid; grid-template-columns: minmax(220px, 34%) minmax(0, 1fr); flex: 1; min-height: 0; gap: 16px; }
+.knowledge-tree, .knowledge-note { overflow: auto; min-width: 0; min-height: 0; overflow-wrap: anywhere; }
+.knowledge-reviews { flex-shrink: 0; margin-bottom: 12px; font-size: 13px; }
+.knowledge-reviews[hidden] { display: none; }
+.knowledge-reviews summary { cursor: pointer; font-weight: 700; }
+.knowledge-review-list { max-height: min(150px, 20dvh); overflow: auto; overflow-wrap: anywhere; }
+.knowledge-review-list p { margin: 8px 0; }
+.knowledge-row { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 10px; border: 0; border-bottom: 1px solid #8884; text-align: left; background: transparent; color: inherit; cursor: pointer; }
+.knowledge-row:hover { background: #8882; }
+.knowledge-row small { opacity: .7; overflow-wrap: anywhere; }
+.knowledge-badge { display: inline-block; width: fit-content; border-radius: 8px; padding: 2px 7px; font-size: 11px; background: #348f6544; margin-right: 4px; }
+.knowledge-badge.needs-verification { background: #d39f3544; }
+.knowledge-badge.archived { background: #7774; }
+.knowledge-branch { font-size: 12px; opacity: .75; min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.knowledge-editor { width: min(850px, 94vw); }
+.knowledge-editor label { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.knowledge-editor textarea { font-family: monospace; }
+@media (max-width: 650px) {
+  .knowledge-columns { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) minmax(0, 2fr); gap: 12px; }
+  .knowledge-window > .body { padding: 10px; }
+  .knowledge-window .knowledge-toolbar .btn { padding: 6px 8px; font-size: 12px; }
+  .knowledge-branch { max-width: 28%; }
+}

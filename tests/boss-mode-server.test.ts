@@ -19,6 +19,7 @@ test('real Boss service dispatches ten workers, enforces roles, independently ch
   git(dir,'init','-q','-b','main');writeFileSync(path.join(dir,'README.md'),'# fixture\n');git(dir,'add','README.md');git(dir,'-c','user.name=Test','-c','user.email=test@example.test','commit','-qm','baseline');
   const cfg=loadConfig([dir,'--password','boss-test','--no-open','--agent',path.join(bin,'claude')]);cfg.port=0;
   const office=await startServer(cfg);
+  git(dir,'add','.gitignore','.agent-office/knowledge');git(dir,'-c','user.name=Test','-c','user.email=test@example.test','commit','-qm','seed knowledge');
   try {
     const floor=office.floors()[0],boss=floorBoss(floor),base='http://127.0.0.1:'+office.hookPort;
     const call=async(id:string,endpoint:string,body?:unknown)=>{
@@ -31,7 +32,7 @@ test('real Boss service dispatches ten workers, enforces roles, independently ch
     assert.equal(response.status,200,JSON.stringify(response.body));await boss.tick();await boss.tick();state=boss.state();const master=state.team!.current!.masterId!;
     const act=async(actor:string,body:Record<string,unknown>)=>{const r=(await call(master,'/office/team')).body.current;return call(actor,'/office/team',{id:r.id,revision:r.revision,...body});};
     assert.equal((await act(master,{action:'plan',plan:'Inspect ten independent areas',tasks:Array.from({length:10},(_,i)=>({id:'area-'+i,title:'Inspect area '+i,instructions:'Inspect README and report maintenance observations; research only',acceptance:'Document observed evidence',files:[],dependencies:[]}))})).status,200);
-    for(let i=0;i<10;i++)assert.equal((await act(master,{action:'dispatch',task:'area-'+i,choice:{provider:'codex',model:'gpt-5.4-mini'},reason:'Independent research assignment'})).status,200);
+    for(let i=0;i<10;i++){const result=await act(master,{action:'dispatch',task:'area-'+i,choice:{provider:'codex',model:'gpt-5.4-mini'},reason:'Independent research assignment'});assert.equal(result.status,200,JSON.stringify(result.body));}
     state=boss.state();assert.equal(state.team!.current!.workers.length,10);assert.equal(floor.workers.list().length,11);
     const worker=state.team!.current!.workers[0].workerId;
     assert.equal((await call(worker,'/office/workers/boss',{action:'focus',activity:'Claim boss authority'})).status,400);
@@ -44,6 +45,7 @@ test('real Boss service dispatches ten workers, enforces roles, independently ch
     }
     const masterDir=path.resolve(dir,floor.workers.get(master)!.worktree!.path);writeFileSync(path.join(masterDir,'inventory.md'),'# Module inventory\nVerified fixture evidence.\n');git(masterDir,'add','inventory.md');git(masterDir,'-c','user.name=Test','-c','user.email=test@example.test','commit','-qm','inventory');const head=git(masterDir,'rev-parse','HEAD'),url='https://github.com/example/fixture/pull/1';
     writeFileSync(pulls,JSON.stringify([{number:1,title:'Inventory',state:'OPEN',isDraft:false,url,headRefName:floor.workers.get(master)!.worktree!.branch,headRefOid:head,baseRefName:'main',author:{login:'tester'},labels:[],body:'Verified inventory',statusCheckRollup:[]} ]));
+    assert.equal((await call(master,'/office/workers/knowledge',{action:'review_done',changed:[],none_reason:'Fixture inventory task; no additional durable knowledge'})).status,200);
     const revision=(await call(master,'/office/workers/completion')).body.revision;
     assert.equal((await call(master,'/office/workers/complete',{revision,summary:'Inventory delivered',checks:[{name:'fixture',status:'passed',evidence:'README inspected'}],files:['inventory.md'],pr:url,commit:head})).status,200);
     const done=await act(master,{action:'finish',pr:url,summary:'Inventory delivered',checks:'Verification pending office execution'});assert.equal(done.status,200,JSON.stringify(done.body));

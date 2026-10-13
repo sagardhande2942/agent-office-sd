@@ -1,5 +1,7 @@
 # Shift Handover & Lore Shelf
 
+This is the legacy JSON store reference. New floors use the [Knowledge Tree](knowledge.md); see [migration](knowledge.md#lint-and-migration) and [architecture](knowledge-architecture.md).
+
 Back to the [README](../README.md).
 
 The **Lore Shelf** is persistent worker memory for each project floor. Coding workers receive relevant notes automatically and are instructed to record reusable discoveries themselves. The office saves a shift handover whenever a worker submits its completion checklist. You do not need to write notes or copy them into each worker's prompt.

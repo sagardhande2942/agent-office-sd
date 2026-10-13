@@ -1,3 +1,7 @@
+import { LoreStore } from './lore.js';
+import { KnowledgeCurator } from './knowledge/curator.js';
+import { loadKnowledgeConfig } from './knowledge/settings.js';
+import { LocalKnowledge } from './knowledge/surface.js';
 import { PlanReviewTable } from './plan-review.js';
 import type { CommunicationsState } from '../shared/communications.js';
 import { execFileSync } from 'node:child_process';
@@ -128,6 +132,7 @@ export function projectInfo(dir: string, name: string, agentCmd: string, agentAr
  * boards, task queue, pictures, jukebox and TV, all kept in that checkout's .agent-office folder.
  */
 export class Floor {
+  get knowledge() { return new LocalKnowledge(this.def.dir); }
   readonly id: string;
   readonly dir: string;
   readonly project: ProjectInfo;
@@ -153,8 +158,8 @@ export class Floor {
   readonly helpers: Helpers;
   /** The bookshelf: the project's Markdown files (see docs.ts). */
   readonly docs: Docs;
-  readonly lore: CuratorMemory;
-  readonly curator: LoreCurator;
+  readonly lore: LoreStore;
+  readonly curator: LoreCurator | KnowledgeCurator;
   /** Settles once the workers whose terminals outlived the last office are picked back up, and the rest woken. */
   readonly ready: Promise<void>;
   readonly dog: Dog;
@@ -185,8 +190,10 @@ export class Floor {
     excludeFromGit(def.dir);
     this.project = projectInfo(def.dir, def.name, ctx.agentCmd, ctx.agentArgs);
     this.docs = new Docs(def.dir);
-    this.lore = new CuratorMemory(dataDir);
-    this.curator = new LoreCurator(def.id, def.dir, this.lore, ctx.agentCmd, msg => ctx.emit(this, msg));
+    this.lore = loadKnowledgeConfig(def.dir).legacyLore ? new CuratorMemory(dataDir) : new LoreStore(dataDir);
+    this.curator = loadKnowledgeConfig(def.dir).legacyLore
+      ? new LoreCurator(def.id, def.dir, this.lore as CuratorMemory, ctx.agentCmd, msg => ctx.emit(this, msg))
+      : new KnowledgeCurator(def.id, def.dir, ctx.agentCmd, msg => ctx.emit(this, msg));
     // Before the workers and the dog: the back office's desks are only there once it's built.
     this.plan = new FloorPlanStore(dataDir);
     this.jail = new Jail(dataDir);

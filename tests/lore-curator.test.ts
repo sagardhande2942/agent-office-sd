@@ -8,7 +8,7 @@ import { LoreCurator } from '../src/server/lore-curator/service.js';
 import { CuratorMemory } from '../src/server/lore-curator/memory.js';
 import { nextCuratorRun } from '../src/server/lore-curator/schedule.js';
 import { repositoryEvidence } from '../src/server/lore-curator/evidence.js';
-import { createCuratorAgent, curatorSchema } from '../src/server/lore-curator/agent.js';
+import { createCuratorAgent, curatorSchema, curatorErrorDetail } from '../src/server/lore-curator/agent.js';
 import { applyActions, parseActions } from '../src/server/lore-curator/actions.js';
 import { DEFAULT_CURATOR_SETTINGS, validateCuratorSettings } from '../src/shared/lore-curator.js';
 import { selectWorkerLore } from '../src/shared/worker-lore.js';
@@ -278,4 +278,16 @@ test('completion evidence includes core validation and tests despite a reference
     assert.ok(unit.excerpt.includes('filesNote')); assert.ok(unit.excerpt.includes('assert.throws'));
     assert.ok(e.files.length <= 24); assert.ok(e.files.every(x => x.excerpt.length <= 8000));
   } finally { f.close(); }
+});
+
+test('failed background agents expose bounded diagnostics and redact credentials', async () => {
+  assert.equal(curatorErrorDetail('user\nprivate note text\nERROR: invalid request api_key=secret-value Bearer abcdef\n'), 'ERROR: invalid request api_key=[redacted] Bearer [redacted]');
+  assert.equal(curatorErrorDetail('user\nCurate notes about quota, unauthorized requests, rate limits and unsupported model errors. Batch: private knowledge\nERROR: model is unavailable\n'), 'ERROR: model is unavailable');
+  assert.equal(curatorErrorDetail('Curate notes containing invalid_request_error and authentication failed; Batch: private knowledge'), '');
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'curator-failed-agent-'));
+  try {
+    const command = path.join(dir, 'fake-agent');
+    writeFileSync(command, `#!${process.execPath}\nprocess.stdin.resume();process.stdin.on('end',()=>{console.error('ERROR: unsupported model sk-privatecredential');process.exit(1);});`, { mode: 0o755 });
+    await assert.rejects(createCuratorAgent({ codex: command })({ ...DEFAULT_CURATOR_SETTINGS, provider: 'codex' }, 'Private note', new AbortController().signal), /unsupported model \[redacted\]/);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
 });

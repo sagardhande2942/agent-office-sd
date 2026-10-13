@@ -1,10 +1,9 @@
 import type { Ctx } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
-import { knowledgeShelfNotes } from '../../../shared/lore';
 import { store } from '../../state';
 import { toast } from '../../ui/dom';
 import { HUD_ACTIONS } from '../../ui/menu';
-import { openLoreShelf } from './ui';
+import { openKnowledgeShelf } from '../knowledge/index';
 
 declare module '../../world/types' {
   interface InteractKinds {
@@ -15,7 +14,7 @@ declare module '../../world/types' {
 export function installLore(ctx: Ctx) {
   function showLoreShelf(onUseInPrompt?: (text: string) => void) {
     if (!store.floor) return toast('Take the elevator to a floor first');
-    openLoreShelf({ net: ctx.net, onUseInPrompt });
+    openKnowledgeShelf(onUseInPrompt);
   }
 
   HUD_ACTIONS.push({
@@ -30,11 +29,11 @@ export function installLore(ctx: Ctx) {
   ctx.interactions.define('lore', {
     reach: 4,
     hint: () => {
-      const count = knowledgeShelfNotes(store.lore).length;
+      const count = store.knowledge.rows.filter(n => !n.directory).length;
       return {
         k: 'lore',
         parts: [
-          hintTitle('📜 Lore Shelf'),
+          hintTitle('📜 Knowledge'),
           aside(count ? `${count} note${count === 1 ? '' : 's'}` : 'empty shelf'),
           key('E', 'Open shelf'),
         ],

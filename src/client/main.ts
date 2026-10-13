@@ -1,3 +1,4 @@
+import { installKnowledge } from './features/knowledge';
 import { installPerformance } from './features/performance';
 import { installObjectPlacement } from './features/object-placement';
 import { installTopdown, isTopdownRoute } from './features/topdown';
@@ -174,6 +175,7 @@ parts.meeting = installMeeting(ctx, parts);
 parts.smartphone = installSmartphone(ctx, parts);
 parts.boss = installBossMode(ctx, parts);
 parts.bookshelf = installBookshelf(ctx);
+installKnowledge(ctx);
 installLore(ctx);
 installLoreCurator(ctx);
 installHerald(ctx, parts);
