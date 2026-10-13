@@ -14,6 +14,9 @@ import { loadKnowledgeConfig } from './settings.js';
 import { applyKnowledgeActions, curationBatch, parseKnowledgeActions, type CurationInput } from './curation.js';
 import { lintKnowledge } from './lint.js';
 interface CuratorDisk { settings: CuratorSettings; nextRunAt?: number; retryAt?: number; eventAt?: number; failures: number; runs: CuratorRun[]; cursor?: number }
+export function curatorGitArgs(args: string[]) {
+  return ['-c', 'user.name=Agent Office', '-c', 'user.email=agent-office@localhost', '-c', 'commit.gpgSign=false', ...args];
+}
 export function knowledgeCuratorSchema(notes: CurationInput[], destinations: string[], evidencePaths: string[]) {
   const pathProperty = { enum: notes.map(n => n.path) };
   const targetProperty = { enum: [...notes.filter(n => !n.handover).map(n => n.path), ...destinations] };
@@ -66,7 +69,7 @@ export class KnowledgeCurator {
     const signature = JSON.stringify(worker.completion); if (this.completions.get(worker.id) === signature) return;
     this.completions.set(worker.id, signature); if (this.disk.settings.afterCompletion) { this.disk.eventAt = Date.now() + 30000; this.save(); }
   }, remove: worker => { this.completions.delete(worker.id); } }; }
-  private git(args: string[], cwd = this.checkout) { return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 }).trim(); }
+  private git(args: string[], cwd = this.checkout) { return execFileSync('git', curatorGitArgs(args), { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 }).trim(); }
   async tick() {
     const now = Date.now(); const s = this.disk.settings;
     if (this.controller || !s.enabled || s.paused || this.disk.retryAt && this.disk.retryAt > now) return;

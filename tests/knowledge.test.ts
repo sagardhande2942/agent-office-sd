@@ -12,7 +12,7 @@ import { parseKnowledgeIndex, parseKnowledgeNote, serializeKnowledgeIndex } from
 import { knowledgeBootstrapContext, scoreKnowledgeHint } from '../src/shared/worker-knowledge.js';
 import { knowledgeReviewGate, writeHandover, knowledgeMrSection } from '../src/server/knowledge/worker.js';
 import { parseKnowledgeActions, applyKnowledgeActions, curationBatch } from '../src/server/knowledge/curation.js';
-import { knowledgeCuratorSchema } from '../src/server/knowledge/curator.js';
+import { curatorGitArgs, knowledgeCuratorSchema } from '../src/server/knowledge/curator.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
 import type { CompletionReport } from '../src/shared/completion.js';
 function fixture(t: { after(fn: () => void): void }) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'knowledge-test-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); const store = new KnowledgeStore(dir); store.seed(); return store; }
@@ -133,6 +133,14 @@ test('curator schema uses strict action variants accepted by structured output',
   const split = variants.find((v: any) => v.properties.action.const === 'split');
   assert.equal(split.properties.parts.items.additionalProperties, false);
   assert.deepEqual(split.properties.parts.items.required, Object.keys(split.properties.parts.items.properties));
+});
+
+test('curator commits use a scoped identity when git has no user config', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'knowledge-curator-git-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: path.join(dir, 'missing-global-config'), GIT_CONFIG_NOSYSTEM: '1' };
+  const git = (args: string[]) => execFileSync('git', curatorGitArgs(args), { cwd: dir, env, encoding: 'utf8' }).trim();
+  git(['init', '-b', 'main']); fs.writeFileSync(path.join(dir, 'note.md'), 'Knowledge\n'); git(['add', 'note.md']); git(['commit', '-m', 'knowledge: curate project tree']);
+  assert.equal(git(['log', '-1', '--format=%an <%ae>']), 'Agent Office <agent-office@localhost>');
 });
 
 test('migration preserves a matching legacy curator overlay', t => {
