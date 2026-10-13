@@ -5,6 +5,7 @@ import { lintKnowledge } from './lint.js';
 export interface CurationInput { path: string; frontmatter: KnowledgeFrontmatter; body: string; version: string; handover?: boolean }
 export interface KnowledgeAction { action: 'merge' | 'split' | 'move' | 'archive' | 'flag-needs-verification' | 'verify' | 'rewrite-summary' | 'fix-index' | 'promote-handover'; path: string; target?: string; reason: string; summary?: string; body?: string; title?: string; evidence?: string[]; parts?: { path: string; title: string; summary: string; body: string }[] }
 export class OverlappingKnowledgeActions extends Error {}
+export function humanVerified(note: CurationInput) { return note.frontmatter.status === 'active' && !!(note.frontmatter.human_verified_by || note.frontmatter.author?.startsWith('human:')); }
 export function parseKnowledgeActions(value: unknown, batch: CurationInput[], destinations: string[], evidencePaths: string[] = []): { summary: string; actions: KnowledgeAction[] } {
   if (!value || typeof value !== 'object') throw Error('Expected a curator object');
   const v = value as { summary: string; actions: KnowledgeAction[] };
@@ -12,7 +13,8 @@ export function parseKnowledgeActions(value: unknown, batch: CurationInput[], de
   const paths = new Map(batch.map(n => [n.path, n])); const allowed = new Set(destinations); const used = new Set<string>();
   for (const action of v.actions) {
     if (!action || !['merge', 'split', 'move', 'archive', 'flag-needs-verification', 'verify', 'rewrite-summary', 'fix-index', 'promote-handover'].includes(action.action) || !paths.has(action.path) || typeof action.reason !== 'string' || !action.reason.trim()) throw Error('Curator action must address an exact supplied path');
-    if (Object.keys(action).some(k => !['action', 'path', 'target', 'reason', 'summary', 'body', 'title', 'parts', 'evidence'].includes(k))) throw Error('Unknown curator action field');
+    if (Object.keys(action).some(k => !['action', 'path', 'target', 'reason', 'summary', 'body', 'title', 'parts', 'evidence', 'contradiction'].includes(k))) throw Error('Unknown curator action field');
+    if (action.action === 'flag-needs-verification' && humanVerified(paths.get(action.path)!) && (!action.evidence?.length || typeof (action as KnowledgeAction & { contradiction?: string }).contradiction !== 'string' || !(action as KnowledgeAction & { contradiction?: string }).contradiction?.trim())) throw Error('Human-verified notes require cited contradictory evidence to propose a downgrade');
     if (paths.get(action.path)!.handover && action.action !== 'promote-handover') throw Error('Handovers are read-only promotion inputs');
     if (!paths.get(action.path)!.handover && action.action === 'promote-handover') throw Error('Promotion needs a handover');
     if (['merge', 'move', 'promote-handover'].includes(action.action) && (typeof action.target !== 'string' || action.target === action.path || !(action.action === 'merge' ? paths.has(action.target) && !paths.get(action.target)!.handover : allowed.has(action.target)))) throw Error('Target is outside supplied paths');

@@ -595,6 +595,8 @@ If a curator plan contains conflicting actions on the same note, it gets one cor
 
 Curator failures display explicit CLI error diagnostics without including echoed knowledge prompts.
 
+Human-verified active notes are preserved when curator evidence is incomplete. A downgrade proposal must cite contradictory repository evidence and explain the contradiction before review.
+
 Knowledge publication accepts HTTPS and SSH GitHub/GitLab origins with a `.git` suffix. Failed publication retains its proposal branch for recovery; see [Knowledge Tree](docs/knowledge.md).
 
 Curator failures show bounded, credential-redacted CLI diagnostics and the model used by the run. If a provider request fails intermittently, retry Run now; a failed proposal remains available for inspection.

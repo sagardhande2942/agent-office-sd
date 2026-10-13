@@ -157,6 +157,8 @@ export class KnowledgeStore {
     if (typeof body !== 'string' || !frontmatter || typeof frontmatter !== 'object') throw Error('Send frontmatter and Markdown body');
     const existing = fs.existsSync(file) ? parseKnowledgeNote(fs.readFileSync(file, 'utf8')).frontmatter : {};
     const draft = { ...existing, ...frontmatter, author, updated: new Date().toISOString().slice(0, 10) };
+    const prior = existing as Partial<KnowledgeFrontmatter>;
+    draft.human_verified_by = author.startsWith('human:') && draft.status === 'active' ? author : prior.human_verified_by ?? (prior.status === 'active' && prior.author?.startsWith('human:') ? prior.author : undefined);
     for (const values of [draft.tags, draft.paths, draft.sources]) if (values?.some(v => /[\r\n]/.test(v))) throw Error('Metadata arrays must contain single-line values');
     if (draft.tags?.some(tag => !/^[a-zA-Z0-9_-]+$/.test(tag))) throw Error('Tags use letters, digits, underscores and hyphens');
     if (draft.summary && /\[(?:tags:|status:|pinned\])/.test(draft.summary)) throw Error('Keep lifecycle markers in frontmatter, not the summary');

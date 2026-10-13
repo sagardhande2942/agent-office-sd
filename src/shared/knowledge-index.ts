@@ -2,7 +2,7 @@
 export type KnowledgeStatus = 'active' | 'needs-verification' | 'archived';
 export interface KnowledgeFrontmatter {
   title: string; summary: string; tags?: string[]; status?: KnowledgeStatus; pinned?: boolean;
-  paths?: string[]; sources?: string[]; author?: string; updated?: string; verified_at?: string;
+  paths?: string[]; sources?: string[]; author?: string; updated?: string; verified_at?: string; human_verified_by?: string;
 }
 export interface KnowledgeEntry { path: string; summary: string; tags?: string[]; status?: KnowledgeStatus; pinned?: boolean }
 export interface KnowledgeIndex { prose: string; entries: KnowledgeEntry[]; archived: KnowledgeEntry[] }
@@ -31,7 +31,7 @@ export function parseKnowledgeNote(text: string): { frontmatter: KnowledgeFrontm
   if (fields.status !== undefined && !['active', 'needs-verification', 'archived'].includes(String(fields.status))) throw Error('Invalid knowledge status');
   for (const field of ['tags', 'paths', 'sources']) if (fields[field] !== undefined && (!Array.isArray(fields[field]) || (fields[field] as unknown[]).some(v => typeof v !== 'string'))) throw Error(`${field} must be a string array`);
   if (fields.pinned !== undefined && typeof fields.pinned !== 'boolean') throw Error('pinned must be boolean');
-  for (const field of ['author', 'updated', 'verified_at']) if (fields[field] !== undefined && typeof fields[field] !== 'string') throw Error(`${field} must be a string`);
+  for (const field of ['author', 'updated', 'verified_at', 'human_verified_by']) if (fields[field] !== undefined && typeof fields[field] !== 'string') throw Error(`${field} must be a string`);
   return { frontmatter: { ...fields, status: fields.status ?? 'active' } as unknown as KnowledgeFrontmatter, body };
 }
 export function serializeFrontmatter(fields: Record<string, unknown>, body: string): string {

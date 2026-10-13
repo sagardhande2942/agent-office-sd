@@ -12,6 +12,8 @@ Review history is collapsed into a status summary above the tree. Expand **Revie
 
 Curator plans must use each source, merge target and split destination in at most one action. If the agent returns overlapping actions, the host sends the conflicting paths back for one complete replacement plan before making any edits. A second conflict fails the run and retains its review branch; choose one operation per note and defer additional cleanup to a later run. Other validation failures and provider errors do not trigger this correction attempt.
 
+Saving an active note through the shelf records `human_verified_by`. Existing active notes with a `human:` author are also treated as human-verified. Curation preserves that verification when repository excerpts are missing or incomplete. A proposed downgrade requires cited repository evidence plus a concrete `contradiction`; it still needs PR review and synchronization. Changes to referenced files alone do not automatically flag human-verified active notes.
+
 ![Knowledge shelf with lifecycle badges](knowledge-evidence/knowledge-shelf.png)
 
 The branch label identifies the floor checkout. All workers, including workers with separate code worktrees, read and edit this shared tree immediately. Each note read returns a `version`. Editing, moving, archiving or deleting an existing note requires that version as `expectedVersion`; a new note uses `null`. Stale edits are rejected so the writer can reread and reconcile both changes. File mutations are serialized across processes. A process crash can leave `_meta/state/write.lock`; after confirming no host/CLI is writing, remove that empty lock directory and retry.

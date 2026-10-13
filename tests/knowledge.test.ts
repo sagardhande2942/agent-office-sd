@@ -161,3 +161,28 @@ test('migration preserves a matching legacy curator overlay', t => {
   assert.equal(imported.frontmatter?.status, 'archived'); assert.deepEqual(imported.frontmatter?.sources, ['PR 123']);
   assert.match(store.read(imported.path).text, /Curated body/);
 });
+
+test('every curator enum and const declares its JSON type', () => {
+  const schema = knowledgeCuratorSchema([{ path: 'a.md', frontmatter, body: '', version: '' }], ['b.md'], []);
+  const visit = (value: any) => {
+    if (!value || typeof value !== 'object') return;
+    if ('enum' in value || 'const' in value) assert.equal(value.type, 'string');
+    Object.values(value).forEach(visit);
+  };
+  visit(schema);
+});
+test('human approval persists through edits and protects against unsupported curator flags', t => {
+  const store = fixture(t);
+  store.write('project/human.md', { ...frontmatter, status: 'active' }, 'Checked fact', 'human:tester');
+  const note = store.read('project/human.md');
+  store.write('project/human.md', {}, 'Checked fact', 'worker:ada', note.version);
+  const batch = curationBatch(store, 20);
+  const approved = batch.find(n => n.path === 'project/human.md')!;
+  assert.equal(approved.frontmatter.human_verified_by, 'human:tester');
+  const flag = { action: 'flag-needs-verification', path: approved.path, reason: 'Evidence incomplete' };
+  assert.throws(() => parseKnowledgeActions({ summary: '', actions: [flag] }, batch, [], ['src/a.ts']), /contradictory evidence/);
+  assert.throws(() => parseKnowledgeActions({ summary: '', actions: [{ ...flag, evidence: ['src/a.ts'] }] }, batch, [], ['src/a.ts']), /contradictory evidence/);
+  assert.equal(parseKnowledgeActions({ summary: '', actions: [{ ...flag, evidence: ['src/a.ts'], contradiction: 'The cited implementation contradicts the documented command.' }] }, batch, [], ['src/a.ts']).actions.length, 1);
+  const legacy = { ...approved, frontmatter: { ...frontmatter, status: 'active' as const, author: 'human:legacy' } };
+  assert.throws(() => parseKnowledgeActions({ summary: '', actions: [flag] }, [legacy], []), /contradictory evidence/);
+});

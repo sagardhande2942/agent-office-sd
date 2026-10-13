@@ -11,7 +11,7 @@ import { nextCuratorRun } from '../lore-curator/schedule.js';
 import { KnowledgeStore } from './store.js';
 import { prepareKnowledgeDelivery, finishKnowledgeDelivery, failKnowledgeDelivery, proposeKnowledgeRevert } from './delivery.js';
 import { loadKnowledgeConfig } from './settings.js';
-import { applyKnowledgeActions, curationBatch, type CurationInput } from './curation.js';
+import { applyKnowledgeActions, curationBatch, humanVerified, type CurationInput } from './curation.js';
 import { requestKnowledgePlan } from './curator-plan.js';
 import { lintKnowledge } from './lint.js';
 interface CuratorDisk { settings: CuratorSettings; nextRunAt?: number; retryAt?: number; eventAt?: number; failures: number; runs: CuratorRun[]; cursor?: number }
@@ -19,21 +19,21 @@ export function curatorGitArgs(args: string[]) {
   return ['-c', 'user.name=Agent Office', '-c', 'user.email=agent-office@localhost', '-c', 'commit.gpgSign=false', ...args];
 }
 export function knowledgeCuratorSchema(notes: CurationInput[], destinations: string[], evidencePaths: string[]) {
-  const pathProperty = { enum: notes.map(n => n.path) };
-  const targetProperty = { enum: [...notes.filter(n => !n.handover).map(n => n.path), ...destinations] };
+  const pathProperty = { type: 'string', enum: notes.map(n => n.path) };
+  const targetProperty = { type: 'string', enum: [...notes.filter(n => !n.handover).map(n => n.path), ...destinations] };
   const evidenceProperty = { type: 'array', maxItems: Math.min(8, evidencePaths.length), items: { type: 'string', ...(evidencePaths.length ? { enum: evidencePaths } : {}) } };
   const action = (name: string, properties: Record<string, unknown> = {}) => ({
     type: 'object', additionalProperties: false, required: ['action', 'path', 'reason', 'evidence', ...Object.keys(properties)],
-    properties: { action: { const: name }, path: pathProperty, reason: { type: 'string' }, evidence: evidenceProperty, ...properties },
+    properties: { action: { type: 'string', const: name }, path: pathProperty, reason: { type: 'string' }, evidence: evidenceProperty, ...properties },
   });
   const target = { target: targetProperty };
   return { type: 'object', additionalProperties: false, required: ['summary', 'actions'], properties: {
     summary: { type: 'string' }, actions: { type: 'array', maxItems: notes.length, items: { anyOf: [
-      action('merge', target), action('move', target), action('archive'), action('flag-needs-verification'),
+      action('merge', target), action('move', target), action('archive'), action('flag-needs-verification', { contradiction: { type: 'string' } }),
       action('verify'), action('rewrite-summary', { summary: { type: 'string' } }), action('fix-index'),
       action('promote-handover', { ...target, title: { type: 'string' }, summary: { type: 'string' }, body: { type: 'string' } }),
       action('split', { parts: { type: 'array', minItems: 2, maxItems: 4, items: { type: 'object', additionalProperties: false,
-        required: ['path', 'title', 'summary', 'body'], properties: { path: { enum: destinations }, title: { type: 'string' }, summary: { type: 'string' }, body: { type: 'string' } } } } }),
+        required: ['path', 'title', 'summary', 'body'], properties: { path: { type: 'string', enum: destinations }, title: { type: 'string' }, summary: { type: 'string' }, body: { type: 'string' } } } } }),
     ] } },
   } };
 }
@@ -105,7 +105,7 @@ export class KnowledgeCurator {
         const body = note.body.trim().replace(/\r\n/g, '\n'); const target = seen.get(body);
         if (target && !used.has(target)) { deterministic.push({ action: 'merge', path: note.path, target, reason: 'Identical Markdown content' }); used.add(note.path); used.add(target); }
         else if (!target) seen.set(body, note.path);
-        if (!used.has(note.path) && note.frontmatter.verified_at && note.frontmatter.paths?.length) {
+        if (!used.has(note.path) && !humanVerified(note) && note.frontmatter.verified_at && note.frontmatter.paths?.length) {
           try { if (this.git(['diff', '--name-only', note.frontmatter.verified_at, 'HEAD', '--', ...note.frontmatter.paths], worktree)) { deterministic.push({ action: 'flag-needs-verification', path: note.path, reason: 'Referenced files changed since verified_at' }); used.add(note.path); } } catch { /* unknown historical revision is left for model review */ }
         }
       }
