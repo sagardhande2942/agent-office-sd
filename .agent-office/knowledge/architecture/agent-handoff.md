@@ -1,9 +1,9 @@
 ---
 title: "Durable worker handoff packets"
 summary: "Handoff packets separate explicit recipient acceptance from tracked inbox receipts and retain worker-reported continuation evidence."
-author: "worker:f9f981a74389"
+author: "curator"
 updated: "2026-10-13"
-status: "active"
+status: "needs-verification"
 ---
 The Handoff station is an independent feature in the office and Lite. Service, CLI/MCP and client implementations are integrated on `feat/agent-handoff-station`.
 
