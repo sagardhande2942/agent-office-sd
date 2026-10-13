@@ -82,8 +82,10 @@ All three from one spot in the lounge, looking north-east over the desks at the 
 | 💡 Lights up | 🕯️ Warm dim | 🎬 Lights out |
 
 `npm run e2e:tv-lights` takes those three pictures and measures them, so the middle one can't quietly
-become too dark or too cold: the wall's own pixels come out at 175 / 98 / 19 across the three, and
-the warm dim is measurably warmer than lights up (r/b 2.09 against 1.48).
+become too dark or too cold: on one run the wall's own pixels came out at 183 / 98 / 19 across the
+three, and the warm dim was measurably warmer than lights up (r/b 2.27 against 1.53). The numbers
+move a little from run to run; the orderings — each setting darker than the one before it, the middle
+one warmer than lights up — are what the check holds to.
 
 The room comes down over about a second, the way a dimmer does. The switch's own rocker has a
 resting angle for each setting — up, level, down — with a little lamp that lights in its colour and
@@ -123,7 +125,7 @@ Two details make it a dimmer rather than a multiplier that drifts:
   says how much of the room is left is `down`. Without that, a warm room is also a darker room and
   the two effects can't be reasoned about separately.
 - **Every frame is worked out from the setting asked for**, never multiplied onto what the last frame
-  left (`roomLevel`). Throw the switch as often as you like: coming back to **Lights up** restores
+  left (`levelFor`). Throw the switch as often as you like: coming back to **Lights up** restores
   exactly `(1, 1, 1)`, not a little less each time.
 
 The light the screen throws on the wall round it is a soft additive patch just off the wall
@@ -255,7 +257,7 @@ the bezel (the frame's own `overflow: hidden` takes it back off).
 
 ## The state, and where it lives
 
-Four messages, all floor-wide, all validated server-side (`src/server/tv.ts`):
+Six messages, all floor-wide, all validated server-side (`src/server/tv.ts`):
 
 | You do | Message | What it means |
 | --- | --- | --- |
@@ -275,10 +277,10 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
 | File | Piece |
 | --- | --- |
 | `src/shared/tv.ts` | `TvState` (with `light` and the older `theatre`), `TvLight` / `TV_LIGHTS` / `nextTvLight` / `checkTvLight` / `tvLightOf`, `checkTvUrl`, `classify` (YouTube / media / embed), `youtubeId`, `embedUrl`, `startSeconds` (reading `t=`/`start=`), `positionAt` — one source of truth for client and server |
-| `src/server/tv.ts` | `class Tv`: the five operations above, `tv.json` kept with mode `0o600`, like `Jukebox` |
+| `src/server/tv.ts` | `class Tv`: the six operations above, `tv.json` kept with mode `0o600`, like `Jukebox` |
 | `src/server/floor.ts` | `Floor.tv`, one per floor's checkout |
 | `src/server/server.ts` | The `tv.*` cases in the message router, `tvChanged` to the floor, `tv:` in `floorView()` |
-| `src/shared/protocol.ts` | The five messages, `{ t: 'tv', state }` and `FloorView.tv` |
+| `src/shared/protocol.ts` | The six messages, `{ t: 'tv', state }` and `FloorView.tv` |
 | `src/client/state.ts` | The `tv` topic, `store.tv`, `enter()` and `apply()` |
 | `src/client/tvscreen.ts` | The link: what to load for it, keeping every player in step, and your own speakers |
 | `src/client/tv-siting.ts` | The picture's half: the layer, the per-frame projection onto the TV, the mask of what's in front of it, and how drunk the picture is |
@@ -293,7 +295,8 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
 | `tests/tv-light.test.ts` | The three settings as three amounts of light, the middle one dim enough and warm enough to see by, the tint costing no brightness, and the lights coming back exactly |
 | `tests/tv-mask.test.ts` | The mask: the slab test against the long way round, the cells lying where the screen does, what does and doesn't hide the picture, and the frame wearing a mask only while it has to |
 | `tests/drunkframe.test.ts` | How much drink puts the filter on the picture, and the numbers the shader's own lines give |
-| `src/client/world/sky.ts` | `setRoomLight` and the `skyRoom` colour in the shader, `ROOM_DIM` / `ROOM_WARM` / `roomLevel`, `indoors` for the halos |
+| `src/client/world/room-light.ts` | The room's own light as numbers: `ROOM_DIM`, the warm `ROOM_WARM` (normalised by `luma`), `levelFor`, and the one `roomColor` expression the shader input and the tests both use |
+| `src/client/world/sky.ts` | `setRoomLight` and the `skyRoom` colour in the shader, `indoors` for the halos |
 | `src/client/world/theatre.ts` | `buildTheatre`: the switch on the wall, its rocker, lamp and setting sign, and the light off the screen |
 
 ## Controls

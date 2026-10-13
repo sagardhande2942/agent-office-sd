@@ -1,4 +1,4 @@
-import { TV_LIGHT_ORDER, TV_LIGHTS, nextTvLight, tvLightOf, type TvLight } from '../../../shared/tv';
+import { TV_LIGHT_ORDER, TV_LIGHTS, checkTvLight, nextTvLight, tvLightOf, type TvLight } from '../../../shared/tv';
 import { hintTitle, key } from '../../core/hint';
 import { h } from '../../ui/dom';
 
@@ -20,9 +20,13 @@ export const ROOM_LIGHT: Record<TvLight, { down: number; warm: number }> = {
   off: { down: 1, warm: 0 },
 };
 
-/** What the sky is asked for: the setting, or the room as usual when you aren't on this floor. */
+/**
+ * What the sky is asked for: the setting, or the room as usual when you aren't on this floor. Guarded
+ * here as well as at the state slice, so a table lookup can never land on `undefined` — `ROOM_LIGHT`
+ * is indexed with whatever the floor's state says.
+ */
 export function roomLightFor(mode: TvLight, inOffice: boolean): { down: number; warm: number } {
-  return inOffice ? ROOM_LIGHT[mode] : ROOM_LIGHT.bright;
+  return inOffice ? (ROOM_LIGHT[checkTvLight(mode) ?? 'bright'] ?? ROOM_LIGHT.bright) : ROOM_LIGHT.bright;
 }
 
 /** What the setting is called, with its icon, for the window and anything else that names it. */
@@ -39,32 +43,34 @@ export const lightHint = (mode: TvLight) => ({
 
 /**
  * The three settings as a row of buttons, for the TV window — the same switch as the plate on the
- * wall, for anyone on the couch rather than standing at it. `paint` redraws it, since the row follows
- * the floor's setting rather than anybody's own.
+ * wall, for anyone on the couch rather than standing at it. The buttons are built once and `paint`
+ * only flips which is checked, so repainting as the floor's setting changes never drops the keyboard
+ * focus somebody is arrowing round the group with.
  */
 export function lightRow(get: () => TvLight, set: (mode: TvLight) => void): { el: HTMLElement; paint(): void } {
-  const el = h('div.seg', { role: 'radiogroup', 'aria-label': "The room's light" });
+  const buttons = TV_LIGHT_ORDER.map((mode) =>
+    h(
+      'button.btn',
+      {
+        type: 'button',
+        role: 'radio',
+        title: TV_LIGHTS[mode].note,
+        // Just the send: the store drives the paint when the floor's setting lands, so there is no
+        // rebuild here that would show the old setting a moment longer anyway.
+        onclick: () => {
+          if (get() !== mode) set(mode);
+        },
+      },
+      lightName(mode),
+    ),
+  );
   const paint = () =>
-    el.replaceChildren(
-      ...TV_LIGHT_ORDER.map((mode) =>
-        h(
-          'button.btn',
-          {
-            type: 'button',
-            role: 'radio',
-            title: TV_LIGHTS[mode].note,
-            'aria-checked': String(get() === mode),
-            class: get() === mode ? 'on' : '',
-            onclick: () => {
-              if (get() === mode) return;
-              set(mode);
-              paint();
-            },
-          },
-          lightName(mode),
-        ),
-      ),
-    );
+    buttons.forEach((b, i) => {
+      const on = get() === TV_LIGHT_ORDER[i];
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', String(on));
+    });
+  const el = h('div.seg', { role: 'radiogroup', 'aria-label': "The room's light" }, ...buttons);
   paint();
   return { el, paint };
 }

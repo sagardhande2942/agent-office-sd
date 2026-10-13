@@ -26,5 +26,5 @@ export const forkHandlers = {
   'tv.seek'(ctx: Ctx, c: Client, msg: Extract<ClientMsg, {t:'tv.seek'}>) { void ctx.floorOf(c)?.tv.seek(num(msg.position),c.peer.name); },
   'tv.stop'(ctx: Ctx, c: Client) { void ctx.floorOf(c)?.tv.stop(c.peer.name); },
   'tv.theatre'(ctx: Ctx, c: Client, msg: Extract<ClientMsg, {t:'tv.theatre'}>) { void ctx.floorOf(c)?.tv.theatre(msg.on === true,c.peer.name); },
-  'tv.lights'(ctx: Ctx, c: Client, msg: Extract<ClientMsg, {t:'tv.lights'}>) { void ctx.floorOf(c)?.tv.lights(msg.light,c.peer.name); },
+  'tv.lights'(ctx: Ctx, c: Client, msg: Extract<ClientMsg, {t:'tv.lights'}>) { void Promise.resolve(ctx.floorOf(c)?.tv.lights(msg.light,c.peer.name)).then(r => { if (typeof r === 'string') ctx.warn(c, r); }); },
 };

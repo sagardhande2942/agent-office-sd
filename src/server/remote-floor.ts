@@ -9,7 +9,7 @@ import type { BallState } from '../shared/hoop.js';
 import type { CarPose, CarState } from '../shared/garage.js';
 import type { Decoration } from '../shared/decor.js';
 import type { JukeboxSpot, JukeboxState } from '../shared/jukebox.js';
-import { tvTitle, TV_OFF, type TvState } from '../shared/tv.js';
+import { checkTvLight, tvTitle, TV_OFF, type TvState } from '../shared/tv.js';
 import type { DeskLabel, FloorPlan } from '../shared/floorplan.js';
 import { EMPTY_PLAN } from '../shared/floorplan.js';
 import type { Landed } from './leave-on-merge.js';
@@ -104,7 +104,7 @@ export class RemoteFloor implements FloorActions {
     /** The floor's identity, as the host announced it. Named so refusals and the elevator can use it. */
     readonly def: { id: string; name: string; dir: string; repo?: string; palette: number; addedBy: string; addedAt: number },
     /** What the host's `ready` frame said, kept here so the office can describe the floor it is in. */
-    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean; cinema?: boolean; masterWorkers?: boolean; lore?: boolean; curator?: boolean; bossMode?: boolean } = { providers: [], forge: 'github' },
+    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean; cinema?: boolean; masterWorkers?: boolean; lore?: boolean; curator?: boolean; bossMode?: boolean; lights?: boolean } = { providers: [], forge: 'github' },
   ) {
     // The office keeps this for identity, and must never use it: it is a path on the host.
     this.dir = '';
@@ -198,7 +198,7 @@ export class RemoteFloor implements FloorActions {
       // The same frame is where the host says which branch it is on and which agents it has, which is
       // what `project` and `officeDefault` answer from. Recorded here rather than in the constructor,
       // because the office registers a hosted floor from the building long before its machine pairs.
-      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true, cinema: msg.floor.cinema === true, masterWorkers: msg.floor.masterWorkers === true, lore: msg.floor.lore === true, curator: msg.floor.curator === true, bossMode: msg.floor.bossMode === true };
+      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true, cinema: msg.floor.cinema === true, masterWorkers: msg.floor.masterWorkers === true, lore: msg.floor.lore === true, curator: msg.floor.curator === true, bossMode: msg.floor.bossMode === true, lights: msg.floor.lights === true };
       return;
     }
     // An unaddressed refusal (no floor) is about the connection, not a call, so it never settles one.
@@ -485,7 +485,17 @@ export class RemoteFloor implements FloorActions {
       pause: async (position, by) => Boolean(await remote.call('tv.pause', { position, by })),
       seek: async (position, by) => Boolean(await remote.call('tv.seek', { position, by })),
       stop: async (by) => Boolean(await remote.call('tv.stop', { by })),
-      lights: async (light, by) => (await remote.call('tv.lights', { light, by })) === true,
+      // A host from before the three settings has only the older one-position switch, and it still
+      // answers: only lights-out is ever asked of it, since it has nothing in between, so a request
+      // for the warm dim leaves its lights up rather than plunging the room dark. A host that can do
+      // neither is named rather than left silently unlit — the office passes this string on as a toast.
+      lights: async (light, by) => {
+        const mode = checkTvLight(light);
+        if (!mode) return false;
+        if (remote.announced.lights) return (await remote.call('tv.lights', { light: mode, by })) === true;
+        const old = await remote.call('tv.theatre', { on: mode === 'off', by });
+        return typeof old === 'boolean' ? old : "Update the floor host to support the room's three light settings";
+      },
       theatre: async (on, by) => Boolean(await remote.call('tv.theatre', { on, by })),
       // Read from the `tv` event the host emits as its state changes — the same state a local floor
       // derives its title from, so there is nothing to ask the host for.

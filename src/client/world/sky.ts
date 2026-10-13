@@ -7,6 +7,10 @@ import { FLOOR, SLAB, STREET_Y, WALL_HEIGHT, WALL_T, WING, wingMinZ } from '../.
 import type { SkyState, Theme, Weather } from '../../shared/protocol';
 import { guessPlace, skyNow, sunPosition } from '../../shared/sun';
 import type { NightParts } from './outside';
+// The room's own light — how far down and how warm, and the colour that gives the shader — is its own
+// small module, re-exported here so the sky stays the one place the rest of the office reads it from.
+import { levelFor, roomColor } from './room-light';
+export * from './room-light';
 
 /*
  * Day, night and the weather outside the windows. The server says where the office is and what the
@@ -23,34 +27,8 @@ import type { NightParts } from './outside';
 
 export const MAX_LAMPS = 24;
 export const DEG = Math.PI / 180;
-/**
- * How much of the room's own light the switch by the TV takes away at full (see `roomLevel`): enough
- * that the picture on the TV is clearly the brightest thing in the office, and the people in it are
- * lit by it, but a shape by the window is still a shape and not a hole in the dark. The middle
- * setting asks for part of it, and warms what's left towards ROOM_WARM.
- */
-export const ROOM_DIM = 0.84;
-/** The room's own light with nothing asked of it: every colour the same, and every one of them full. */
-export const ROOM_LIT = new THREE.Color(1, 1, 1);
-/**
- * The warm white the room's own light goes in the middle setting: a lamp turned down, not a blue
- * screen, and only a shade off white so it reads as warmth rather than as an orange room. Normalised
- * to its own brightness (see `luma`), so the tint costs no light of its own and ROOM_DIM is the only
- * thing that says how much of the room is left.
- */
-export const ROOM_WARM = new THREE.Color('#fff0e4');
-/** How much light a linear colour has, the way the eye weighs it. */
-export const luma = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
-ROOM_WARM.multiplyScalar(1 / luma(ROOM_WARM.r, ROOM_WARM.g, ROOM_WARM.b));
-
-/**
- * How much of the room's light is left with `down` (0–1) of it gone: what the shader's `skyRoom`
- * scales by, and the one number the halos and your own hands are given, so the two can't drift apart.
- *
- * Worked out from the setting asked for rather than off what the last frame left, which is what lets
- * the office's lights come back exactly as they were however often the switch is thrown.
- */
-export const roomLevel = (down: number) => 1 - clamp01(down) * ROOM_DIM;
+// The room's own light — ROOM_DIM, the warm tint, and the level/colour helpers above — lives in
+// room-light.ts, re-exported at the top of this file.
 /**
  * The furthest off the haze ever is, however high up you are: past that nothing's built (the grass
  * and the road round the office end there, the city round the roof just past it), so it hides that.
@@ -211,10 +189,10 @@ if ( skyOn > 0.0 ) {
   // (skyRoomAt). Everything the sun, the sky and the lamps have just given the room goes with it,
   // the lamp globes included; the TV's screen is drawn unlit, so it doesn't, and the street outside
   // is untouched.
-  vec3 skyRoom = skyRoomAt( skyIndoor );
-  reflectedLight.directDiffuse *= skyRoom;
-  reflectedLight.indirectDiffuse *= skyRoom;
-  totalEmissiveRadiance *= skyRoom;`}
+  vec3 roomLight = skyRoomAt( skyIndoor );
+  reflectedLight.directDiffuse *= roomLight;
+  reflectedLight.indirectDiffuse *= roomLight;
+  totalEmissiveRadiance *= roomLight;`}
 }
 `;
 
@@ -661,7 +639,9 @@ export class Sky {
    * on it hears the same switch go over.
    */
   setRoomLight(light: { down: number; warm: number }) {
-    this.room = light;
+    // Copied in rather than kept by reference: the caller may hand back a shared table entry, and a
+    // stray write through it would retune the office for every client (see features/tv/lighting.ts).
+    this.room = { down: light.down, warm: light.warm };
   }
 
   /**
@@ -728,10 +708,13 @@ export class Sky {
     this.spooky = step(this.spooky, this.theme === 'halloween' ? 1 : 0, 12);
     this.festive = step(this.festive, this.theme === 'christmas' ? 1 : 0, 12);
     // The switch by the TV: a dimmer, not a light switch, so the room comes down over a second.
+    const down0 = this.roomDown;
+    const warm0 = this.roomWarm;
     this.roomDown = step(this.roomDown, this.room.down, 1.1);
     this.roomWarm = step(this.roomWarm, this.room.warm, 1.1);
-    this.roomLevel = roomLevel(this.roomDown);
-    uniforms.skyRoom.value.copy(ROOM_WARM).lerp(ROOM_LIT, 1 - this.roomWarm).multiplyScalar(this.roomLevel);
+    this.roomLevel = levelFor(this.roomDown);
+    // Recomputed only while the room is actually moving, not on every frame it sits at its setting.
+    if (this.roomDown !== down0 || this.roomWarm !== warm0) uniforms.skyRoom.value.copy(roomColor(this.roomDown, this.roomWarm));
     const sp = this.spooky;
 
     // The weather, easing from one spell to the next.

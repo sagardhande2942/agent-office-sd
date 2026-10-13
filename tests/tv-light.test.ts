@@ -5,11 +5,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { TV_LIGHT_ORDER, TV_LIGHTS, type TvLight } from '../src/shared/tv.js';
-import { ROOM_DIM, ROOM_LIT, ROOM_WARM, luma, roomLevel } from '../src/client/world/sky.js';
+import { ROOM_DIM, ROOM_WARM, levelFor, luma, roomColor } from '../src/client/world/sky.js';
 import { ROOM_LIGHT, roomLightFor } from '../src/client/features/tv/lighting.js';
 
-/** The colour the shader's `skyRoom` ends up in for a setting, as linear RGB. */
-const room = (mode: TvLight) => ROOM_WARM.clone().lerp(ROOM_LIT, 1 - ROOM_LIGHT[mode].warm).multiplyScalar(roomLevel(ROOM_LIGHT[mode].down));
+/**
+ * The colour the shader's `skyRoom` ends up in for a setting, as linear RGB — the very expression the
+ * frame loop uses (`roomColor` in sky.ts), not a copy of it, so the "no drift" test below tests what
+ * ships.
+ */
+const room = (mode: TvLight) => roomColor(ROOM_LIGHT[mode].down, ROOM_LIGHT[mode].warm);
 
 test('the three settings are three amounts of the room’s own light, and each is dimmer than the last', () => {
   assert.equal(ROOM_LIGHT.bright.down, 0, 'lights up leaves the room exactly as it was');
@@ -17,7 +21,7 @@ test('the three settings are three amounts of the room’s own light, and each i
   assert.equal(ROOM_LIGHT.off.down, 1, 'lights out is all the way down, as it always was');
   assert.ok(ROOM_LIGHT.dim.down > 0 && ROOM_LIGHT.dim.down < 1, 'the middle setting is in between');
   // Up, then the warm dim, then out: less light each step, whatever order they are asked in.
-  const levels = TV_LIGHT_ORDER.map((m) => roomLevel(ROOM_LIGHT[m].down));
+  const levels = TV_LIGHT_ORDER.map((m) => levelFor(ROOM_LIGHT[m].down));
   assert.ok(levels[0] > levels[1] && levels[1] > levels[2], `${levels.join(' then ')}`);
   assert.equal(levels[2], 1 - ROOM_DIM, 'the lights-out mode is the one the switch has always given');
 });
@@ -26,8 +30,8 @@ test('the middle setting is dim enough to be a different mood and bright enough 
   const dim = ROOM_LIGHT.dim.down * ROOM_DIM;
   // A little over half the room's light: the desks, the walkways and the workers at them are all
   // plainly there, which is what somebody watching a film in the office actually needs.
-  assert.ok(dim > 0.3 && dim < 0.55, `${(roomLevel(ROOM_LIGHT.dim.down) * 100).toFixed(0)}% of the room's light is left`);
-  assert.ok(roomLevel(ROOM_LIGHT.dim.down) > 0.4);
+  assert.ok(dim > 0.3 && dim < 0.55, `${(levelFor(ROOM_LIGHT.dim.down) * 100).toFixed(0)}% of the room's light is left`);
+  assert.ok(levelFor(ROOM_LIGHT.dim.down) > 0.4);
   // It is warm white, not a blue screen: red and green up, blue down.
   assert.ok(ROOM_WARM.r > ROOM_WARM.b, 'the warm tint is warmer at the red end');
   assert.ok(ROOM_WARM.g > ROOM_WARM.b, 'and at the green end');
@@ -49,8 +53,8 @@ test('the room’s light is worked out from the setting, never off what the last
   assert.deepEqual(room('bright').toArray(), [1, 1, 1]);
   assert.equal(room('dim').getHex(), there);
   // Out of range on the way in is the nearest end of it, never a colour outside the range.
-  assert.equal(roomLevel(-1), 1);
-  assert.equal(roomLevel(2), 1 - ROOM_DIM);
+  assert.equal(levelFor(-1), 1);
+  assert.equal(levelFor(2), 1 - ROOM_DIM);
 });
 
 test('the switch only asks for the room’s light while you’re on this floor', () => {

@@ -26,12 +26,16 @@ export function nextTvLight(mode: TvLight): TvLight {
   return TV_LIGHT_ORDER[(i + 1) % TV_LIGHT_ORDER.length];
 }
 
+/** The three, as a set, so checking a setting allocates nothing on the frames that check it. */
+const LIGHT_SET: ReadonlySet<string> = new Set(TV_LIGHT_ORDER);
+
 /**
  * A setting off the wire, if it is one: anything else — an older floor that only had the boolean
- * switch, a nonsense value, nothing at all — is left out rather than guessed at.
+ * switch, a nonsense value, `'constructor'`, nothing at all — is left out rather than guessed at.
+ * Only the three exact strings are settings; nothing is coerced and no prototype key is one.
  */
 export function checkTvLight(raw: unknown): TvLight | undefined {
-  return TV_LIGHT_ORDER.find((m) => m === raw);
+  return typeof raw === 'string' && LIGHT_SET.has(raw) ? (raw as TvLight) : undefined;
 }
 
 /**

@@ -293,6 +293,25 @@ test('shared placement snapshots reset per floor and updates cannot leak across 
   assert.deepEqual(s.placements.items, {});
 });
 
+test("a floor's light setting off the wire is one of the three, whatever it sent", async () => {
+  const { Store } = await import('../src/client/state/store.js');
+  const { SLICES } = await import('../src/client/state/slices/index.js');
+  const s = new Store(SLICES);
+  const tv = (state: object) => s.apply(msg({ t: 'tv', state }));
+  // The wire is the trust boundary: the plate indexes its own tables with whatever ends up here, so a
+  // nonsense setting has to be turned into a real one on the way in.
+  tv({ light: 'constructor', theatre: 'yes' });
+  assert.equal(s.tv.light, 'bright', 'a nonsense setting is left out rather than guessed at');
+  tv({ light: ['dim'] });
+  assert.equal(s.tv.light, 'bright');
+  // An office from before the three settings sends only the boolean switch, and is read as it was.
+  tv({ theatre: true });
+  assert.equal(s.tv.light, 'off');
+  // Both present: `light` wins over the older boolean.
+  tv({ light: 'dim', theatre: false });
+  assert.equal(s.tv.light, 'dim');
+});
+
 test("a slice's topics fire in its place in the list; a floor's after the message's own, bar the ones the floor hangs on", async () => {
   const { Store } = await import('../src/client/state/store.js');
   const fired: string[] = [];

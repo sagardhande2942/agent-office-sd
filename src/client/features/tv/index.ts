@@ -33,8 +33,9 @@ export function installTv(ctx: Ctx, deps: TvDeps) {
   const light = (): TvLight => lightOf(store.tv);
   /** Puts the floor's setting on the plate by the TV and into the sky. */
   const applyLight = () => {
-    ctx.sky.setRoomLight(roomLightFor(light(), ctx.inOffice()));
-    ctx.office.theatre.show(light(), store.tv.on);
+    const mode = light();
+    ctx.sky.setRoomLight(roomLightFor(mode, ctx.inOffice()));
+    ctx.office.theatre.show(mode, store.tv.on);
   };
   const apply = () => {
     playback.sync(store.tv);

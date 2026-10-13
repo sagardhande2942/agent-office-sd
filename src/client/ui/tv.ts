@@ -1,4 +1,4 @@
-import { checkTvUrl, positionAt, tvTitle } from '../../shared/tv';
+import { TV_LIGHTS, checkTvUrl, positionAt, tvTitle } from '../../shared/tv';
 import type { Net } from '../net';
 import { store } from '../state';
 import type { TvScreen } from '../tvscreen';
@@ -35,7 +35,8 @@ export function openTv(net: Net, tvScreen: TvScreen, share: () => void, dance: {
   const pct = h('span.vol-pct');
   const sound = h('div.volume', {}, mute, level, pct);
   // The room, not your own: the switch on the wall by the TV, which everyone on the floor shares.
-  const lightNote = h('p.setting-note', {}, "The switch by the TV: 💡 Lights up, 🕯️ Warm dim — lamps turned down to a warm glow, with the desks, the walkways and everybody at them still plain to see — or 🎬 Lights out, so the picture stands out in the dark. Everyone on this floor sees it at once, and the setting stays how it was left.");
+  // The wording comes from the one table the switch and the buttons already read, so it can't drift.
+  const lightNote = h('p.setting-note', {}, `The switch by the TV: ${TV_LIGHTS.bright.icon} ${TV_LIGHTS.bright.label}, ${TV_LIGHTS.dim.icon} ${TV_LIGHTS.dim.label} — ${TV_LIGHTS.dim.note} — or ${TV_LIGHTS.off.icon} ${TV_LIGHTS.off.label}, ${TV_LIGHTS.off.note}. Everyone on this floor sees it at once, and the setting stays how it was left.`);
   const room = h('div.volume', {}, lights.el, lightNote);
 
   // The dance floor with disco lights in front of the TV (see world/disco.ts). Each browser keeps

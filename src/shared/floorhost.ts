@@ -59,6 +59,8 @@ export interface FloorReady {
   lore?: boolean;
   curator?: boolean;
   bossMode?: boolean;
+  /** Serves the room's three light settings (`tv.lights`), not only the older one-position switch. */
+  lights?: boolean;
   /**
    * The branch this host's checkout is on, and the agent CLIs it has installed.
    *

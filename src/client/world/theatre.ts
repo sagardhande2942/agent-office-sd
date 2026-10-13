@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { THEATRE_SWITCH, TV } from '../../shared/layout';
-import { TV_LIGHT_ORDER, TV_LIGHTS, type TvLight } from '../../shared/tv';
+import { TV_LIGHT_ORDER, TV_LIGHTS, checkTvLight, type TvLight } from '../../shared/tv';
 import { mesh, roundedBox, textPlane, toon } from './toon';
 import type { Interactable } from './office';
 
@@ -68,20 +68,15 @@ export function buildTheatre(): TheatreView {
   rocker.position.set(0, -0.05, 0.06);
   rocker.add(mesh(roundedBox(0.12, 0.17, 0.045, 0.025), toon('#e6e0d2'), 0, 0.085, 0, false));
   plate.add(rocker);
-  // The lamp above the rocker, and a little screen of an emoji to say what the switch is for. Both
-  // unlit, so they keep showing in a room the switch has just put out.
+  // The lamp over the rocker, and the emoji for the setting the switch is in below it — both unlit, so
+  // they keep showing in a room the switch has just put out. Only the setting's own sign is visible, so
+  // the plate can't read as two answers at once.
   const lampMat = new THREE.MeshBasicMaterial({ color: LAMP.bright });
   plate.add(mesh(new THREE.CircleGeometry(0.022, 12), lampMat, 0, 0.155, 0.062, false));
-  const label = textPlane('🎬', { size: 44 });
-  label.scale.multiplyScalar(0.3);
-  label.position.set(0, -0.135, 0.062);
-  plate.add(label);
-  // A little screen of an emoji to say what the switch is for, and the setting it's in under it, so
-  // the plate reads from across the room rather than only from under your nose.
   const signs = TV_LIGHT_ORDER.map((mode) => {
     const sign = textPlane(TV_LIGHTS[mode].icon, { size: 44 });
     sign.scale.multiplyScalar(0.3);
-    sign.position.set(0, 0.215, 0.062);
+    sign.position.set(0, -0.135, 0.062);
     plate.add(sign);
     return [mode, sign] as const;
   });
@@ -104,8 +99,11 @@ export function buildTheatre(): TheatreView {
   let light: TvLight = 'bright';
   let lit = false;
   const show = (mode: TvLight, hasPicture: boolean) => {
-    light = mode;
+    // Guarded here as well as at the state slice: a nonsense setting must not index TILT/LAMP to
+    // undefined or leave a NaN in the rocker's rotation that sticks for good.
+    light = checkTvLight(mode) ?? 'bright';
     lit = hasPicture;
+    for (const [m, sign] of signs) sign.visible = m === light;
   };
 
   const update = (dt: number) => {
@@ -113,7 +111,6 @@ export function buildTheatre(): TheatreView {
     // room itself eases down and warms in Sky, over about a second.
     rocker.rotation.x += (TILT[light] - rocker.rotation.x) * Math.min(1, dt * FLIP);
     lampMat.color.set(LAMP[light]);
-    for (const [mode, sign] of signs) sign.visible = mode === light;
     // The screen's light on the wall round it, in the middle setting just a little of what it is in
     // the dark — a dimmed room has its own light to compete with.
     const want = lit ? (light === 'off' ? SPILL_MAX : light === 'dim' ? SPILL_DIM : 0) : 0;
