@@ -67,15 +67,47 @@ test('every toy has a part of its own that turns, or it is not a toy', () => {
   }
 });
 
-test('the kinds take turns desk by desk, so no two neighbours match', () => {
-  assert.deepEqual([0, 1, 2, 3, 4, 5].map(deskToyKind), ['top', 'duck', 'robot', 'top', 'duck', 'robot']);
+test('the kinds take turns pod by pod, so no two neighbours match', () => {
+  assert.deepEqual([0, 1, 2, 3, 4, 5].map(deskToyKind), ['top', 'robot', 'robot', 'duck', 'top', 'robot']);
   // Whatever index it is handed, it names one of the three.
-  for (const i of [-4, -1, 0, 1, 2, 7, 15, 16, 31, 32, 999]) assert.ok(TOY_KINDS.includes(deskToyKind(i)));
+  for (const i of [-4, -1, 0, 1, 2, 3, 7, 15, 16, 31, 32, 999]) assert.ok(TOY_KINDS.includes(deskToyKind(i)));
 
-  // Built in order, consecutive seats never match.
+  // The turn repeats every four, and each group of four holds all three kinds, so a pod of desks
+  // never repeats a kind that a pod next door also has in the same place.
   const { toys } = site([...DESKS, ...WING_DESKS, ...BEANBAGS]);
   const kinds = [...toys.values()].map((t) => t.kind);
-  for (let i = 1; i < kinds.length; i++) assert.notEqual(kinds[i], kinds[i - 1], `seats ${i - 1} and ${i} both have a ${kinds[i]}`);
+  for (let i = 0; i + 4 <= kinds.length; i += 4) {
+    assert.equal(new Set(kinds.slice(i, i + 4)).size, 3, `seats ${i}..${i + 3} are ${kinds.slice(i, i + 4).join('/')}, which is not all three`);
+  }
+  // Which is not to say consecutive seats always differ: seats 1 and 2 of a pod are both robots,
+  // and they are that pod's farthest pair. What has to hold is the distance one, checked below.
+});
+
+test('no two seats standing near each other were given the same toy', () => {
+  // "Neighbours" is a distance, not a seat number: the desks are built in pods of four, and a pod's
+  // far corners are closer together than two of its different toys ever stand. Checking the turn by
+  // index alone would pass a pattern that put one toy on every pod's closest pair, so this measures
+  // the real plan: where each toy stands, and how close its nearest neighbour stands to it.
+  const { toys } = site([...DESKS, ...WING_DESKS, ...BEANBAGS]);
+  // The toy hangs on the desk in its own frame (DESK_TOY_SPOT), turned by the desk's own facing, so
+  // this is where it really is rather than where its desk's origin is.
+  const standsAt = (id: string) => {
+    const def = [...DESKS, ...WING_DESKS, ...BEANBAGS].find((d) => d.id === id)!;
+    const spot = def.beanbag ? LAP_TOY_SPOT : DESK_TOY_SPOT;
+    const c = Math.cos(def.rotY), s = Math.sin(def.rotY);
+    return { x: def.x + spot.t * c + spot.s * s, z: def.z - spot.t * s + spot.s * c };
+  };
+  const seats = [...toys.keys()];
+  const clashes: string[] = [];
+  for (const [i, a] of seats.entries()) {
+    const pa = standsAt(a);
+    for (const b of seats.slice(i + 1)) {
+      const pb = standsAt(b);
+      if (Math.hypot(pa.x - pb.x, pa.z - pb.z) > 2.5) continue;
+      if (toys.get(a)!.kind === toys.get(b)!.kind) clashes.push(`${a} and ${b} are both ${toys.get(a)!.kind}s, ${Math.hypot(pa.x - pb.x, pa.z - pb.z).toFixed(2)}m apart`);
+    }
+  }
+  assert.deepEqual(clashes, [], `neighbouring seats sharing a toy:\n  ${clashes.join('\n  ')}`);
 });
 
 test('every seat a coding agent sits at gets a toy: the desks, the back office and the bean bags', () => {

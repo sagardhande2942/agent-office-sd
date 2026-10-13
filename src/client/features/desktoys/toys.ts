@@ -1,9 +1,9 @@
 /**
  * The toys that sit on the coding agents' desks, and what each one does while it's going.
  *
- * Three kinds, and they take turns desk by desk, so no two neighbours match. Each is a handful of
- * primitives about desk-doll size (nothing here is over 15cm), with one part that turns and the
- * whole toy that leans, tips and bobs. So all three are driven by one small piece of arithmetic
+ * Three kinds, and they take turns pod by pod, so no two neighbours match (see POD_TURN). Each is a
+ * handful of primitives about desk-doll size (nothing here is over 15cm), with one part that turns and
+ * the whole toy that leans, tips and bobs. So all three are driven by one small piece of arithmetic
  * (toyMotion) rather than three animations that drift apart.
  */
 
@@ -15,9 +15,25 @@ import { mesh, toon } from '../../world/toon';
 export const TOY_KINDS = ['top', 'duck', 'robot'] as const;
 export type ToyKind = (typeof TOY_KINDS)[number];
 
-/** The toy the `i`th desk gets: kinds take turns, so no two neighbours match. */
+/**
+ * The toys in the order a run of four seats takes them: top, robot, robot, duck.
+ *
+ * Not a plain turn through the three. The desks are built in pods of four (two back-to-back rows of
+ * two, see buildDesks in shared/layout), and the pod's four seats are not evenly spaced: the pair
+ * across the back-to-back gap stands about 1.2m apart, the pair along a row 2.2m, and the diagonal
+ * that ties the far corner to the near one about 2.1m. A period of 3 ran the same toy onto that
+ * 2.1m diagonal in every pod - the pair the eye lands on sweeping a pod - while different toys stood
+ * 2.2m apart, so the turn is shaped to the pod instead of to the count.
+ *
+ * The repeated kind sits on seats 1 and 2, which are the pod's long diagonal and its farthest pair
+ * (about 3.9m, the back row's left desk to the front row's right), leaving the four close pairs all
+ * different. Which kind repeats is cosmetic; that it lands on the far diagonal is the point.
+ */
+const POD_TURN: readonly ToyKind[] = ['top', 'robot', 'robot', 'duck'];
+
+/** The toy the `i`th desk gets: kinds take turns pod by pod, so no two neighbours match. */
 export function deskToyKind(i: number): ToyKind {
-  return TOY_KINDS[((i % TOY_KINDS.length) + TOY_KINDS.length) % TOY_KINDS.length];
+  return POD_TURN[((i % POD_TURN.length) + POD_TURN.length) % POD_TURN.length];
 }
 
 /** One toy: the group that goes in a desk's own frame, and the bit of it that turns. */
