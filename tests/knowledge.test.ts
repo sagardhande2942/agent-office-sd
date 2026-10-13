@@ -10,7 +10,7 @@ import { fingerprint } from '../src/server/lore-curator/journal.js';
 import { migrateKnowledge } from '../src/server/knowledge/migrate.js';
 import { parseKnowledgeIndex, parseKnowledgeNote, serializeKnowledgeIndex } from '../src/shared/knowledge-index.js';
 import { knowledgeBootstrapContext, scoreKnowledgeHint } from '../src/shared/worker-knowledge.js';
-import { knowledgeReviewGate, writeHandover, knowledgeMrSection } from '../src/server/knowledge/worker.js';
+import { knowledgeReviewGate, writeHandover, knowledgeMrSection, workerKnowledgeStore } from '../src/server/knowledge/worker.js';
 import { parseKnowledgeActions, applyKnowledgeActions, curationBatch } from '../src/server/knowledge/curation.js';
 import { curatorGitArgs, knowledgeCuratorSchema } from '../src/server/knowledge/curator.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
@@ -76,6 +76,12 @@ test('bootstrap never injects bodies, respects budget, labels verification and r
   const root = '---\nkind: index\nsummary: Root\n---\n# Knowledge\n\n## Entries\n' + Array.from({ length: 80 }, (_, i) => `- [note-${i}.md](note-${i}.md) — entry ${i}`).join('\n');
   const block = knowledgeBootstrapContext('ci', { rootIndex: root, notes: [{ ...recent, frontmatter: { ...recent.frontmatter, status: 'needs-verification' } }, { path: 'pinned.md', frontmatter }], budget: 1600 });
   assert.ok(block.length <= 1600); assert.match(block, /more entries omitted/); assert.match(block, /Pinned: pinned.md/); assert.ok(!block.endsWith('entry'));
+  assert.equal(scoreKnowledgeHint({ ...recent, frontmatter: { ...recent.frontmatter, status: 'needs-verification' } }, 'ci'), -1);
+});
+test('workers share the floor knowledge store across isolated worktrees', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'knowledge-central-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const store = workerKnowledgeStore({ def: { dir } } as any, { ...worker, worktree: { path: '.agent-office/worktrees/ada', branch: 'office/ada', base: 'HEAD' } } as WorkerInfo);
+  assert.equal(store.checkout, dir);
 });
 const worker = { id: 'ada', name: 'Ada', kind: 'agent', deskId: 'desk-1', completionRevision: 1, prompt: 'Build task' } as WorkerInfo;
 const report = { revision: 1, summary: 'Summary', checks: [{ name: 'Test', status: 'passed', evidence: 'full evidence '.repeat(100) }], files: ['src/file.ts'], pr: 'https://github.com/example/repo/pull/123', branch: 'task', commit: 'abcdef123', status: 'ready', submittedAt: 1 } as CompletionReport;

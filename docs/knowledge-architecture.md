@@ -59,7 +59,7 @@ Bootstrap uses the root index, pinned titles/summaries and scored hints, never b
 
 `knowledge_read` returns all text by default and explicit line-page metadata when requested. Search returns literal matches with adjacent lines, a bounded hit count and an omitted count. Read counts are local telemetry. Knowledge read/write author identity comes from the authenticated worker; request bodies cannot choose worker IDs or authors.
 
-The human browser acts on the floor's checkout and reports its current branch. Remote floors use `knowledge.execute` through the existing host-call allow-list. Worker hooks are shared by office and floor-host listeners and operate on the authenticated worker's worktree. Journals/reviews are local to that checkout; worktree cleanup follows the existing lifecycle, so promote durable facts before cleanup.
+The floor checkout is the live central brain. The human browser and every authenticated worker operate on that same knowledge tree regardless of the worker's code worktree, so updates are immediately shared across the floor. Remote floors use `knowledge.execute` through the existing host-call allow-list. Curator proposals are mirrored into the live tree as `needs-verification` after a review PR is published and are not injected automatically until activated. Journals and review state remain floor-local.
 
 ## Curation and rollout
 

@@ -1,6 +1,5 @@
 import { DESK_BY_ID } from '../../shared/layout.js';
 import type http from 'node:http';
-import path from 'node:path';
 import type { Floor } from '../floor.js';
 import { readBody, send } from '../http/util.js';
 import { KnowledgeStore } from './store.js';
@@ -18,7 +17,7 @@ export async function floorWorkerKnowledge(floor: Floor | undefined, req: http.I
     if (!active) return send(res, 401, { error: 'Worker session changed while reading request' });
     if (active.kind !== 'agent' || active.helper || active.meeting || active.planReview?.locked || DESK_BY_ID.get(active.deskId)?.station) return send(res, 403, { error: 'Worker role changed while reading request' });
     if (Object.keys(body).some(k => !['action', 'path', 'offset', 'limit', 'query', 'scope', 'frontmatter', 'body', 'template', 'from', 'to', 'reason', 'changed', 'none_reason'].includes(k))) throw Error('Unknown knowledge field; identity is server-owned');
-    const store = new KnowledgeStore(active.worktree ? path.resolve(floor.def.dir, active.worktree.path) : floor.def.dir, loadKnowledgeConfig(floor.def.dir));
+    const store = new KnowledgeStore(floor.def.dir, loadKnowledgeConfig(floor.def.dir));
     store.seed(); let result: unknown;
     switch (body.action) {
       case 'index': result = { text: store.index(body.path as string | undefined) }; break;

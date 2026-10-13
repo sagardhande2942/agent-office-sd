@@ -6,7 +6,7 @@ export interface KnowledgeConfig {
   dir: string; bootstrapBudgetChars: number; hintCount: number; reviewPolicy: 'required' | 'prompt' | 'off';
   commitMode: 'worker' | 'office' | 'none'; mrSection: boolean; maxNoteBytes: number; searchMaxHits: number; handoversDir: string; legacyLore: boolean;
 }
-export const KNOWLEDGE_DEFAULTS: KnowledgeConfig = { dir: '.agent-office/knowledge', bootstrapBudgetChars: 4000, hintCount: 8, reviewPolicy: 'required', commitMode: 'worker', mrSection: true, maxNoteBytes: 65536, searchMaxHits: 40, handoversDir: '.agent-office/handovers', legacyLore: false };
+export const KNOWLEDGE_DEFAULTS: KnowledgeConfig = { dir: '.agent-office/knowledge', bootstrapBudgetChars: 4000, hintCount: 8, reviewPolicy: 'required', commitMode: 'none', mrSection: true, maxNoteBytes: 65536, searchMaxHits: 40, handoversDir: '.agent-office/handovers', legacyLore: false };
 export const credentialPattern = /(?:BEGIN .*PRIVATE KEY|(?:api[_-]?key|password|secret|token)\s*[:=]\s*['"]?[^'"\s]{12,}|\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16})\b)/i;
 export function rejectCredentials(text: string) { if (text.split('\n').some(line => credentialPattern.test(line))) throw Error('Knowledge cannot contain credentials; remove the matching line'); }
 export interface TreeNote { path: string; frontmatter?: KnowledgeFrontmatter; error?: string }

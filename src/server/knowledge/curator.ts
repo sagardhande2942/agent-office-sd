@@ -13,6 +13,7 @@ import { KnowledgeStore, atomicWrite } from './store.js';
 import { loadKnowledgeConfig } from './settings.js';
 import { applyKnowledgeActions, curationBatch, parseKnowledgeActions, type CurationInput } from './curation.js';
 import { lintKnowledge } from './lint.js';
+import { parseKnowledgeNote } from '../../shared/knowledge-index.js';
 interface CuratorDisk { settings: CuratorSettings; nextRunAt?: number; retryAt?: number; eventAt?: number; failures: number; runs: CuratorRun[]; cursor?: number }
 export function curatorGitArgs(args: string[]) {
   return ['-c', 'user.name=Agent Office', '-c', 'user.email=agent-office@localhost', '-c', 'commit.gpgSign=false', ...args];
@@ -70,6 +71,18 @@ export class KnowledgeCurator {
     this.completions.set(worker.id, signature); if (this.disk.settings.afterCompletion) { this.disk.eventAt = Date.now() + 30000; this.save(); }
   }, remove: worker => { this.completions.delete(worker.id); } }; }
   private git(args: string[], cwd = this.checkout) { return execFileSync('git', curatorGitArgs(args), { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120000 }).trim(); }
+  private publishLiveProposals(branchStore: KnowledgeStore, changed: string[], snapshots: CurationInput[]) {
+    const versions = new Map(snapshots.filter(n => !n.handover).map(n => [n.path, n.version])); let skipped = 0;
+    for (const relative of changed) {
+      if (path.basename(relative) === 'INDEX.md') continue;
+      const source = branchStore.resolve(relative); if (!fs.existsSync(source)) continue;
+      const live = this.store.resolve(relative, true); const version = versions.get(relative);
+      if (version && fs.existsSync(live) && fs.readFileSync(live, 'utf8') !== version) { skipped++; continue; }
+      const note = parseKnowledgeNote(fs.readFileSync(source, 'utf8'));
+      this.store.write(relative, { ...note.frontmatter, status: 'needs-verification' }, note.body, 'curator');
+    }
+    return skipped;
+  }
   async tick() {
     const now = Date.now(); const s = this.disk.settings;
     if (this.controller || !s.enabled || s.paused || this.disk.retryAt && this.disk.retryAt > now) return;
@@ -88,6 +101,10 @@ export class KnowledgeCurator {
     try {
       this.git(['fetch', 'origin', 'main']);
       this.git(['worktree', 'add', '-b', branch, worktree, 'origin/main']); created = true;
+      const branchKnowledge = path.resolve(worktree, this.store.config.dir);
+      fs.rmSync(branchKnowledge, { recursive: true, force: true });
+      fs.cpSync(this.store.root, branchKnowledge, { recursive: true, force: true,
+        filter: source => !source.startsWith(path.join(this.store.root, '_meta/state')) });
       const store = new KnowledgeStore(worktree, this.store.config); store.seed();
       const all = curationBatch(store, 10000); const cursor = this.disk.cursor ?? 0;
       const notes = [...all.slice(cursor), ...all.slice(0, cursor)].slice(0, this.disk.settings.maxNotes);
@@ -131,9 +148,10 @@ export class KnowledgeCurator {
           const bodyFile = path.join(temp, 'mr.md'); atomicWrite(bodyFile, `Curated durable project knowledge.\n\n## Knowledge base updates\n\n${result.changed.map(p => `- \`${p}\``).join('\n')}\n\nValidation: knowledge lint passed.\n`);
           if (/github\.com[:/]/.test(remote)) {
             const repo = remote.replace(/^.*github\.com[:/]/, '').replace(/\.git$/, '');
-            url = execFileSync('gh', ['pr', 'create', '--repo', repo, '--base', 'main', '--head', branch, '--title', 'Knowledge tree curation', '--body-file', bodyFile], { cwd: worktree, encoding: 'utf8', timeout: 120000 }).trim();
-          } else url = execFileSync('glab', ['mr', 'create', '--source-branch', branch, '--target-branch', 'main', '--title', 'Knowledge tree curation', '--description', fs.readFileSync(bodyFile, 'utf8'), '--yes'], { cwd: worktree, encoding: 'utf8', timeout: 120000 }).trim();
+            url = execFileSync('gh', ['pr', 'create', '--repo', repo, '--base', 'main', '--head', branch, '--title', '[Knowledge] Knowledge tree curation', '--body-file', bodyFile], { cwd: worktree, encoding: 'utf8', timeout: 120000 }).trim();
+          } else url = execFileSync('glab', ['mr', 'create', '--source-branch', branch, '--target-branch', 'main', '--title', '[Knowledge] Knowledge tree curation', '--description', fs.readFileSync(bodyFile, 'utf8'), '--yes'], { cwd: worktree, encoding: 'utf8', timeout: 120000 }).trim();
         }
+        result.skipped += this.publishLiveProposals(store, result.changed, batch);
         run.summary += `\n${url}`;
       }
       run.status = 'completed'; this.disk.failures = 0; this.disk.retryAt = undefined;
