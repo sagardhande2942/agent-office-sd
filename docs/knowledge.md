@@ -10,6 +10,8 @@ Press **E** at the shelf on the west wall beside the basketball hoop, or choose 
 
 Review history is collapsed into a status summary above the tree. Expand **Reviews** to read recent delivery errors and review links; long logs scroll inside that section. The tree and selected note scroll independently, and stack vertically on narrow screens.
 
+Curator plans must use each source, merge target and split destination in at most one action. If the agent returns overlapping actions, the host sends the conflicting paths back for one complete replacement plan before making any edits. A second conflict fails the run and retains its review branch; choose one operation per note and defer additional cleanup to a later run. Other validation failures and provider errors do not trigger this correction attempt.
+
 ![Knowledge shelf with lifecycle badges](knowledge-evidence/knowledge-shelf.png)
 
 The branch label identifies the floor checkout. All workers, including workers with separate code worktrees, read and edit this shared tree immediately. Each note read returns a `version`. Editing, moving, archiving or deleting an existing note requires that version as `expectedVersion`; a new note uses `null`. Stale edits are rejected so the writer can reread and reconcile both changes. File mutations are serialized across processes. A process crash can leave `_meta/state/write.lock`; after confirming no host/CLI is writing, remove that empty lock directory and retry.

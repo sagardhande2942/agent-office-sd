@@ -4,6 +4,7 @@ import { KnowledgeStore, rejectCredentials } from './store.js';
 import { lintKnowledge } from './lint.js';
 export interface CurationInput { path: string; frontmatter: KnowledgeFrontmatter; body: string; version: string; handover?: boolean }
 export interface KnowledgeAction { action: 'merge' | 'split' | 'move' | 'archive' | 'flag-needs-verification' | 'verify' | 'rewrite-summary' | 'fix-index' | 'promote-handover'; path: string; target?: string; reason: string; summary?: string; body?: string; title?: string; evidence?: string[]; parts?: { path: string; title: string; summary: string; body: string }[] }
+export class OverlappingKnowledgeActions extends Error {}
 export function parseKnowledgeActions(value: unknown, batch: CurationInput[], destinations: string[], evidencePaths: string[] = []): { summary: string; actions: KnowledgeAction[] } {
   if (!value || typeof value !== 'object') throw Error('Expected a curator object');
   const v = value as { summary: string; actions: KnowledgeAction[] };
@@ -22,7 +23,8 @@ export function parseKnowledgeActions(value: unknown, batch: CurationInput[], de
     if (action.action === 'rewrite-summary' && (typeof action.summary !== 'string' || !action.summary.trim())) throw Error('Summary required');
     if (action.action === 'promote-handover' && (!action.title || !action.summary || typeof action.body !== 'string')) throw Error('Promotion requires title, summary and body');
     const affected = [action.path, ...(action.target ? [action.target] : []), ...(action.parts?.map(p => p.path) ?? [])];
-    if (affected.some(p => used.has(p)) || new Set(affected).size !== affected.length) throw Error('Overlapping curator actions');
+    const overlaps = affected.filter((p, i) => used.has(p) || affected.indexOf(p) !== i);
+    if (overlaps.length) throw new OverlappingKnowledgeActions(`Overlapping curator actions: ${[...new Set(overlaps)].join(', ')}. Each source, target and split destination may appear in only one action.`);
     affected.forEach(p => used.add(p)); rejectCredentials(JSON.stringify(action));
   }
   return v;
