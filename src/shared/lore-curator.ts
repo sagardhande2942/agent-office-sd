@@ -1,5 +1,5 @@
 import { providerMeta } from './providers.js';
-export const CURATOR_PROVIDERS = ['claude', 'codex', 'opencode'] as const;
+export const CURATOR_PROVIDERS = ['claude', 'codex'] as const;
 export type CuratorProvider = typeof CURATOR_PROVIDERS[number];
 export type KnowledgeStatus = 'active' | 'needs-verification' | 'archived' | 'superseded';
 export interface CurationMeta { status: KnowledgeStatus; reason: string; sources: string[]; checkedAt: number }

@@ -40,7 +40,7 @@ export function openCurator(ui: CuratorUI): Modal {
     const save = h('button.btn.primary', { type: 'submit', disabled: !admin || !state.providers.length }, 'Save settings');
     form.append(h('h3', {}, 'Schedule and agent'), h('div.curator-grid', {}, field('Enable automatic curation', enabled), field('After worker completion', after), field('Schedule', schedule), intervalRow, dailyRow, tzRow, field('Maximum notes per run', batch)), agent.element,
       h('p.setting-note', {}, 'Uses the selected agent’s existing login on this floor’s machine. Coding-worker defaults are independent. Runs review bounded repository excerpts without modifying the checkout.'),
-      h('p.setting-note', {}, state.providers.length ? 'Supported background adapters: Claude Code, Codex and OpenCode. OpenCode free models may reject tool-disabled background runs. Other agents remain available for coding workers.' : 'Install Claude Code, Codex or OpenCode and restart this floor host to enable curation.'), save,
+      h('p.setting-note', {}, state.providers.length ? 'Supported background adapters: Claude Code and Codex. Other agents remain available for coding workers.' : 'Install Claude Code or Codex and restart this floor host to enable curation.'), save,
       ...(!admin ? [h('p.setting-note', {}, 'Only admins can change settings, run curation or restore notes.')] : []));
     if (!admin) for (const control of form.querySelectorAll<HTMLInputElement | HTMLSelectElement>('input, select')) control.disabled = true;
     form.onsubmit = e => {
