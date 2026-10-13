@@ -5,6 +5,7 @@ summary: "Knowledge about gotchas."
 # gotchas
 
 ## Entries
+- [knowledge-delivery.md](knowledge-delivery.md) — Review worktrees run asynchronously; Git diagnostics and retained proposals support safe retries.
 - [knowledge-seed-checkout.md](knowledge-seed-checkout.md) — A fresh seed changes .gitignore and indexes; team dispatch requires a clean participant checkout [tags: git, knowledge]
 - [shared-checkout-and-pr-target.md](shared-checkout-and-pr-target.md) — The main checkout is shared and rarely clean: branch in a worktree, never commit others' changes there, and target pull requests at the project's real remote.
 - [size-guard.md](size-guard.md) — tests/size.test.ts caps every src/.ts and .css file at 600 lines, with a CEILINGS list that may only shrink; split files instead of raising ceilings.
