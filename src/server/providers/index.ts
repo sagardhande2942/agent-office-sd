@@ -8,6 +8,7 @@ import { cursor } from './cursor.js';
 import { custom } from './custom.js';
 import { dsh } from './dsh.js';
 import { grok } from './grok.js';
+import { kilo } from './kilo.js';
 import { muse } from './muse.js';
 import { opencode } from './opencode.js';
 import { pi } from './pi.js';
@@ -25,6 +26,7 @@ export const PROVIDERS: Record<AgentProvider, SomeAdapter> = {
   pi,
   cursor,
   antigravity,
+  kilo,
   custom,
 };
 
