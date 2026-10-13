@@ -1,9 +1,10 @@
 ---
 title: "Commands to install, run, verify"
 summary: "Verbatim npm commands for install, dev, typecheck, tests, build, and how the headless-browser e2e harnesses find Chromium."
-author: "curator"
+author: "human:inferno"
 updated: "2026-10-13"
-status: "needs-verification"
+status: "active"
+tags: []
 ---
 From the repository root:
 

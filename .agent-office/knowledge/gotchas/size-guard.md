@@ -1,9 +1,10 @@
 ---
 title: "The 600-line file size guard and its CEILINGS list"
 summary: "tests/size.test.ts caps every src/.ts and .css file at 600 lines, with a CEILINGS list that may only shrink; split files instead of raising ceilings."
-author: "curator"
+author: "human:inferno"
 updated: "2026-10-13"
-status: "needs-verification"
+status: "active"
+tags: []
 ---
 `tests/size.test.ts` fails if any `.ts` or `.css` file tracked under `src/` is longer than 600 lines. It lists files with `git ls-files` instead of walking the folder, so a worktree checked out inside the repository does not trip it.
 
