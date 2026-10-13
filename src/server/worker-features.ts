@@ -1,3 +1,4 @@
+import { workerRoles } from './worker-roles/service.js';
 import { installFloorBoss, closeFloorBoss } from './boss-mode/service.js';
 import { bossHostCalls, bossHostSnapshot } from './boss-mode/host.js';
 import { curatorHostCalls, curatorHostSnapshot } from './lore-curator/host.js';
@@ -16,7 +17,7 @@ export const workerFeatureSnapshots = (floor: Floor): ServerMsg[] => [loreHostSn
 const FEATURES = [workerLore] as const;
 export function floorWorkerFeatures(floor: Floor, publish: (msg: ServerMsg) => void, context: FloorContext): WorkerFeature[] {
   installFloorBoss(floor, context, publish);
-  return [...FEATURES.map(install => install(floor.lore, publish)), floor.curator.feature()];
+  return [...FEATURES.map(install => install(floor.lore, publish)), floor.curator.feature(), workerRoles(floor.dir)];
 }
 
 export function closeFloorWorkerFeatures(floor: Floor) { closeFloorBoss(floor); }

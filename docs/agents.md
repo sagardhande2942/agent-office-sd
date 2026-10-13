@@ -152,3 +152,11 @@ When any worker is spawned or resumed on any floor (from desks, issue and pull r
 - **Defaults & Launch args**: Configured default model, reasoning effort, extra CLI arguments, and custom environment variables (`KEY=value`) injected directly into the worker's execution environment.
 
 Model selectors offer **Use office default** to copy the provider, model and effort saved in office Settings, and **Use agent default** to remove the model override for the selected provider. Plan comparison and Master / Workers accept agent defaults too. Duplicate candidate provider/model choices remain rejected; different providers’ defaults may resolve to the same underlying model. On remote floors, agent defaults come from the host’s configuration.
+
+## Worker roles
+
+The hiring and task prompt dialogs in Lite and the game include a **Worker role** selector. Choose **Developer**, **Reviewer**, **Tester**, or **Researcher** to add explicit responsibilities to the agent's task. General worker follows the task without a specialization. The selector writes a visible `[Office worker role: reviewer]` directive into the prompt, so you can inspect the assignment before sending.
+
+Roles persist across tasks and office restarts. Send a new role directive to reassign an existing worker; send `[Office worker role: none]` to clear its specialization. CLI/MCP hiring and tell prompts accept the same directive at the very start of the prompt, followed by a newline and the task. Assignments live in the floor's `.agent-office/worker-roles.json` and are removed when the worker goes home.
+
+Developers implement and verify changes. Reviewers report actionable findings and avoid edits unless fixes are requested. Testers verify acceptance criteria and report actual checks and coverage gaps. Researchers report evidence, sources and uncertainty. Responsibilities are appended to each agent task sent through the office; permission answers and shell terminals are not decorated. Roles guide model behavior, do not enforce a sandbox, and remain subject to the user's task and repository instructions. Direct terminal typing bypasses office prompt decoration.
