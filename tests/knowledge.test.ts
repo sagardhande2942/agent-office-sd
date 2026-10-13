@@ -12,6 +12,7 @@ import { parseKnowledgeIndex, parseKnowledgeNote, serializeKnowledgeIndex } from
 import { knowledgeBootstrapContext, scoreKnowledgeHint } from '../src/shared/worker-knowledge.js';
 import { knowledgeReviewGate, writeHandover, knowledgeMrSection } from '../src/server/knowledge/worker.js';
 import { parseKnowledgeActions, applyKnowledgeActions, curationBatch } from '../src/server/knowledge/curation.js';
+import { knowledgeCuratorSchema } from '../src/server/knowledge/curator.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
 import type { CompletionReport } from '../src/shared/completion.js';
 function fixture(t: { after(fn: () => void): void }) { const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'knowledge-test-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true })); const store = new KnowledgeStore(dir); store.seed(); return store; }
@@ -118,6 +119,20 @@ test('curation validates whole action sets, rejects journal edits and skips conc
   store.write('project/a.md', frontmatter, 'Concurrent edit', 'human:tester'); assert.equal(applyKnowledgeActions(store, batch, value.actions as never, 'abcdef123').skipped, 1);
   const handover = { path: 'handovers/ada.md', frontmatter, body: 'Journal', version: 'Journal', handover: true };
   assert.throws(() => parseKnowledgeActions({ summary: '', actions: [{ action: 'archive', path: handover.path, reason: 'Old' }] }, [handover], []), /read-only/);
+});
+
+test('curator schema uses strict action variants accepted by structured output', () => {
+  const note = { path: 'project/a.md', frontmatter, body: 'Body', version: 'v1' };
+  const schema = knowledgeCuratorSchema([note], ['project/a-part-1.md'], ['src/a.ts']) as any;
+  const variants = schema.properties.actions.items.anyOf;
+  assert.equal(schema.properties.actions.maxItems, 1); assert.equal(variants.length, 9);
+  for (const variant of variants) {
+    assert.equal(variant.additionalProperties, false);
+    assert.deepEqual(new Set(variant.required), new Set(Object.keys(variant.properties)));
+  }
+  const split = variants.find((v: any) => v.properties.action.const === 'split');
+  assert.equal(split.properties.parts.items.additionalProperties, false);
+  assert.deepEqual(split.properties.parts.items.required, Object.keys(split.properties.parts.items.properties));
 });
 
 test('migration preserves a matching legacy curator overlay', t => {
