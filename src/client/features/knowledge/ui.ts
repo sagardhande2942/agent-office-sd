@@ -11,7 +11,9 @@ export function openKnowledge(opts: { net: Net; onUseInPrompt?: (text: string) =
   const right = h('article.knowledge-note'); const branch = h('span.knowledge-branch');
   const search = h('input', { type: 'search', placeholder: 'Search knowledge…', 'aria-label': 'Search knowledge' }) as HTMLInputElement;
   const commit = h('button.btn', { onclick: () => net.send({ t: 'knowledge.commit', title: parsed?.frontmatter.title ?? 'knowledge' }) }, 'Publish review');
-  const reviews = h('div.knowledge-reviews', { 'aria-label': 'Knowledge reviews' });
+  const reviewSummary = h('summary');
+  const reviewList = h('div.knowledge-review-list');
+  const reviews = h('details.knowledge-reviews', { 'aria-label': 'Knowledge reviews' }, reviewSummary, reviewList);
   const body = h('div.knowledge-columns', {}, left, right);
   const modalEl = h('div.modal.knowledge-window', { role: 'dialog', 'aria-label': 'Knowledge' },
     h('header', {}, h('h2', {}, '📜 Knowledge'), branch),
@@ -26,7 +28,10 @@ export function openKnowledge(opts: { net: Net; onUseInPrompt?: (text: string) =
     branch.textContent = `${store.knowledge.branch || 'branch unknown'}${store.knowledge.uncommitted ? ' · uncommitted' : ''}`;
     const deliveries = store.knowledge.deliveries ?? [];
     commit.disabled = deliveries.some(d => d.state === 'preparing' || d.state === 'published');
-    reviews.replaceChildren(...deliveries.slice(-5).map(d => h('p', {},
+    reviews.hidden = deliveries.length === 0;
+    const latest = deliveries.at(-1);
+    reviewSummary.textContent = `Reviews (${deliveries.length})${latest ? ' · latest: ' + latest.state : ''}`;
+    reviewList.replaceChildren(...deliveries.slice(-5).reverse().map(d => h('p', {},
       `${d.state}${d.conflicts?.length ? ' - needs reconciliation: ' + d.conflicts.join(', ') : ''} `,
       ...(d.url ? [h('a', { href: d.url, target: '_blank', rel: 'noopener noreferrer' }, 'Review changes')] : []), d.error ?? '')));
     if (handovers) { left.replaceChildren(...store.knowledge.handovers.map(n => h('button.knowledge-row', { onclick: () => read(n.path, true) }, n.title))); return; }

@@ -36,6 +36,32 @@ try {
   assert.equal(await editor.getByLabel('Markdown body').inputValue(), 'Stale edit that must remain recoverable');
   assert.match(store.read('project/test.md').text, /Concurrent worker update/);
   await editor.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.evaluate(() => {
+    const s = window.__game2d.store;
+    s.knowledge.deliveries = Array.from({ length: 5 }, (_, i) => ({ id: String(i), state: 'failed', error: ('Curator usage limit; retained at /tmp/' + 'long-path'.repeat(30) + '\n').repeat(8) }));
+    s.emit('knowledge');
+  });
+  for (const [width, height] of [[1440, 900], [712, 1162], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    const reviews = modal.locator('.knowledge-reviews');
+    assert.equal(await reviews.getAttribute('open'), null);
+    await reviews.locator('summary').click();
+    const layout = await modal.evaluate(el => {
+      const box = selector => el.querySelector(selector).getBoundingClientRect();
+      const body = el.querySelector('.body');
+      const list = el.querySelector('.knowledge-review-list');
+      return { width: el.getBoundingClientRect().width, bodyWidth: body.clientWidth, scrollWidth: body.scrollWidth,
+        bodyHeight: body.clientHeight, scrollHeight: body.scrollHeight, treeHeight: box('.knowledge-tree').height,
+        noteHeight: box('.knowledge-note').height, bottom: box('.knowledge-columns').bottom,
+        modalBottom: el.getBoundingClientRect().bottom, logsScroll: list.scrollHeight > list.clientHeight };
+    });
+    assert.ok(layout.width <= width && layout.bottom <= layout.modalBottom, JSON.stringify(layout));
+    assert.ok(layout.scrollWidth <= layout.bodyWidth + 1 && layout.scrollHeight <= layout.bodyHeight + 1, JSON.stringify(layout));
+    assert.ok(layout.treeHeight > 60 && layout.noteHeight > 120 && layout.logsScroll, JSON.stringify(layout));
+    await page.screenshot({ path: path.join(artifacts, `knowledge-errors-${width}.png`) });
+    await reviews.locator('summary').click();
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
   await page.screenshot({ path: path.join(artifacts, 'knowledge-shelf.png') });
   await modal.getByRole('button', { name: 'Close', exact: true }).click(); await modal.waitFor({ state: 'detached' });
   await page.keyboard.press('Tab'); await page.locator('button:has-text("Knowledge base")').first().click(); await page.keyboard.press('Escape'); await modal.waitFor({ state: 'detached' });

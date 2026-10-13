@@ -8,6 +8,8 @@ The Knowledge shelf is a hierarchical Markdown knowledge base committed with the
 
 Press **E** at the shelf on the west wall beside the basketball hoop, or choose **📜 Knowledge base** in **☰**. The left pane lists directories and notes; the right pane renders Markdown. Every row shows its lifecycle status, including archived and needs-verification notes. Search returns matched lines and adjacent context. Tags are displayed with the selected note.
 
+Review history is collapsed into a status summary above the tree. Expand **Reviews** to read recent delivery errors and review links; long logs scroll inside that section. The tree and selected note scroll independently, and stack vertically on narrow screens.
+
 ![Knowledge shelf with lifecycle badges](knowledge-evidence/knowledge-shelf.png)
 
 The branch label identifies the floor checkout. All workers, including workers with separate code worktrees, read and edit this shared tree immediately. Each note read returns a `version`. Editing, moving, archiving or deleting an existing note requires that version as `expectedVersion`; a new note uses `null`. Stale edits are rejected so the writer can reread and reconcile both changes. File mutations are serialized across processes. A process crash can leave `_meta/state/write.lock`; after confirming no host/CLI is writing, remove that empty lock directory and retry.

@@ -24,5 +24,15 @@
     "publishAndSyncControls": true,
     "closeAndEscape": true
   },
-  "publicationTests": "local Git remotes and fixture forge; no real review PR created by tests"
+  "publicationTests": "local Git remotes and fixture forge; no real review PR created by tests",
+  "reviewErrorLayout": {
+    "expandedLogsScroll": true,
+    "noBodyOverflow": true,
+    "panesRemainVisible": true,
+    "widths": [
+      1440,
+      712,
+      390
+    ]
+  }
 }

@@ -589,4 +589,6 @@ The **☰ Office menu** has a bounded, scrollable action list. Search finds acti
 
 Knowledge is shared immediately across office workers. Use the Knowledge shelf's **Publish review** to persist shared notes in a separate PR and **Sync approved** to apply merged proposals. Curator proposals stay separate until approved; stale note edits are rejected. See [Knowledge Tree](docs/knowledge.md) for review policies and recovery.
 
+The shelf keeps review history in an expandable **Reviews** summary so long delivery errors leave room for browsing. Its tree and note panes scroll independently on desktop and mobile.
+
 Curator failures show bounded, credential-redacted CLI diagnostics and the model used by the run. If a provider request fails intermittently, retry Run now; a failed proposal remains available for inspection.
