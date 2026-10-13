@@ -2,6 +2,7 @@ import { knowledgeHostCalls } from './knowledge/host.js';
 import { loadKnowledgeConfig } from './knowledge/settings.js';
 import { KNOWLEDGE_WORKER_TOOLS } from './knowledge/hooks.js';
 import { workerKnowledge } from './knowledge/worker.js';
+import { installKnowledgeAutoSync, closeKnowledgeAutoSync } from './knowledge/auto-sync.js';
 import { workerRoles } from './worker-roles/service.js';
 import { installFloorBoss, closeFloorBoss } from './boss-mode/service.js';
 import { bossHostCalls, bossHostSnapshot } from './boss-mode/host.js';
@@ -22,7 +23,8 @@ export const workerFeatureSnapshots = (floor: Floor): ServerMsg[] => [loreHostSn
 const FEATURES = [workerLore] as const;
 export function floorWorkerFeatures(floor: Floor, publish: (msg: ServerMsg) => void, context: FloorContext): WorkerFeature[] {
   installFloorBoss(floor, context, publish);
+  installKnowledgeAutoSync(floor, publish);
   return [providerSpendFeature(context.ledger, floor.def.id), workerKnowledge(floor), ...(loadKnowledgeConfig(floor.def.dir).legacyLore ? FEATURES.map(install => install(floor.lore, publish)) : []), floor.curator.feature(), workerRoles(floor.dir)];
 }
 
-export function closeFloorWorkerFeatures(floor: Floor) { closeFloorBoss(floor); }
+export function closeFloorWorkerFeatures(floor: Floor) { closeFloorBoss(floor); closeKnowledgeAutoSync(floor); }

@@ -81,3 +81,9 @@ Compatibility is explicit: `legacyLore` re-enables old injection/curation for on
 Worker tools resolve the floor checkout, independently of worker code worktrees. Reads return content versions; external mutations require those versions. The store serializes mutations and checks versions inside the lock. Required review blocks every completion attempt until the current revision has a review. Legacy commitMode values no longer commit to either checkout.
 
 `delivery.ts` owns snapshot publication and merge synchronization. It overlays local note deltas on fresh origin/main, regenerates indexes, publishes a dedicated review, and records before/after snapshots in local state. Remote fetch, push and forge commands are asynchronous. Curator actions use the same path: proposals never mutate live notes before acceptance. Sync preflights every affected note and only applies an approved set when no newer live or upstream edits would be overwritten.
+
+## Automatic review synchronization
+
+`server/knowledge/auto-sync.ts` installs through the floor worker-feature registry and closes with the floor. The checkout owner polls persisted published deliveries on startup and every minute, without requiring a client or curator schedule. Remote floor hosts use the same registry and forward the normal Knowledge tree/status events. No forge requests are made when no review is published. Uninitialized legacy floors remain untouched until the Knowledge root index exists, so polling cannot create partial state that blocks seeding.
+
+`syncKnowledge` coalesces overlapping automatic/manual calls by the knowledge root's real path. Existing whole-proposal reconciliation and write-lock guards still apply. Changed review records trigger a tree/status broadcast; unchanged pending/conflicting records do not. Transient failures retry and identical consecutive errors are reported only once.

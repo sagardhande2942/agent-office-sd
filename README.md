@@ -589,7 +589,7 @@ Model selectors offer **Use office default** to copy the provider, model and eff
 
 The **☰ Office menu** has a bounded, scrollable action list. Search finds actions and display settings across all categories; **Open**, **Together**, **Office**, and **Display** narrow browsing. **Pinned** shows your saved favorites, and the pin beside each action adds it to the top bar. Clear search to return to your selected category. Arrow keys navigate results; **Tab**, **Esc**, or the top-right **✕** closes the menu and restores mouse-look.
 
-Knowledge is shared immediately across office workers. Use the Knowledge shelf's **Publish review** to persist shared notes in a separate PR and **Sync approved** to apply merged proposals. Curator proposals stay separate until approved; stale note edits are rejected. See [Knowledge Tree](docs/knowledge.md) for review policies and recovery.
+Knowledge is shared immediately across office workers. Use the Knowledge shelf's **Publish review** to persist shared notes in a separate PR. The floor checks pending reviews at startup and every minute, automatically applying merged proposals. **Sync approved** checks immediately. Curator proposals stay separate until approved; stale note edits are rejected. See [Knowledge Tree](docs/knowledge.md) for review policies and recovery.
 
 The shelf keeps review history in an expandable **Reviews** summary so long delivery errors leave room for browsing. Its tree and note panes scroll independently on desktop and mobile.
 
