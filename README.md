@@ -589,4 +589,6 @@ Model selectors offer **Use office default** to copy the provider, model and eff
 
 The **☰ Office menu** has a bounded, scrollable action list. Search finds actions and display settings across all categories; **Open**, **Together**, **Office**, and **Display** narrow browsing. **Pinned** shows your saved favorites, and the pin beside each action adds it to the top bar. Clear search to return to your selected category. Arrow keys navigate results; **Tab**, **Esc**, or the top-right **✕** closes the menu and restores mouse-look.
 
+Reported provider spend persists across restarts and worker removal: Codex root-session tokens and OpenCode cumulative tokens have daily/all-time totals. The daily budget includes Claude estimates and known reported OpenCode/DeepSeek costs; unavailable costs are explicitly excluded. DeepSeek context occupancy is not accumulated as token spend. See [configuration](docs/configuration.md) for accounting scope.
+
 Workers can have **Developer**, **Reviewer**, **Tester**, or **Researcher** roles. Choose a role in the hiring or task prompt dialog, or start a CLI/MCP prompt with `[Office worker role: reviewer]` followed by the task on the next line. Each role supplies specific responsibilities on subsequent office prompts and survives restarts. See [Worker roles](docs/agents.md#worker-roles) for reassignment and behavior.

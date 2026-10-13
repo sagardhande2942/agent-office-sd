@@ -1,6 +1,6 @@
 // What workers spend: session usage, the office ledger and the Claude plan limits.
 
-/** Session usage. The persistent office ledger continues to cover Claude Code only. */
+/** Session usage. Persistent provider reports are tracked separately from Claude transcripts. */
 export interface Usage {
   /** Input tokens that missed the prompt cache. */
   input: number;
@@ -51,6 +51,8 @@ export function fmtCost(usd: number): string {
 
 /** Spend across the whole office, kept on disk (see server/usage.ts). */
 export interface UsageState {
+  reported?: ProviderSpend[];
+  budgetCost?: number;
   /** Every worker the office ever ran, including ones sent home. */
   total: Usage;
   /** Since midnight on the office's machine. */
@@ -61,6 +63,11 @@ export interface UsageState {
   budget?: number;
   /** New hires are refused for the rest of the day once the budget is spent (--budget-pause). */
   pauseHiring: boolean;
+}
+export interface ProviderSpend {
+  provider: string;
+  total: { tokens: number; cost: number; unknownCost: boolean; partial: boolean };
+  today: { tokens: number; cost: number; unknownCost: boolean; partial: boolean };
 }
 
 /** One of the Claude plan's usage windows: the 5-hour session, the week, or a model's week. */
