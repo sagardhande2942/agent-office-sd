@@ -1,15 +1,15 @@
 ---
 title: "Kilo Code CLI facts the office's provider depends on"
-summary: "Verified behaviour of the Kilo Code CLI (kilo 7.8.8) that the office's kilo provider relies on: it is an OpenCode fork, loads OpenCode plugins from a workspace kilo.json, and how models, effort, resume and sign-in work."
-author: "curator"
+summary: "Verified behaviour of the Kilo Code CLI (kilo 7.8.8, plugin loader re-checked on 7.8.1) that the office's kilo provider relies on: it is an OpenCode fork, its loader calls a plugin definition's server() entry, it loads plugins from a workspace kilo.json, and how models, effort, resume and sign-in work."
+author: "worker:19e5ba07aa61"
 updated: "2026-10-13"
 status: "needs-verification"
 ---
-Everything below was checked against `@kilocode/cli` **7.8.8** on Linux (`npm install --prefix /tmp/kilo @kilocode/cli`; the binary is `kilo`, with `kilocode` as an alias, in `node_modules/.bin`). Re-check with `kilo --help`, `kilo models --help`, `kilo agent list` before trusting it later.
+Everything below was checked against `@kilocode/cli` **7.8.8** on Linux (`npm install --prefix /tmp/kilo @kilocode/cli`; the binary is `kilo`, with `kilocode` as an alias, in `node_modules/.bin`). Re-check with `kilo --help`, `kilo models --help`, `kilo agent list` before trusting it later. The plugin-loader entry was re-checked against **7.8.1** on 2026-10-14 (see `project/opencode-plugin-bridge.md`).
 
 ## What it is
 
-Kilo Code's CLI is a **fork of OpenCode's**: same plugin module API, same config shape, same model catalogue layout. That is why `src/server/providers/kilo.ts` loads the office's existing OpenCode plugin (`src/server/opencode.ts`) and reports on the `/hooks/opencode` bridge through `hooksAs`, instead of carrying a second copy of that plugin.
+Kilo Code's CLI is a **fork of OpenCode's**: same plugin module API, same config shape, same model catalogue layout. That is why `src/server/providers/kilo.ts` loads the office's existing OpenCode plugin (`src/server/opencode.ts`) and reports on the `/hooks/opencode` bridge through `hooksAs`, instead of carrying a second copy of that plugin. Its plugin loader calls a definition's **`server()` entry** (not `setup()`, and not a hooks object returned from the module), so a plugin whose wiring lives in `setup()` loads without error and never reports anything — the desk then sits on *ready* forever.
 
 ## Config
 

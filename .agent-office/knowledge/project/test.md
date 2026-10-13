@@ -5,9 +5,9 @@ tags: ["testing","ci"]
 pinned: true
 paths: ["tests/**","scripts/e2e-*.mjs"]
 sources: ["package.json scripts","scripts/e2e-knowledge-tree.mjs","scripts/e2e-knowledge-shelf.mjs","scripts/e2e-knowledge-curator.mjs","commit 50e0997363d0db3ca18c7c366bf91d90665bd2d6","PR https://github.com/sagardhande2942/agent-office-sd/pull/146"]
-author: "worker:c92d84159150"
-updated: "2026-10-12"
-status: "active"
+author: "curator"
+updated: "2026-10-13"
+status: "needs-verification"
 verified_at: "50e0997363d0db3ca18c7c366bf91d90665bd2d6"
 ---
 # Repository checks

@@ -1,8 +1,9 @@
 ---
 title: "Two tests pin the worker MCP tool allow-list"
 summary: "Adding a worker MCP tool breaks tests/workers.test.ts as well as tests/office-workers.test.ts: both assert the exact claude-hooks permissions allow-list."
-author: "worker:4aca092bd8d6"
+author: "curator"
 updated: "2026-10-13"
+status: "needs-verification"
 ---
 The worker MCP tool allow-list is asserted by exact `deepEqual` in more than one test file. Adding a tool under `bin/office-worker-extensions.js` fails until every copy is updated.
 
