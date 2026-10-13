@@ -135,7 +135,7 @@ test('Lite opens the station through the shared module alone, which loads no thr
 test('the station window is read-only, brings its own ✕, and goes through openModal for Esc and mouse-look', () => {
   const ui = client('shared/handoff/ui.ts');
   assert.doesNotMatch(ui, /net\.send/, 'the station never sends anything: accepting is a worker’s action');
-  assert.match(ui, /h\('button\.btn\.close'/);
+  assert.match(ui, /h\('button\.btn\.close\.corner'/);
   assert.match(ui, /openModal\(el, \{ reading: true, doing: 'reading a task handoff'/);
   assert.match(ui, /fetchHandoffs\(/);
   assert.match(ui, /Could not read the handoff station/);
