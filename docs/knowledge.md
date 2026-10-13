@@ -136,3 +136,7 @@ node --import tsx scripts/e2e-knowledge-curator.mjs
 The browser script finds installed Playwright Chromium or accepts `CHROMIUM_PATH`; screenshots and checks go to `/tmp/agent-office-knowledge-evidence` (override `KNOWLEDGE_ARTIFACTS`). The curator fixture mocks MR publishing rather than creating an external review request.
 
 Curator failures show bounded, credential-redacted CLI diagnostics and the model used by the run. If a provider request fails intermittently, retry Run now; a failed proposal remains available for inspection.
+
+OpenCode is available as a curator provider when installed on the floor host. Choose a provider/model (for example `opencode/space-bunny-free`). Its isolated background adapter preserves provider routing and credentials, disables plugins/MCP and denies tools, and validates returned JSON through the same curator action checks. Restart the floor host after installing OpenCode.
+
+OpenCode Zen free models may reject tool-disabled background sessions with “free tier can only be used from within OpenCode”, even when launched with the official CLI. This adapter keeps tools denied; select a provider/model that supports this mode. Space Bunny Free was rejected in the live verification; fixture adapter tests passed.

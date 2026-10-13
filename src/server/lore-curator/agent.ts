@@ -1,3 +1,4 @@
+import { isolateOpenCode, parseOpenCodeOutput } from './opencode.js';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -44,11 +45,12 @@ export function createCuratorAgent(commands: Partial<Record<CuratorProvider, str
       writeFileSync(schema, JSON.stringify(outputSchema), { mode: 0o600 });
       const args = settings.provider === 'claude'
         ? ['--print', '--output-format', 'json', '--json-schema', JSON.stringify(outputSchema), '--tools', '', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--setting-sources', '', '--settings', '{"disableAllHooks":true}', '--disable-slash-commands', '--no-session-persistence', '--max-turns', '2']
-        : ['exec', '--ignore-user-config', '--ignore-rules', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only', '-c', 'approval_policy="never"', '-c', 'web_search="disabled"', ...['shell_tool', 'unified_exec', 'apps', 'plugins', 'hooks'].flatMap(f => ['--disable', f]), '--output-schema', schema, '--output-last-message', result];
+        : settings.provider === 'opencode' ? ['run', '--pure', '--dir', temp, '--format', 'json'] : ['exec', '--ignore-user-config', '--ignore-rules', '--ephemeral', '--skip-git-repo-check', '--sandbox', 'read-only', '-c', 'approval_policy="never"', '-c', 'web_search="disabled"', ...['shell_tool', 'unified_exec', 'apps', 'plugins', 'hooks'].flatMap(f => ['--disable', f]), '--output-schema', schema, '--output-last-message', result];
       if (settings.model) args.push('--model', settings.model);
       if (settings.provider === 'codex') args.push('-');
       const env = { ...process.env };
       for (const key of Object.keys(env)) if (/^(AGENT_OFFICE_|CLAUDECODE$|CLAUDE_CODE_|CODEX_THREAD_ID$|CODEX_INTERNAL_ORIGINATOR_OVERRIDE$)/.test(key)) delete env[key];
+      if (settings.provider === 'opencode') { isolateOpenCode(env, temp); prompt += `\nReturn only a JSON object matching this schema. Do not use tools. Schema: ${JSON.stringify(outputSchema)}`; }
       const output = await new Promise<string>((resolve, reject) => {
         const child = spawn(command, args, { cwd: temp, env, stdio: ['pipe', 'pipe', 'pipe'], signal, killSignal: 'SIGKILL', timeout: 5 * 60000 });
         let out = '', err = '', bytes = 0, capped = false;
@@ -60,9 +62,17 @@ export function createCuratorAgent(commands: Partial<Record<CuratorProvider, str
         child.stdout.on('data', c => receive(c, true)); child.stderr.on('data', c => receive(c, false));
         child.stdin.on('error', () => {}); child.stdin.end(prompt);
         child.on('error', reject);
-        child.on('close', (code, sig) => code === 0 && !capped ? resolve(out) : reject(Error(capped ? 'Curator output exceeded its limit' : `Curator agent ended (${sig ?? code})${curatorErrorDetail(err) ? ': ' + curatorErrorDetail(err) : '; no diagnostic returned. Check installation, login and chosen model.'}`)));
+        child.on('close', (code, sig) => {
+          if (code !== 0 && settings.provider === 'opencode' && !capped) {
+            try { parseOpenCodeOutput(out); } catch (e) { const detail = curatorErrorDetail('ERROR: ' + (e as Error).message); if (detail) { reject(Error(detail)); return; } }
+          }
+          code === 0 && !capped ? resolve(out) : reject(Error(capped ? 'Curator output exceeded its limit' : `Curator agent ended (${sig ?? code})${curatorErrorDetail(err) ? ': ' + curatorErrorDetail(err) : '; no diagnostic returned. Check installation, login and chosen model.'}`));
+        });
       });
       if (settings.provider === 'codex') return JSON.parse(readFileSync(result, 'utf8'));
+      if (settings.provider === 'opencode') {
+        try { return parseOpenCodeOutput(output); } catch (e) { throw Error(curatorErrorDetail('ERROR: ' + (e as Error).message) || 'Invalid OpenCode curator output'); }
+      }
       const envelope = JSON.parse(output);
       if (envelope.is_error) throw Error('Curator agent returned an error; check login and model');
       return envelope.structured_output ?? JSON.parse(envelope.result ?? output);

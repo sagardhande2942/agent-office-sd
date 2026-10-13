@@ -590,3 +590,5 @@ The **☰ Office menu** has a bounded, scrollable action list. Search finds acti
 Knowledge is shared immediately across office workers. Use the Knowledge shelf's **Publish review** to persist shared notes in a separate PR and **Sync approved** to apply merged proposals. Curator proposals stay separate until approved; stale note edits are rejected. See [Knowledge Tree](docs/knowledge.md) for review policies and recovery.
 
 Curator failures show bounded, credential-redacted CLI diagnostics and the model used by the run. If a provider request fails intermittently, retry Run now; a failed proposal remains available for inspection.
+
+OpenCode is available as a curator provider when installed on the floor host. Choose a provider/model (for example `opencode/space-bunny-free`). Its isolated background adapter preserves provider routing and credentials, disables plugins/MCP and denies tools, and validates returned JSON through the same curator action checks. Restart the floor host after installing OpenCode.

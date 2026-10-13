@@ -289,3 +289,24 @@ test('failed background agents expose bounded diagnostics and redact credentials
     await assert.rejects(createCuratorAgent({ codex: command })({ ...DEFAULT_CURATOR_SETTINGS, provider: 'codex' }, 'Private note', new AbortController().signal), /unsupported model \[redacted\]/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('OpenCode curator uses isolated provider config and rejects tools or malformed responses', async () => {
+  const { isolateOpenCode, parseOpenCodeOutput } = await import('../src/server/lore-curator/opencode.js');
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'curator-opencode-test-'));
+  try {
+    const env = { HOME: dir, OPENCODE_CONFIG_CONTENT: '{"provider":{"opencode":{"options":{"baseURL":"https://opencode.ai/zen/v1"}}},"plugin":["unsafe"],"mcp":{"unsafe":{}}}' };
+    isolateOpenCode(env, path.join(dir, 'isolated'));
+    const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
+    assert.equal(config.provider.opencode.options.baseURL, 'https://opencode.ai/zen/v1');
+    assert.deepEqual(config.mcp, {}); assert.deepEqual(config.plugin, []); assert.equal(config.permission['*'], 'deny');
+    assert.deepEqual(parseOpenCodeOutput(JSON.stringify({ type: 'text', part: { text: '{"summary":"OK","actions":[]}' } })), { summary: 'OK', actions: [] });
+    assert.throws(() => parseOpenCodeOutput(JSON.stringify({ type: 'tool_use' })), /forbidden tool/);
+    assert.throws(() => parseOpenCodeOutput(JSON.stringify({ type: 'error', error: { data: { message: 'Invalid credential' } } })), /Invalid credential/);
+    assert.throws(() => parseOpenCodeOutput(JSON.stringify({ type: 'text', part: { text: 'Here is an answer' } })));
+    const command = path.join(dir, 'fake-opencode'), log = path.join(dir, 'launch.json');
+    writeFileSync(command, `#!${process.execPath}\nconst fs=require('fs');let prompt='';process.stdin.on('data',c=>prompt+=c);process.stdin.on('end',()=>{fs.writeFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),prompt,config:JSON.parse(process.env.OPENCODE_CONFIG_CONTENT)}));console.log(JSON.stringify({type:'text',part:{text:JSON.stringify({summary:'Fixture',actions:[]})}}));});`, {mode:0o755});
+    const output = await createCuratorAgent({opencode:command})({...DEFAULT_CURATOR_SETTINGS,provider:'opencode',model:'opencode/space-bunny-free'},'Review',new AbortController().signal);
+    assert.deepEqual(output,{summary:'Fixture',actions:[]});const launch=JSON.parse(readFileSync(log,'utf8'));
+    assert.ok(launch.args.includes('--pure'));assert.ok(launch.args.includes('--dir'));assert.ok(launch.args.includes('opencode/space-bunny-free'));assert.match(launch.prompt,/Schema:/);
+  } finally { rmSync(dir,{recursive:true,force:true}); }
+});
