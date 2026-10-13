@@ -259,7 +259,7 @@ test('a new store starts every field where it always has', async () => {
       dog: null, dogStart: 0, jukebox: { on: false, track: JUKEBOX_TUNES[0].id, startedAt: 0, elapsed: 0, since: 0 }, clock: '<undefined>',
       whiteboard: [], drawing: [], cabinet: { player: null, scores: [] }, cabinetFrame: null, cinema: { reels: [], on: false, frame: 0, playing: false, at: 0 }, ball: {},
       cars: parked(), carsAt: [], jail: { prisoners: [], bones: 0 },
-      appearances: { config: { categories: ['original'], characters: ['naruto','pikachu','goku','mario','luigi','sonic','totoro','spongebob','luffy','doraemon','kirby','link','yoshi','stitch','baymax','shrek','batman','spider-man','deadpool','darth-vader'] }, assignments: {} }, team: null, accounts: null, signins: null, smartphone: {threads:{}, recents:[]}, helpers:[], helperStart:0, tv:{on:false,playing:false,position:0,at:0,theatre:false},
+      appearances: { config: { categories: ['original'], characters: ['naruto','pikachu','goku','mario','luigi','sonic','totoro','spongebob','luffy','doraemon','kirby','link','yoshi','stitch','baymax','shrek','batman','spider-man','deadpool','darth-vader'] }, assignments: {} }, team: null, accounts: null, signins: null, smartphone: {threads:{}, recents:[]}, helpers:[], helperStart:0, tv:{on:false,playing:false,position:0,at:0,theatre:false,light:'bright'},
     },
   );
 });

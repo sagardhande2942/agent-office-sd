@@ -6,8 +6,10 @@ import { saveSettings, store } from '../../state';
  * shared, and watching it full screen, is features/voice's.
  */
 import * as THREE from 'three';
+import { nextTvLight, type TvLight } from '../../../shared/tv';
 import type { Ctx } from '../../core/context';
 import { hintTitle, key, onE } from '../../core/hint';
+import { lightHint, lightOf, lightRow, roomLightFor } from './lighting';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
 declare module '../../world/types' {
@@ -27,18 +29,25 @@ export interface TvDeps {
 
 export function installTv(ctx: Ctx, deps: TvDeps) {
   const playback = new TvScreen(ctx.office.tvScreen);
+  /** Which of the three settings the room's light is in, from the floor's state (see lighting.ts). */
+  const light = (): TvLight => lightOf(store.tv);
+  /** Puts the floor's setting on the plate by the TV and into the sky. */
+  const applyLight = () => {
+    ctx.sky.setRoomLight(roomLightFor(light(), ctx.inOffice()));
+    ctx.office.theatre.show(light(), store.tv.on);
+  };
   const apply = () => {
     playback.sync(store.tv);
     playback.setVolume(ctx.settings.tv, ctx.settings.tvMuted);
-    ctx.sky.setTheatre(!!store.tv.theatre && ctx.inOffice());
-    ctx.office.theatre.show(!!store.tv.theatre,store.tv.on);
+    applyLight();
     ctx.office.danceFloor.setOn(ctx.settings.danceFloor);
   };
   store.on('tv', apply);
-  ctx.ticks.add('env',()=> { playback.setVolume(ctx.settings.tv,ctx.settings.tvMuted); ctx.office.danceFloor.setOn(ctx.settings.danceFloor); ctx.sky.setTheatre(!!store.tv.theatre && ctx.inOffice()); });
+  ctx.ticks.add('env',()=> { playback.setVolume(ctx.settings.tv,ctx.settings.tvMuted); ctx.office.danceFloor.setOn(ctx.settings.danceFloor); applyLight(); });
   ctx.ticks.add('env',({now,t})=>playback.setDrunk(deps.drunk(now/1000),t,!ctx.reduceMotion.matches));
   ctx.ticks.add('render',()=>playback.update(ctx.camera,ctx.inOffice()&&!tvStream,ctx.office.colliders,ctx.player.pos,ctx.inOffice()));
-  ctx.interactions.define('theatre',{reach:3,hint:()=>({k:String(store.tv.theatre),parts:[hintTitle('Theatre mode'),key('E','Toggle')]}), use:onE(()=>ctx.net.send({t:'tv.theatre',on:!store.tv.theatre}))});
+  // The switch by the wall: one press steps to the next setting, for everyone on the floor.
+  ctx.interactions.define('theatre',{reach:3,hint:()=>lightHint(light()), use:onE(()=>ctx.net.send({t:'tv.lights',light:nextTvLight(light())}))});
   // TV
   const tvVideo = document.createElement('video');
   tvVideo.muted = true;
@@ -76,7 +85,10 @@ export function installTv(ctx: Ctx, deps: TvDeps) {
       const any = deps.shares().length > 0;
       return { k: String(any), parts: [hintTitle('📺 Office TV'), key('E', 'TV controls')] };
     },
-    use: onE(() => openTv(ctx.net,playback,()=>deps.watch(),{on:()=>ctx.settings.danceFloor,set:on=>{ctx.settings.danceFloor=on;saveSettings(ctx.settings);ctx.office.danceFloor.setOn(on);}})),
+    use: onE(() => openTv(ctx.net, playback, () => deps.watch(), {
+      on: () => ctx.settings.danceFloor,
+      set: on => { ctx.settings.danceFloor = on; saveSettings(ctx.settings); ctx.office.danceFloor.setOn(on); },
+    }, lightRow(light, mode => ctx.net.send({ t: 'tv.lights', light: mode })))),
   });
 
   let tvStream: MediaStream | null = null;

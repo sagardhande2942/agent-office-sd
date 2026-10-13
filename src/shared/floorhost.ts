@@ -138,6 +138,7 @@ export const FLOOR_CASES = [
   'station.prompt',
   'term.input',
   'tv.pause',
+  'tv.lights',
   'tv.play',
   'tv.seek',
   'tv.stop',

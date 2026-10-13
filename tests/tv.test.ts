@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { TV_OFF, checkTvUrl, classify, embedUrl, positionAt, startSeconds, tvTitle, youtubeId } from '../src/shared/tv.js';
+import { TV_OFF, TV_LIGHT_ORDER, TV_LIGHTS, checkTvLight, checkTvUrl, classify, embedUrl, nextTvLight, positionAt, startSeconds, tvLightOf, tvTitle, youtubeId } from '../src/shared/tv.js';
 import { Tv } from '../src/server/tv.js';
 
 const YT = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
@@ -71,7 +71,7 @@ test('where the TV is ticks on while it plays, and stands still when it doesn’
   assert.equal(positionAt(going, 4_500), 15.5);
   assert.equal(positionAt({ ...going, playing: false }, 4_500), 12);
   assert.equal(positionAt({ ...going, position: 0, at: 1_000 }, 500), 0, 'a clock behind where it started is still the start');
-  assert.deepEqual(TV_OFF, { on: false, playing: false, position: 0, at: 0, theatre: false });
+  assert.deepEqual(TV_OFF, { on: false, playing: false, position: 0, at: 0, theatre: false, light: 'bright' });
 });
 
 test('what the TV is showing, in a line for the hint bar and the toasts', () => {
@@ -136,29 +136,86 @@ test('the TV’s four moves carry a link from one to the next', (t) => {
   assert.equal(tv.title(), 'example.com · movie.mp4');
 });
 
-test('the switch by the TV puts the room in the dark, and leaves the film where it was', (t) => {
+test('the switch by the TV walks the room through its three settings, and leaves the film alone', (t) => {
   const { dir, tv } = tvFor(t);
-  assert.equal(tv.state().theatre, false, 'a floor starts lit');
+  assert.equal(tv.state().light, 'bright', 'a floor starts lit');
   assert.equal(tv.play({ url: YT }, 'Ada').changed, true);
 
-  // On, then off, then on again: two people at the switch in a moment don't fight over it.
+  // Every way round, and every step of it: two people at the switch in a moment don't fight over it.
+  assert.equal(tv.lights('bright', 'Grace'), false, 'a switch already at lights up is not news');
+  for (const mode of TV_LIGHT_ORDER) {
+    tv.lights(mode === 'off' ? 'bright' : 'off', 'Grace');
+    assert.equal(tv.lights(mode, 'Grace'), true, `the switch moves the room to ${mode}`);
+    assert.equal(tv.state().light, mode);
+    assert.equal(tv.lights(mode, 'Grace'), false, `a switch already at ${mode} is not news`);
+  }
+  tv.lights('bright', 'Grace');
+  // Only one of the three is a setting; anything else leaves the room as it is.
+  assert.equal(tv.lights('candlelight', 'Ken'), false);
+  assert.equal(tv.lights(true, 'Ken'), false);
+  assert.equal(tv.lights(undefined, 'Ken'), false);
+  assert.equal(tv.state().light, 'bright');
+
+  // The room's light is the light's: changing it must not take the picture along with it, so the
+  // position is where it was and the second it is measured from has not moved either.
+  const before = positionAt(tv.state(), Date.now());
+  const at = tv.state().at;
+  assert.equal(tv.lights('dim', 'Grace'), true);
+  const after = positionAt(tv.state(), Date.now());
+  assert.ok(Math.abs(after - before) < 1, `the film carried on rather than jumping: ${after - before}`);
+  assert.equal(tv.state().at, at, 'the clock the position is measured from did not move');
+
+  // It is the room's, and it stays how it was left.
+  assert.equal(new Tv(dir).state().light, 'dim');
+});
+
+test('an office from before the three settings still reads, and still answers, the old switch', (t) => {
+  const { dir, tv } = tvFor(t);
+  // The old boolean is lights out, and is answered in both directions.
   assert.equal(tv.theatre(true, 'Grace'), true);
-  assert.equal(tv.state().theatre, true);
-  assert.equal(tv.theatre(true, 'Grace'), false, 'a switch already thrown that way is not news');
+  assert.equal(tv.state().light, 'off');
+  assert.equal(tv.state().theatre, true, 'the boolean old browsers read is still true in the dark');
+  assert.equal(tv.theatre(true, 'Grace'), false);
   assert.equal(tv.theatre(false, 'Ken'), true);
+  assert.equal(tv.state().light, 'bright');
   assert.equal(tv.state().theatre, false);
   assert.equal(tv.theatre(false, 'Ken'), false);
   // Only a yes or a no is a switch.
   assert.equal(tv.theatre('yes' as unknown as boolean, 'Ken'), false);
 
-  // The room going dark must not take the picture along with it: the position is where it was.
-  const before = positionAt(tv.state(), Date.now());
-  assert.equal(tv.theatre(true, 'Grace'), true);
-  const after = positionAt(tv.state(), Date.now());
-  assert.ok(Math.abs(after - before) < 1, `the film carried on rather than jumping: ${after - before}`);
+  // Every setting is reported as the old boolean too: a browser that only knows the switch puts the
+  // room's light down for anything but lights-up, which is what that switch meant.
+  for (const mode of TV_LIGHT_ORDER) {
+    tv.lights(mode, 'QA');
+    assert.equal(tv.state().theatre, mode !== 'bright', `${mode} reads as ${mode !== 'bright'} to an old browser`);
+  }
 
-  // It is the room's, and it stays how it was left.
-  assert.equal(new Tv(dir).state().theatre, true);
+  // A state, a message and a file that only know the boolean.
+  assert.equal(tvLightOf({ theatre: true }), 'off');
+  assert.equal(tvLightOf({ theatre: false }), 'bright');
+  assert.equal(tvLightOf({}), 'bright');
+  writeFileSync(path.join(dir, 'tv.json'), JSON.stringify({ on: false, playing: false, position: 0, at: 0, theatre: true }));
+  assert.equal(new Tv(dir).state().light, 'off', 'a floor that only ever had the boolean is dark');
+  assert.equal(new Tv(dir).state().light, 'off');
+  writeFileSync(path.join(dir, 'tv.json'), JSON.stringify({ on: false, playing: false, position: 0, at: 0, light: 'dim' }));
+  assert.equal(new Tv(dir).state().light, 'dim', 'and the setting it saved comes back');
+});
+
+test('the three settings are named, ordered, and one of them is next on the switch', () => {
+  assert.deepEqual([...TV_LIGHT_ORDER], ['bright', 'dim', 'off']);
+  assert.deepEqual(TV_LIGHT_ORDER.map((m) => TV_LIGHTS[m].label), ['Lights up', 'Warm dim', 'Lights out']);
+  for (const mode of TV_LIGHT_ORDER) assert.ok(TV_LIGHTS[mode].icon && TV_LIGHTS[mode].note, `${mode} has an icon and a note for the window`);
+  // Up, dim, out, and round again — pressing E on the plate goes all the way round.
+  assert.equal(nextTvLight('bright'), 'dim');
+  assert.equal(nextTvLight('dim'), 'off');
+  assert.equal(nextTvLight('off'), 'bright');
+  // Anything off the wire that is a setting, and nothing else.
+  for (const mode of TV_LIGHT_ORDER) assert.equal(checkTvLight(mode), mode);
+  for (const nope of ['candlelight', true, false, null, 1, undefined]) assert.equal(checkTvLight(nope), undefined, String(nope));
+  // `light` says so where there is one, the old boolean stands in where there isn't.
+  assert.equal(tvLightOf({ light: 'dim', theatre: false }), 'dim');
+  assert.equal(tvLightOf({ light: 'candlelight', theatre: true }), 'off', 'a nonsense setting falls back to the boolean');
+  assert.equal(tvLightOf({ light: undefined, theatre: undefined }), 'bright');
 });
 
 test('what’s on the TV is still on it after a restart, and only they can read it', (t) => {
@@ -191,24 +248,36 @@ test('a tv.json nobody would have allowed leaves the screen dark', (t) => {
   assert.equal(new Tv(dir).state().on, false);
   // A room that was never told to go dark is lit, whatever the file claims.
   writeFileSync(path.join(dir, 'tv.json'), JSON.stringify({ on: false, playing: false, position: 0, at: 0, theatre: 'yes' }));
-  assert.equal(new Tv(dir).state().theatre, false);
+  assert.equal(new Tv(dir).state().light, 'bright');
+  writeFileSync(path.join(dir, 'tv.json'), JSON.stringify({ on: false, playing: false, position: 0, at: 0, light: 'candlelight' }));
+  assert.equal(new Tv(dir).state().light, 'bright', 'a setting nobody recognises is not one');
 });
 
 
-test('TV mutations notify floor subscribers, including theatre without moving playback time', () => {
+test('TV mutations notify floor subscribers, including the room’s light without moving playback time', () => {
   const dir=mkdtempSync(path.join(tmpdir(),'office-tv-sync-'));
   try {
     const states: ReturnType<Tv['state']>[]=[];
     const tv=new Tv(dir,state=>states.push(state));
     assert.ok('error' in tv.play({url:'javascript:alert(1)'},'QA'));assert.equal(states.length,0);
     tv.play({url:YT,position:10},'QA');assert.equal(states.length,1);assert.equal(states[0].playing,true);
-    const at=tv.state().at;tv.theatre(true,'QA');assert.equal(states.length,2);assert.equal(states[1].theatre,true);assert.equal(states[1].at,at);
-    tv.theatre(true,'QA');assert.equal(states.length,2);
+    const at=tv.state().at;
+    // Every setting goes out to the floor in its own right, and none of them moves the film.
+    for (const mode of ['dim','off','bright'] as const) {
+      const before=states.length;
+      tv.lights(mode,'QA');assert.equal(states.length,before+1);assert.equal(states.at(-1)!.light,mode);assert.equal(states.at(-1)!.at,at);
+      tv.lights(mode,'QA');assert.equal(states.length,before+1,'a switch already there is not news');
+    }
+    const lit=states.length;
+    // The old switch announces the same thing, and says so the way an old browser reads it.
+    tv.theatre(true,'QA');assert.equal(states.length,lit+1);assert.equal(states.at(-1)!.light,'off');assert.equal(states.at(-1)!.theatre,true);
+    tv.theatre(false,'QA');assert.equal(states.length,lit+2);assert.equal(states.at(-1)!.light,'bright');
+    tv.lights('candlelight','QA');assert.equal(states.length,lit+2,'a setting nobody recognises changes nothing');
     tv.pause(12,'QA');assert.equal(states.at(-1)!.playing,false);
     tv.seek(25,'QA');assert.equal(states.at(-1)!.position,25);
     tv.play({},'QA');assert.equal(states.at(-1)!.playing,true);
     tv.stop('QA');assert.equal(states.at(-1)!.on,false);
-    assert.equal(states.length,6);
+    assert.equal(states.length,lit+6);
   } finally { rmSync(dir,{recursive:true,force:true}); }
 });
 

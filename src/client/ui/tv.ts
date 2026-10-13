@@ -18,8 +18,10 @@ function clock(s: number): string {
  * link into, and your own speakers — the picture itself is on the TV (see client/tvscreen.ts).
  * `share` offers the screen share the TV still shows in front of a link. `dance` is the dance
  * floor in front of the TV (see world/disco.ts): this window is where it's put out or brought back.
+ * `lights` is the room's light, in the three settings the switch by the TV walks through — built by
+ * features/tv/lighting.ts, and painted from the floor's state like everything else here.
  */
-export function openTv(net: Net, tvScreen: TvScreen, share: () => void, dance: { on(): boolean; set(on: boolean): void }) {
+export function openTv(net: Net, tvScreen: TvScreen, share: () => void, dance: { on(): boolean; set(on: boolean): void }, lights: { el: HTMLElement; paint(): void }) {
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
   const now = h('div.tv-now');
   const scrub = h('input', { type: 'range', min: '0', max: '60', step: '0.5', value: '0', 'aria-label': 'Where the video is' }) as HTMLInputElement;
@@ -33,7 +35,8 @@ export function openTv(net: Net, tvScreen: TvScreen, share: () => void, dance: {
   const pct = h('span.vol-pct');
   const sound = h('div.volume', {}, mute, level, pct);
   // The room, not your own: the switch on the wall by the TV, which everyone on the floor shares.
-  const theatre = h('button.btn', { type: 'button' });
+  const lightNote = h('p.setting-note', {}, "The switch by the TV: 💡 Lights up, 🕯️ Warm dim — lamps turned down to a warm glow, with the desks, the walkways and everybody at them still plain to see — or 🎬 Lights out, so the picture stands out in the dark. Everyone on this floor sees it at once, and the setting stays how it was left.");
+  const room = h('div.volume', {}, lights.el, lightNote);
 
   // The dance floor with disco lights in front of the TV (see world/disco.ts). Each browser keeps
   // its own choice; this window is where it's put away or brought back.
@@ -77,7 +80,7 @@ export function openTv(net: Net, tvScreen: TvScreen, share: () => void, dance: {
       now,
       h('div.volume.tv-scrub', {}, scrub, time, open),
       h('label', { style: 'margin-top:16px' }, 'The room'),
-      h('div.volume', {}, theatre, h('span.setting-note', {}, "The switch by the TV: the office's own light goes down, and the picture stands out in the dark.")),
+      room,
       h('label', { style: 'margin-top:16px' }, 'Your sound'),
       sound,
       h('label', { style: 'margin-top:16px' }, 'Put something on'),
@@ -137,13 +140,9 @@ export function openTv(net: Net, tvScreen: TvScreen, share: () => void, dance: {
       boxed = s.url ?? '';
       url.value = boxed;
     }
-    theatre.textContent = s.theatre ? '💡 Lights back up' : '🎬 Lights down';
-    theatre.title = s.theatre ? "Put the office's lights back on" : "Take the office's light down, so the picture stands out";
-    theatre.setAttribute('aria-pressed', String(s.theatre));
-    theatre.classList.toggle('primary', s.theatre);
+    lights.paint();
     tick();
   };
-  theatre.addEventListener('click', () => net.send({ t: 'tv.theatre', on: !store.tv.theatre }));
 
   const putOnUrl = () => {
     const found = checkTvUrl(url.value, window.location.origin);

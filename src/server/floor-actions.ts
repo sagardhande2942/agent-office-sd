@@ -261,7 +261,9 @@ export interface FloorTv {
   pause(position: unknown, by: string): Awaitable<boolean>;
   seek(position: unknown, by: string): Awaitable<boolean>;
   stop(by: string): Awaitable<boolean>;
-  /** The switch by it: the room's light down for the picture, or back up. */
+  /** The switch by it: which of the three settings the room's light is in (see shared/tv.ts). */
+  lights(light: unknown, by: string): Awaitable<boolean>;
+  /** The older one-position switch, still answered: the room's light down for the picture, or back up. */
   theatre(on: boolean, by: string): Awaitable<boolean>;
   /** What is on it, for the toast. Mirrored from the `tv` event, like the rest of the TV's state. */
   title(): string;

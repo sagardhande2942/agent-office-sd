@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { checkTvUrl, positionAt, startSeconds, tvTitle, type TvState } from '../shared/tv.js';
+import { checkTvLight, checkTvUrl, positionAt, startSeconds, tvLightOf, tvTitle, type TvLight, type TvState } from '../shared/tv.js';
 
 interface Saved {
   on: boolean;
@@ -10,8 +10,12 @@ interface Saved {
   position: number;
   /** When `position` and `playing` were last true, on this machine's clock. */
   at: number;
-  /** Whether the room's light is down for the picture (see shared/tv.ts). */
-  theatre: boolean;
+  /**
+   * Which of the three settings the room's light is in (see shared/tv.ts). A file written before
+   * there were three says `theatre` instead, and is read as the lights-out mode, which is what that
+   * boolean always meant.
+   */
+  light: TvLight;
 }
 
 /** A position in seconds, floored into something a video could be at. */
@@ -21,11 +25,11 @@ function secs(v: unknown, fallback: number): number {
 
 /**
  * The big TV on one floor, saved in .agent-office/tv.json. It says which link, whether it's running
- * and how far in, and whether the room's light is down for the picture; every browser plays the link
- * for itself from the same point (see client/tvscreen.ts), the way the jukebox plays its tunes.
+ * and how far in, and which of the three settings the room's light is in; every browser plays the
+ * link for itself from the same point (see client/tvscreen.ts), the way the jukebox plays its tunes.
  */
 export class Tv {
-  private s: Saved = { on: false, playing: false, position: 0, at: Date.now(), theatre: false };
+  private s: Saved = { on: false, playing: false, position: 0, at: Date.now(), light: 'bright' };
   private file: string;
 
   constructor(dataDir: string, private readonly changed: (state: TvState) => void = () => {}) {
@@ -34,8 +38,10 @@ export class Tv {
   }
 
   state(): TvState {
-    const { on, url, by, playing, position, at, theatre } = this.s;
-    return { on, ...(url ? { url } : {}), ...(by ? { by } : {}), playing, position, at, theatre };
+    const { on, url, by, playing, position, at, light } = this.s;
+    // `theatre` is the older one-position switch, answered anyway so a browser from before the three
+    // settings still puts the room's light down when it is meant to be down.
+    return { on, ...(url ? { url } : {}), ...(by ? { by } : {}), playing, position, at, theatre: light !== 'bright', light };
   }
 
   /** What's on, for toasts: where the link comes from, and its file. */
@@ -86,17 +92,26 @@ export class Tv {
   }
 
   /**
-   * The switch by the TV: `on` puts the room's light down for the picture, `off` brings it back.
-   * Says whether that changed anything, so two people at the switch in a moment don't fight over it.
+   * The switch by the TV, in the three settings the wall plate and the window walk through. Says
+   * whether that changed anything, so two people at the switch in a moment don't fight over it.
    * Deliberately doesn't go through `set`, which would move `at` and so jump the video along with it.
    */
-  theatre(on: boolean, by: string): boolean {
-    if (on !== true && on !== false) return false;
-    if (this.s.theatre === on) return false;
-    this.s = { ...this.s, theatre: on, by };
+  lights(light: unknown, by: string): boolean {
+    const mode = checkTvLight(light);
+    if (!mode || this.s.light === mode) return false;
+    this.s = { ...this.s, light: mode, by };
     this.save();
     this.changed(this.state());
     return true;
+  }
+
+  /**
+   * The older one-position switch, still answered for a browser or a floor host from before the
+   * three settings: `on` is lights out, `off` is lights up. Anything else is not a switch at all.
+   */
+  theatre(on: boolean, by: string): boolean {
+    if (on !== true && on !== false) return false;
+    return this.lights(on ? 'off' : 'bright', by);
   }
 
   private set(s: Omit<Saved, 'at'> & { at?: number }) {
@@ -108,7 +123,7 @@ export class Tv {
   private load() {
     if (!existsSync(this.file)) return;
     try {
-      const s = JSON.parse(readFileSync(this.file, 'utf8')) as Partial<Saved>;
+      const s = JSON.parse(readFileSync(this.file, 'utf8')) as Partial<Saved> & { theatre?: unknown };
       const url = s.url === undefined ? undefined : checkTvUrl(s.url);
       if (url && 'error' in url) return;
       this.s = {
@@ -118,7 +133,7 @@ export class Tv {
         playing: s.on === true && s.playing === true,
         position: secs(s.position, 0),
         at: typeof s.at === 'number' && Number.isFinite(s.at) ? s.at : Date.now(),
-        theatre: s.theatre === true,
+        light: tvLightOf(s),
       };
     } catch {
       // a broken file just means a dark screen

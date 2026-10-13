@@ -9,7 +9,8 @@ same moment, controlled from the TV itself.
 
 - [What plays](#what-plays)
 - [Everyone stays in step](#everyone-stays-in-step)
-- [Theatre mode](#theatre-mode)
+- [The room's light](#the-rooms-light)
+  - [Older offices](#older-offices)
 - [Why the picture is HTML, not a texture](#why-the-picture-is-html-not-a-texture)
 - [The drinks reach the picture too](#the-drinks-reach-the-picture-too)
 - [The state, and where it lives](#the-state-and-where-it-lives)
@@ -63,23 +64,48 @@ The state sits with the rest of a floor's things in `<project>/.agent-office/tv.
 brings back what was on. Each floor has its own TV: what's on yours says nothing about another
 project's.
 
-## Theatre mode
+## The room's light
 
-There is a light switch on the wall beside the TV, at the height you flip one at, and it is a
-real switch in the room: anyone on the floor can press **E** on it and the office's own light goes
-down, so the picture on the 6.4 m screen is the brightest thing in the room. The room comes down
-over about a second, the way a dimmer does, and the switch's own rocker tips over and its little
-lamp lights while it is. Nothing about the film changes: the switch is the light's, so the video
-carries on exactly where it was (`Tv.theatre` deliberately doesn't touch `at`, the second the
-position is measured from).
+There is a switch on the wall beside the TV, at the height you flip one at, and it is a real
+switch in the room. It has **three** settings, and **E** on the plate steps to the next one:
 
-The dim is done in the sky's own shader, per fragment, rather than by turning lights off
-(`Sky.setTheatre`, `client/world/sky.ts`):
+| | Setting | What the room does |
+| --- | --- | --- |
+| 💡 | **Lights up** | The office as usual. |
+| 🕯️ | **Warm dim** | 42% of the room's own light goes down and what is left goes warm — a lampshade at night, not a blue screen. The desks, the walkways and the workers at them are all plainly there to see. |
+| 🎬 | **Lights out** | The old theatre mode, unchanged: 84% of it goes down, so the picture on the 6.4 m screen is the brightest thing in the room. |
+
+All three from one spot in the lounge, looking north-east over the desks at the screen:
+
+| ![Lights up](images/tv-lights-bright.png) | ![Warm dim](images/tv-lights-warm-dim.png) | ![Lights out](images/tv-lights-off.png) |
+| --- | --- | --- |
+| 💡 Lights up | 🕯️ Warm dim | 🎬 Lights out |
+
+`npm run e2e:tv-lights` takes those three pictures and measures them, so the middle one can't quietly
+become too dark or too cold: the wall's own pixels come out at 175 / 98 / 19 across the three, and
+the warm dim is measurably warmer than lights up (r/b 2.09 against 1.48).
+
+The room comes down over about a second, the way a dimmer does. The switch's own rocker has a
+resting angle for each setting — up, level, down — with a little lamp that lights in its colour and
+a screen showing its icon, so you can see which one you're in from across the room. The hint bar at
+the plate says the setting and where **E** takes it next.
+
+Nothing about the film changes: the switch is the light's, so the video carries on exactly where it
+was (`Tv.lights` deliberately doesn't touch `at`, the second the position is measured from).
+
+How much comes down and how warm it goes is one table, `ROOM_LIGHT` in
+`src/client/features/tv/lighting.ts`, which the switch, the window, the hint bar and the sky all
+read — so what the plate says and what the room does can't disagree. `down` is a share of
+`ROOM_DIM` (0.84, the most the lights-out setting ever took), so the middle setting asks for part of
+the same thing rather than a second, differently-tuned one.
+
+The light itself is done in the sky's own shader, per fragment, rather than by turning lights off
+(`Sky.setRoomLight`, `client/world/sky.ts`):
 
 - Everything the sun, the sky and the office's lamps have given a fragment **inside the office's
-  walls** is scaled down by `THEATRE_DIM`, the emissive lamp globes included, so the room goes dark
-  in the middle of the afternoon as well as at night. Fragments outside are untouched: the street
-  keeps its lamps, and the daylight still comes in through the windows.
+  walls** is scaled by one colour, `skyRoom`, the emissive lamp globes included, so the room goes
+  down and warm in the middle of the afternoon as well as at night. Fragments outside are untouched:
+  the street keeps its lamps, and the daylight still comes in through the windows.
 - The unlit materials (glass, the board signs, the meeting panel) are dimmed in the fog pass
   instead, since they never had any light to take away — except the TV's screen, which carries
   `userData.theatreLit` and is skipped. A link's picture is HTML over the canvas and was never lit at
@@ -91,15 +117,39 @@ The dim is done in the sky's own shader, per fragment, rather than by turning li
 - `Sky.lightAt` dims your own hands by the same amount, or you would be the one lit thing in the
   picture.
 
+Two details make it a dimmer rather than a multiplier that drifts:
+
+- **The warm tint costs no light.** `ROOM_WARM` is normalised to its own luma, so the only thing that
+  says how much of the room is left is `down`. Without that, a warm room is also a darker room and
+  the two effects can't be reasoned about separately.
+- **Every frame is worked out from the setting asked for**, never multiplied onto what the last frame
+  left (`roomLevel`). Throw the switch as often as you like: coming back to **Lights up** restores
+  exactly `(1, 1, 1)`, not a little less each time.
+
 The light the screen throws on the wall round it is a soft additive patch just off the wall
 (`client/world/theatre.ts`), which fades up with the dim and only while there is something on the
-screen. The picture itself is drawn over the canvas, so the patch is the spill round its edge and
-never washes over it.
+screen — at a quarter of its brightness in the middle setting, since a dimmed room has its own light
+to compete with. The picture itself is drawn over the canvas, so the patch is the spill round its
+edge and never washes over it.
 
-The state is the floor's, in `theatre` on the same `TvState` as the link, so it rides the same
-message, the same `tv.json` and the same hosted-floor path. The **🎬 Lights down / 💡 Lights back
-up** row in the TV window is the same switch, for anyone who is on the couch rather than standing
-at the wall.
+The setting is the floor's, in `light` on the same `TvState` as the link, so it rides the same
+message, the same `tv.json` and the same hosted-floor path. The three-button row in the TV window is
+the same switch, for anyone who is on the couch rather than standing at the wall.
+
+### Older offices
+
+`light` is optional on `TvState`, and the older one-position boolean `theatre` is still read and
+still answered, in both directions:
+
+- A browser reading a state with only `theatre` gets **Lights out** for `true` and **Lights up**
+  otherwise (`tvLightOf` in `src/shared/tv.ts`, and the state slice runs every incoming state
+  through it).
+- A browser sending the old `tv.theatre { on }` gets **Lights out** / **Lights up** from it
+  (`Tv.theatre`, which is a thin call into `Tv.lights`).
+- An office answering a state with all three also sets `theatre` to `light !== 'bright'`, so an older
+  browser asked for a dimmed room dims it — fully, since it has nothing in between.
+- A `tv.json` written before the three settings has `theatre` in it, and loads as the setting that
+  boolean meant. A saved `light` comes back as itself.
 
 ## Why the picture is HTML, not a texture
 
@@ -213,7 +263,8 @@ Four messages, all floor-wide, all validated server-side (`src/server/tv.ts`):
 | **▶️ / ⏸️** | `tv.play` / `tv.pause` | Carry on from where it was paused, or stop it where the office works out it has got to |
 | Drag the scrubber | `tv.seek { position }` | Jump, keeping play and pause as they were |
 | **⏹️ Stop** | `tv.stop` | Off; the link stays so **Play** puts it on again |
-| **E** at the switch, or **🎬 / 💡** in the window | `tv.theatre { on }` | The room's light down for the picture, or back up — without moving the film |
+| **E** at the switch, or one of the three buttons in the window | `tv.lights { light }` | The room's light **Lights up**, **Warm dim** or **Lights out** — without moving the film |
+| The older one-position switch | `tv.theatre { on }` | Still answered: `true` is **Lights out**, `false` **Lights up** |
 
 The server answers every one of them with `{ t: 'tv', state }`, which the browser keeps in
 `store.tv` under the `tv` topic, exactly like `jukebox`. Arriving on a floor gets the whole state in
@@ -223,7 +274,7 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
 
 | File | Piece |
 | --- | --- |
-| `src/shared/tv.ts` | `TvState` (with `theatre`), `checkTvUrl`, `classify` (YouTube / media / embed), `youtubeId`, `embedUrl`, `startSeconds` (reading `t=`/`start=`), `positionAt` — one source of truth for client and server |
+| `src/shared/tv.ts` | `TvState` (with `light` and the older `theatre`), `TvLight` / `TV_LIGHTS` / `nextTvLight` / `checkTvLight` / `tvLightOf`, `checkTvUrl`, `classify` (YouTube / media / embed), `youtubeId`, `embedUrl`, `startSeconds` (reading `t=`/`start=`), `positionAt` — one source of truth for client and server |
 | `src/server/tv.ts` | `class Tv`: the five operations above, `tv.json` kept with mode `0o600`, like `Jukebox` |
 | `src/server/floor.ts` | `Floor.tv`, one per floor's checkout |
 | `src/server/server.ts` | The `tv.*` cases in the message router, `tvChanged` to the floor, `tv:` in `floorView()` |
@@ -236,12 +287,14 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
 | `src/client/drunkframe.ts` | The drunk effect for the picture, as an SVG filter — the same one `world/drunk.ts` puts on the canvas |
 | `src/client/world/office.ts` | The TV itself is unchanged; its glass panes are colliders marked `glass: true`, so they don't hide it, and the switch's bit of wall is a fixture so no picture hangs over it |
 | `src/client/main.ts` | Wiring: **E** at the TV and at the switch, the hint bar, painting the screen dark under the picture, the per-frame `update`, and how drunk the picture is |
+| `src/client/features/tv/lighting.ts` | `ROOM_LIGHT` (how much of the room's light goes down, and how warm, in each setting), the hint at the plate and the three-button row for the window |
 | `src/client/ui/tv.ts` | The TV window: what's on, ▶️/⏸️/⏹️, a scrubber, the **The room** row, the Dance floor choice, the link box, **Open in a tab ↗**, **Share screen** and your own sound (mute and volume) |
-| `tests/tv.test.ts` | Link parsing and validation, `positionAt`, the switch leaving the film alone, `class Tv` surviving a restart, and the whiteboard's panel masking the picture but its walking envelope not |
+| `tests/tv.test.ts` | Link parsing and validation, `positionAt`, all three settings and the old boolean, the switch leaving the film alone, `class Tv` surviving a restart, and the whiteboard's panel masking the picture but its walking envelope not |
+| `tests/tv-light.test.ts` | The three settings as three amounts of light, the middle one dim enough and warm enough to see by, the tint costing no brightness, and the lights coming back exactly |
 | `tests/tv-mask.test.ts` | The mask: the slab test against the long way round, the cells lying where the screen does, what does and doesn't hide the picture, and the frame wearing a mask only while it has to |
 | `tests/drunkframe.test.ts` | How much drink puts the filter on the picture, and the numbers the shader's own lines give |
-| `src/client/world/sky.ts` | `setTheatre` and the `skyRoomLight` dim in the shader, `indoors` for the halos |
-| `src/client/world/theatre.ts` | `buildTheatre`: the switch on the wall, its rocker and lamp, and the light off the screen |
+| `src/client/world/sky.ts` | `setRoomLight` and the `skyRoom` colour in the shader, `ROOM_DIM` / `ROOM_WARM` / `roomLevel`, `indoors` for the halos |
+| `src/client/world/theatre.ts` | `buildTheatre`: the switch on the wall, its rocker, lamp and setting sign, and the light off the screen |
 
 ## Controls
 
@@ -254,9 +307,10 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
 - **🖥️ Share screen** is there too, because sharing used to be what **E** at the TV did; starting one
   turns the link off the screen (see above), and **▶️ Play** brings it back once the share ends.
 - The hint bar over the TV says what's on before you press anything.
-- **E** at the switch by the wall puts the room in theatre mode and **E** again brings the light
-  back. It's the floor's, not yours, so it works the same from the **🎬 / 💡** row in the TV window
-  (handy from the couch), and the office says who threw it either way.
+- **E** at the switch by the wall steps the room through its three settings — **💡 Lights up**,
+  **🕯️ Warm dim**, **🎬 Lights out** — and round again. It's the floor's, not yours, so it works the
+  same from the three-button **The room** row in the TV window (handy from the couch), and the hint
+  bar at the plate says which one you're in and what the next press will do.
 
 ## Limits, and what's deliberately left out
 
@@ -273,14 +327,17 @@ The server answers every one of them with `{ t: 'tv', state }`, which the browse
   as before, but a link plays on the TV itself, which is 6.4 m across. A second screen elsewhere in
   the room (the walls are all spoken for: boards, windows, the ladder, the hoop, the elevator) would
   need its own seating, and is the obvious next step if two things need to be on at once.
-- **Theatre mode dims the whole office, not just the lounge.** The room is one open space, so the
+- **The setting dims the whole office, not just the lounge.** The room is one open space, so the
   switch can't light one end of it without the other, and the shader works out "inside the office's
   walls" rather than "near the TV". The lamps' halos are sorted the same way, so the balcony and
   the street keep their lights.
-- **The switch stays where it was left.** Turning the TV off doesn't turn the lights back on,
-  because a switch is a switch; the **💡 Lights back up** row, or **E** at the plate, is how you
-  undo it, and the state is kept in `tv.json` with everything else about the screen.
+- **The switch stays where it was left.** Turning the TV off doesn't change the light, because a
+  switch is a switch; the row in the window, or **E** at the plate, is how you change it, and the
+  setting is kept in `tv.json` with everything else about the screen.
+- **The middle setting is one number, not a slider.** 42% of `ROOM_DIM` and a warm tint, which is
+  what "a dim warm white" turned out to be worth in practice. Changing it is a change to
+  `ROOM_LIGHT.dim` and the tests that hold its brightness and warmth; there is no setting to move.
 
-TV playback controls and theatre lighting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
+TV playback controls and the room's lighting setting update every viewer on the floor immediately, including hosted floors. External video playback still depends on the source allowing playback/embedding.
 
 At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.

@@ -434,6 +434,8 @@ export class HostFloors {
         return await floor.tv.stop(s('by'));
       case 'tv.theatre':
         return await floor.tv.theatre(m.on === true, s('by'));
+      case 'tv.lights':
+        return await floor.tv.lights(m.light, s('by'));
 
       case 'meeting.start':
       case 'meeting.stop':

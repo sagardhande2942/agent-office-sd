@@ -24,11 +24,33 @@ import type { NightParts } from './outside';
 export const MAX_LAMPS = 24;
 export const DEG = Math.PI / 180;
 /**
- * How much of the room's own light the theatre switch takes away, at full (see skyRoomLight): enough
+ * How much of the room's own light the switch by the TV takes away at full (see `roomLevel`): enough
  * that the picture on the TV is clearly the brightest thing in the office, and the people in it are
- * lit by it, but a shape by the window is still a shape and not a hole in the dark.
+ * lit by it, but a shape by the window is still a shape and not a hole in the dark. The middle
+ * setting asks for part of it, and warms what's left towards ROOM_WARM.
  */
-export const THEATRE_DIM = 0.84;
+export const ROOM_DIM = 0.84;
+/** The room's own light with nothing asked of it: every colour the same, and every one of them full. */
+export const ROOM_LIT = new THREE.Color(1, 1, 1);
+/**
+ * The warm white the room's own light goes in the middle setting: a lamp turned down, not a blue
+ * screen, and only a shade off white so it reads as warmth rather than as an orange room. Normalised
+ * to its own brightness (see `luma`), so the tint costs no light of its own and ROOM_DIM is the only
+ * thing that says how much of the room is left.
+ */
+export const ROOM_WARM = new THREE.Color('#fff0e4');
+/** How much light a linear colour has, the way the eye weighs it. */
+export const luma = (r: number, g: number, b: number) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+ROOM_WARM.multiplyScalar(1 / luma(ROOM_WARM.r, ROOM_WARM.g, ROOM_WARM.b));
+
+/**
+ * How much of the room's light is left with `down` (0–1) of it gone: what the shader's `skyRoom`
+ * scales by, and the one number the halos and your own hands are given, so the two can't drift apart.
+ *
+ * Worked out from the setting asked for rather than off what the last frame left, which is what lets
+ * the office's lights come back exactly as they were however often the switch is thrown.
+ */
+export const roomLevel = (down: number) => 1 - clamp01(down) * ROOM_DIM;
 /**
  * The furthest off the haze ever is, however high up you are: past that nothing's built (the grass
  * and the road round the office end there, the city round the roof just past it), so it hides that.
@@ -79,8 +101,8 @@ export const uniforms = {
   /** Lamplight filling the office, and the garage: color × strength, in the units of three.js lights. */
   skyOffice: { value: new THREE.Color(0, 0, 0) },
   skyGarage: { value: new THREE.Color(0, 0, 0) },
-  /** How far the room's own light is down for the picture (the switch by the TV), 0–1. */
-  skyTheatre: { value: 0 },
+  /** What is left of the room's own light, in colour: white at full, warm and down at the switch (see roomLight). */
+  skyRoom: { value: new THREE.Color(1, 1, 1) },
   skyLampCount: { value: 0 },
   /** Each lamp's position and reach, and its color × strength. */
   skyLamps: { value: Array.from({ length: MAX_LAMPS }, () => new THREE.Vector4()) },
@@ -114,7 +136,7 @@ export const ROOM_PARS = /* glsl */ `
 varying vec3 vSkyWorld;
 uniform float skyOn;
 uniform float skyInside;
-uniform float skyTheatre;
+uniform vec3 skyRoom;
 uniform vec4 skyWing;
 
 // Inside the office's walls, up to the given height and no further, or in the back office's, up to
@@ -130,11 +152,12 @@ float skyInsideOf( vec3 p, float top ) {
 // Up through the office's open top, as far as its light reaches.
 float skyInOffice( vec3 p ) { return skyInsideOf( p, ${SHAFT_TOP.toFixed(1)} ); }
 
-// The theatre switch by the TV: what is left of the room's own light where the fragment is indoors,
-// which is the whole room at once (see Sky.setTheatre). The sun and the sky still come in through
-// the windows and the street keeps its lamps; it is the room's own light that goes out, leaving the
-// picture on the screen the brightest thing in it.
-float skyRoomLight( float indoor ) { return 1.0 - ${THEATRE_DIM} * skyTheatre * indoor; }
+// The switch by the TV: what is left of the room's own light where the fragment is indoors, which is
+// the whole room at once (see Sky.setRoomLight). The sun and the sky still come in through the windows
+// and the street keeps its lamps; it is the room's own light that goes down and warms, leaving the
+// picture on the screen the brightest thing in it. The room factor is 0 outdoors, so nothing out
+// there changes.
+vec3 skyRoomAt( float indoor ) { return mix( vec3( 1.0 ), skyRoom, indoor ); }
 `;
 
 export const PARS = /* glsl */ `
@@ -179,15 +202,16 @@ material.diffuseColor *= 1.0 - 0.38 * skyWet * skyUp;
 material.diffuseColor = mix( material.diffuseColor, vec3( 0.93, 0.96, 1.0 ), skySnow * skyUp );
 `;
 
-/** The lamps' light, added to what the sun and the sky give, then the room's light turned down. */
+/** The lamps' light, added to what the sun and the sky give, then the room's own light turned down. */
 export const LIGHT = (screen: boolean) => /* glsl */ `
 if ( skyOn > 0.0 ) {
   vec3 skyLight = skyIndoor * skyOffice * ( 0.65 + 0.35 * skyN.y ) + ( 1.0 - skyIndoor ) * ( skyGar * skyGarage + skyLampsAt( vSkyWorld, skyN ) );
   reflectedLight.indirectDiffuse += skyLight * BRDF_Lambert( material.diffuseColor );${screen ? '' : `
-  // The theatre switch: the room's own light down, so the picture on the wall reads (skyRoomLight).
-  // Everything the sun, the sky and the lamps have just given the room goes with it, the lamp globes
-  // included; the TV's screen is drawn unlit, so it doesn't, and the street outside is untouched.
-  float skyRoom = skyRoomLight( skyIndoor );
+  // The switch by the TV: the room's own light down and warm, so the picture on the wall reads
+  // (skyRoomAt). Everything the sun, the sky and the lamps have just given the room goes with it,
+  // the lamp globes included; the TV's screen is drawn unlit, so it doesn't, and the street outside
+  // is untouched.
+  vec3 skyRoom = skyRoomAt( skyIndoor );
   reflectedLight.directDiffuse *= skyRoom;
   reflectedLight.indirectDiffuse *= skyRoom;
   totalEmissiveRadiance *= skyRoom;`}
@@ -239,17 +263,17 @@ export const HAZE_PARS = /* glsl */ `
 `;
 
 /**
- * The theatre dim for the unlit materials (glass, signs, the meeting panel, the TV's own dark
+ * The room's light for the unlit materials (glass, signs, the meeting panel, the TV's own dark
  * screen): the lit ones have their light taken away in LIGHT instead, so this is only for what's
  * drawn with no light on it at all. A material can ask to be left out of it — the TV's screen does,
  * because a screen share is painted on that mesh rather than over the canvas, and the one thing
  * the switch must never take away is the picture itself.
  */
 export const UNLIT_ROOM = /* glsl */ `
-  gl_FragColor.rgb *= skyRoomLight( skyInOffice( vSkyWorld ) * skyOn * skyInside );
+  gl_FragColor.rgb *= skyRoomAt( skyInOffice( vSkyWorld ) * skyOn * skyInside );
 `;
 
-/** The haze over a lit or unlit material, with the theatre dim after it unless it's a screen. */
+/** The haze over a lit or unlit material, with the room's light after it unless it's a screen. */
 export const HAZE = (unlitRoom: string) => /* glsl */ `
 #ifdef USE_FOG
   #ifdef FOG_EXP2
@@ -268,8 +292,8 @@ ${unlitRoom}
 // Everything with fog gets the haze above, and knows which room it's in to work it out; every lit
 // material also gets the lines before that, sharing one set of uniforms. Nothing else in the office
 // uses onBeforeCompile, so this is its default; unlit ones (glass, signs, outlines) get the haze and
-// the theatre dim. A material with `userData.theatreLit` set is a light in its own right — the TV's
-// screen, which a share is painted on — and the switch leaves it alone, whichever kind it is.
+// the room's own light. A material with `userData.theatreLit` set is a light in its own right — the
+// TV's screen, which a share is painted on — and the switch leaves it alone, whichever kind it is.
 THREE.Material.prototype.onBeforeCompile = function (shader) {
   const foggy = shader.fragmentShader.includes('#include <fog_fragment>');
   const lit = shader.fragmentShader.includes('#include <lights_fragment_end>');
@@ -280,8 +304,8 @@ THREE.Material.prototype.onBeforeCompile = function (shader) {
   const screen = this.userData.theatreLit === true;
   shader.uniforms.skyOn = uniforms.skyOn;
   shader.uniforms.skyInside = uniforms.skyInside;
-  // The theatre dim reaches the unlit materials too, so it goes in with the room test both want.
-  shader.uniforms.skyTheatre = uniforms.skyTheatre;
+  // The room's own light reaches the unlit materials too, so it goes in with the room test both want.
+  shader.uniforms.skyRoom = uniforms.skyRoom;
   shader.uniforms.skyWing = uniforms.skyWing;
   // Which room a fragment is in goes to everything with fog, for the haze over it; the lamps and
   // the lamplight from them are the lit materials' alone.
@@ -395,8 +419,8 @@ export const sheltered = (x: number, z: number) =>
   (x > B.minX - 0.05 && x < B.maxX + 0.05 && z > B.minZ - 0.05 && z < B.maxZ + 0.05) || (!!wingBox && x > wingBox.minX - 0.05 && x < wingBox.maxX + 0.05 && z > wingBox.minZ - 0.05 && z < wingBox.maxZ);
 
 /**
- * Whether a light is the office's own, in the room: what the theatre switch puts out (see
- * setTheatre). The back office is counted at its widest, so its lamps go out with the rest of the
+ * Whether a light is the office's own, in the room: what the switch by the TV puts out (see
+ * setRoomLight). The back office is counted at its widest, so its lamps go out with the rest of the
  * room — there are none in there until it's been built out anyway. This is the shader's own
  * `skyInOffice` in numbers, for the halos, which are points and so aren't lit at all.
  */
@@ -418,9 +442,12 @@ export class Sky {
   snow = 0;
   /** How far the lamps are on, 0–1: at night, and on the darkest of days. */
   lampsOn = 0;
-  /** How far the room's own light is down for the picture, 0–1, easing (see setTheatre). */
-  theatre = 0;
-  private theatreOn = false;
+  /** How far the room's own light is down for the picture and how warm it has gone, 0–1, easing (see setRoomLight). */
+  roomDown = 0;
+  roomWarm = 0;
+  /** How much of the room's light is left as one number, for the halos and your hands. */
+  private roomLevel = 1;
+  private room: { down: number; warm: number } = { down: 0, warm: 0 };
   /** Up on the roof: out in the open, over the whole city (see setRoof). */
   private roof = false;
   /** In a hall with a roof and walls all round (a map other than the office's, see setIndoors). */
@@ -628,12 +655,13 @@ export class Sky {
   }
 
   /**
-   * The theatre switch by the TV (see shared/tv.ts): the room's own light goes down, so the picture
-   * on the wall is the brightest thing in the office. Eased in `update` rather than snapped, the way
-   * a dimmer is, and the floor's — everybody on it hears the same switch go over.
+   * The switch by the TV (see client/features/tv/lighting.ts): how far down, and how warm, the
+   * room's own light is — all the way down and white in the lights-out mode, a dim warm white in
+   * between. Eased in `update` rather than snapped, the way a dimmer is, and the floor's — everybody
+   * on it hears the same switch go over.
    */
-  setTheatre(on: boolean) {
-    this.theatreOn = on;
+  setRoomLight(light: { down: number; warm: number }) {
+    this.room = light;
   }
 
   /**
@@ -663,7 +691,7 @@ export class Sky {
     const inside = !this.roof && ((p.x > FLOOR.minX && p.x < FLOOR.maxX && p.z > FLOOR.minZ && p.z < FLOOR.maxZ) || (sheltered(p.x, p.z) && (p.y < 0 || p.z < FLOOR.minZ)));
     // Your own hands go down with the room's light, or you'd be the one lit thing in the picture —
     // but only in the room itself, not in the garage under it or out on the landing.
-    if (inside) return 1 - (indoors(p) ? THEATRE_DIM * this.theatre : 0);
+    if (inside) return 1 - (indoors(p) ? 1 - this.roomLevel : 0);
     let lamp = 0;
     if (!this.roof) {
       const drop = STREET_Y - this.street;
@@ -700,8 +728,10 @@ export class Sky {
     this.spooky = step(this.spooky, this.theme === 'halloween' ? 1 : 0, 12);
     this.festive = step(this.festive, this.theme === 'christmas' ? 1 : 0, 12);
     // The switch by the TV: a dimmer, not a light switch, so the room comes down over a second.
-    this.theatre = step(this.theatre, this.theatreOn ? 1 : 0, 1.1);
-    uniforms.skyTheatre.value = this.theatre;
+    this.roomDown = step(this.roomDown, this.room.down, 1.1);
+    this.roomWarm = step(this.roomWarm, this.room.warm, 1.1);
+    this.roomLevel = roomLevel(this.roomDown);
+    uniforms.skyRoom.value.copy(ROOM_WARM).lerp(ROOM_LIT, 1 - this.roomWarm).multiplyScalar(this.roomLevel);
     const sp = this.spooky;
 
     // The weather, easing from one spell to the next.
@@ -776,8 +806,8 @@ export class Sky {
     for (const b of this.night.bulbs) b.mat.emissiveIntensity = lerp(b.day, 1, this.lampsOn);
     for (const m of this.night.windows) m.emissiveIntensity = this.lampsOn * 1.1;
     for (const h of this.halos) {
-      // The office's own bulbs go out with the switch (see setTheatre); the street's don't.
-      const on = this.lampsOn * (h.indoors ? 1 - THEATRE_DIM * this.theatre : 1);
+      // The office's own bulbs go down with the switch (see setRoomLight); the street's don't.
+      const on = this.lampsOn * (h.indoors ? this.roomLevel : 1);
       h.points.material.opacity = on * 0.85;
       h.points.visible = on > 0.01 && !this.roof && !this.indoors;
     }
