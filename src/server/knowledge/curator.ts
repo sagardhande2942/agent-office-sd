@@ -80,7 +80,7 @@ export class KnowledgeCurator {
     if (this.controller) throw Error('Curator already running');
     if (!this.providers.includes(this.disk.settings.provider)) throw Error('Install the selected curator agent');
     const controller = new AbortController(); this.controller = controller;
-    const run: CuratorRun = { id: randomUUID(), startedAt: Date.now(), trigger, provider: this.disk.settings.provider, status: 'running', summary: '', changed: 0, skipped: 0 };
+    const run: CuratorRun = { id: randomUUID(), startedAt: Date.now(), trigger, provider: this.disk.settings.provider, model: this.disk.settings.model, status: 'running', summary: '', changed: 0, skipped: 0 };
     let draft: Awaited<ReturnType<typeof prepareKnowledgeDelivery>> | undefined;
     this.disk.runs.push(run); this.save();
     try {

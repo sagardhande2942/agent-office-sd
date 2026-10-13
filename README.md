@@ -588,3 +588,5 @@ Model selectors offer **Use office default** to copy the provider, model and eff
 The **☰ Office menu** has a bounded, scrollable action list. Search finds actions and display settings across all categories; **Open**, **Together**, **Office**, and **Display** narrow browsing. **Pinned** shows your saved favorites, and the pin beside each action adds it to the top bar. Clear search to return to your selected category. Arrow keys navigate results; **Tab**, **Esc**, or the top-right **✕** closes the menu and restores mouse-look.
 
 Knowledge is shared immediately across office workers. Use the Knowledge shelf's **Publish review** to persist shared notes in a separate PR and **Sync approved** to apply merged proposals. Curator proposals stay separate until approved; stale note edits are rejected. See [Knowledge Tree](docs/knowledge.md) for review policies and recovery.
+
+Curator failures show bounded, credential-redacted CLI diagnostics and the model used by the run. If a provider request fails intermittently, retry Run now; a failed proposal remains available for inspection.

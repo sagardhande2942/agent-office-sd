@@ -7,6 +7,14 @@ import { CURATOR_PROVIDERS } from '../../shared/lore-curator.js';
 import { providerCommand } from '../agents.js';
 import { resolveCommand } from '../workers/process.js';
 export type CuratorAgent = (settings: CuratorSettings, prompt: string, signal: AbortSignal, schema?: typeof CURATOR_SCHEMA) => Promise<unknown>;
+/** Return actionable diagnostics without echoed knowledge or credentials. */
+export function curatorErrorDetail(stderr: string): string {
+  const clean = stderr.replace(/\x1b\[[0-9;]*m/g, '');
+  const lines = clean.split(/\r?\n/).filter(line => /(?:^\s*(?:error|fatal|"message"|"code")\s*[:=]|invalid_request_error|unauthorized|rate.limit|quota|unsupported.*model|authentication.*failed)/i.test(line));
+  return lines.join('\n').replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
+    .replace(/\b(?:sk-[\w-]+|gh[pousr]_[\w]+|github_pat_[\w]+)\b/g, '[redacted]')
+    .replace(/((?:api[_-]?key|access[_-]?token|password|secret)\s*[=:]\s*)[^\s,;]+/gi, '$1[redacted]').slice(0, 2000);
+}
 export const CURATOR_SCHEMA = { type: 'object', additionalProperties: false, required: ['summary', 'actions'], properties: {
   summary: { type: 'string' }, actions: { type: 'array', items: { type: 'object', additionalProperties: false,
     required: ['action', 'id', 'target', 'reason', 'evidence'], properties: { action: { type: 'string', enum: ['merge', 'archive', 'verify', 'flag'] },
@@ -43,15 +51,16 @@ export function createCuratorAgent(commands: Partial<Record<CuratorProvider, str
       for (const key of Object.keys(env)) if (/^(AGENT_OFFICE_|CLAUDECODE$|CLAUDE_CODE_|CODEX_THREAD_ID$|CODEX_INTERNAL_ORIGINATOR_OVERRIDE$)/.test(key)) delete env[key];
       const output = await new Promise<string>((resolve, reject) => {
         const child = spawn(command, args, { cwd: temp, env, stdio: ['pipe', 'pipe', 'pipe'], signal, killSignal: 'SIGKILL', timeout: 5 * 60000 });
-        let out = '', bytes = 0, capped = false;
+        let out = '', err = '', bytes = 0, capped = false;
         const receive = (chunk: Buffer, stdout: boolean) => {
           bytes += chunk.length; if (bytes > 1024 * 1024) { capped = true; child.kill('SIGKILL'); }
           else if (stdout) out += chunk.toString();
+          else err += chunk.toString();
         };
         child.stdout.on('data', c => receive(c, true)); child.stderr.on('data', c => receive(c, false));
         child.stdin.on('error', () => {}); child.stdin.end(prompt);
         child.on('error', reject);
-        child.on('close', (code, sig) => code === 0 && !capped ? resolve(out) : reject(Error(capped ? 'Curator output exceeded its limit' : `Curator agent ended (${sig ?? code}); check its installation, login and chosen model`)));
+        child.on('close', (code, sig) => code === 0 && !capped ? resolve(out) : reject(Error(capped ? 'Curator output exceeded its limit' : `Curator agent ended (${sig ?? code})${curatorErrorDetail(err) ? ': ' + curatorErrorDetail(err) : '; no diagnostic returned. Check installation, login and chosen model.'}`)));
       });
       if (settings.provider === 'codex') return JSON.parse(readFileSync(result, 'utf8'));
       const envelope = JSON.parse(output);
