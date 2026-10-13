@@ -593,4 +593,6 @@ The shelf keeps review history in an expandable **Reviews** summary so long deli
 
 If a curator plan contains conflicting actions on the same note, it gets one correction attempt before any edits are applied.
 
+Knowledge publication accepts HTTPS and SSH GitHub/GitLab origins with a `.git` suffix. Failed publication retains its proposal branch for recovery; see [Knowledge Tree](docs/knowledge.md).
+
 Curator failures show bounded, credential-redacted CLI diagnostics and the model used by the run. If a provider request fails intermittently, retry Run now; a failed proposal remains available for inspection.

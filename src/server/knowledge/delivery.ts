@@ -49,11 +49,15 @@ function save(store: KnowledgeStore, record: KnowledgeDelivery) {
     data.records = [...records.filter(r => r.id !== record.id), record];
   });
 }
-function forge(store: KnowledgeStore) {
-  const remote = knowledgeGit(store.checkout, ['remote', 'get-url', 'origin']);
-  const match = remote.match(/^(?:https:\/\/|git@)(github\.com|gitlab\.com)[:/]([\w.-]+(?:\/[\w.-]+)+?)(?:\.git)?$/);
+export function knowledgeForge(remote: string) {
+  const match = remote.match(/^(?:https:\/\/|git@)(github\.com|gitlab\.com)[:/]([\w.-]+(?:\/[\w.-]+)+)$/);
   if (!match) throw Error('Knowledge publishing supports verified github.com or gitlab.com origin URLs');
-  return { cli: match[1] === 'github.com' ? 'gh' : 'glab', repo: match[2] };
+  const repo = match[2].replace(/\.git$/, '');
+  if (repo.split('/').some(part => !part || part === '.' || part === '..') || match[1] === 'github.com' && repo.split('/').length !== 2) throw Error('Invalid knowledge repository path');
+  return { cli: match[1] === 'github.com' ? 'gh' : 'glab', repo };
+}
+function forge(store: KnowledgeStore) {
+  return knowledgeForge(knowledgeGit(store.checkout, ['remote', 'get-url', 'origin']));
 }
 export async function prepareKnowledgeDelivery(store: KnowledgeStore, kind: 'edit' | 'curation', options: DeliveryOptions = {}) {
   if (!options.publishBranch) forge(store);

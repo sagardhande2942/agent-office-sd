@@ -5,7 +5,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { KnowledgeStore } from '../src/server/knowledge/store.js';
 import { applyKnowledgeActions, curationBatch } from '../src/server/knowledge/curation.js';
-import { deliveries, prepareKnowledgeDelivery, finishKnowledgeDelivery, publishKnowledge, syncKnowledge, proposeKnowledgeRevert, knowledgeGit as git } from '../src/server/knowledge/delivery.js';
+import { deliveries, prepareKnowledgeDelivery, finishKnowledgeDelivery, publishKnowledge, syncKnowledge, proposeKnowledgeRevert, knowledgeForge, knowledgeGit as git } from '../src/server/knowledge/delivery.js';
+
+test('forge repository arguments strip the Git suffix for HTTPS and SSH origins', () => {
+  for (const prefix of ['https://github.com/', 'git@github.com:']) for (const suffix of ['', '.git']) {
+    assert.deepEqual(knowledgeForge(`${prefix}sagardhande2942/agent-office-sd${suffix}`), { cli: 'gh', repo: 'sagardhande2942/agent-office-sd' });
+  }
+  for (const prefix of ['https://gitlab.com/', 'git@gitlab.com:']) for (const suffix of ['', '.git']) {
+    assert.deepEqual(knowledgeForge(`${prefix}group/subgroup/project${suffix}`), { cli: 'glab', repo: 'group/subgroup/project' });
+  }
+  assert.equal(knowledgeForge('https://github.com/owner/my.git.project.git').repo, 'owner/my.git.project');
+  for (const remote of ['https://github.com.evil.test/owner/repo.git', 'https://github.com/owner/repo/extra.git', 'https://github.com/owner/..', 'https://gitlab.com/group/.git', 'file:///repo.git']) assert.throws(() => knowledgeForge(remote));
+});
 
 const fm = { title: 'Build', summary: 'Build commands' };
 function fixture(t: { after(fn: () => void): void }) {
