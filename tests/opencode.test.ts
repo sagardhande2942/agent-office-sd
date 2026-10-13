@@ -110,8 +110,8 @@ async function effortPlugin(t: { after(fn: () => void): void }, effort: string, 
   });
   Object.assign(process.env, { AGENT_OFFICE_HOOK_URL: 'http://127.0.0.1:1', AGENT_OFFICE_HOOK_TOKEN: 'token', AGENT_OFFICE_WORKER_ID: 'worker', AGENT_OFFICE_SESSION_ID: '', AGENT_OFFICE_EFFORT: effort, AGENT_OFFICE_MODEL: model });
   globalThis.fetch = (async () => new Response(null, { status: 200 })) as typeof fetch;
-  const mod = await import(`${pathToFileURL(writeOpenCodePlugin(dir)).href}?effort=${Date.now()}-${Math.random()}`) as { default: (ctx?: unknown) => Promise<any> };
-  const hooks = await mod.default({});
+  const mod = await import(`${pathToFileURL(writeOpenCodePlugin(dir)).href}?effort=${Date.now()}-${Math.random()}`) as { default: { server: (ctx?: unknown) => Promise<any> } };
+  const hooks = await mod.default.server({});
   /**
    * One message as OpenCode hands it to the hook: `tui` is the variant its TUI sent, and `variants`
    * is false for an OpenCode from before it had any. Returns the variant it's saved with.
@@ -183,8 +183,8 @@ test('writes a loadable plugin module that forwards root events and excludes sub
       sent.push(JSON.parse(String(init?.body)));
       return new Response(null, { status: 200 });
     }) as typeof fetch;
-    const mod = await import(`${pathToFileURL(file).href}?test=${Date.now()}`) as { default: (ctx?: unknown) => Promise<any> };
-    const hooks = await mod.default({});
+    const mod = await import(`${pathToFileURL(file).href}?test=${Date.now()}`) as { default: { server: (ctx?: unknown) => Promise<any> } };
+    const hooks = await mod.default.server({});
     await hooks.event({ event: { type: 'session.status', properties: { sessionID: 'ses_existing', status: { type: 'busy' } } } });
     await hooks.event({ event: { type: 'session.created', properties: { info: { id: 'ses_root' } } } });
     await hooks.event({ event: { type: 'session.created', properties: { info: { id: 'ses_child', parentID: 'ses_root' } } } });
@@ -224,7 +224,7 @@ test('writes a loadable plugin module that forwards root events and excludes sub
 
     // Selecting an existing root conversation emits no session.created event. Verify it through
     // the SDK before adopting it, and serialize that lookup with subsequent busy/idle events.
-    const selected = await mod.default({ client: { session: { get: async ({ path }: any) => {
+    const selected = await mod.default.server({ client: { session: { get: async ({ path }: any) => {
       await new Promise((resolve) => setTimeout(resolve, 10));
       return { data: { id: path.id, ...(path.id === 'child' ? { parentID: 'parent' } : {}) } };
     } } } });
@@ -316,8 +316,8 @@ test('hydrates persisted OpenCode root and child usage without blocking plugin s
         };
       },
     };
-    const mod = await import(`${pathToFileURL(file).href}?hydrate=${Date.now()}`) as { default: (ctx?: unknown) => Promise<any> };
-    await mod.default({ client: { session } });
+    const mod = await import(`${pathToFileURL(file).href}?hydrate=${Date.now()}`) as { default: { server: (ctx?: unknown) => Promise<any> } };
+    await mod.default.server({ client: { session } });
     await new Promise((resolve) => setTimeout(resolve, 20));
     assert.deepEqual(sent, [{ type: 'usage', sessionId: 'hydrate-root', usage: {
       input: 12, output: 5, reasoning: 1, cacheRead: 3, cacheWrite: 1, cost: 0.5, calls: 2, costKnown: true,
@@ -354,8 +354,8 @@ test('marks live OpenCode usage incomplete when hydration fails', async () => {
       children: async function () { assert.equal(this, session); throw new Error('children unavailable'); },
       messages: async function () { assert.equal(this, session); return { error: { message: 'messages unavailable' } }; },
     };
-    const mod = await import(`${pathToFileURL(file).href}?partial=${Date.now()}`) as { default: (ctx?: unknown) => Promise<any> };
-    const hooks = await mod.default({ client: { session } });
+    const mod = await import(`${pathToFileURL(file).href}?partial=${Date.now()}`) as { default: { server: (ctx?: unknown) => Promise<any> } };
+    const hooks = await mod.default.server({ client: { session } });
     await hooks.event({ event: { type: 'message.updated', properties: { sessionID: 'partial-root', info: {
       id: 'partial-message', sessionID: 'partial-root', role: 'assistant', cost: 0.1,
       tokens: { input: 2, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
@@ -375,7 +375,7 @@ test('marks live OpenCode usage incomplete when hydration fails', async () => {
 test('planning plugin denies edits, commands, delegation and unrelated MCP tools for either role',async()=>{
  const dir=mkdtempSync(path.join(tmpdir(),'office-plan-plugin-'));const previous=process.env.AGENT_OFFICE_PLAN_ROLE;const before=Object.fromEntries(['AGENT_OFFICE_HOOK_URL','AGENT_OFFICE_HOOK_TOKEN','AGENT_OFFICE_WORKER_ID'].map(k=>[k,process.env[k]]));
  process.env.AGENT_OFFICE_HOOK_URL='http://127.0.0.1:1';process.env.AGENT_OFFICE_HOOK_TOKEN='test';process.env.AGENT_OFFICE_WORKER_ID='candidate';
- try {const file=writeOpenCodePlugin(dir);const mod=await import(`${pathToFileURL(file).href}?planning=${Date.now()}`);const hooks=await mod.default({});
+ try {const file=writeOpenCodePlugin(dir);const mod=await import(`${pathToFileURL(file).href}?planning=${Date.now()}`);const hooks=await mod.default.server({});
  for(const role of ['candidate','reviewer']){process.env.AGENT_OFFICE_PLAN_ROLE=role;for(const tool of ['bash','shell','edit','write','patch','task','agent-office_send_home','other_mcp_tool'])assert.throws(()=>hooks['tool.execute.before']({sessionID:'child',tool}),/planning session/);await hooks['tool.execute.before']({sessionID:'child',tool:'read'});await hooks['tool.execute.before']({sessionID:'child',tool:'agent-office_plan_review_state'});}
  process.env.AGENT_OFFICE_PLAN_ROLE='candidate';assert.throws(()=>hooks['tool.execute.before']({tool:'agent-office_submit_plan_review'}),/planning session/);
  process.env.AGENT_OFFICE_PLAN_ROLE='reviewer';assert.throws(()=>hooks['tool.execute.before']({tool:'agent-office_submit_candidate_plan'}),/planning session/);

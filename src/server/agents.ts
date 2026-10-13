@@ -9,7 +9,7 @@ import { AGENT_PROVIDERS, PROVIDER_META, isAgentEffort, providerMeta, providerNa
  */
 export function configuredProvider(command: string): AgentProvider {
   const base = path.basename(command.replaceAll('\\', '/')).toLowerCase().replace(/\.(?:exe|cmd|bat|com)$/, '');
-  return AGENT_PROVIDERS.find((p) => PROVIDER_META[p].bin === base) ?? 'custom';
+  return AGENT_PROVIDERS.find((p) => PROVIDER_META[p].bin === base || !!PROVIDER_META[p].bins?.includes(base)) ?? 'custom';
 }
 
 /** The providers an office started with `configured` can hire: the ones it knows, and a custom --agent only when that's what it was started with. */

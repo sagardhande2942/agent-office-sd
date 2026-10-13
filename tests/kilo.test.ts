@@ -20,7 +20,7 @@ const config = (dir: string, name = 'kilo.json') => JSON.parse(readFileSync(path
 
 test('the Kilo CLI is a provider of its own, taking a provider/model and an effort', () => {
   for (const cmd of ['kilo', '/opt/bin/kilo', 'C:\\bin\\kilo.exe']) assert.equal(configuredProvider(cmd), 'kilo');
-  assert.equal(configuredProvider('kilocode'), 'custom');
+  assert.equal(configuredProvider('kilocode'), 'kilo');
   assert.equal(providerCommand('kilo', 'claude'), 'kilo');
   assert.equal(PROVIDER_META.kilo.bin, 'kilo');
   assert.equal(validateWorkerModel('agent', 'kilo', 'kilo/anthropic/claude-opus-5.5'), undefined);
@@ -97,7 +97,7 @@ test('a Kilo config the office cannot parse fails the launch instead of losing t
 test('the adapter runs Kilo with the office plugin installed, and its effort through that plugin', () => {
   withTemp((dir) => {
     const setup = kilo.prepare!({ dataDir: dir, mcpScript: '/office/bin/office-workers.js', dshProfile: 'acp' });
-    assert.ok(setup.plugin.endsWith('agent-office-opencode.mjs'));
+    assert.ok(setup.plugin.endsWith(path.join('agent-office-opencode', 'index.mjs')));
     assert.deepEqual(setup.mcp, MCP);
     const h: any = { info: { id: 'worker', model: 'kilo/anthropic/claude-opus-5.5', effort: 'high', planReview: { locked: true } }, state: {} };
     const launch = kilo.launch({ h, args: [], prompt: 'Do the work', cwd: dir, setup });

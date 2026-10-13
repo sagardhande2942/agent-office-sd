@@ -23,25 +23,28 @@ export interface OpenCodeUsageEvent {
 
 export type OpenCodeHookEvent = OpenCodeStatusEvent | OpenCodeUsageEvent;
 
+/** The key an inline OpenCode config lists its plugins under: `plugin` in OpenCode 1, `plugins` in OpenCode 2. */
+export type OpenCodePluginKey = 'plugin' | 'plugins';
+
 /**
  * Merge the per-process plugin, and the office's MCP server when there is one (`mcp`, see
  * openCodeMcp), into inline OpenCode config without touching user config files.
  */
-export function mergeOpenCodeConfigContent(existing: string | undefined, plugin: string, mcp?: Record<string, unknown>): string {
+export function mergeOpenCodeConfigContent(existing: string | undefined, plugin: string, mcp?: Record<string, unknown>, pluginKey: OpenCodePluginKey = 'plugin'): string {
   let config: Record<string, unknown> = {};
   if (existing) {
     try {
       const parsed: unknown = JSON.parse(existing);
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('not an object');
       config = { ...(parsed as Record<string, unknown>) };
-      if (config.plugin !== undefined && !Array.isArray(config.plugin)) throw new Error('plugin is not an array');
+      if (config[pluginKey] !== undefined && !Array.isArray(config[pluginKey])) throw new Error(`${pluginKey} is not an array`);
     } catch {
       throw new Error('OPENCODE_CONFIG_CONTENT must be valid JSON');
     }
   }
-  const plugins = Array.isArray(config.plugin) ? [...config.plugin] : [];
+  const plugins = Array.isArray(config[pluginKey]) ? [...(config[pluginKey] as unknown[])] : [];
   if (!plugins.includes(plugin)) plugins.push(plugin);
-  config.plugin = plugins;
+  config[pluginKey] = plugins;
   if (mcp) {
     const theirs = config.mcp && typeof config.mcp === 'object' && !Array.isArray(config.mcp) ? (config.mcp as Record<string, unknown>) : {};
     config.mcp = { ...theirs, ...mcp };
@@ -49,50 +52,52 @@ export function mergeOpenCodeConfigContent(existing: string | undefined, plugin:
   return JSON.stringify(config);
 }
 
-/** Write the self-contained plugin used for every OpenCode worker process. */
+/** The manifest OpenCode 2 needs before it will load a configured plugin directory. */
+const OPENCODE_PLUGIN_MANIFEST = JSON.stringify({
+  name: 'agent-office-opencode',
+  version: '1.0.0',
+  type: 'module',
+  main: 'index.mjs',
+  exports: { '.': './index.mjs' },
+}, null, 2) + '\n';
+
+/**
+ * Write the plugin every OpenCode and Kilo worker loads, as a package directory (its entry module
+ * plus the manifest OpenCode 2 requires), and return the entry module's path.
+ */
 export function writeOpenCodePlugin(dataDir: string): string {
-  mkdirSync(dataDir, { recursive: true, mode: 0o700 });
-  const file = path.join(dataDir, 'agent-office-opencode.mjs');
-  writeFileSync(file, OPENCODE_PLUGIN_SOURCE, { mode: 0o600 });
-  return file;
+  const dir = path.join(dataDir, 'agent-office-opencode');
+  const entry = path.join(dir, 'index.mjs');
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  writeFileSync(entry, OPENCODE_PLUGIN_SOURCE, { mode: 0o600 });
+  writeFileSync(path.join(dir, 'package.json'), OPENCODE_PLUGIN_MANIFEST, { mode: 0o600 });
+  return entry;
 }
 
-export function openCodePluginSpecifier(file: string): string {
-  return pathToFileURL(file).href;
+/** The module specifier OpenCode 1 and Kilo take for the plugin's entry file. */
+export function openCodePluginSpecifier(entry: string): string {
+  return pathToFileURL(entry).href;
 }
 
-/** No imports: OpenCode loads this module from the office data directory in packaged installs. */
-export const OPENCODE_PLUGIN_SOURCE = String.raw`export default async function AgentOfficeOpenCodePlugin({ client } = {}) {
+/** OpenCode 2 refuses a module file: a configured plugin is a package directory. */
+export function openCodePluginDir(entry: string): string {
+  return pathToFileURL(path.dirname(entry)).href;
+}
+
+/**
+ * The office's OpenCode/Kilo plugin, written once per floor and loaded by each worker's CLI. One
+ * default export serves both plugin APIs an OpenCode-family CLI may use: `server()` returns the
+ * hook object OpenCode 1 and Kilo take, and `setup(ctx)` drives OpenCode 2's event stream and
+ * hooks (see the Lifecycle/Events notes at the end). No imports: the CLI loads this module from the
+ * office's data directory in packaged installs.
+ */
+export const OPENCODE_PLUGIN_SOURCE = String.raw`function createBridge(input) {
+  const client = input && input.client;
   const url = process.env.AGENT_OFFICE_HOOK_URL;
   const token = process.env.AGENT_OFFICE_HOOK_TOKEN;
   const worker = process.env.AGENT_OFFICE_WORKER_ID;
-  if (!url || !token || !worker) return {};
+  const enabled = !!(url && token && worker);
   let rootSession = process.env.AGENT_OFFICE_SESSION_ID || undefined;
-  // The reasoning effort picked for this worker, for a fresh session: OpenCode calls it the model's
-  // variant, and its TUI has no flag for one. It sends each message with the variant it remembers
-  // for the model (the last one anyone used it at, in any session), so the first message goes out
-  // at the worker's own instead. The TUI then takes its variant from that message, and ctrl+t still
-  // changes it: once it sends another variant than it started with, or another model, theirs stands.
-  let effort = process.env.AGENT_OFFICE_EFFORT || undefined;
-  const effortModel = process.env.AGENT_OFFICE_MODEL || undefined;
-  let effortSession;
-  let effortOver;
-  function applyEffort(input, output) {
-    const model = output && output.message && output.message.model;
-    // An OpenCode from before variants names none here, and wouldn't know what to do with one.
-    if (!effort || !model || typeof model !== "object" || typeof input.sessionID !== "string" || !("variant" in input)) return;
-    if (!effortSession) {
-      effortSession = input.sessionID;
-      effortOver = input.variant;
-    }
-    // A subagent's messages are its own.
-    if (input.sessionID !== effortSession) return;
-    if (input.variant !== effortOver || (effortModel && model.providerID + "/" + model.modelID !== effortModel)) {
-      effort = undefined;
-      return;
-    }
-    model.variant = effort;
-  }
   const children = new Set();
   const pending = new Set();
   const usageByMessage = new Map();
@@ -110,7 +115,7 @@ export const OPENCODE_PLUGIN_SOURCE = String.raw`export default async function A
     return queued;
   }
   async function send(value) {
-    if (!value) return;
+    if (!value || !enabled) return;
     try {
       const response = await fetch(url + "/hooks/opencode?worker=" + encodeURIComponent(worker), {
         method: "POST",
@@ -302,42 +307,191 @@ export const OPENCODE_PLUGIN_SOURCE = String.raw`export default async function A
       return working();
     }
   }
+  // A tool call, once its root session is settled: what it is doing, or that it waits on the person.
+  function tool(sessionId, name) {
+    if (!sessionId || sessionId !== rootSession || children.has(sessionId)) return;
+    return send({ type: "tool", sessionId, tool: name, status: pending.size ? "needs_input" : "working" });
+  }
+  // The office's checkpoint for a finished root tool call: what it wants appended to the result.
+  async function checkpoint(sessionId) {
+    if (!sessionId || sessionId !== rootSession || children.has(sessionId)) return;
+    const response = await send({ type: "checkpoint", sessionId });
+    const context = response?.hookSpecificOutput?.additionalContext;
+    return typeof context === "string" && context.length <= 10000 ? context : undefined;
+  }
+  // A worker picked back up: read what its session already spent, without blocking its start.
   if (rootSession && client && client.session && typeof client.session.messages === "function") {
     hydrationPending = true;
     void hydrate(rootSession, usageEpoch);
   }
+  return { enabled, client, enqueue, send, compact, select, selectExisting, tool, checkpoint, pending, get rootSession() { return rootSession; } };
+}
+
+// OpenCode 1 and Kilo: a hook object, exactly what those CLIs call.
+async function openCode1(input) {
+  const bridge = createBridge(input || {});
+  if (!bridge.enabled) return {};
+  // The reasoning effort picked for this worker, for a fresh session: OpenCode calls it the model's
+  // variant, and its TUI has no flag for one. It sends each message with the variant it remembers
+  // for the model (the last one anyone used it at, in any session), so the first message goes out
+  // at the worker's own instead. The TUI then takes its variant from that message, and ctrl+t still
+  // changes it: once it sends another variant than it started with, or another model, theirs stands.
+  let effort = process.env.AGENT_OFFICE_EFFORT || undefined;
+  const effortModel = process.env.AGENT_OFFICE_MODEL || undefined;
+  let effortSession;
+  let effortOver;
+  function applyEffort(input, output) {
+    const model = output && output.message && output.message.model;
+    // An OpenCode from before variants names none here, and wouldn't know what to do with one.
+    if (!effort || !model || typeof model !== "object" || typeof input.sessionID !== "string" || !("variant" in input)) return;
+    if (!effortSession) {
+      effortSession = input.sessionID;
+      effortOver = input.variant;
+    }
+    // A subagent's messages are its own.
+    if (input.sessionID !== effortSession) return;
+    if (input.variant !== effortOver || (effortModel && model.providerID + "/" + model.modelID !== effortModel)) {
+      effort = undefined;
+      return;
+    }
+    model.variant = effort;
+  }
   return {
-    event: ({ event }) => enqueue(() => send(compact(event))),
+    event: ({ event }) => bridge.enqueue(() => bridge.send(bridge.compact(event))),
     "chat.message": (input, output) => {
       // Before anything is awaited: OpenCode saves the message as this hook leaves it.
       applyEffort(input, output);
-      return enqueue(async () => {
-        if (typeof input.sessionID !== "string" || !await selectExisting(input.sessionID)) return;
+      return bridge.enqueue(async () => {
+        if (typeof input.sessionID !== "string" || !await bridge.selectExisting(input.sessionID)) return;
         const parts = output && Array.isArray(output.parts) ? output.parts : [];
         const prompt = parts.filter((part) => part && part.type === "text" && typeof part.text === "string").map((part) => part.text).join("\n").trim().slice(0, 20000);
-        await send({ type: "prompt", sessionId: input.sessionID, status: "working", ...(prompt ? { prompt } : {}) });
+        await bridge.send({ type: "prompt", sessionId: input.sessionID, status: "working", ...(prompt ? { prompt } : {}) });
       });
     },
-    "tool.execute.after": (input, output) => enqueue(async () => {
-      if (input.sessionID !== rootSession || children.has(input.sessionID)) return;
-      const response = await send({ type: "checkpoint", sessionId: input.sessionID });
-      const context = response?.hookSpecificOutput?.additionalContext;
-      if (typeof context === "string" && context.length <= 10000 && typeof output?.output === "string") output.output += "\n\n" + context;
+    "tool.execute.after": (input, output) => bridge.enqueue(async () => {
+      const context = await bridge.checkpoint(input.sessionID);
+      if (context !== undefined && typeof output?.output === "string") output.output += "\n\n" + context;
     }),
     "tool.execute.before": (input) => {
-      const role = process.env.AGENT_OFFICE_PLAN_ROLE;
-      if (role) {
-        const tools = ["plan_review_state", ...(role === "candidate" ? ["submit_candidate_plan"] : ["request_plan_clarification", "submit_plan_review"])];
-        const allowed = ["read", "glob", "grep", "list", ...tools.flatMap(t => ["agent-office_" + t, "agent_office_" + t])];
-        if (!allowed.includes(input.tool)) throw new Error("This planning session permits repository reads and its role's plan tools only");
-
-      }
-      return enqueue(() => {
-        if (input.sessionID === rootSession && !children.has(input.sessionID)) {
-          return send({ type: "tool", sessionId: input.sessionID, tool: input.tool, status: pending.size ? "needs_input" : "working" });
-        }
-      });
+      if (planReviewBlocked(input)) throw new Error("This planning session permits repository reads and its role's plan tools only");
+      return bridge.enqueue(() => bridge.tool(input.sessionID, input.tool));
     },
   };
 }
+
+/** The plan-comparison lock: only repository reads and the role's own plan tools get through. */
+function planReviewBlocked(input) {
+  const role = process.env.AGENT_OFFICE_PLAN_ROLE;
+  if (!role) return false;
+  const tools = ["plan_review_state", ...(role === "candidate" ? ["submit_candidate_plan"] : ["request_plan_clarification", "submit_plan_review"])];
+  const allowed = ["read", "glob", "grep", "list", ...tools.flatMap((t) => ["agent-office_" + t, "agent_office_" + t])];
+  return !allowed.includes(input && input.tool);
+}
+
+// OpenCode 2: the CLI loads a definition and calls setup(ctx); its lifecycle arrives as events and
+// hooks instead of the hook object an OpenCode 1 CLI calls. Same bridge, different wiring.
+async function openCode2(ctx) {
+  const bridge = createBridge({});
+  if (!bridge.enabled || !ctx || !ctx.event || typeof ctx.event.subscribe !== "function") return;
+  const controller = new AbortController();
+  // One event from the connected server, as the compact payload the bridge reduces. A session the
+  // worker has not claimed yet is not its own: unrelated (a subagent) and stale sessions are dropped
+  // rather than reported, so they cannot overwrite the desk's status.
+  function translate(event) {
+    const type = event && event.type;
+    const p = (event && event.data) || {};
+    const id = p.sessionID;
+    if (!id || id !== bridge.rootSession) return;
+    if (type === "session.execution.started") return { type: "session.status", properties: { sessionID: id, status: { type: "busy" } } };
+    if (type === "session.execution.succeeded" || type === "session.execution.interrupted") return { type: "session.idle", properties: { sessionID: id } };
+    if (type === "session.execution.failed") return { type: "session.error", properties: { sessionID: id, error: p.error } };
+    if (type === "session.status" || type === "session.idle" || type === "session.error") return { type, properties: p };
+    if (type === "permission.asked") {
+      return { type: "permission.asked", properties: { sessionID: id, id: p.id, permission: openCode2Permission(p) } };
+    }
+    if (type === "permission.replied") {
+      return { type: "permission.replied", properties: { sessionID: id, requestID: p.requestID } };
+    }
+    return;
+  }
+  // The session a user prompt is admitted to is this worker's root. A resumed worker already has
+  // one from AGENT_OFFICE_SESSION_ID; a fresh one is claimed here, before its first execution.
+  try {
+    await ctx.session.hook("prompt", (event) => {
+      const id = event && event.sessionID;
+      const text = event && event.prompt && typeof event.prompt.text === "string" ? event.prompt.text : "";
+      return bridge.enqueue(async () => {
+        if (typeof id !== "string" || !id) return;
+        if (id !== bridge.rootSession) await bridge.send(bridge.select(id));
+        await bridge.send({ type: "prompt", sessionId: id, status: "working", ...(text ? { prompt: text.slice(0, 20000) } : {}) });
+      });
+    });
+  } catch {}
+  try {
+    await ctx.tool.hook("execute.before", (event) => {
+      if (planReviewBlocked(event)) throw new Error("This planning session permits repository reads and its role's plan tools only");
+      return bridge.tool(event && event.sessionID, event && event.tool);
+    });
+    await ctx.tool.hook("execute.after", async (event) => {
+      if (!event || event.status !== "completed") return;
+      const context = await bridge.checkpoint(event.sessionID);
+      if (context !== undefined && event.result && Array.isArray(event.result.content)) {
+        event.result.content.push({ type: "text", text: context });
+      }
+    });
+  } catch {}
+  async function handle(event) {
+    // A fresh worker whose prompt hook has not named its session yet: the first session event is
+    // its own (a subagent's only follows work the root already started). Claimed here, in order.
+    const sessionID = event && event.data && event.data.sessionID;
+    if (!bridge.rootSession && typeof sessionID === "string" && sessionID && typeof event.type === "string" && event.type.startsWith("session.")) {
+      const start = bridge.select(sessionID);
+      if (start) await bridge.send(start);
+    }
+    if (event && event.type === "session.usage.updated" && sessionID !== undefined && sessionID === bridge.rootSession) {
+      return bridge.send({ type: "usage", sessionId: sessionID, usage: openCode2Usage(event.data) });
+    }
+    const payload = translate(event);
+    if (payload) await bridge.send(payload.type === "usage" ? payload : bridge.compact(payload));
+  }
+  void (async () => {
+    for await (const event of ctx.event.subscribe({ signal: controller.signal })) {
+      void bridge.enqueue(() => handle(event));
+    }
+  })().catch(() => {});
+  // Returning the cleanup lets the CLI stop the subscription when the plugin unloads.
+  return () => controller.abort();
+}
+
+// OpenCode 2 reports a permission request as an action plus its resources, with no title.
+function openCode2Permission(p) {
+  const what = typeof p.action === "string" && p.action ? p.action : "tool";
+  const resource = Array.isArray(p.resources) && typeof p.resources[0] === "string" ? p.resources[0] : undefined;
+  const text = resource ? what + ": " + resource : what;
+  return text.trim().slice(0, 500) || undefined;
+}
+
+// A whole-session usage snapshot (session.usage.updated), as the bridge's Usage.
+function openCode2Usage(data) {
+  const tokens = data && data.tokens ? data.tokens : {};
+  const cache = tokens.cache || {};
+  const num = (value) => (Number.isSafeInteger(value) && value >= 0 ? value : 0);
+  const cost = typeof data.cost === "number" && Number.isFinite(data.cost) && data.cost >= 0 ? data.cost : 0;
+  return {
+    input: num(tokens.input),
+    output: num(tokens.output),
+    ...(tokens.reasoning === undefined ? {} : { reasoning: num(tokens.reasoning) }),
+    cacheRead: num(cache.read),
+    cacheWrite: num(cache.write),
+    cost,
+    calls: 1,
+    costKnown: typeof data.cost === "number" && Number.isFinite(data.cost) && data.cost >= 0,
+  };
+}
+
+export default {
+  id: "agent-office-opencode",
+  setup: openCode2,
+  server: openCode1,
+};
 `;
