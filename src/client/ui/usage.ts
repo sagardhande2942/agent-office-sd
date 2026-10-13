@@ -5,6 +5,14 @@ import { providerUsageState, providerUsageTracked, resolvedProvider } from './pr
 
 export { fmtCost, fmtTokens, tokensOf };
 
+/**
+ * OpenCode and Kilo report their own model/provider estimate for a turn: what they say it cost, not
+ * what a provider billed, so the windows say so wherever they show the figure.
+ */
+function estimated(provider: AgentProvider): boolean {
+  return provider === 'opencode' || provider === 'kilo';
+}
+
 function displayedCost(u: Usage): string {
   return u.costKnown === false ? 'cost unavailable' : fmtCost(u.cost);
 }
@@ -15,7 +23,7 @@ export function usageLabel(u: Usage, provider: AgentProvider = 'claude'): string
     ? 'cost unavailable'
     : u.costKnown === false
       ? 'cost unavailable'
-      : `${fmtCost(u.cost)}${provider === 'opencode' ? ' reported' : ''}`;
+      : `${fmtCost(u.cost)}${estimated(provider) ? ' reported' : ''}`;
   // DeepSeek Harness reports what is in the context window, not a token split.
   if (provider === 'dsh') {
     const window = u.contextSize !== undefined ? ` / ${fmtTokens(u.contextSize)}` : '';
@@ -30,7 +38,7 @@ export function usageTitle(u: Usage, provider: AgentProvider = 'claude'): string
   const money = provider === 'codex' && u.costKnown !== true ? 'cost unavailable' : u.costKnown === false ? 'cost unavailable' : fmtCost(u.cost);
   const calls = provider === 'codex' || u.callsKnown === false
     ? 'API call count unavailable'
-    : provider === 'opencode'
+    : estimated(provider)
       ? `${u.calls} reported call${u.calls === 1 ? '' : 's'}`
       : `${u.calls} API call${u.calls === 1 ? '' : 's'}`;
   const dshContext = u.contextSize !== undefined ? `${fmtTokens(tokensOf(u))} of ${fmtTokens(u.contextSize)} context tokens` : `${fmtTokens(tokensOf(u))} context tokens`;
@@ -38,8 +46,8 @@ export function usageTitle(u: Usage, provider: AgentProvider = 'claude'): string
     ...(u.incomplete ? ['Partial metrics: some session history is still loading or unavailable.'] : []),
     provider === 'codex'
       ? `Codex root-session metrics; subagent usage is not included; ${money}; ${calls}`
-      : provider === 'opencode'
-        ? `OpenCode reported estimate ${money}; model/provider estimate, not billing; ${calls}`
+      : estimated(provider)
+        ? `${provider === 'kilo' ? 'Kilo' : 'OpenCode'} reported estimate ${money}; model/provider estimate, not billing; ${calls}`
         : provider === 'dsh'
           ? `DeepSeek Harness context usage from ACP: ${dshContext}; session cost ${u.costKnown === true ? money : 'unavailable'}; ${calls}`
           : `${money} over ${calls}`,

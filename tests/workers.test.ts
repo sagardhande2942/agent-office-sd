@@ -1760,6 +1760,43 @@ process.stdout.write('PROBE:' + (resolveCommand('office-probe-agent') ?? 'null')
   assert.equal(found, agent, `probe should resolve the command on the login shell's PATH (saw: ${JSON.stringify(seen.slice(-400))})`);
 });
 
+test('Kilo workers load the office plugin into their workspace, report on the OpenCode bridge and resume their own session', async (t) => {
+  const f = fixture();
+  isolateProviderEnvironment(f, t);
+  writeFileSync(path.join(path.dirname(f.claude), 'kilo'), fakeAgent, { mode: 0o700 });
+  const oldLog = process.env.FAKE_AGENT_LOG;
+  process.env.FAKE_AGENT_LOG = f.log;
+  t.after(() => { if (oldLog === undefined) delete process.env.FAKE_AGENT_LOG; else process.env.FAKE_AGENT_LOG = oldLog; f.close(); });
+  const workers = new WorkerManager(f.root, f.data, f.claude, [], { url: 'http://127.0.0.1:1', token: '' }, events([]), ledger(f.data));
+  t.after(() => workers.shutdown());
+  const worker = workers.spawn('desk-1', 'test', 'Implement task', false, 'agent', 'kilo', 'kilo/anthropic/claude-opus-5.5', 'high');
+  assert.notEqual(typeof worker, 'string'); if (typeof worker === 'string') return;
+  const calls = await waitFor(f.read, x => x.some(r => r.kind === 'kilo'));
+  const first = calls.find(r => r.kind === 'kilo')!;
+  assert.deepEqual(first.args, ['--model', 'kilo/anthropic/claude-opus-5.5', '--prompt', coordinated('Implement task')]);
+  const workspace = path.join(f.root, 'kilo.json');
+  assert.ok(JSON.parse(readFileSync(workspace, 'utf8')).plugin.some((p: string) => p.endsWith('agent-office-opencode.mjs')));
+  // Kilo's CLI is an OpenCode fork, so its workers report on the OpenCode bridge with their own token.
+  const hook = (payload: unknown, token = first.env.hookToken!) => workers.handleProviderHook('opencode', worker.id, token, '', payload);
+  assert.equal(hook({ type: 'session', sessionId: 'ses_kilo', status: 'starting' }, 'wrong'), false);
+  assert.equal(hook({ type: 'prompt', sessionId: 'ses_kilo', status: 'working', prompt: 'Implement task' }), true);
+  assert.equal(worker.status, 'working');
+  assert.equal(worker.sessionId, 'ses_kilo');
+  assert.equal(hook({ type: 'session', sessionId: 'other', status: 'done' }), false);
+  assert.equal(hook({ type: 'session', sessionId: 'ses_kilo', status: 'done' }), true);
+  assert.equal(worker.status, 'done');
+  workers.shutdown();
+  assert.equal(existsSync(workspace), false);
+  const restored = manager(f, f.claude, [], []);
+  t.after(() => restored.shutdown());
+  await restored.start();
+  const resumed = await waitFor(f.read, x => x.filter(r => r.kind === 'kilo' && !r.stdin).length >= 2);
+  const next = resumed.filter(r => r.kind === 'kilo' && !r.stdin).at(-1)!;
+  assert.deepEqual(next.args, ['--session', 'ses_kilo']);
+  assert.notEqual(next.env.hookToken, first.env.hookToken);
+  assert.equal(restored.get(worker.id)?.provider, 'kilo');
+});
+
 test('Antigravity workers launch interactively, authenticate hooks, restore and resume their own conversation', async (t) => {
   const f = fixture();
   isolateProviderEnvironment(f, t);
