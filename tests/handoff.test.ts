@@ -73,3 +73,16 @@ test('validation, cancellation and storage errors are surfaced', () => {
     assert.throws(() => handoffs(f.floor, f.ledger));
   } finally { rmSync(f.dir, { recursive: true, force: true }); }
 });
+test('persisted outbox retries delivery once after inbox failure', () => {
+  const f = fixture(); try {
+    const request = f.ledger.request.bind(f.ledger);
+    f.ledger.request = () => { throw Error('inbox storage unavailable'); };
+    assert.throws(() => f.run(f.source, f.body), /inbox storage unavailable/);
+    const pending = handoffs(f.floor, f.ledger).list()[0]; assert.ok(pending); assert.equal(pending.messageId, undefined);
+    f.ledger.request = request;
+    const delivered = f.run(f.source, f.body).handoff;
+    assert.equal(delivered.id, pending.id); assert.ok(delivered.messageId);
+    assert.equal(f.run(f.source, f.body).handoff.messageId, delivered.messageId);
+    assert.equal(f.ledger.state().messages.length, 1);
+  } finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
