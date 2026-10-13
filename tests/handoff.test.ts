@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Floor } from '../src/server/floor.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
+import { isToOffice } from '../src/shared/floorhost.js';
 import { Communications } from '../src/server/communications.js';
 import { executeHandoff, handoffs, prefill } from '../src/server/handoff/service.js';
 function fixture() {
@@ -85,4 +86,9 @@ test('persisted outbox retries delivery once after inbox failure', () => {
     assert.equal(f.run(f.source, f.body).handoff.messageId, delivered.messageId);
     assert.equal(f.ledger.state().messages.length, 1);
   } finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test('hosted handoff observer reads use the registered floor-scoped RPC', () => {
+  assert.equal(isToOffice({ t: 'handoff.list', floorId: 'floor-a', seq: 1 }), true);
+  assert.equal(isToOffice({ t: 'handoff.list', seq: 1 }), false);
 });
