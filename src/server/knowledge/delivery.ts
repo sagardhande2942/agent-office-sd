@@ -152,7 +152,14 @@ export async function proposeKnowledgeRevert(store: KnowledgeStore, commit: stri
   } catch (e) { if (draft.record.state === 'preparing') failKnowledgeDelivery(store, draft, e); throw e; }
 }
 /** Apply only merged proposals, with one preflight for the whole proposal (moves included). */
-export async function syncKnowledge(store: KnowledgeStore, options: DeliveryOptions = {}) {
+const syncing = new Map<string, Promise<{ message: string }>>();
+export function syncKnowledge(store: KnowledgeStore, options: DeliveryOptions = {}) {
+  const key = fs.realpathSync(store.root);
+  const active = syncing.get(key); if (active) return active;
+  const run = applyMergedKnowledge(store, options).finally(() => { syncing.delete(key); });
+  syncing.set(key, run); return run;
+}
+async function applyMergedKnowledge(store: KnowledgeStore, options: DeliveryOptions) {
   const records = deliveries(store); const messages: string[] = [];
   for (const record of records.filter(r => r.state === 'published')) {
     let state: 'published' | 'merged' | 'closed';

@@ -150,3 +150,9 @@ Curator failures show bounded, credential-redacted explicit CLI error lines and 
 Knowledge review worktree creation runs asynchronously with quiet checkout output, so the floor remains responsive while Git checks out a large repository or a mounted filesystem. A failed review records Git stderr and the exit code or termination signal, together with the retained worktree path. Shared Markdown notes remain tracked and unchanged by a failed publication.
 
 Read the reported Git error before retrying **Publish review**. For example, correct a failing checkout hook, repository permissions or disk-space issue first. A retry creates a fresh review branch; failed proposal branches and any worktree that was created remain available for inspection. Do not delete retained worktrees until you have checked them for work worth preserving.
+
+## Automatic review sync
+
+The floor that owns the checkout checks pending Knowledge reviews immediately at startup and every 60 seconds, even when nobody has the shelf open. This also runs on remote floor hosts. A merged review is applied to the live shared notes and its updated tree/review state is broadcast to connected clients. The project branch and staging area are not moved. Open reviews stay pending; closed reviews preserve live notes.
+
+**Sync approved** remains available for an immediate check. Automatic and manual checks share one in-flight sync per knowledge tree. Newer live edits or changes to the approved proposal still trigger reconciliation instead of overwriting notes; the shelf shows the conflicting paths. Temporary forge or fetch failures are reported and retried on the next interval. Repeated identical failures or conflicts do not produce repeated status messages. Pending reviews survive restarts and are checked again when the floor starts. Shutdown stops further polling and notifications; an already-running sync may finish applying its approved review.
