@@ -175,6 +175,18 @@ export async function fetchCursorModels(command: string, cwd: string, runner: Mo
   }
 }
 
+/**
+ * Run `kilo models` without a shell: Kilo's CLI is a fork of OpenCode's, so its catalogue is read
+ * the same way — one `provider/model` id a line, or its details with `--verbose` when it gives them.
+ */
+export async function fetchKiloModels(command: string, cwd: string, runner: ModelCommandRunner = runModelCommand): Promise<ModelOption[]> {
+  try {
+    return await fetchOpenCodeModels(command, cwd, runner);
+  } catch {
+    throw new Error('Kilo model catalogue unavailable');
+  }
+}
+
 type ModelLister = (command: string, cwd: string, runner?: ModelCommandRunner) => Promise<ModelOption[]>;
 
 /** The providers whose CLI lists its models (ProviderMeta.models.catalog), and how each is asked. */
@@ -183,6 +195,7 @@ export const MODEL_LISTERS: Partial<Record<AgentProvider, ModelLister>> = {
   codex: fetchCodexModels,
   grok: fetchGrokModels,
   cursor: fetchCursorModels,
+  kilo: fetchKiloModels,
 };
 
 export interface ModelCatalogue {

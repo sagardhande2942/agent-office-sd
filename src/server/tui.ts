@@ -277,7 +277,7 @@ function session(ws: WebSocket): Promise<number> {
       if (!['hire','chat','enqueue','issues','pulls','queue','home','attach','prompt','resume','pr'].includes(cmd)) throw new Error(unknownCommand(cmd));
       if (!view?.floor) throw new Error('Add a project in the browser, then select it with go');
       if (cmd === 'hire') {
-        if (!isAgentProvider(key)) throw new Error('Provider: claude, codex, opencode, grok, muse, dsh, pi, cursor, antigravity or custom');
+        if (!isAgentProvider(key)) throw new Error('Provider: claude, codex, opencode, grok, muse, dsh, pi, cursor, antigravity, kilo or custom');
         const all = seats(view);
         const selected = all[dashboard.selected];
         const desk = selected && !selected.worker ? selected : all.find((s) => !s.worker);
