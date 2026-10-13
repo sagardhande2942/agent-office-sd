@@ -9,6 +9,7 @@ Back to the [README](../README.md). Operation and formats: [Knowledge](knowledge
 | `src/shared/knowledge-index.ts` | Frontmatter validation, index parsing and canonical sorted serialization |
 | `src/shared/worker-knowledge.ts` | Summary-only bootstrap, task scoring, recency, globs and usage boost |
 | `src/server/knowledge/store.ts` | Seeds, guarded relative paths, atomic private-mode writes, note/index operations and local state |
+| `src/server/knowledge/delivery.ts` | Separate review publication, snapshots and guarded merge synchronization |
 | `src/server/knowledge/settings.ts` | Validated floor-local settings |
 | `src/server/knowledge/hooks.ts` | Worker-owned loopback API, authentication before and after body read |
 | `src/server/knowledge/worker.ts` | Prompt hook, completion gate, full journals and MR-section formatting |
@@ -23,19 +24,19 @@ Back to the [README](../README.md). Operation and formats: [Knowledge](knowledge
 
 The shelf keeps the existing `loreShelf` fixture, `lore` interaction kind and 📜 menu action. `installLore` delegates opening to the installed Knowledge window. Feature logic stays in modules; composition roots only register them.
 
-Worker lifecycle features register through `server/worker-features.ts`. A generic `WorkerFeature.completion` hook runs after checklist validation and before manager persistence; a returned instruction holds acceptance. The Knowledge feature stores one prompt guard per `(workerId, completionRevision)`. The second missing-review attempt accepts with a journal flag. A record in `reviews.json` satisfies that revision. An actual new task revision gets another opportunity to review.
+Worker lifecycle features register through `server/worker-features.ts`. A generic `WorkerFeature.completion` hook runs after checklist validation and before manager persistence; a returned instruction holds acceptance. The Knowledge feature stores one prompt guard per `(workerId, completionRevision)`. Required policy rejects every missing-review submission until the revision has a review; prompt policy reminds once. A record in `reviews.json` satisfies that revision. An actual new task revision gets another opportunity to review.
 
 ```mermaid
 flowchart LR
   Task[Task prompt] --> Bootstrap[Root index and summary hints]
   Bootstrap --> Tools[Authenticated knowledge tools]
-  Tools --> Worktree[Worker checkout tree]
+  Tools --> FloorTree[Shared floor knowledge tree]
   Checklist[Completion checklist] --> Journal[Full local handover]
   Checklist --> Gate[Review gate]
   Gate --> Review[Review diff and update knowledge]
   Review --> Record[knowledge_review_done]
-  Record --> Commit[Separate knowledge commit]
-  Commit --> MR[Worker updates MR description]
+  Record --> Publish[Publish review from dedicated worktree]
+  Publish --> PR[Knowledge review request]
   Human[Shelf on floor checkout] --> RPC[Local or hosted surface]
   RPC --> FloorTree[Floor checkout tree]
   Curator[Bounded isolated curator] --> Branch[Fresh curation branch]
@@ -49,9 +50,9 @@ Each directory has a machine-parsed `INDEX.md`. Each note has required title/sum
 
 The store resolves every Markdown path beneath the configured root and checks ancestors for symlinks. `_meta` is not exposed through worker reads/writes; indexes cannot be written directly by workers. State files validate their own ancestors, too. Private directories/files use 0700/0600 and tmp-then-rename publication. A note over the byte cap is rejected, rather than sliced. Credential patterns inherited from repository evidence filtering are applied to writes and lint.
 
-Frontmatter intentionally implements a constrained YAML subset, not arbitrary YAML evaluation. Scalars and inline string arrays round-trip through JSON-compatible serialization. Invalid frontmatter produces a browser warning and is excluded from hints; lint will not rewrite it. Worker tools have no delete operation. Human deletion uses `git rm`; restoring requires a clean checkout and a knowledge-only revert commit.
+Frontmatter intentionally implements a constrained YAML subset, not arbitrary YAML evaluation. Scalars and inline string arrays round-trip through JSON-compatible serialization. Invalid frontmatter produces a browser warning and is excluded from hints; lint will not rewrite it. Worker tools have no delete operation. Human deletion removes the note locally for later publication; restoring publishes a separate knowledge-only revert proposal.
 
-Single-process synchronous store operations serialize updates to parent indexes and state. Different worker branches merge through Git. Canonical sorted lines reduce conflicts, and `lint --fix` regenerates blocks after a merge. The store does not pretend to provide cross-process locking for two office processes writing the same checkout.
+A shared filesystem lock serializes mutations across processes; versions checked under the lock reject stale external edits. Canonical indexes regenerate from child notes. Abrupt termination requires recovery of the empty write.lock directory after confirming writers are stopped.
 
 ## Context boundaries
 
@@ -59,7 +60,7 @@ Bootstrap uses the root index, pinned titles/summaries and scored hints, never b
 
 `knowledge_read` returns all text by default and explicit line-page metadata when requested. Search returns literal matches with adjacent lines, a bounded hit count and an omitted count. Read counts are local telemetry. Knowledge read/write author identity comes from the authenticated worker; request bodies cannot choose worker IDs or authors.
 
-The floor checkout is the live central brain. The human browser and every authenticated worker operate on that same knowledge tree regardless of the worker's code worktree, so updates are immediately shared across the floor. Remote floors use `knowledge.execute` through the existing host-call allow-list. Curator proposals are mirrored into the live tree as `needs-verification` after a review PR is published and are not injected automatically until activated. Journals and review state remain floor-local.
+The floor checkout is the live central brain. The human browser and every authenticated worker operate on that same knowledge tree regardless of the worker's code worktree, so updates are immediately shared across the floor. Remote floors use `knowledge.execute` through the existing host-call allow-list. Curator proposals remain on the review branch; Sync approved applies merged changes with their intended lifecycle status. Journals and review state remain floor-local.
 
 ## Curation and rollout
 
@@ -73,4 +74,10 @@ Compatibility is explicit: `legacyLore` re-enables old injection/curation for on
 
 ## Evidence
 
-`tests/knowledge.test.ts` covers format round trips, sorting, path/symlink/credential guards, paging, search context, index repair, corruption preservation, budget/scoring, review policies/revisions, journal idempotency, office commits, MR sections, migration and curator guards. Existing CLI, worker permissions and client-state contract tests include Knowledge fields/tools. Three fixture E2Es cover worker worktree isolation and commits, shelf status-preserving edits with screenshots, and branch curation with a mocked review publisher. CI runs knowledge lint alongside typecheck, tests and build.
+`tests/knowledge.test.ts` covers format round trips, sorting, path/symlink/credential guards, paging, search context, index repair, corruption preservation, budget/scoring, review policies/revisions, journal idempotency, pending shared edits, MR sections, migration and curator guards. Existing CLI, worker permissions and client-state contract tests include Knowledge fields/tools. Three fixture E2Es cover shared knowledge and isolated code worktrees, shelf status-preserving edits with screenshots, and branch curation with a mocked review publisher. CI runs knowledge lint alongside typecheck, tests and build.
+
+## Shared-store delivery
+
+Worker tools resolve the floor checkout, independently of worker code worktrees. Reads return content versions; external mutations require those versions. The store serializes mutations and checks versions inside the lock. Required review blocks every completion attempt until the current revision has a review. Legacy commitMode values no longer commit to either checkout.
+
+`delivery.ts` owns snapshot publication and merge synchronization. It overlays local note deltas on fresh origin/main, regenerates indexes, publishes a dedicated review, and records before/after snapshots in local state. Remote fetch, push and forge commands are asynchronous. Curator actions use the same path: proposals never mutate live notes before acceptance. Sync preflights every affected note and only applies an approved set when no newer live or upstream edits would be overwritten.

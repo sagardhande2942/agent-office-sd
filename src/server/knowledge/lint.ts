@@ -57,7 +57,7 @@ export function lintKnowledge(store: KnowledgeStore, fix = false): KnowledgeLint
       if ([...notes.values()].some(n => n.error && path.posix.dirname(n.path) === (relative || '.'))) {
         result.errors.push(`${p}: cannot regenerate until invalid children are corrected`); return;
       }
-      if (text !== expected) {
+      if (text.replace(/\r\n/g, '\n') !== expected) {
         if (fix) { atomicWrite(file, expected); if (!result.fixed.includes(p)) result.fixed.push(p); }
         else result.errors.push(`${p}: stale, missing, duplicate or unsorted entries; use lint --fix`);
       }

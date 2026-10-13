@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { parseFrontmatter, parseKnowledgeIndex, parseKnowledgeNote, serializeFrontmatter, serializeKnowledgeIndex, type KnowledgeEntry, type KnowledgeFrontmatter } from '../../shared/knowledge-index.js';
 export interface KnowledgeConfig {
   dir: string; bootstrapBudgetChars: number; hintCount: number; reviewPolicy: 'required' | 'prompt' | 'off';
@@ -17,6 +17,7 @@ export function atomicWrite(file: string, text: string) {
   finally { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); }
 }
 export class KnowledgeStore {
+  private locked = false;
   readonly root: string;
   readonly config: KnowledgeConfig;
   constructor(readonly checkout: string, config: Partial<KnowledgeConfig> = {}) {
@@ -49,6 +50,22 @@ export class KnowledgeStore {
     const text = serializeFrontmatter({ kind: 'index', summary }, `# ${dir || 'Knowledge'}\n\n${dir ? '' : 'Write for a stranger. Include commands verbatim. Use one topic per file; operational build, run and test notes are welcome. Split files beyond about 200 lines and directories beyond about 40 entries. Never paste secrets.\n'}\n## Entries\n`);
     return serializeKnowledgeIndex(parseKnowledgeIndex(text));
   }
+  /** Serialize read/modify/write operations across HTTP, CLI and curator processes. */
+  withLock<T>(run: () => T): T {
+    if (this.locked) return run();
+    const lock = path.join(this.root, '_meta/state/write.lock'); this.validateParents(lock);
+    fs.mkdirSync(path.dirname(lock), { recursive: true });
+    try { fs.mkdirSync(lock); } catch { throw Error('Knowledge is being updated; retry shortly (stale write.lock requires host recovery)'); }
+    this.locked = true;
+    try { return run(); } finally { this.locked = false; fs.rmdirSync(lock); }
+  }
+  version(relative: string): string | null {
+    const file = this.resolve(relative);
+    return fs.existsSync(file) ? createHash('sha256').update(fs.readFileSync(file)).digest('hex') : null;
+  }
+  assertVersion(relative: string, expected: string | null) {
+    if (this.version(relative) !== expected) throw Error(`Knowledge changed: ${relative}. Read it again before saving.`);
+  }
   seed() {
     if (fs.existsSync(path.join(this.root, 'INDEX.md'))) { this.validateParents(path.join(this.root, 'INDEX.md')); return; }
     if (fs.existsSync(this.root) && fs.readdirSync(this.root).length) throw Error('Knowledge root is missing INDEX.md; run lint repair after restoring the root index');
@@ -80,7 +97,7 @@ export class KnowledgeStore {
     const file = this.resolve(relative); const text = fs.readFileSync(file, 'utf8');
     const lines = text.split('\n');
     this.stateUpdate('usage.json', data => { data[relative] = Number(data[relative] ?? 0) + 1; });
-    return { path: relative, text: offset === 0 && limit === undefined ? text : lines.slice(offset, limit === undefined ? undefined : offset + limit).join('\n'), offset, totalLines: lines.length, nextOffset: limit !== undefined && offset + limit < lines.length ? offset + limit : null };
+    return { path: relative, version: createHash('sha256').update(text).digest('hex'), text: offset === 0 && limit === undefined ? text : lines.slice(offset, limit === undefined ? undefined : offset + limit).join('\n'), offset, totalLines: lines.length, nextOffset: limit !== undefined && offset + limit < lines.length ? offset + limit : null };
   }
   tree(): TreeNote[] {
     this.seed(); const result: TreeNote[] = [];
@@ -131,7 +148,11 @@ export class KnowledgeStore {
     if (entry) (entry.status === 'archived' ? index.archived : index.entries).push({ ...entry, path: name });
     atomicWrite(file, serializeKnowledgeIndex(index));
   }
-  write(relative: string, frontmatter: Partial<KnowledgeFrontmatter>, body: string, author: string) {
+  write(relative: string, frontmatter: Partial<KnowledgeFrontmatter>, body: string, author: string, expectedVersion?: string | null): ReturnType<KnowledgeStore['writeNote']> {
+    this.seed();
+    return this.withLock(() => { if (expectedVersion !== undefined) this.assertVersion(relative, expectedVersion); return this.writeNote(relative, frontmatter, body, author); });
+  }
+  private writeNote(relative: string, frontmatter: Partial<KnowledgeFrontmatter>, body: string, author: string) {
     this.seed(); const file = this.resolve(relative, true);
     if (typeof body !== 'string' || !frontmatter || typeof frontmatter !== 'object') throw Error('Send frontmatter and Markdown body');
     const existing = fs.existsSync(file) ? parseKnowledgeNote(fs.readFileSync(file, 'utf8')).frontmatter : {};
@@ -144,21 +165,30 @@ export class KnowledgeStore {
     if (Buffer.byteLength(text) > this.config.maxNoteBytes) throw Error(`Note exceeds ${this.config.maxNoteBytes} bytes; split it into topics`);
     this.ensureDirectories(relative); atomicWrite(file, text);
     this.upsert(relative, { path: relative, summary: parsed.frontmatter.summary, tags: parsed.frontmatter.tags, status: parsed.frontmatter.status, pinned: parsed.frontmatter.pinned });
-    return { path: relative, ...parsed, warning: Buffer.byteLength(text) > 16384 ? 'Consider splitting this note (over 16 KiB).' : undefined };
+    return { path: relative, version: this.version(relative), ...parsed, warning: Buffer.byteLength(text) > 16384 ? 'Consider splitting this note (over 16 KiB).' : undefined };
   }
-  move(from: string, to: string) {
+  move(from: string, to: string, expectedVersion?: string | null): { from: string; to: string } {
+    return this.withLock(() => { if (expectedVersion !== undefined) this.assertVersion(from, expectedVersion); return this.moveNote(from, to); });
+  }
+  private moveNote(from: string, to: string) {
     const source = this.resolve(from, true); const dest = this.resolve(to, true);
     if (fs.existsSync(dest)) throw Error('Destination already exists');
     const note = parseKnowledgeNote(fs.readFileSync(source, 'utf8'));
     this.write(to, note.frontmatter, note.body, note.frontmatter.author ?? 'curator');
     fs.unlinkSync(source); this.upsert(from); return { from, to };
   }
-  archive(relative: string, reason: string, author: string) {
+  archive(relative: string, reason: string, author: string, expectedVersion?: string | null): ReturnType<KnowledgeStore['writeNote']> {
+    return this.withLock(() => { if (expectedVersion !== undefined) this.assertVersion(relative, expectedVersion); return this.archiveNote(relative, reason, author); });
+  }
+  private archiveNote(relative: string, reason: string, author: string) {
     if (typeof reason !== 'string' || !reason.trim()) throw Error('Archive needs a reason');
     const note = parseKnowledgeNote(fs.readFileSync(this.resolve(relative, true), 'utf8'));
     return this.write(relative, { ...note.frontmatter, status: 'archived' }, note.body + `\n\nArchived: ${reason}\n`, author);
   }
   stateUpdate(name: string, update: (data: Record<string, unknown>) => void) {
+    return this.withLock(() => this.updateState(name, update));
+  }
+  private updateState(name: string, update: (data: Record<string, unknown>) => void) {
     const file = path.join(this.root, '_meta/state', name); this.validateParents(file);
     const data = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown> : {};
     update(data); atomicWrite(file, JSON.stringify(data, null, 2) + '\n');

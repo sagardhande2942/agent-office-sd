@@ -55,6 +55,7 @@ test('index round trip is canonical, sorted and rejects mismatched directory lin
   const text = '---\nkind: index\nsummary: Navigation\n---\n# Project\n\nProse remains.\n\n## Entries\n- [z.md](z.md) — Z\n- [a/](a/INDEX.md) — A [tags: ci] [pinned]\n';
   const canonical = serializeKnowledgeIndex(parseKnowledgeIndex(text)); assert.ok(canonical.indexOf('[a/]') < canonical.indexOf('[z.md]'));
   assert.equal(serializeKnowledgeIndex(parseKnowledgeIndex(canonical)), canonical);
+  assert.equal(serializeKnowledgeIndex(parseKnowledgeIndex(canonical.replace(/\n/g, '\r\n'))), canonical);
   assert.throws(() => parseKnowledgeIndex(text.replace('a/INDEX.md', 'a/other.md')));
   assert.throws(() => parseKnowledgeIndex(text + '- [z.md](z.md) — Duplicate\n'));
 });
@@ -85,14 +86,14 @@ test('workers share the floor knowledge store across isolated worktrees', t => {
 });
 const worker = { id: 'ada', name: 'Ada', kind: 'agent', deskId: 'desk-1', completionRevision: 1, prompt: 'Build task' } as WorkerInfo;
 const report = { revision: 1, summary: 'Summary', checks: [{ name: 'Test', status: 'passed', evidence: 'full evidence '.repeat(100) }], files: ['src/file.ts'], pr: 'https://github.com/example/repo/pull/123', branch: 'task', commit: 'abcdef123', status: 'ready', submittedAt: 1 } as CompletionReport;
-test('required gate prompts once per revision, preserves full handover tail and accepts recorded review', t => {
+test('required gate blocks every missing review, preserves full handover tail and accepts recorded review', t => {
   const store = fixture(t); assert.match(knowledgeReviewGate(store, worker, report)!, /Review git diff/);
   store.review(worker.id, 1, [], 'No durable facts changed'); assert.equal(knowledgeReviewGate(store, worker, report), undefined);
   const file = writeHandover(store, worker, report); const text = fs.readFileSync(file, 'utf8'); assert.match(text, /abcdef123/); assert.match(text, /pull\/123/); assert.ok(text.includes(report.checks[0].evidence));
   const mtime = fs.statSync(file).mtimeMs; writeHandover(store, worker, report); assert.equal(fs.statSync(file).mtimeMs, mtime);
   assert.match(knowledgeReviewGate(store, { ...worker, completionRevision: 2 }, { ...report, revision: 2 })!, /Review git diff/);
-  assert.equal(knowledgeReviewGate(store, { ...worker, completionRevision: 2 }, report), undefined);
-  assert.match(fs.readFileSync(path.join(store.checkout, store.config.handoversDir, 'ada-2.md'), 'utf8'), /Knowledge review missing/);
+  assert.match(knowledgeReviewGate(store, { ...worker, completionRevision: 2 }, report)!, /Review git diff/);
+  assert.match(fs.readFileSync(path.join(store.checkout, store.config.handoversDir, 'ada-2.md'), 'utf8'), /Knowledge review pending/);
 });
 test('prompt and off policies accept completion; empty reviews need an explicit reason', t => {
   const base = fixture(t); const prompt = new KnowledgeStore(base.checkout, { reviewPolicy: 'prompt' });
@@ -101,11 +102,12 @@ test('prompt and off policies accept completion; empty reviews need an explicit 
   assert.equal(knowledgeReviewGate(new KnowledgeStore(base.checkout, { reviewPolicy: 'off' }), worker, report), undefined);
   assert.throws(() => base.review('ada', 1, []), /none_reason/);
 });
-test('office commit mode commits only knowledge on the task branch and produces MR section', t => {
+test('legacy office commit mode leaves shared edits pending a separate review branch', t => {
   const base = fixture(t); const git = (args: string[]) => execFileSync('git', args, { cwd: base.checkout, encoding: 'utf8' });
   git(['init', '-b', 'task']); git(['config', 'user.name', 'Test']); git(['config', 'user.email', 'test@example.test']); git(['add', '.gitignore']); git(['commit', '-m', 'fixture']);
   const store = new KnowledgeStore(base.checkout, { commitMode: 'office' }); store.write('project/build.md', frontmatter, 'npm run build', 'worker:ada'); store.review('ada', 1, ['project/build.md']);
-  assert.equal(knowledgeReviewGate(store, worker, report), undefined); assert.match(git(['log', '-1', '--format=%s']), /knowledge:/);
+  assert.equal(knowledgeReviewGate(store, worker, report), undefined); assert.match(git(['log', '-1', '--format=%s']), /fixture/);
+  assert.equal(git(['diff', '--cached', '--name-only']).trim(), '');
   assert.match(knowledgeMrSection(store, ['project/build.md']), /project\/build.md.*Run npm run build/);
 });
 test('migration is idempotent, maps status and provenance, keeps original JSON and full journals', t => {

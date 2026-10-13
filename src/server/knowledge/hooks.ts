@@ -16,7 +16,9 @@ export async function floorWorkerKnowledge(floor: Floor | undefined, req: http.I
     const active = floor.workers.authenticate(id, token);
     if (!active) return send(res, 401, { error: 'Worker session changed while reading request' });
     if (active.kind !== 'agent' || active.helper || active.meeting || active.planReview?.locked || DESK_BY_ID.get(active.deskId)?.station) return send(res, 403, { error: 'Worker role changed while reading request' });
-    if (Object.keys(body).some(k => !['action', 'path', 'offset', 'limit', 'query', 'scope', 'frontmatter', 'body', 'template', 'from', 'to', 'reason', 'changed', 'none_reason'].includes(k))) throw Error('Unknown knowledge field; identity is server-owned');
+    if (Object.keys(body).some(k => !['action', 'path', 'offset', 'limit', 'query', 'scope', 'frontmatter', 'body', 'template', 'from', 'to', 'reason', 'changed', 'none_reason', 'expectedVersion'].includes(k))) throw Error('Unknown knowledge field; identity is server-owned');
+    if (body.expectedVersion !== undefined && body.expectedVersion !== null && typeof body.expectedVersion !== 'string') throw Error('expectedVersion must be the version from knowledge_read, or null for a new note');
+    const expectedVersion = (body.expectedVersion ?? null) as string | null;
     const store = new KnowledgeStore(floor.def.dir, loadKnowledgeConfig(floor.def.dir));
     store.seed(); let result: unknown;
     switch (body.action) {
@@ -27,10 +29,10 @@ export async function floorWorkerKnowledge(floor: Floor | undefined, req: http.I
         if (body.frontmatter && typeof body.frontmatter === 'object' && ('author' in body.frontmatter || 'updated' in body.frontmatter)) throw Error('author and updated are server-owned');
         const templates: Record<string, string> = { howto: '## Steps\n\n## Verification\n', gotcha: '## Observation\n\n## Evidence\n\n## When this applies\n', decision: '## Decision\n\n## Rationale\n\n## Alternatives\n', module: '## Responsibilities\n\n## Interfaces\n\n## Verification\n' };
         if (body.template !== undefined && !Object.hasOwn(templates, String(body.template))) throw Error('Unknown template');
-        result = store.write(body.path as string, body.frontmatter as never, (body.body ?? templates[String(body.template)] ?? '') as string, `worker:${active.id}`); break;
+        result = store.write(body.path as string, body.frontmatter as never, (body.body ?? templates[String(body.template)] ?? '') as string, `worker:${active.id}`, expectedVersion); break;
       }
-      case 'move': result = store.move(body.from as string, body.to as string); break;
-      case 'archive': result = store.archive(body.path as string, body.reason as string, `worker:${active.id}`); break;
+      case 'move': result = store.move(body.from as string, body.to as string, expectedVersion); break;
+      case 'archive': result = store.archive(body.path as string, body.reason as string, `worker:${active.id}`, expectedVersion); break;
       case 'review_done': result = store.review(active.id, active.completionRevision ?? 0, body.changed as string[], body.none_reason as string | undefined); break;
       default: throw Error('Unknown knowledge action');
     }

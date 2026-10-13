@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import type { Floor } from '../floor.js';
 import type { WorkerFeature } from '../workers/features.js';
 import type { WorkerInfo } from '../../shared/protocol.js';
@@ -36,24 +35,17 @@ export function writeHandover(store: KnowledgeStore, worker: WorkerInfo, report?
   return file;
 }
 export function reviewFollowup(worker: WorkerInfo, store: KnowledgeStore, report: CompletionReport) {
-  return `Review git diff ${worker.worktree?.base ?? 'origin/main'}...HEAD and the task. Decide what durable knowledge changed: build/run/test steps, modules, gotchas, decisions or conventions. Update notes and indexes via knowledge tools, then call knowledge_review_done with changed paths or an explicit none_reason. ${store.config.commitMode === 'worker' ? `Commit separately as knowledge: ${worker.task?.name ?? 'task review'}.` : ''} Rebase before pushing; run agent-office knowledge lint --fix if an index conflicted. ${store.config.mrSection && report.pr ? `Push your branch and append/replace ## Knowledge base updates in ${report.pr}, listing paths with summaries. Detect the forge from git origin; use gh for GitHub or glab for GitLab. If the CLI is unavailable leave the section in the handover for a human.` : ''} Submit the completion checklist again after review.`;
+  return `Review git diff ${worker.worktree?.base ?? 'origin/main'}...HEAD and the task. Update durable shared knowledge with the knowledge tools, then call knowledge_review_done with changed paths or an explicit none_reason. Read each existing note first and pass its version as expectedVersion when editing. Knowledge lives in the floor's central store; publish it separately using the Knowledge shelf's Publish review button. ${store.config.mrSection && report.pr ? `Append a Knowledge base updates section to ${report.pr} listing shared note paths and their pending review status.` : ''} Submit the completion checklist again after review.`;
 }
 export function knowledgeReviewGate(store: KnowledgeStore, worker: WorkerInfo, report: CompletionReport): string | undefined {
   store.seed(); const key = `${worker.id}:${worker.completionRevision ?? 0}`;
   let review: { changed: string[]; none_reason?: string } | undefined; let prompted = false;
   store.stateUpdate('reviews.json', data => { review = data[key] as typeof review; });
   store.stateUpdate('review-prompts.json', data => { prompted = !!data[key]; if (!review && store.config.reviewPolicy !== 'off') data[key] = true; });
-  if (!review && store.config.reviewPolicy !== 'off' && !prompted) {
+  if (!review && store.config.reviewPolicy !== 'off' && (store.config.reviewPolicy === 'required' || !prompted)) {
     writeHandover(store, worker, report, '\nKnowledge review pending.\n');
     if (store.config.reviewPolicy === 'required') return reviewFollowup(worker, store, report);
     report.knowledgeReview = reviewFollowup(worker, store, report);
-  }
-  if (review && store.config.commitMode === 'office' && review.changed.length) {
-    const git = (args: string[]) => execFileSync('git', args, { cwd: store.checkout, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-    // Never include someone else's already-staged files in the office-owned commit.
-    if (git(['diff', '--cached', '--name-only']).trim()) throw Error('Office knowledge commit needs a clean staging area');
-    git(['add', '--', store.config.dir]);
-    if (git(['diff', '--cached', '--name-only']).trim()) git(['commit', '-m', `knowledge: ${worker.task?.name ?? 'task review'}`]);
   }
   writeHandover(store, worker, report, review ? '\n' + knowledgeMrSection(store, review.changed, review.none_reason) : store.config.reviewPolicy === 'off' ? '' : '\nKnowledge review missing.\n' + (report.knowledgeReview ? '\nAdvisory knowledge review:\n' + report.knowledgeReview : ''));
 }

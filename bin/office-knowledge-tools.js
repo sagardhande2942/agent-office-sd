@@ -7,10 +7,11 @@ const properties = {
   review_done: { changed: { type: 'array', items: { type: 'string' } }, none_reason: { type: 'string' } },
 };
 const required = { index: [], read: ['path'], search: ['query'], write: ['path', 'frontmatter'], move: ['from', 'to'], archive: ['path', 'reason'], review_done: ['changed'] };
+for (const action of ['write', 'move', 'archive']) properties[action].expectedVersion = { type: ['string', 'null'], description: 'Version from knowledge_read. Null means create only; existing notes require their version.' };
 export const KNOWLEDGE_TOOL_EXTENSION = {
   usage: '\n  office-workers knowledge index|read|search|write|mv|archive|review [args] [--json]\n    write/review read JSON on stdin; read accepts --offset/--limit, search accepts --scope',
   actions: Object.fromEntries(actions.map(a => [`knowledge.${a}`, '/knowledge'])), reads: [],
-  tools: actions.map(a => ({ name: `knowledge_${a}`, description: `Project knowledge: ${a}. Paths are relative to the worker checkout knowledge tree. Notes are historical facts; verify them.`, inputSchema: { type: 'object', properties: properties[a], required: required[a], additionalProperties: false }, annotations: { readOnlyHint: ['index', 'read', 'search'].includes(a), destructiveHint: false, openWorldHint: false } })),
+  tools: actions.map(a => ({ name: `knowledge_${a}`, description: `Shared office knowledge: ${a}. Paths are relative to the floor knowledge tree. Read before editing; pass its version as expectedVersion. Notes are historical facts; verify them.`, inputSchema: { type: 'object', properties: properties[a], required: required[a], additionalProperties: false }, annotations: { readOnlyHint: ['index', 'read', 'search'].includes(a), destructiveHint: false, openWorldHint: false } })),
   parse(argv) {
     if (argv[0] !== 'knowledge') return;
     let [, action = 'index', ...rest] = argv; action = ({ mv: 'move', review: 'review_done' })[action] ?? action;
@@ -18,6 +19,7 @@ export const KNOWLEDGE_TOOL_EXTENSION = {
     const args = {}; const words = [];
     for (let i = 0; i < rest.length; i++) {
       if (rest[i] === '--json') continue;
+      if (rest[i] === '--expected-version' && rest[i + 1] !== undefined) { args.expectedVersion = rest[++i]; continue; }
       if (['--offset', '--limit', '--scope'].includes(rest[i]) && rest[i + 1] !== undefined) { const key = rest[i].slice(2); args[key] = key === 'scope' ? rest[++i] : Number(rest[++i]); continue; }
       if (rest[i].startsWith('--')) throw Error(`Unknown knowledge option: ${rest[i]}`);
       words.push(rest[i]);

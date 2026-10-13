@@ -10,11 +10,15 @@ Press **E** at the shelf on the west wall beside the basketball hoop, or choose 
 
 ![Knowledge shelf with lifecycle badges](knowledge-evidence/knowledge-shelf.png)
 
-The branch label identifies the **floor checkout**. Workers' tools instead use **their own worktrees**. A worker's unmerged knowledge changes will appear on the shelf after merging and updating the floor checkout. Hosted floors read and write on the host through the same RPC surface.
+The branch label identifies the floor checkout. All workers, including workers with separate code worktrees, read and edit this shared tree immediately. Each note read returns a `version`. Editing, moving, archiving or deleting an existing note requires that version as `expectedVersion`; a new note uses `null`. Stale edits are rejected so the writer can reread and reconcile both changes. File mutations are serialized across processes. A process crash can leave `_meta/state/write.lock`; after confirming no host/CLI is writing, remove that empty lock directory and retry.
 
-Edit preserves sources, pinned state, paths and verification metadata; status changes only when you select a different status. The uncommitted label and **Commit** button expose working-tree changes. Commit stages the knowledge directory and creates `knowledge: edit <title>` on the floor branch; it refuses unrelated staged changes. It does not push. **Use in prompt** copies a relative path and a `knowledge_read` instruction.
+**Publish review** snapshots pending knowledge into a dedicated worktree branched from freshly fetched `origin/main`, then commits and publishes a GitHub PR or GitLab MR. It preserves the floor branch, staged code, and worker worktrees. It checks the origin URL and refuses overlapping upstream note edits. Only one knowledge review may be in flight per floor. The shelf shows published, merged, closed and failed deliveries with their review link. Failed publishing retains its branch/worktree for recovery.
 
-**Handovers** lists local shift journals. Journals are read-only, full-length evidence from workers, not independently verified facts. **Promote to knowledge** opens an editor prefilled with the journal; write a durable, focused note with evidence before saving. **History** uses Git, and **Restore** reverts a knowledge-only commit on a clean checkout.
+**Sync approved** checks the forge review status and fetches `main`. Open reviews remain proposals; closed reviews preserve live notes. Merged changes apply as a complete set only when the live notes still match the captured snapshot or accepted result, and upstream content matches the proposal. This preserves archive/verification status and removes the old path of a move. Concurrent edits, including newly created destinations, stop the entire application with a list of paths to reconcile. Review the retained delivery snapshots in `_meta/state/deliveries.json` alongside the PR; reconcile the live files to the accepted proposal and retry. If the PR itself was edited after publication, reconcile its recorded `after` snapshot to the reviewed merged content before retrying. Keep a backup when performing this host recovery operation.
+
+Edit preserves sources, pinned state, paths and verification metadata. **Use in prompt** copies a relative path and a `knowledge_read` instruction. **Delete** removes a shared note locally; publish its removal through review. Pending notes remain local until published and merged; Git history alone is not a backup of unpublished changes.
+
+**Handovers** lists local shift journals. Journals are read-only, full-length evidence from workers, not independently verified facts. **Promote to knowledge** opens an editor prefilled with the journal; write a durable, focused note with evidence before saving. **History** uses Git, and **Propose revert** publishes a separate review reversing a knowledge-only commit, refusing to overwrite later note edits.
 
 Closing the window with its top-right ✕ or Esc uses the office's normal modal/pointer-lock lifecycle.
 
@@ -29,10 +33,10 @@ office-workers knowledge read project/test.md
 office-workers knowledge read project/test.md --offset 20 --limit 40
 office-workers knowledge search "npm test" --scope project
 office-workers knowledge write <<'JSON'
-{"path":"project/test.md","frontmatter":{"title":"Run tests","summary":"Run npm test and the fixture E2Es","tags":["testing","ci"],"pinned":true,"paths":["tests/**"]},"body":"Run `npm test`. Record the actual result before opening a PR.\n"}
+{"path":"project/test.md","frontmatter":{"title":"Run tests","summary":"Run npm test and the fixture E2Es","tags":["testing","ci"],"pinned":true,"paths":["tests/**"]},"body":"Run `npm test`. Record the actual result before opening a PR.\n","expectedVersion":null}
 JSON
-office-workers knowledge mv project/test.md project/testing.md
-office-workers knowledge archive project/testing.md "Replaced by new test runner"
+office-workers knowledge mv project/test.md project/testing.md --expected-version <version-from-read>
+office-workers knowledge archive project/testing.md "Replaced by new test runner" --expected-version <version-from-read>
 office-workers knowledge review <<'JSON'
 {"changed":["project/testing.md"]}
 JSON
@@ -70,9 +74,9 @@ Only title and summary are required. Frontmatter supports single-line scalars an
 
 The default required policy holds the first completion submission when that worker/task revision lacks a review. The tool returns a follow-up instruction to inspect `git diff <base>...HEAD`, update durable knowledge, record the review and resubmit the checklist. A no-change review is valid and needs `none_reason`.
 
-The office prompts only once per revision. A second submission without review is accepted with **Knowledge review missing** in the local journal. Prompt policy is advisory and returns its review instruction with the accepted report and in the journal; off skips review. The separate knowledge commit is normally made by the worker. Office commit mode stages only the knowledge root and refuses an already occupied staging area. None leaves changes uncommitted.
+Required policy continues rejecting completion until `knowledge_review_done` is recorded for that revision. An explicit `none_reason` is valid when there are no durable changes. Prompt policy is advisory and off skips the gate. Review records are worker-reported evidence, not independent verification.
 
-The follow-up tells the worker to rebase, push and append/replace `## Knowledge base updates` in its existing PR/MR description using `gh` or `glab`. When a review exists, the journal includes the formatted section, listing paths and summaries; a human can paste it if the forge CLI is unavailable. The office does not edit worker MR descriptions itself.
+Workers list the changed shared paths and their pending review status in the task PR's Knowledge base updates section. They do not commit those files from their code worktree. Use **Publish review** for durable delivery, or enable scheduled curation to publish a separate knowledge review. The local handover retains full completion evidence and the knowledge section.
 
 ## Configuration and limits
 
@@ -84,7 +88,7 @@ Put per-floor settings in `<project>/.agent-office/knowledge.json`. Omitted fiel
 | `bootstrapBudgetChars` | `4000` |
 | `hintCount` | `8` |
 | `reviewPolicy` | `required` (`prompt`, `off` supported) |
-| `commitMode` | `worker` (`office`, `none` supported) |
+| `commitMode` | `none`; legacy `worker`/`office` values remain readable but never commit to the floor or worker branch. Use Publish review. |
 | `mrSection` | `true` |
 | `maxNoteBytes` | `65536` |
 | `searchMaxHits` | `40` |
@@ -109,7 +113,7 @@ From source, use `node --import tsx src/server/cli.ts knowledge lint`. Lint chec
 
 Migration imports legacy `.agent-office/lore/*.json` into `_imported/`, puts archived/superseded discoveries in `_imported/_archive/`, and moves handover **copies** to the local journal. It maps provenance and historical update dates, generates indexes, and leaves all original JSON untouched. Re-running skips already imported files. Credential-bearing or malformed notes are reported rather than committed.
 
-The floor checkout is the live central knowledge store: every worker and worktree reads and writes the same tree, so shelf edits and worker discoveries are immediately shared across the office. Curator results are copied into that live tree as `needs-verification` proposals after their tagged review PR is published. They remain visible in the shelf but are excluded from automatic worker prompt hints until a human changes their status to `active`. The Git PR is the durable audit and synchronization path, not the runtime visibility gate.
+The floor checkout is the live central knowledge store. Worker discoveries and shelf edits are immediately shared. Curator changes remain on their review branch until merged and applied with **Sync approved**; the shelf links to that proposal. A review is the persistence and acceptance boundary for curator changes.
 
 The old worker Lore endpoint is disabled by default and directs callers to the Knowledge tools. `legacyLore: true` retains the old worker-memory injection and curator during the transition release. Compatibility modules remain available for this rollout; the Knowledge shelf uses the new tree. Run migration before switching a populated floor to the tree. Removal of the old modules is a subsequent compatibility-breaking step.
 
@@ -117,7 +121,7 @@ The old worker Lore endpoint is disabled by default and directs callers to the K
 
 The existing Knowledge curator settings control the tree by default: completion debounce (30 seconds), interval or daily IANA scheduling, pause/resume, one catch-up and exponential 5–60 minute retry. Models still run noninteractively in empty temporary directories with tools, hooks and MCP disabled, five-minute timeouts and a 1 MiB output cap.
 
-A run fetches `origin/main`, creates `agent-office/knowledge-curation/<date>-<id>` in a separate worktree, and reviews bounded batches plus committed repository evidence. Its review request title starts with `[Knowledge]`. Exact duplicates and changes since `verified_at` are handled without asking the model for those notes. Models may merge, split, move, archive, flag, verify, rewrite summaries, fix indexes and promote read-only journals. All action paths and new destinations are supplied in advance; the whole response is validated before applying it. Concurrent changes are guarded by the full note snapshot, including its `updated` field.
+A run fetches `origin/main`, creates `agent-office/knowledge-curation/<date>-<id>` in a separate worktree, and reviews bounded batches plus committed repository evidence. Its review request title starts with `[Knowledge]`. Exact duplicates and changes since `verified_at` are handled without asking the model for those notes. Models may merge, split, move, archive, flag, verify, rewrite summaries, fix indexes and promote read-only journals. All action paths and new destinations are supplied in advance; the whole response is validated before applying it. Concurrent changes and new destination collisions are guarded by full note snapshots. The approved set is applied together, so a conflicting move never deletes its source.
 
 After lint, changes are committed, pushed to the verified origin, and published with the matching GitHub/GitLab CLI. The floor branch is never switched. Failures retain the curation branch/worktree for inspection and report it in the run summary. Git history replaces the old overlay journal for the new tree; legacy originals remain untouched.
 

@@ -38,6 +38,7 @@ export function serializeFrontmatter(fields: Record<string, unknown>, body: stri
   return `---\n${Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join('\n')}\n---\n${body}`;
 }
 export function parseKnowledgeIndex(text: string): KnowledgeIndex {
+  text = text.replace(/\r\n/g, '\n');
   const { fields } = parseFrontmatter(text);
   if (fields.kind !== 'index' || typeof fields.summary !== 'string' || !fields.summary.trim()) throw Error('Index needs kind: index and summary');
   if (text.split('\n').filter(line => line === '## Entries').length !== 1 || text.split('\n').filter(line => line === '## Archived').length > 1) throw Error('Indexes need exactly one Entries block and at most one Archived block');

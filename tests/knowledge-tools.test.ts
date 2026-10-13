@@ -36,6 +36,10 @@ test('knowledge loopback API rechecks auth after body read, rejects spoofed iden
   assert.equal((await call({ action: 'write', path: 'project/test.md', frontmatter: { title: 'Test', summary: 'Test command', author: 'spoof' }, body: 'Body' })).status, 400);
   const saved = await call({ action: 'write', path: 'project/test.md', frontmatter: { title: 'Test', summary: 'Test command' }, body: 'Body' });
   assert.equal(saved.status, 200); assert.equal(saved.body.frontmatter.author, 'worker:ada');
+  const read = await call({ action: 'read', path: 'project/test.md' });
+  const updated = await call({ action: 'write', path: 'project/test.md', frontmatter: { title: 'Test', summary: 'Updated' }, body: 'New body', expectedVersion: read.body.version });
+  assert.equal(updated.status, 200);
+  assert.equal((await call({ action: 'write', path: 'project/test.md', frontmatter: { title: 'Test', summary: 'Stale' }, body: 'Stale body', expectedVersion: read.body.version })).status, 400);
   assert.equal((await call({ action: 'review_done', changed: [], none_reason: 'No additional facts changed' })).status, 200);
   const state = JSON.parse(fs.readFileSync(path.join(new KnowledgeStore(dir).root, '_meta/state/reviews.json'), 'utf8'));
   assert.ok(state['ada:4']);

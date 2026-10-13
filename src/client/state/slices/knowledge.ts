@@ -1,7 +1,7 @@
 import type { KnowledgeTreeView } from '../../../shared/protocol/knowledge';
 import type { Slice } from '../store';
 declare module '../store' {
-  interface Store { knowledge: KnowledgeTreeView; knowledgeNote: { path: string; text: string; handover?: boolean } | null; knowledgeStatus: { message: string; results?: { path: string; title: string; line: number; lines: string[] }[] } }
+  interface Store { knowledge: KnowledgeTreeView; knowledgeNote: { path: string; text: string; version?: string; handover?: boolean } | null; knowledgeStatus: { message: string; results?: { path: string; title: string; line: number; lines: string[] }[] } }
   interface Topics { knowledge: true; knowledgeNote: true; knowledgeStatus: true }
 }
 const empty = (): KnowledgeTreeView => ({ branch: '', rows: [], uncommitted: false, handovers: [] });

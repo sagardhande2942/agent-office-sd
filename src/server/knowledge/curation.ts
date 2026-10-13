@@ -28,12 +28,17 @@ export function parseKnowledgeActions(value: unknown, batch: CurationInput[], de
   return v;
 }
 export function applyKnowledgeActions(store: KnowledgeStore, batch: CurationInput[], actions: KnowledgeAction[], commit: string) {
+  return store.withLock(() => applyLocked(store, batch, actions, commit));
+}
+function applyLocked(store: KnowledgeStore, batch: CurationInput[], actions: KnowledgeAction[], commit: string) {
   const snapshots = new Map(batch.map(n => [n.path, n])); const changed: string[] = []; let skipped = 0;
   for (const a of actions) {
     const note = snapshots.get(a.path)!;
     const guard = (n: CurationInput) => n.handover || fs.existsSync(store.resolve(n.path)) && fs.readFileSync(store.resolve(n.path), 'utf8') === n.version;
     // Exact content guards also detect two edits made on the same updated date.
     if (!guard(note) || a.action === 'merge' && !guard(snapshots.get(a.target!)!)) { skipped++; continue; }
+    const destinations = a.action === 'split' ? a.parts!.map(p => p.path) : ['move', 'promote-handover'].includes(a.action) ? [a.target!] : [];
+    if (destinations.some(p => fs.existsSync(store.resolve(p)))) { skipped++; continue; }
     const write = (p: string, frontmatter: KnowledgeFrontmatter, body: string) => { store.write(p, frontmatter, body, 'curator'); changed.push(p); };
     switch (a.action) {
       case 'archive': store.archive(a.path, a.reason, 'curator'); changed.push(a.path); break;

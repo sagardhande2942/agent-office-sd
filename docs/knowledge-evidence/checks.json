@@ -1,7 +1,28 @@
 {
-  "tree": true,
-  "statusBadges": true,
-  "editPreservesStatus": true,
-  "editPreservesSources": true,
-  "closeAndEscape": true
+  "typecheck": "passed",
+  "build": "passed",
+  "tests": {
+    "passed": 1328,
+    "skipped": 1,
+    "failed": 0
+  },
+  "knowledgeLint": "passed",
+  "workerE2E": {
+    "sharedAcrossWorkers": true,
+    "staleEditRejected": true,
+    "requiredReviewEnforced": true,
+    "codeWorktreeUnchanged": true
+  },
+  "curatorE2E": {
+    "proposalIsolated": true,
+    "reviewPublishedWithFixtureForge": true
+  },
+  "browserE2E": {
+    "statusBadges": true,
+    "editPreservesMetadata": true,
+    "staleDraftRetained": true,
+    "publishAndSyncControls": true,
+    "closeAndEscape": true
+  },
+  "publicationTests": "local Git remotes and fixture forge; no real review PR created by tests"
 }

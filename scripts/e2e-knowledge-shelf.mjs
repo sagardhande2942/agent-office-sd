@@ -24,7 +24,18 @@ try {
   await page.waitForFunction(() => window.__game2d.store.knowledge.uncommitted);
   const parsed = (await import('../src/shared/knowledge-index.ts')).parseKnowledgeNote(store.read('project/test.md').text);
   assert.equal(parsed.frontmatter.status, 'needs-verification'); assert.deepEqual(parsed.frontmatter.sources, ['PR #123']);
+  await editor.waitFor({ state: 'detached' });
   await modal.locator('.knowledge-row').filter({ hasText: 'Run the test suite' }).click(); await modal.locator('.md').filter({ hasText: 'before opening a PR' }).waitFor();
+  await modal.getByRole('button', { name: 'Publish review', exact: true }).waitFor();
+  await modal.getByRole('button', { name: 'Sync approved', exact: true }).waitFor();
+  await modal.getByRole('button', { name: 'Edit', exact: true }).click(); await editor.waitFor();
+  store.write('project/test.md', {}, '# Tests\n\nConcurrent worker update.\n', 'worker:other');
+  await editor.getByLabel('Markdown body').fill('Stale edit that must remain recoverable');
+  await editor.getByRole('button', { name: 'Save', exact: true }).click();
+  await page.getByText('Knowledge changed:', { exact: false }).first().waitFor();
+  assert.equal(await editor.getByLabel('Markdown body').inputValue(), 'Stale edit that must remain recoverable');
+  assert.match(store.read('project/test.md').text, /Concurrent worker update/);
+  await editor.getByRole('button', { name: 'Close', exact: true }).click();
   await page.screenshot({ path: path.join(artifacts, 'knowledge-shelf.png') });
   await modal.getByRole('button', { name: 'Close', exact: true }).click(); await modal.waitFor({ state: 'detached' });
   await page.keyboard.press('Tab'); await page.locator('button:has-text("Knowledge base")').first().click(); await page.keyboard.press('Escape'); await modal.waitFor({ state: 'detached' });

@@ -16,5 +16,5 @@ async function execute(ctx: Parameters<HandlerMap<KnowledgeClientMsg>['knowledge
 }
 export const knowledgeHandlers = {
   'knowledge.tree': execute, 'knowledge.read': execute, 'knowledge.search': execute, 'knowledge.write': execute,
-  'knowledge.commit': execute, 'knowledge.history': execute, 'knowledge.restore': execute, 'knowledge.delete': execute,
+  'knowledge.commit': execute, 'knowledge.sync': execute, 'knowledge.history': execute, 'knowledge.restore': execute, 'knowledge.delete': execute,
 } satisfies HandlerMap<KnowledgeClientMsg>;
