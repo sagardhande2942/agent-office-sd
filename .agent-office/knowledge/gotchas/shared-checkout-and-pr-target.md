@@ -1,9 +1,10 @@
 ---
 summary: "The main checkout is shared and rarely clean: branch in a worktree, never commit others' changes there, and target pull requests at the project's real remote."
 title: "Shared checkout, worktrees and pull request targets"
-author: "curator"
+author: "human:inferno"
 updated: "2026-10-13"
-status: "needs-verification"
+status: "active"
+tags: []
 ---
 The repository checkout at `/home/tradeai/agent-office/vishal2942/agent-office-sd` is shared with other live sessions and board agents. It is rarely clean: expect an unrelated modified `.gitignore` and an untracked `.agent-office/` directory. Never stash, reset, commit or clean those.
 

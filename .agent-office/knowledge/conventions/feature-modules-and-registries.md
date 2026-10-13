@@ -1,9 +1,10 @@
 ---
 summary: "Features are folders that register through the client and server registries; do not add code to main.ts, server.ts, the store or protocol.ts."
 title: "Features plug in through registries, not into the big files"
-author: "curator"
+author: "human:inferno"
 updated: "2026-10-13"
 status: "needs-verification"
+tags: []
 ---
 `docs/code-layout.md` in the repository is the full reference and stays accurate; this note is the short version to remember before you start.
 

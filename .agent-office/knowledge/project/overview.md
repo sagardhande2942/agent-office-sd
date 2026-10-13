@@ -1,9 +1,10 @@
 ---
 title: "What this repository is"
 summary: "agent-office: a 3D multiplayer office where agent CLIs work at desks, with a server, a Lite dashboard and many floor features."
-author: "curator"
+author: "human:inferno"
 updated: "2026-10-13"
-status: "needs-verification"
+status: "active"
+tags: []
 ---
 `agent-office` is a cartoon 3D multiplayer office (TypeScript, Vite client, Node server) where a team spawns coding agents at desks, watches their live terminals, talks to them and tracks their pull requests.
 
