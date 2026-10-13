@@ -602,4 +602,6 @@ Human-verified active notes are preserved when curator evidence is incomplete. A
 Knowledge publication accepts HTTPS and SSH GitHub/GitLab origins with a `.git` suffix. Failed publication retains its proposal branch for recovery; see [Knowledge Tree](docs/knowledge.md).
 
 Curator failures show bounded, credential-redacted CLI diagnostics and the model used by the run. If a provider request fails intermittently, retry Run now; a failed proposal remains available for inspection.
+Reported provider spend persists across restarts and worker removal: Codex root-session tokens and OpenCode cumulative tokens have daily/all-time totals. The daily budget includes Claude estimates and known reported OpenCode/DeepSeek costs; unavailable costs are explicitly excluded. DeepSeek context occupancy is not accumulated as token spend. See [configuration](docs/configuration.md) for accounting scope.
+
 Workers can have **Developer**, **Reviewer**, **Tester**, or **Researcher** roles. Choose a role in the hiring or task prompt dialog, or start a CLI/MCP prompt with `[Office worker role: reviewer]` followed by the task on the next line. Each role supplies specific responsibilities on subsequent office prompts and survives restarts. See [Worker roles](docs/agents.md#worker-roles) for reassignment and behavior.

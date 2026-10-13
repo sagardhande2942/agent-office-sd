@@ -59,7 +59,7 @@ export function usageTitle(u: Usage, provider: AgentProvider = 'claude'): string
 
 export function overBudget(): boolean {
   const s = store.usage;
-  return s.budget !== undefined && s.today.cost >= s.budget;
+  return s.budget !== undefined && (s.budgetCost ?? s.today.cost) >= s.budget;
 }
 
 /** New hires are refused: the daily budget is spent and the office runs with --budget-pause. */
@@ -155,12 +155,17 @@ export function renderUsage() {
   head.title = 'Current desks: tracked Claude Code costs plus reported OpenCode and DeepSeek Harness estimates; Codex root-session tokens appear below; sessions with unavailable cost or partial history are excluded.';
 
   const el = $('usage');
-  const any = s.total.calls > 0 || s.budget !== undefined || untracked || currentOpenCodeReports > 0 || openCodeWaiting || currentCodexReports > 0 || codexWaiting || currentDshReports > 0 || dshWaiting;
+  const any = s.total.calls > 0 || s.budget !== undefined || !!s.reported?.length || untracked || currentOpenCodeReports > 0 || openCodeWaiting || currentCodexReports > 0 || codexWaiting || currentDshReports > 0 || dshWaiting;
   el.classList.toggle('hidden', !any);
   if (!any) return;
   const over = overBudget();
   el.classList.toggle('over', over);
   const rows: HTMLElement[] = [];
+  for (const report of s.reported ?? []) {
+    const label = report.provider === 'codex' ? 'Codex root sessions' : report.provider === 'dsh' ? 'DeepSeek reported cost' : 'OpenCode';
+    const spend = (u: typeof report.total) => `${u.cost > 0 ? fmtCost(u.cost) + (u.unknownCost ? '+ known' : ' reported') : u.unknownCost ? 'cost unavailable' : fmtCost(0)}${report.provider === 'dsh' ? '' : ' · ' + fmtTokens(u.tokens) + ' tokens'}`;
+    rows.push(h('div.row.muted', { title: 'Persistent cumulative reports; partial history and unknown costs are excluded. Codex excludes subagents. DeepSeek context occupancy is not token spend.' }, `${label} today ${spend(report.today)} · all time ${spend(report.total)}`));
+  }
   if (s.total.calls > 0 || s.budget !== undefined) {
     rows.push(
       h(
@@ -168,12 +173,13 @@ export function renderUsage() {
         {},
         h('span', {}, '💸 Claude Code today'),
         h('b', { title: usageTitle(s.today, 'claude') }, displayedCost(s.today)),
-        s.budget !== undefined ? h('span.muted', {}, `of ${fmtCost(s.budget)}`) : h('span.muted', {}, `· ${fmtTokens(tokensOf(s.today))} tokens`),
+        h('span.muted', {}, `· ${fmtTokens(tokensOf(s.today))} tokens`),
       ),
     );
   }
   if (s.budget !== undefined) {
-    const pct = Math.min(100, (s.today.cost / s.budget) * 100);
+    rows.push(h('div.row.muted', {}, `Budget known spend ${fmtCost(s.budgetCost ?? s.today.cost)} of ${fmtCost(s.budget)} · unknown costs excluded`));
+    const pct = Math.min(100, ((s.budgetCost ?? s.today.cost) / s.budget) * 100);
     const state = over ? (s.pauseHiring ? 'Budget spent — no new hires until tomorrow' : 'Budget spent') : `${Math.round(pct)}% of today's budget`;
     rows.push(h('div.budget', { class: over ? 'over' : pct >= 80 ? 'near' : '', title: state, role: 'progressbar', 'aria-valuenow': Math.round(pct) }, h('div.fill', { style: `width:${pct}%` })));
   }
@@ -232,7 +238,7 @@ export function renderUsage() {
   }
   if (dshWaiting) rows.push(h('div.row.muted', { title: 'DeepSeek Harness usage appears after its first ACP usage update.' }, 'DeepSeek Harness metrics waiting for first report'));
   if (untracked) {
-    rows.push(h('div.row.muted', { title: 'Custom provider usage is not reported by the office.' }, 'Custom usage untracked · budget and totals cover Claude Code only'));
+    rows.push(h('div.row.muted', { title: 'Agents without usage reports are excluded from known spend.' }, 'Unmetered agents excluded · unknown costs are outside the budget'));
   }
   el.replaceChildren(...rows);
 }

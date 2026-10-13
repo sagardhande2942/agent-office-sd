@@ -1,6 +1,7 @@
 import { closeSync, existsSync, fstatSync, openSync, readdirSync, readFileSync, readSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Usage, UsageState } from '../shared/protocol.js';
+import { ProviderLedger } from './provider-ledger.js';
 
 /*
  * Where a worker's numbers come from
@@ -272,6 +273,7 @@ export const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
  * the office was down at the time.
  */
 export class Ledger {
+  private reported: ProviderLedger;
   private file: string;
   private total = zeroUsage();
   private days: Record<string, Usage> = {};
@@ -288,6 +290,7 @@ export class Ledger {
     private toast: (text: string, level: 'info' | 'warn') => void,
   ) {
     this.file = path.join(dataDir, 'usage.json');
+    this.reported = new ProviderLedger(dataDir);
     this.load();
     this.shownDay = localDay();
     // Midnight: "today" starts over and a paused office hires again.
@@ -299,11 +302,14 @@ export class Ledger {
 
   state(): UsageState {
     const day = localDay();
-    return { total: { ...this.total }, today: { ...(this.days[day] ?? zeroUsage()) }, day, budget: this.opts.budget, pauseHiring: this.opts.pauseHiring };
+    return { total: { ...this.total }, today: { ...(this.days[day] ?? zeroUsage()) }, reported: this.reported.state(day), budgetCost: (this.days[day]?.cost ?? 0) + this.reported.cost(day), day, budget: this.opts.budget, pauseHiring: this.opts.pauseHiring };
   }
 
   get overBudget(): boolean {
-    return this.opts.budget !== undefined && (this.days[localDay()]?.cost ?? 0) >= this.opts.budget;
+    return this.opts.budget !== undefined && this.state().budgetCost! >= this.opts.budget;
+  }
+  observeProvider(provider: string, session: string, usage: Usage) {
+    if (this.reported.observe(provider, session, usage, localDay())) { this.emit(); this.warnBudget(); }
   }
 
   /** Why a new agent can't be hired right now, when it can't. */
@@ -320,9 +326,13 @@ export class Ledger {
     for (const d of Object.keys(this.days).sort().slice(0, -KEEP_DAYS)) delete this.days[d];
     this.save();
     this.emit();
+    this.warnBudget();
+  }
+  private warnBudget() {
+    const day = localDay();
     if (this.opts.budget !== undefined && this.overBudget && this.warnedDay !== day) {
       this.warnedDay = day;
-      const spent = fmtUsd(this.days[day].cost);
+      const spent = fmtUsd(this.state().budgetCost!);
       this.toast(`💸 Today's spend passed the ${fmtUsd(this.opts.budget)} budget (${spent})${this.opts.pauseHiring ? ' — no new hires until tomorrow' : ''}`, 'warn');
     }
   }

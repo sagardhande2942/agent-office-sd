@@ -1,0 +1,40 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { ProviderLedger } from '../src/server/provider-ledger.js';
+import { Ledger } from '../src/server/usage.js';
+const usage = (tokens: number, cost = 0, known = false) => ({ input: tokens, output: 0, cacheRead: 0, cacheWrite: 0, calls: 0, cost, costKnown: known, totalTokens: tokens });
+test('provider accounting persists session baselines, retains removed sessions and books only new deltas across days', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'provider-ledger-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  let ledger = new ProviderLedger(dir);
+  ledger.observe('codex', 'floor/session', usage(100), '2026-10-13');
+  ledger = new ProviderLedger(dir);
+  assert.equal(ledger.observe('codex', 'floor/session', usage(100), '2026-10-14'), false);
+  ledger.observe('codex', 'floor/session', usage(150), '2026-10-14');
+  ledger.observe('codex', 'floor/session', usage(120), '2026-10-14');
+  ledger.observe('codex', 'other/session', usage(20), '2026-10-14');
+  assert.equal(ledger.state('2026-10-14')[0].total.tokens, 170);
+  assert.equal(ledger.state('2026-10-14')[0].today.tokens, 70);
+  assert.equal(ledger.state('2026-10-14')[0].total.unknownCost, true);
+});
+test('context occupancy, incomplete snapshots and unknown prices never inflate spend', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'provider-ledger-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const ledger = new ProviderLedger(dir);
+  ledger.observe('dsh', 's', usage(30000, 2, true), 'day');
+  ledger.observe('dsh', 's', usage(10000, 3, true), 'day');
+  assert.equal(ledger.state('day')[0].total.tokens, 0); assert.equal(ledger.cost('day'), 3);
+  ledger.observe('opencode', 's', { ...usage(100, 10, true), incomplete: true }, 'day');
+  assert.equal(ledger.cost('day'), 3);
+  ledger.observe('codex', 's', usage(100, 99, false), 'day');
+  assert.equal(ledger.cost('day'), 3);
+});
+test('known provider costs participate in hiring budgets and survive restart', t => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'provider-budget-')); t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  let ledger = new Ledger(dir, { budget: 2, pauseHiring: true }, () => {}, () => {});
+  ledger.observeProvider('opencode', 's', usage(100, 3, true));
+  assert.ok(ledger.hiringPaused); assert.equal(ledger.state().budgetCost, 3); ledger.flush();
+  ledger = new Ledger(dir, { budget: 2, pauseHiring: true }, () => {}, () => {});
+  assert.ok(ledger.hiringPaused); ledger.flush();
+});

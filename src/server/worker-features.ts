@@ -10,6 +10,7 @@ import type { FloorContext, Floor } from './floor.js';
 import type { ServerMsg } from '../shared/protocol.js';
 import type { WorkerFeature } from './workers/features.js';
 import { workerLore } from './lore/worker.js';
+import { providerSpendFeature } from './provider-spend-feature.js';
 import { LORE_WORKER_TOOLS } from './lore/hooks.js';
 import { loreHostCalls, loreHostSnapshot } from './lore/host.js';
 
@@ -21,7 +22,7 @@ export const workerFeatureSnapshots = (floor: Floor): ServerMsg[] => [loreHostSn
 const FEATURES = [workerLore] as const;
 export function floorWorkerFeatures(floor: Floor, publish: (msg: ServerMsg) => void, context: FloorContext): WorkerFeature[] {
   installFloorBoss(floor, context, publish);
-  return [workerKnowledge(floor), ...(loadKnowledgeConfig(floor.def.dir).legacyLore ? FEATURES.map(install => install(floor.lore, publish)) : []), floor.curator.feature(), workerRoles(floor.dir)];
+  return [providerSpendFeature(context.ledger, floor.def.id), workerKnowledge(floor), ...(loadKnowledgeConfig(floor.def.dir).legacyLore ? FEATURES.map(install => install(floor.lore, publish)) : []), floor.curator.feature(), workerRoles(floor.dir)];
 }
 
 export function closeFloorWorkerFeatures(floor: Floor) { closeFloorBoss(floor); }
