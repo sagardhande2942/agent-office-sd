@@ -4,7 +4,7 @@
 //
 // Browser-safe: no node imports, the hire dialog reads this too.
 
-export const AGENT_PROVIDERS = ['claude', 'opencode', 'codex', 'grok', 'muse', 'dsh', 'pi', 'cursor', 'antigravity', 'custom'] as const;
+export const AGENT_PROVIDERS = ['claude', 'opencode', 'codex', 'grok', 'muse', 'dsh', 'pi', 'cursor', 'antigravity', 'kilo', 'custom'] as const;
 
 export type AgentProvider = (typeof AGENT_PROVIDERS)[number];
 
@@ -329,6 +329,27 @@ export const PROVIDER_META: Record<AgentProvider, ProviderMeta> = {
       invalid: 'Use a model slug: letters, digits and . _ : / - (up to 128 characters).' },
     takesEffort: true,
     usage: { note: 'Antigravity uses the office machine’s Google login. Usage and cost remain in Antigravity; the office does not meter them.' },
+  },
+  kilo: {
+    label: 'Kilo Code',
+    name: 'Kilo',
+    bin: 'kilo',
+    validModel: isValidOpenCodeModel,
+    invalidModel: 'Invalid Kilo model (expected provider/model without whitespace)',
+    models: {
+      pick: 'typed',
+      catalog: true,
+      unset: 'Default (Kilo settings)',
+      max: OPEN_CODE_MODEL_MAX,
+      hint: 'Optional provider/model: choose a suggestion from `kilo models` or type one. Effort is the model\u2019s variant in Kilo.',
+      invalid: 'Use provider/model format without whitespace or control characters (up to 256 characters).',
+    },
+    takesEffort: true,
+    usage: {
+      reports: true,
+      waiting: 'waiting for first report',
+      note: 'Kilo reports model/provider estimates through the office\u2019s plugin; they are not billing, and arrive after the first report.',
+    },
   },
   custom: {
     label: 'Custom',

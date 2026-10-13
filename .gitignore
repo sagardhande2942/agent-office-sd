@@ -7,7 +7,7 @@ pw.txt
 __pycache__/
 reel-staged.json
 
-# Commit the knowledge tree; keep journals and telemetry local.
+# Agent Office knowledge (committed); journals and telemetry stay local
 !/.agent-office/
 /.agent-office/*
 !/.agent-office/knowledge/

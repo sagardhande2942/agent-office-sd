@@ -34,5 +34,10 @@
       712,
       390
     ]
+  },
+  "latestMainMerge": {
+    "shelfBrowser": true,
+    "workerRolesPreserved": true,
+    "knowledgeEntriesPreserved": true
   }
 }
