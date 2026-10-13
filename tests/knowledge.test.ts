@@ -36,6 +36,13 @@ test('path and credential guards reject traversal, symlinks, metadata access and
   assert.throws(() => store.write('project/secret.md', frontmatter, 'token=abcdefghijklmnop', 'worker:ada'), /credentials/);
   assert.throws(() => store.write('project/INDEX.md', frontmatter, 'Body', 'worker:ada'), /Indexes/);
 });
+test('system symlink ancestors outside the checkout are allowed', t => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'knowledge-symlink-parent-')); t.after(() => fs.rmSync(temp, { recursive: true, force: true }));
+  const real = path.join(temp, 'real'); const alias = path.join(temp, 'alias');
+  fs.mkdirSync(path.join(real, 'checkout'), { recursive: true }); fs.symlinkSync(real, alias, 'junction');
+  const store = new KnowledgeStore(path.join(alias, 'checkout')); store.seed();
+  assert.ok(fs.existsSync(path.join(real, 'checkout', '.agent-office/knowledge/INDEX.md')));
+});
 test('read is complete by default, paging is explicit and search returns bounded context', t => {
   const store = fixture(t); store.write('project/build.md', frontmatter, 'before\nneedle\nafter\ntail\n', 'worker:ada');
   const full = store.read('project/build.md'); assert.match(full.text, /tail\n$/);

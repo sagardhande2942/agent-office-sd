@@ -26,9 +26,11 @@ export class KnowledgeStore {
     this.validateParents(this.root);
   }
   private validateParents(file: string) {
-    let cursor = path.parse(file).root;
-    for (const part of file.slice(cursor.length).split(path.sep)) {
-      cursor = path.join(cursor, part);
+    let cursor = path.resolve(this.checkout);
+    const relative = path.relative(cursor, file);
+    if (relative.startsWith('..' + path.sep) || relative === '..' || path.isAbsolute(relative)) throw Error('Knowledge paths must stay within the checkout');
+    for (const part of ['', ...relative.split(path.sep)]) {
+      if (part) cursor = path.join(cursor, part);
       try { if (fs.lstatSync(cursor).isSymbolicLink()) throw Error('Knowledge paths cannot use symlinks'); }
       catch (e) { if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e; }
     }
