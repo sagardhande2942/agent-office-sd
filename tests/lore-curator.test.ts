@@ -282,6 +282,8 @@ test('completion evidence includes core validation and tests despite a reference
 
 test('failed background agents expose bounded diagnostics and redact credentials', async () => {
   assert.equal(curatorErrorDetail('user\nprivate note text\nERROR: invalid request api_key=secret-value Bearer abcdef\n'), 'ERROR: invalid request api_key=[redacted] Bearer [redacted]');
+  assert.equal(curatorErrorDetail('user\nCurate notes about quota, unauthorized requests, rate limits and unsupported model errors. Batch: private knowledge\nERROR: model is unavailable\n'), 'ERROR: model is unavailable');
+  assert.equal(curatorErrorDetail('Curate notes containing invalid_request_error and authentication failed; Batch: private knowledge'), '');
   const dir = mkdtempSync(path.join(os.tmpdir(), 'curator-failed-agent-'));
   try {
     const command = path.join(dir, 'fake-agent');

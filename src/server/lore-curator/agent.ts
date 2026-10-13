@@ -10,7 +10,10 @@ export type CuratorAgent = (settings: CuratorSettings, prompt: string, signal: A
 /** Return actionable diagnostics without echoed knowledge or credentials. */
 export function curatorErrorDetail(stderr: string): string {
   const clean = stderr.replace(/\x1b\[[0-9;]*m/g, '');
-  const lines = clean.split(/\r?\n/).filter(line => /(?:^\s*(?:error|fatal|"message"|"code")\s*[:=]|invalid_request_error|unauthorized|rate.limit|quota|unsupported.*model|authentication.*failed)/i.test(line));
+  // Codex's human-readable stderr echoes the entire prompt. Keywords anywhere in
+  // that prompt are not diagnostics; accept only explicit error records/lines.
+  const lines = clean.split(/\r?\n/).filter(line => /^\s*(?:(?:error|fatal|invalid_request_error|unauthorized|rate[_ -]?limit|quota|authentication failed)\s*[:=]|"(?:message|code)"\s*:)/i.test(line))
+    .map(line => line.slice(0, 1000)).slice(-4);
   return lines.join('\n').replace(/Bearer\s+\S+/gi, 'Bearer [redacted]')
     .replace(/\b(?:sk-[\w-]+|gh[pousr]_[\w]+|github_pat_[\w]+)\b/g, '[redacted]')
     .replace(/((?:api[_-]?key|access[_-]?token|password|secret)\s*[=:]\s*)[^\s,;]+/gi, '$1[redacted]').slice(0, 2000);
