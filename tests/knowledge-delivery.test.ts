@@ -122,6 +122,25 @@ test('publisher failure preserves a reviewable branch and leaves live notes unto
   assert.match(deliveries(store).at(-1)!.error!, /retained/);
   assert.match(store.read('project/a.md').text, /Pending/);
 });
+test('worktree hook failures expose Git diagnostics, preserve notes and allow a fresh retry', async t => {
+  const { store, checkout, options } = fixture(t);
+  store.write('project/a.md', fm, 'Pending discovery', 'worker:a');
+  const hooks = path.join(checkout, 'fixture-hooks'); fs.mkdirSync(hooks);
+  const hook = path.join(hooks, 'post-checkout');
+  fs.writeFileSync(hook, '#!/bin/sh\necho "fixture checkout rejected" >&2\nexit 23\n', { mode: 0o755 });
+  git(checkout, ['config', 'core.hooksPath', hooks]);
+  const head = git(checkout, ['rev-parse', 'HEAD']);
+  await assert.rejects(() => publishKnowledge(store, options), /fixture checkout rejected/);
+  const failed = deliveries(store).at(-1)!;
+  assert.equal(failed.state, 'failed');
+  assert.match(failed.error!, /exit\/code: 23/);
+  assert.match(failed.error!, /retained at/);
+  assert.equal(git(checkout, ['rev-parse', 'HEAD']), head);
+  assert.match(store.read('project/a.md').text, /Pending discovery/);
+  git(checkout, ['config', '--unset', 'core.hooksPath']);
+  assert.match((await publishKnowledge(store, options)).message, /published/);
+  assert.notEqual(deliveries(store).at(-1)!.branch, failed.branch);
+});
 test('restore publishes a review instead of committing on the shared floor branch', async t => {
   const { store, checkout, options, merge } = fixture(t);
   store.write('project/a.md', fm, 'Updated', 'worker:a');

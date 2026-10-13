@@ -8,7 +8,14 @@ import { KnowledgeStore, atomicWrite, rejectCredentials } from './store.js';
 import { lintKnowledge } from './lint.js';
 
 const execAsync = promisify(execFile);
-const remoteGit = async (checkout: string, args: string[]) => (await execAsync('git', args, { cwd: checkout, timeout: 120000 })).stdout.trim();
+const remoteGit = async (checkout: string, args: string[]) => (await execAsync('git', args, { cwd: checkout, timeout: 120000, maxBuffer: 16 * 1024 * 1024, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })).stdout.trim();
+/** Keep Git's diagnostic and process outcome, including silent timeouts and buffer failures. */
+function deliveryError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const details = error as Error & { stderr?: string | Buffer; code?: string | number; signal?: string };
+  const stderr = String(details.stderr ?? '').trim();
+  return [error.message, stderr, details.code !== undefined ? `exit/code: ${details.code}` : '', details.signal ? `signal: ${details.signal}` : ''].filter(Boolean).join('\n');
+}
 type Snapshot = Record<string, string>;
 export interface KnowledgeDelivery {
   id: string; branch: string; url?: string; state: 'preparing' | 'published' | 'merged' | 'closed' | 'failed';
@@ -75,7 +82,8 @@ export async function prepareKnowledgeDelivery(store: KnowledgeStore, kind: 'edi
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'office-knowledge-delivery-')); const worktree = path.join(temp, 'tree');
   try {
     await remoteGit(store.checkout, ['fetch', 'origin', 'main']);
-    knowledgeGit(store.checkout, ['worktree', 'add', '-b', record.branch, worktree, 'origin/main']);
+    // Checkout can be slow on mounted filesystems. Do not block the floor host or buffer progress.
+    await remoteGit(store.checkout, ['worktree', 'add', '--quiet', '-b', record.branch, worktree, 'origin/main']);
     const proposal = new KnowledgeStore(worktree, store.config); proposal.seed();
     const remote = knowledgeSnapshot(proposal);
     // Overlay only local changes. Never replace the entire freshly fetched tree.
@@ -88,7 +96,7 @@ export async function prepareKnowledgeDelivery(store: KnowledgeStore, kind: 'edi
     const lint = lintKnowledge(proposal, true); if (lint.errors.length) throw Error(lint.errors.join('\n'));
     return { record, temp, worktree, proposal };
   } catch (e) {
-    record.state = 'failed'; record.error = `${(e as Error).message}; retained at ${worktree}`; save(store, record); throw Error(record.error);
+    record.state = 'failed'; record.error = `${deliveryError(e)}; retained at ${worktree}`; save(store, record); throw Error(record.error);
   }
 }
 export async function finishKnowledgeDelivery(store: KnowledgeStore, draft: Awaited<ReturnType<typeof prepareKnowledgeDelivery>>, options: DeliveryOptions = {}) {
@@ -113,7 +121,7 @@ export async function finishKnowledgeDelivery(store: KnowledgeStore, draft: Awai
     record.state = 'published'; save(store, record); cleanup(store, draft);
     return { message: `Knowledge review published: ${record.url}`, url: record.url };
   } catch (e) {
-    failKnowledgeDelivery(store, draft, e); throw e;
+    failKnowledgeDelivery(store, draft, e); throw Error(record.error);
   }
 }
 function cleanup(store: KnowledgeStore, draft: Awaited<ReturnType<typeof prepareKnowledgeDelivery>>) {
@@ -121,7 +129,7 @@ function cleanup(store: KnowledgeStore, draft: Awaited<ReturnType<typeof prepare
   catch (e) { draft.record.error = `Published result retained; cleanup failed at ${draft.worktree}: ${String(e)}`; save(store, draft.record); }
 }
 export function failKnowledgeDelivery(store: KnowledgeStore, draft: Awaited<ReturnType<typeof prepareKnowledgeDelivery>>, e: unknown) {
-  draft.record.state = 'failed'; draft.record.error = `${String(e)}; retained at ${draft.worktree}`; save(store, draft.record);
+  draft.record.state = 'failed'; draft.record.error = `${deliveryError(e)}; retained at ${draft.worktree}`; save(store, draft.record);
 }
 export async function publishKnowledge(store: KnowledgeStore, options: DeliveryOptions = {}) {
   return finishKnowledgeDelivery(store, await prepareKnowledgeDelivery(store, 'edit', options), options);

@@ -144,3 +144,9 @@ node --import tsx scripts/e2e-knowledge-curator.mjs
 The browser script finds installed Playwright Chromium or accepts `CHROMIUM_PATH`; screenshots and checks go to `/tmp/agent-office-knowledge-evidence` (override `KNOWLEDGE_ARTIFACTS`). The curator fixture mocks MR publishing rather than creating an external review request.
 
 Curator failures show bounded, credential-redacted explicit CLI error lines and the model used by the run. Echoed prompts containing error-related words are excluded. If the CLI provides no recognized error line, the run reports that no diagnostic was returned. If a provider request fails intermittently, retry Run now; a failed proposal remains available for inspection.
+
+## Publication failure recovery
+
+Knowledge review worktree creation runs asynchronously with quiet checkout output, so the floor remains responsive while Git checks out a large repository or a mounted filesystem. A failed review records Git stderr and the exit code or termination signal, together with the retained worktree path. Shared Markdown notes remain tracked and unchanged by a failed publication.
+
+Read the reported Git error before retrying **Publish review**. For example, correct a failing checkout hook, repository permissions or disk-space issue first. A retry creates a fresh review branch; failed proposal branches and any worktree that was created remain available for inspection. Do not delete retained worktrees until you have checked them for work worth preserving.
