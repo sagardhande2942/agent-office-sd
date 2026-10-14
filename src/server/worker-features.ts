@@ -16,9 +16,12 @@ import { workerLore } from './lore/worker.js';
 import { providerSpendFeature } from './provider-spend-feature.js';
 import { LORE_WORKER_TOOLS } from './lore/hooks.js';
 import { loreHostCalls, loreHostSnapshot } from './lore/host.js';
+import { installActivityHeatmap, closeActivityHeatmap } from './activity-heatmap/service.js';
+import { activitySignalFeature, closeActivitySignals } from './activity-heatmap-signals/index.js';
+import { activityHeatmapHostCalls } from './activity-heatmap/routes.js';
 
 export const WORKER_FEATURE_TOOLS = [...HANDOFF_WORKER_TOOLS, ...KNOWLEDGE_WORKER_TOOLS, ...LORE_WORKER_TOOLS, { name: 'boss_state', readOnly: true } as const, { name: 'boss_action', readOnly: false } as const];
-export const workerFeatureHostCalls = { ...handoffHostCalls, ...knowledgeHostCalls, ...loreHostCalls, ...curatorHostCalls, ...bossHostCalls };
+export const workerFeatureHostCalls = { ...handoffHostCalls, ...knowledgeHostCalls, ...loreHostCalls, ...curatorHostCalls, ...bossHostCalls, ...activityHeatmapHostCalls };
 export const workerFeatureSnapshots = (floor: Floor): ServerMsg[] => [loreHostSnapshot(floor), curatorHostSnapshot(floor), bossHostSnapshot(floor)];
 
 /** Features register once per floor, sharing the floor's actual persistent services. */
@@ -26,7 +29,7 @@ const FEATURES = [workerLore] as const;
 export function floorWorkerFeatures(floor: Floor, publish: (msg: ServerMsg) => void, context: FloorContext): WorkerFeature[] {
   installFloorBoss(floor, context, publish);
   installKnowledgeAutoSync(floor, publish);
-  return [providerSpendFeature(context.ledger, floor.def.id), workerKnowledge(floor), ...(loadKnowledgeConfig(floor.def.dir).legacyLore ? FEATURES.map(install => install(floor.lore, publish)) : []), floor.curator.feature(), workerRoles(floor.dir)];
+  return [providerSpendFeature(context.ledger, floor.def.id), workerKnowledge(floor), ...(loadKnowledgeConfig(floor.def.dir).legacyLore ? FEATURES.map(install => install(floor.lore, publish)) : []), floor.curator.feature(), workerRoles(floor.dir), installActivityHeatmap(floor), activitySignalFeature(floor)];
 }
 
-export function closeFloorWorkerFeatures(floor: Floor) { closeFloorBoss(floor); closeKnowledgeAutoSync(floor); }
+export function closeFloorWorkerFeatures(floor: Floor) { closeActivitySignals(floor); closeActivityHeatmap(floor); closeFloorBoss(floor); closeKnowledgeAutoSync(floor); }

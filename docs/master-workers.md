@@ -1,5 +1,7 @@
 # Master / Workers
 
+Use **Activity heatmap** to inspect recorded phase buckets, attempt durations and time awaiting input or review alongside replay milestones. See [phase semantics and provider coverage](activity-heatmap.md); unknown and missing history remain explicit.
+
 Open **Master / Workers** in the Lite header, the 3D/2D game menu, or the command palette. This is a separate activity from plan comparison: one master completes your task with a team rather than competing against other planners. It requires a Git floor and installed, signed-in coding agent CLIs on the machine hosting that floor. Local and remote floors use the same controls.
 
 Choose a provider and an explicit model/effort or configured defaults for the master, add the models it may hire, and choose a worker limit of 1–5 (default 5). The master is additional to that limit, and everyone counts toward existing office capacity. Eligible models may be reused across workers. The master infers suitability from the task and model identities and records its reasoning; model names do not guarantee capability. All eight built-in providers are supported. Custom shell agents are excluded.
