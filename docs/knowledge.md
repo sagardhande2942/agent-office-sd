@@ -4,6 +4,14 @@ Back to the [README](../README.md). Engineering details: [Knowledge architecture
 
 The Knowledge shelf is a hierarchical Markdown knowledge base committed with the project. Workers start with the root index, pinned note summaries and task hints. They read the notes they need; note bodies are never automatically injected or sliced. Agents maintain the tree themselves.
 
+## Project reference notes
+
+The committed tree includes focused, repository-sourced guides for [PR delivery](../.agent-office/knowledge/conventions/pr-delivery.md), [worker completion evidence](../.agent-office/knowledge/conventions/completion-evidence.md), [data locations and recovery](../.agent-office/knowledge/project/data-and-recovery.md), and [finding the right documentation](../.agent-office/knowledge/project/documentation-map.md). PR delivery is pinned so its shared-checkout and destination rules are available during task bootstrap. These notes summarize existing project behavior; their sources remain the detailed references.
+
+## Reasoning guides for compact models
+
+For tasks that cross several boundaries, start with the [task reasoning checklist](../.agent-office/knowledge/conventions/task-reasoning-checklist.md). Focused notes cover [knowledge concurrency and merge synchronization](../.agent-office/knowledge/gotchas/knowledge-concurrency.md), [floor ownership and authorization](../.agent-office/knowledge/architecture/floor-ownership-and-auth.md), [modal focus and client import boundaries](../.agent-office/knowledge/gotchas/modal-and-client-boundaries.md), and [feature registration](../.agent-office/knowledge/conventions/feature-modules-and-registries.md). They provide ordered steps, failure examples and relevant verification paths; read the cited implementation before editing. These guides help reduce assumptions when context is limited, without promising model-specific results.
+
 ## Browse and edit
 
 Press **E** at the shelf on the west wall beside the basketball hoop, or choose **📜 Knowledge base** in **☰**. The left pane lists directories and notes; the right pane renders Markdown. Every row shows its lifecycle status, including archived and needs-verification notes. Search returns matched lines and adjacent context. Tags are displayed with the selected note.
