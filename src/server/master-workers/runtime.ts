@@ -4,6 +4,7 @@ import type { Floor } from '../floor.js';
 import { nextFreeSeat } from '../../shared/layout.js';
 import { TeamCoordinator, type TeamAdapter } from './coordinator.js';
 import { TeamPresets } from './storage.js';
+import { notifyTeamState } from '../team-sessions.js';
 const git=(dir:string,args:string[])=>execFileSync('git',args,{cwd:dir,encoding:'utf8',timeout:20000,env:{...process.env,GIT_TERMINAL_PROMPT:'0'},stdio:['ignore','pipe','pipe']}).trim();
 export function teamAdapter(floor: Floor, changed: () => void, beforeSpawn: () => void = () => {}): TeamAdapter {
   const checkout=(id:string)=>{
@@ -71,5 +72,10 @@ export function teamAdapter(floor: Floor, changed: () => void, beforeSpawn: () =
 }
 
 export function createTeam(floor: Floor, presets: TeamPresets, changed: () => void, beforeSpawn: () => void = () => {}) {
-  return new TeamCoordinator(path.join(floor.dir,'.agent-office','master-workers.json'),presets,teamAdapter(floor,changed,beforeSpawn));
+  let coordinator: TeamCoordinator | undefined;
+  coordinator = new TeamCoordinator(path.join(floor.dir,'.agent-office','master-workers.json'),presets,teamAdapter(floor, () => {
+    if (coordinator) notifyTeamState(floor, coordinator.state());
+    changed();
+  },beforeSpawn));
+  return coordinator;
 }

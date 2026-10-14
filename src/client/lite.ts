@@ -1,6 +1,7 @@
 import { openBossConsole } from './shared/boss-mode/console';
 import { viewSelector, switchView } from './shared/view-selector';
 import { openMasterWorkers } from './ui/master-workers';
+import { openActivityHeatmap } from './shared/activity-heatmap';
 import { openPlanReview } from './ui/plan-review';
 import { completionLabel } from '../shared/completion';
 import { openCommunications } from './ui/communications';
@@ -332,6 +333,7 @@ $('btn-issues').addEventListener('click', () => openBoard('issues', net, boardAc
 $('btn-pulls').addEventListener('click', () => openBoard('pulls', net, boardActions()));
 $('btn-boss-office').addEventListener('click',()=>openBossConsole(net,openWorker));
 $('btn-master-workers').addEventListener('click',()=>openMasterWorkers(net,openWorker));
+$('btn-activity-heatmap').addEventListener('click',()=>{ if(store.floor) openActivityHeatmap(store.floor); });
 $('btn-plans').addEventListener('click',()=>openPlanReview(net,openWorker));
 $('btn-meeting').addEventListener('click', () => showMeeting());
 $('btn-messages').addEventListener('click', () => openCommunications(openWorker));

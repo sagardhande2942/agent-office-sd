@@ -1,5 +1,6 @@
 import { RemoteHandoff } from './handoff/remote.js';
 import { RemoteKnowledge } from './knowledge/surface.js';
+import { RemoteActivityHeatmap } from './activity-heatmap/remote.js';
 import { RemoteBoss } from './boss-mode/surface.js';
 import { RemoteCurator } from './lore-curator/surface.js';
 import { RemoteTeams } from './master-workers/remote.js';
@@ -77,6 +78,7 @@ export class RemoteFloor implements FloorActions {
   readonly curator = new RemoteCurator((t, body) => this.call(t, body), () => this.announced.curator === true);
   readonly handoff = new RemoteHandoff(t => this.call(t));
   readonly knowledge = new RemoteKnowledge((t, body) => this.call(t, body));
+  readonly activityHeatmap = new RemoteActivityHeatmap((t, body) => this.call(t, body));
   readonly lore = new RemoteLore((t, body) => this.call(t, body), () => this.announced.lore === true);
   readonly helpers = { states: () => (this.mirror.get('helper') ?? []) as import('../shared/helper.js').HelperState[] };
   private seq = 0;

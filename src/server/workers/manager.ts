@@ -1,5 +1,5 @@
 import { authenticated, suspendWorker, wakeEligible } from './suspend.js';
-import { featurePrompt, featureEvent } from './features.js';
+import { featurePrompt, featureEvent, featureHook } from './features.js';
 import { promptWorker } from './prompt.js';
 import { planningSeat, planningVersion, planningPrompt, promotePlanWorker } from './plan-review.js';
 import type { PlanReviewWorker } from '../../shared/plan-review.js';
@@ -585,16 +585,15 @@ export class WorkerManager {
     return this.handleProviderHook('opencode', workerId, token, '', payload);
   }
 
-  /**
-   * An event on the hook route /hooks/`route` (see ProviderAdapter.hook): taken only from a running
-   * agent whose provider reports there, with its hook token. Says whether it was taken.
-   */
+  /** Authenticated provider hook; accepted signals notify the feature registry. */
   handleProviderHook(route: AgentProvider, workerId: string, token: string, event: string, payload: unknown, holdStop = false): boolean {
     const hook = providerAdapter(route)?.hook;
     const w = this.workers.get(workerId);
     const own = w && providerAdapter(w.info.provider);
     if (!hook || !w || !w.pty || w.info.kind !== 'agent' || !own || (own.hooksAs ?? own.id) !== route || !safeEq(token, w.hookToken)) return false;
-    return hook.handle(this.handleOf(w), event, payload, holdStop);
+    const accepted = hook.handle(this.handleOf(w), event, payload, holdStop);
+    if (accepted) featureHook(this.events, w.info, route, event, payload);
+    return accepted;
   }
 
   /**

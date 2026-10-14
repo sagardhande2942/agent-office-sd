@@ -15,6 +15,7 @@ import { serviceRoutes } from './services.js';
 import { worldsRoute } from './parallel-worlds.js';
 import { floorJoinRoutes } from '../../floor-join/routes.js';
 import { taskBriefRoutes } from '../../task-brief/routes.js';
+import { activityHeatmapRoute } from '../../activity-heatmap/routes.js';
 
 export const routes: readonly Route[] = [
   // Anyone.
@@ -36,6 +37,7 @@ export const routes: readonly Route[] = [
   handoffRoute,
   ...Object.values(floorJoinRoutes),
   ...Object.values(taskBriefRoutes),
+  activityHeatmapRoute,
   agentRoutes.models,
   fileRoutes.image,
   cinemaRoutes.shot,
