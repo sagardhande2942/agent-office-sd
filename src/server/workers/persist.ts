@@ -66,12 +66,12 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
 }
 
 /** Takes back the workers saved in `file` into `workers`, each at its desk (while it is free), all of them offline. */
-export function restoreWorkers(file: string, workers: Map<string, Worker>, defaultProvider: AgentProvider, deskOccupied: (deskId: string) => boolean) {
+export function restoreWorkers(file: string, workers: Map<string, Worker>, defaultProvider: AgentProvider, deskOccupied: (deskId: string, meeting?: string) => boolean) {
   if (!existsSync(file)) return;
   try {
     const saved = JSON.parse(readFileSync(file, 'utf8')) as (Partial<WorkerInfo> & { owner?: unknown; tracker?: unknown; hookToken?: unknown; pty?: any; midTurn?: unknown } & Record<string, unknown>)[];
     for (const s of saved) {
-      if (!s.id || !s.deskId || !DESK_BY_ID.has(s.deskId) || deskOccupied(s.deskId)) continue;
+      if (!s.id || !s.deskId || !DESK_BY_ID.has(s.deskId) || deskOccupied(s.deskId, typeof s.meeting === 'string' && DESK_BY_ID.get(s.deskId)?.room ? s.meeting : undefined)) continue;
       const tracker = restoreTracker(s.tracker);
       const provider = s.kind === 'shell'
         ? undefined

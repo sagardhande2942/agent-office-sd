@@ -37,7 +37,7 @@ import { floorWorkerFeatures, closeFloorWorkerFeatures } from './worker-features
 import { Cinema } from './cinema.js';
 import { Tv } from './tv.js';
 import { Whiteboard } from './whiteboard.js';
-import { MeetingRoom } from './meetings.js';
+import { MeetingSpaces as MeetingRoom } from './meeting-spaces/service.js';
 import { Worktrees, type WorktreeCleanup } from './worktrees.js';
 import { landedWork, landedWorkers, type Landed } from './leave-on-merge.js';
 import type { Ledger } from './usage.js';

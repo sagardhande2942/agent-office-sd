@@ -1,3 +1,4 @@
+import { MEETING_WINDOW_EXTENSIONS, meetingCommand } from './meeting-extensions';
 import { meetingMessages, unresolvedRequests } from '../../shared/communications';
 import { renderCommunicationList } from './communications';
 import './meeting.css';
@@ -50,7 +51,12 @@ export function openMeeting(net: Net, actions: MeetingActions, preset?: MeetingP
   let unresolvedOnly = false;
   const openThreads = new Set<string>();
   let form: ReturnType<typeof meetingForm> | null = null;
+  const extensions = MEETING_WINDOW_EXTENSIONS.map(extension => extension.mount(net, () => {
+    form = null; view = store.meeting.current ? 'status' : 'form'; tab = 'status'; render();
+  }));
+  el.insertBefore(h('div', {}, ...extensions.map(extension => extension.element)), body);
   const render = () => {
+    extensions.forEach(extension => extension.refresh());
     if (view === 'status' && store.meeting.current) {
       form = null;
       title.textContent = '🤝 Meeting room';
@@ -91,13 +97,15 @@ export function openMeeting(net: Net, actions: MeetingActions, preset?: MeetingP
     }
     form.refresh();
   };
-  const offs = [store.on('communications', () => view === 'status' && render()), store.on('meeting', render), store.on('workers', () => view === 'status' && render()), store.on('pulls', () => form?.refresh())];
-  const modal: Modal = openModal(el, { doing: '🤝 at the meeting room', onClose: () => offs.forEach((off) => off()) });
+  const offs = [store.on('communications', () => view === 'status' && render()), store.on('meeting', render), store.on('workers', render), store.on('pulls', () => form?.refresh())];
+  const modal: Modal = openModal(el, { doing: '🤝 at the meeting room', onClose: () => { offs.forEach(off => off()); extensions.forEach(extension => extension.dispose?.()); } });
   close.addEventListener('click', () => modal.close());
   render();
 }
 
 function renderStatus(m: Meeting, body: HTMLElement, foot: HTMLElement, net: Net, actions: MeetingActions, callAnother: () => void) {
+  const stop = meetingCommand({ t: 'meeting.stop' });
+  const clear = meetingCommand({ t: 'meeting.clear' });
   const p = MEETING_PATTERNS[m.pattern];
   const running = m.status === 'running';
   const pill = h('span.pill', { class: running ? 'working' : m.status === 'done' ? 'done' : 'needs_input' }, running ? 'in a meeting' : m.status);
@@ -141,9 +149,9 @@ function renderStatus(m: Meeting, body: HTMLElement, foot: HTMLElement, net: Net
     ...present(
     h('span.grow', {}, running ? 'The workers stay at the table after it ends, so you can read their terminals.' : 'Clearing the room sends the workers home. A committed output stays on its branch.'),
     running && m.waitingForCommunications ? h('button.btn.primary', { type: 'button', onclick: () => confirmDialog('Finish with unresolved requests?', 'The output will be committed or the review posted. Outstanding requests and your choice will be recorded in the saved meeting notes.', 'Finish anyway', () => net.send({ t: 'meeting.finish', id: m.id, allowUnresolved: true })) }, 'Finish anyway') : null,
-    running ? h('button.btn', { type: 'button', onclick: () => confirmDialog('Stop the meeting?', `The workers stop where they are and stay at the table. ${m.output} is only there if it was written.`, 'Stop it', () => net.send({ t: 'meeting.stop' })) }, '⛔ Stop meeting') : null,
+    running ? h('button.btn', { type: 'button', onclick: () => confirmDialog('Stop the meeting?', `The workers stop where they are and stay at the table. ${m.output} is only there if it was written.`, 'Stop it', () => net.send(stop)) }, '⛔ Stop meeting') : null,
     !running && m.commit && head?.worktree ? h('button.btn', { type: 'button', title: `Push ${m.worktree?.branch} and open a pull request`, onclick: () => actions.openPr(head.id) }, head.pr ? `🔀 PR #${head.pr.number}` : '🔀 Open PR') : null,
-    !running ? h('button.btn', { type: 'button', onclick: () => net.send({ t: 'meeting.clear' }) }, '🧹 Clear the room') : null,
+    !running ? h('button.btn', { type: 'button', onclick: () => net.send(clear) }, '🧹 Clear the room') : null,
     !running ? h('button.btn.primary', { type: 'button', onclick: callAnother }, '🤝 Call a meeting…') : null,
     ),
   );
@@ -271,7 +279,7 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
     const output = outputIn.value.trim();
     if (outputProblem(output)) return outputIn.focus();
     if (!provider.valid()) return;
-    net.send({
+    net.send(meetingCommand({
       t: 'meeting.start',
       pattern,
       prompt,
@@ -285,7 +293,7 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
       provider: provider.value(),
       model: provider.model(),
       effort: provider.effort(),
-    });
+    }));
     toast(`🤝 Calling the ${def().label} meeting: the workers are heading for the meeting room`);
     done();
   };

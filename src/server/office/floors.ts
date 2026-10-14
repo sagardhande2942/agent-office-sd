@@ -1,3 +1,4 @@
+import { participantMeeting } from '../../shared/meeting-spaces.js';
 import { OFFICE_MAP } from '../../shared/maps/index.js';
 import { communications } from './communications.js';
 import { installFloorJoin } from '../floor-join/index.js';
@@ -95,7 +96,7 @@ export async function openFloors(ctx: Ctx, hookPort: number): Promise<FloorsOpen
     navigation: () => ctx.maps.plan(),
     planTableAvailable: () => ctx.maps.pick() === OFFICE_MAP,
     helperReport: (floor, helper, host, text) => {
-      const meeting = floor.meetings.state().current;
+      const meeting = participantMeeting(floor.meetings.state(), host.id);
       const link = meeting?.status === 'running' && meeting.seats.some(s => s.workerId === host.id) ? { id: meeting.id, round: meeting.round } : undefined;
       return communications(ctx, floor).report(helper, host, text, { branch: host.worktree?.branch ?? floor.project.branch }, link).id;
     },
