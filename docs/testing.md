@@ -16,15 +16,34 @@ npm run build
 
 Build a fresh checkout before running integration tests: worker subprocesses and HTTP fixtures use `dist/`. Rebuild when tests exercise compiled entry points changed by your patch. Missing build artifacts can cause failures and leave integration fixtures waiting for events that never arrive.
 
+Finish the build before starting the suite. Do not run `npm run build` concurrently with tests in the same worktree: Vite replaces `dist/public`, and integrations can fail with "Client bundle not found" during that window. Typechecking does not replace build artifacts.
+
 ## Find bottlenecks
 
 ```sh
 npm run test:profile
+npm run test:profile:focus -- tests/client-structure.test.ts tests/client-registry.test.ts
 ```
 
-This runs the full suite with normal pass/fail output, then prints the 15 slowest test bodies and 10 slowest files. File timings include fixture setup and waiting for open handles; body timings include awaited I/O. A large difference can indicate expensive imports, module-level setup, or timers/processes/sockets left alive after a test. Parallel file durations overlap, so do not add them to estimate suite wall time. Profiling does not skip tests or alter failure exit codes.
+`test:profile` runs the full suite; `test:profile:focus` runs the selected files. Both show normal pass/fail output, then print the 15 slowest test bodies and 10 slowest files. File timings include fixture setup and waiting for open handles; body timings include awaited I/O. A large difference can indicate expensive imports, module-level setup, or timers/processes/sockets left alive after a test. Parallel file durations overlap, so do not add them to estimate suite wall time. Profiling does not skip tests or alter failure exit codes.
 
 Use consistent Node versions and concurrency, build artifacts ready, and an otherwise quiet machine for before/after measurements. Shared office workers and concurrent suites affect timing. Keep Node's default bounded concurrency unless measurements justify an override; focused runs accept `--test-concurrency=2` before file paths.
+
+`test:profile:focus` accepts the same file paths and runner flags as `test:focus`. Use it to investigate a bottleneck without rerunning unrelated integrations. Keep flags before file paths, for example:
+
+```sh
+npm run test:profile:focus -- --test-name-pattern='planning roles' tests/plan-review-server.test.ts
+```
+
+On WSL, repeated reads and import resolution on `/mnt/c` can dominate read-only architecture guards. The client registry and composition guards now reuse source snapshots and resolved imports within their isolated process. They still enumerate the complete source tree and run all assertions; caches disappear with the process, so a new run always sees edits.
+
+## Investigate flakes
+
+- The running floor discovers HTTP listeners inside worker worktrees with `GET /` and `user-agent: agent-office`. A fixture that asserts an exact request list must answer that specific incidental probe without recording it as an application request. `office-workers.test.ts` injects the probe deterministically and keeps exact assertions for every other request.
+- Measure lifecycle deadlines after child-process imports/readiness. `worker-shutdown.test.ts` allows bounded module startup, then gives shutdown seven seconds; this still catches the old 12-second warning timer without counting busy-machine import time.
+- A pass in isolation helps identify contention; it does not erase the original failure. Record both results and fix an observed cause before claiming the flake is resolved. Avoid automatic retries that conceal failures.
+
+Implementation worker startup text always asks agents to read the testing guide and relevant lore, use focused checks while editing, prepare integration artifacts, and reserve full checks for the finished patch. Repository requirements still decide which checks are mandatory.
 
 ## Fast fixtures without weaker assertions
 

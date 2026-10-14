@@ -7,10 +7,13 @@ import {tmpdir} from 'node:os';
 import {loadConfig} from '../src/server/config.js';
 import {startServer} from '../src/server/server.js';
 import {request,plan,verdict} from './fixtures/plan-review.js';
+import {idleAgent} from './fixtures/idle-agent.js';
 
 test('real office restricts planning roles, cleans only rejected worktree, then launches winner fresh',{timeout:30000},async()=>{
  const dir=mkdtempSync(path.join(tmpdir(),'office-plan-live-'));const binary=path.join(dir,'claude'),log=path.join(dir,'launches.jsonl');
- writeFileSync(binary,`#!${process.execPath}\nimport {appendFileSync} from 'node:fs';\nappendFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),role:process.env.AGENT_OFFICE_PLAN_ROLE,worker:process.env.AGENT_OFFICE_WORKER_ID})+'\\n');\nsetInterval(()=>{},1000);\n`,{mode:0o755});
+ // One-shot task labels must finish, rather than holding the file open for the
+ // production 45-second deadline after the interactive assertions have passed.
+ writeFileSync(binary,`${idleAgent}\nimport {appendFileSync} from 'node:fs';\nappendFileSync(${JSON.stringify(log)},JSON.stringify({args:process.argv.slice(2),role:process.env.AGENT_OFFICE_PLAN_ROLE,worker:process.env.AGENT_OFFICE_WORKER_ID})+'\\n');\n`,{mode:0o755});
  const git=(...args:string[])=>execFileSync('git',args,{cwd:dir,encoding:'utf8',stdio:['ignore','pipe','pipe']});
  git('init','-q','-b','main');writeFileSync(path.join(dir,'README.md'),'# Demo\n');git('add','README.md');git('-c','user.name=Test','-c','user.email=test@example.com','commit','-qm','Initial');
  const cfg=loadConfig([dir,'--password','plan-test','--no-open','--agent',binary]);cfg.port=0;cfg.agentArgs=['--dangerously-skip-permissions'];

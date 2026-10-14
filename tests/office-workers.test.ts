@@ -260,6 +260,11 @@ test('answers MCP: the handshake, its tools, and a call', async () => {
 test('office-workers mcp serves a real client over stdio, as the worker', async (t) => {
   const seen: { url: string; auth?: string; body: string }[] = [];
   const office = http.createServer((req, res) => {
+    // The running floor discovers listeners in worker worktrees. Its GET / is
+    // not an MCP request; keep every other request in the exact assertion below.
+    if (req.method === 'GET' && req.url === '/' && req.headers['user-agent'] === 'agent-office') {
+      res.writeHead(404); res.end(); return;
+    }
     let body = '';
     req.on('data', (c) => (body += c));
     req.on('end', () => {
@@ -271,6 +276,13 @@ test('office-workers mcp serves a real client over stdio, as the worker', async 
   await new Promise<void>((r) => office.listen(0, '127.0.0.1', r));
   t.after(() => office.close());
   const port = (office.address() as AddressInfo).port;
+  // Reproduce the incidental discovery probe without depending on a live floor.
+  await new Promise<void>((resolve, reject) => {
+    http.get(`http://127.0.0.1:${port}/`, { headers: { 'user-agent': 'agent-office' } }, (res) => {
+      assert.equal(res.statusCode, 404);
+      res.resume(); res.on('end', resolve);
+    }).on('error', reject);
+  });
   const child = spawn(process.execPath, [SCRIPT, 'mcp'], { env: { ...process.env, AGENT_OFFICE_HOOK_URL: `http://127.0.0.1:${port}`, AGENT_OFFICE_WORKER_ID: 'w1', AGENT_OFFICE_HOOK_TOKEN: 'sekrit' }, stdio: ['pipe', 'pipe', 'inherit'] });
   t.after(() => child.kill());
   const replies = createInterface({ input: child.stdout! })[Symbol.asyncIterator]();
