@@ -156,6 +156,8 @@ export interface ProviderMeta {
   name: string;
   /** The executable it runs as: an office started with `--agent <bin>` runs it (see server/agents.ts). None for a custom --agent. */
   bin?: string;
+  /** Other names the same CLI installs as (Kilo's `kilocode`): `--agent` may name any of them and still be this provider. */
+  bins?: readonly string[];
   /** Takes a model picked for each worker: which ids (they end up on its command line, so they're checked). */
   validModel?: (value: unknown) => value is string;
   /** What asking for a model `validModel` turns down says. */
@@ -334,6 +336,8 @@ export const PROVIDER_META: Record<AgentProvider, ProviderMeta> = {
     label: 'Kilo Code',
     name: 'Kilo',
     bin: 'kilo',
+    // The same CLI also installs a `kilocode` launcher, which `--agent kilocode` may name.
+    bins: ['kilocode'],
     validModel: isValidOpenCodeModel,
     invalidModel: 'Invalid Kilo model (expected provider/model without whitespace)',
     models: {

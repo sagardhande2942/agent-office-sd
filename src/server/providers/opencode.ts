@@ -2,7 +2,7 @@
 // reports statuses and usage snapshots on /hooks/opencode.
 import { toolAction } from '../../shared/actions.js';
 import { openCodeMcp } from '../office-workers.js';
-import { mergeOpenCodeConfigContent, openCodePluginSpecifier, writeOpenCodePlugin, type OpenCodeStatusEvent } from '../opencode.js';
+import { mergeOpenCodeConfigContent, openCodePluginDir, openCodePluginSpecifier, writeOpenCodePlugin, type OpenCodeStatusEvent } from '../opencode.js';
 import { reportedUsage } from '../reported-usage.js';
 import type { WorkerHandle } from '../workers/types.js';
 import { truncate } from '../workers/util.js';
@@ -143,7 +143,12 @@ export const opencode: ProviderAdapter<StatusState, OpenCodeSetup> = {
         // (see ../opencode.ts). Like its model, it's for a fresh session: a resumed one carries on with its own.
         env.AGENT_OFFICE_EFFORT = (!resumeSessionId && info.effort) || '';
         env.AGENT_OFFICE_MODEL = (!resumeSessionId && info.model) || '';
-        env.OPENCODE_CONFIG_CONTENT = mergeOpenCodeConfigContent(env.OPENCODE_CONFIG_CONTENT, openCodePluginSpecifier(setup.plugin), setup.mcpScript ? openCodeMcp(setup.mcpScript) : undefined);
+        // OpenCode 2 loads a configured plugin from a package directory (its `plugins` key) and only
+        // understands the definition-and-setup module the office writes; OpenCode 1 takes the entry
+        // file itself, under `plugin`.
+        const v2 = openCodeNeedsStandalone(command);
+        const plugin = v2 ? openCodePluginDir(setup.plugin) : openCodePluginSpecifier(setup.plugin);
+        env.OPENCODE_CONFIG_CONTENT = mergeOpenCodeConfigContent(env.OPENCODE_CONFIG_CONTENT, plugin, setup.mcpScript ? openCodeMcp(setup.mcpScript) : undefined, v2 ? 'plugins' : 'plugin');
         if (model) {
           const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
           config.model = model;

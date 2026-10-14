@@ -11,7 +11,7 @@ import { excludeFromGit } from './config.js';
 const CONFIG_JSONC = 'kilo.jsonc';
 const CONFIG_JSON = 'kilo.json';
 /** What marks the office's own plugin entry, so a project that lists it itself is never rewritten. */
-const PLUGIN_MARK = 'agent-office-opencode.mjs';
+const PLUGIN_MARK = 'agent-office-opencode';
 /** The office's MCP server, under this name in a config file (see office-workers.ts). */
 const MCP_NAME = 'agent-office';
 
