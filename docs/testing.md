@@ -29,6 +29,7 @@ Use consistent Node versions and concurrency, build artifacts ready, and an othe
 ## Fast fixtures without weaker assertions
 
 - For retention or pagination boundaries, seed bulk history from a small valid fixture, then exercise the real operation across the boundary and reload from disk. Keep lifecycle/persistence tests separate.
+- Fake interactive agent CLIs should also answer incidental one-shot requests such as version probes and task-label generation. A fake that hangs on every invocation can leave a real 45-second timeout running after assertions finish. Settle fake RPC calls even when the test only checks the outgoing frame.
 - Await an observable event or bounded condition for readiness rather than reducing a fixed sleep until it passes locally.
 - Clear timeout guards when their event arrives. Close sockets, servers and child processes in cleanup.
 - Use fake clocks for pure time-based behavior; retain real process and socket tests for integration contracts.

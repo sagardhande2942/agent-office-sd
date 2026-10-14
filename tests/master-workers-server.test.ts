@@ -1,3 +1,4 @@
+import { idleAgent } from './fixtures/idle-agent.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
@@ -11,7 +12,7 @@ import type { TeamState } from '../src/shared/master-workers.js';
 
 test('real mixed-provider team uses isolated bases, enforces roles, integrates commits and verifies its only PR',{timeout:45000},async()=>{
  const dir=mkdtempSync(path.join(tmpdir(),'office-team-server-')),bin=path.join(dir,'bin');mkdirSync(bin);
- const fake=`#!${process.execPath}\nif(process.argv.includes('--version')){console.log('1.0.0');process.exit(0);}setInterval(()=>{},1000);\n`;
+ const fake=idleAgent;
  for(const name of ['claude','codex'])writeFileSync(path.join(bin,name),fake,{mode:0o755});
  const pulls=path.join(dir,'pulls.json');writeFileSync(pulls,'[]');
  writeFileSync(path.join(bin,'gh'),`#!${process.execPath}\nimport {readFileSync} from 'node:fs';\nconst a=process.argv.slice(2);console.log(a[0]==='pr'&&a[1]==='list'&&a[a.indexOf('--state')+1]==='open'?readFileSync(${JSON.stringify(pulls)},'utf8'):'[]');\n`,{mode:0o755});
