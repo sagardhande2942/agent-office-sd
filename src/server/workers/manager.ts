@@ -843,13 +843,13 @@ export class WorkerManager {
     // SessionStart fires as soon as Claude can take input. Still silent after a while means it is
     // blocked on a human: folder trust dialog, login, first-run onboarding. Flag it so it jumps.
     setTimeout(() => {
-      if (info.status !== 'starting' || w.pty !== proc) return;
+      if (this.closing || info.status !== 'starting' || w.pty !== proc) return;
       if (adapter?.bootHint) {
         w.bootBlocked = true;
         info.activity = adapter.bootHint;
         this.setStatus(w, 'needs_input');
       } else this.setStatus(w, 'idle');
-    }, 12000);
+    }, 12000).unref();
   }
 
   private startFailed(w: Worker, message: string) {

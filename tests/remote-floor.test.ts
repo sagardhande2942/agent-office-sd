@@ -175,6 +175,7 @@ test('a write nobody reads the answer to still ships', () => {
   assert.equal(host.sent[1].t, 'term.resize');
   floor.jukebox.skip('bob');
   assert.equal(host.sent[2].t, 'jukebox.skip');
+  floor.deliver({ t: 'result', floorId: 'f1', seq: host.sent[2].seq as number, value: undefined });
 });
 
 test('the three host-local features refuse by name rather than silently', () => {
@@ -306,12 +307,16 @@ test('the viewer and the typist travel with the call', async () => {
   // An anonymous viewer on the host is a viewer nobody can see, and the office sends who they are.
   const host = fakeHost();
   const floor = make(host);
-  void floor.workers.attach('w1', 'client-7', 'Ada');
+  const attached = floor.workers.attach('w1', 'client-7', 'Ada');
   void floor.workers.write('w1', 'ls\n', 'Ada');
-  void floor.workers.detach('w1', 'client-7');
+  const detached = floor.workers.detach('w1', 'client-7');
   assert.deepEqual(host.sent[0], { t: 'worker.attach', floorId: 'f1', seq: 1, workerId: 'w1', clientId: 'client-7', name: 'Ada' });
   assert.equal(host.sent[1].by, 'Ada', 'the typist is named');
   assert.equal(host.sent[2].clientId, 'client-7', 'and detach says which viewer left');
+  for (const msg of [host.sent[0], host.sent[2]]) {
+    floor.deliver({ t: 'result', floorId: 'f1', seq: msg.seq as number, value: undefined });
+  }
+  await Promise.all([attached, detached]);
 });
 
 

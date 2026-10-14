@@ -173,11 +173,17 @@ test('interrupt delivery waits for idle, submits once, and refuses repeat delive
   assert.equal(prompts, 1);
 });
 
-test('a failed interruption retains the report without queuing it', async () => {
+test('a failed interruption retains the report without queuing it', async (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1000 });
   const info = { id: 'host', kind: 'agent', provider: 'opencode', status: 'working', helperReport: { helperName: 'Widget', text: 'Install dependencies', state: 'pending' } } as WorkerInfo;
   const worker = { info, pty: { write: () => {} } };
   const manager = { workers: new Map([['host', worker]]), emitUpdate: () => {}, persist: () => {}, prompt: () => { throw Error('Must not queue after timeout'); } };
-  const error = await WorkerManager.prototype.deliverHelperReport.call(manager as any, 'host', 'Alice');
+  const pending = WorkerManager.prototype.deliverHelperReport.call(manager as any, 'host', 'Alice');
+  // Advance each poll and its continuation through the real six-second deadline.
+  for (let i = 0; i < 59; i++) { t.mock.timers.tick(100); await Promise.resolve(); }
+  assert.equal(info.helperReport?.state, 'interrupting', 'do not fail before the deadline');
+  t.mock.timers.tick(100);
+  const error = await pending;
   assert.match(error as string, /did not stop/);
   assert.equal(info.helperReport?.state, 'failed');
   assert.equal(info.helperReport?.text, 'Install dependencies');
