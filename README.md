@@ -605,3 +605,7 @@ Curator failures show bounded, credential-redacted CLI diagnostics and the model
 Reported provider spend persists across restarts and worker removal: Codex root-session tokens and OpenCode cumulative tokens have daily/all-time totals. The daily budget includes Claude estimates and known reported OpenCode/DeepSeek costs; unavailable costs are explicitly excluded. DeepSeek context occupancy is not accumulated as token spend. See [configuration](docs/configuration.md) for accounting scope.
 
 Workers can have **Developer**, **Reviewer**, **Tester**, or **Researcher** roles. Choose a role in the hiring or task prompt dialog, or start a CLI/MCP prompt with `[Office worker role: reviewer]` followed by the task on the next line. Each role supplies specific responsibilities on subsequent office prompts and survives restarts. See [Worker roles](docs/agents.md#worker-roles) for reassignment and behavior.
+
+### Agent handoff station
+
+Transfer unfinished work through a durable, worker-reported packet with goal, progress, next steps, files, checks, unresolved questions and branch/worktree context. Open the Handoff station from the office menu/fixture or Lite; coding workers create and explicitly accept offers through `office-workers handoff` or the `handoff_*` MCP tools. Inbox delivery and human viewing do not count as acceptance, and acceptance does not change active tasks or move files. See [Agent handoff](docs/agent-handoff.md) for creation, acceptance, continuation and evidence semantics.

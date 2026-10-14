@@ -1,4 +1,5 @@
 import { planReviewTable } from '../../features/plan-review/world';
+import { handoffStation } from '../../features/handoff/world';
 import { enhancements } from './enhancements';
 import { basketballPlant } from './basketball-plant';
 import * as THREE from 'three';
@@ -79,6 +80,7 @@ function floorPlan() {
     meetingRoom,
     screeningRoom,
     planReviewTable,
+    handoffStation,
     elevator,
     garageLift,
     gong,

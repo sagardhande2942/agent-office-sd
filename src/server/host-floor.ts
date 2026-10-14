@@ -1,3 +1,4 @@
+import { hostTrackedInbox } from './handoff/host-inbox.js';
 import { HostTeams, TEAM_HOST_CALLS } from './master-workers/host.js';
 import { cinemaHostCalls, cinemaHostState } from './cinema/host.js';
 import { HOST_CINEMA_PATHS, hostCinemaHook } from './cinema/host-hooks.js';
@@ -503,6 +504,7 @@ export function startHooks(
     }
     if (workerTools && await workerTools(req, res, url)) return;
     const featureFloor = cinema?.floorOf(url.searchParams.get('worker') ?? '');
+    if (await hostTrackedInbox(featureFloor, req, res, url)) return;
     if (await floorWorkerFeatureHook(featureFloor, req, res, url, msg => { if (featureFloor) cinema?.publish?.(featureFloor, msg); })) return;
     if (HOST_CINEMA_PATHS.has(url.pathname)) {
       const id = url.searchParams.get('worker') ?? '';

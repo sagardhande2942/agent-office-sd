@@ -1,3 +1,4 @@
+import { handoffInbox } from '../handoff/service.js';
 import { workerTeamSession } from '../team-sessions.js';
 import path from 'node:path';
 import type http from 'node:http';
@@ -85,12 +86,12 @@ export class HostTeams {
       send(res, 403, { error: 'Team participants use team actions; ordinary hiring, PR management and unrelated office operations are disabled' }); return true;
     }
     try {
-      if (await floorWorkerFeatureHook(floor, req, res, url, msg => this.emit({ t: 'event', floorId: floor.id, seq: 0, msg }))) return true;
+      if (await floorWorkerFeatureHook(floor, req, res, url, msg => this.emit({ t: 'event', floorId: floor.id, seq: 0, msg }), handoffInbox(floor))) return true;
       if (['/office/workers/completion', '/office/workers/complete'].includes(url.pathname)) await floorCompletion(floor, req, res, url);
       else if (url.pathname === '/office/workers') send(res, 200, { floor: { id: floor.id, name: floor.def.name }, you: id, workers: floor.workers.list() });
       else {
         let ledger = this.ledgers.get(floor.id);
-        if (!ledger) { ledger = new Communications(path.join(floor.dir, '.agent-office', 'team-inbox')); this.ledgers.set(floor.id, ledger); }
+        if (!ledger) { ledger = handoffInbox(floor); this.ledgers.set(floor.id, ledger); }
         await floorCommunications(floor, ledger, req, res, url);
       }
     } catch (e) { send(res, 400, { error: (e as Error).message }); }

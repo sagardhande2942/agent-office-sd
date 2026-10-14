@@ -90,7 +90,7 @@ export interface FloorReady {
  * to round-trip them like the rest, so they travel, and nothing else about them changes.
  */
 export const HOST_CALLS = [
-  'knowledge.execute',
+  'knowledge.execute', 'handoff.list',
   'worker.search', 'queue.dropIssue', 'gh.claim', 'cinema.shot', 'master-workers.capacity', 'boss.capacity'] as const;
 
 export const FLOOR_CASES = [

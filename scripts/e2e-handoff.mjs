@@ -1,0 +1,95 @@
+// Production-bundle visual and acceptance check using a real isolated office and authenticated tools.
+// npm run build && node --import tsx scripts/e2e-handoff.mjs
+import assert from 'node:assert/strict';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { chromium } from 'playwright-core';
+import { loadConfig } from '../src/server/config.ts';
+import { startServer } from '../src/server/server.ts';
+const output = path.resolve(process.env.HANDOFF_ARTIFACTS ?? '/tmp/agent-office-handoff-evidence');
+mkdirSync(output, { recursive: true });
+const dir = mkdtempSync(path.join(os.tmpdir(), 'office-handoff-visual-'));
+execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: dir });
+execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '--allow-empty', '-qm', 'fixture'], { cwd: dir });
+const cfg = loadConfig([dir, '--password', 'handoff-visual', '--no-open', '--agent', process.execPath]);
+cfg.port = 0; cfg.agentArgs = ['-e', 'setInterval(() => {}, 1000)'];
+const office = await startServer(cfg, { publicDir: path.resolve('dist/public') });
+const base = `http://127.0.0.1:${office.server.address().port}`;
+const cache = path.join(os.homedir(), '.cache/ms-playwright');
+const executablePath = process.env.CHROMIUM_PATH ?? path.join(cache, readdirSync(cache).find(x => x.startsWith('chromium-')), 'chrome-linux64/chrome');
+const checks = [], errors = [];
+let browser;
+const check = (name, evidence) => { checks.push({ name, status: 'passed', evidence }); console.log(`PASS ${name}: ${evidence}`); };
+try {
+  const floor = office.floors()[0]; await floor.ready;
+  const source = await floor.workers.spawn('desk-1', 'fixture', undefined, false, 'agent', 'custom');
+  const recipient = await floor.workers.spawn('desk-2', 'fixture', undefined, false, 'agent', 'custom');
+  assert.equal(typeof source, 'object'); assert.equal(typeof recipient, 'object');
+  const token = id => JSON.parse(readFileSync(path.join(dir, '.agent-office/workers.json'), 'utf8')).find(w => w.id === id).hookToken;
+  const tool = async (worker, action, body = {}) => {
+    const response = await fetch(`http://127.0.0.1:${office.hookPort}/office/workers/handoff?worker=${worker.id}`, { method: 'POST', headers: { authorization: `Bearer ${token(worker.id)}`, 'content-type': 'application/json' }, body: JSON.stringify({ ...body, action }) });
+    const result = await response.json(); assert.equal(response.status, 200, JSON.stringify(result)); return result;
+  };
+  const { revision } = await tool(source, 'prefill');
+  const { handoff } = await tool(source, 'create', { key: 'visual-continuation', recipient: recipient.id, revision,
+    goal: 'Finish durable handoff validation', completedWork: 'Persisted the packet and authenticated the source worker.', nextSteps: 'Review the remaining questions and rerun integration checks.',
+    files: ['src/server/handoff/store.ts'], checks: [{ name: 'Store tests', status: 'passed', evidence: 'Focused store cases passed during this fixture run.' }, { name: 'Recipient integration', status: 'skipped', evidence: 'Outstanding continuation work; not yet integrated.' }], questions: ['Should the continuation branch retain the source commits?'],
+    context: { branch: 'feat/source-handoff', commit: 'abcdef1', worktree: '.agent-office/worktrees/source' } });
+  floor.workers.prompt = async () => { throw Error('Handoff must not prompt a terminal'); };
+  floor.workers.resume = () => { throw Error('Handoff must not wake a worker'); };
+  browser = await chromium.launch({ executablePath, headless: true, args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await context.addInitScript(() => localStorage.setItem('agent-office.profile', JSON.stringify({ name: 'Handoff observer', color: '#ef476f', look: { skin: 0, hair: 0, style: 0 } })));
+  assert.ok((await context.request.post(base + '/api/login', { data: { password: 'handoff-visual' } })).ok());
+  const page = await context.newPage(); page.setDefaultTimeout(30000);
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(base + `/lite?floor=${floor.id}`);
+  await page.waitForFunction(() => window.__lite?.store.floor);
+  await page.locator('#btn-handoffs').click();
+  const dialog = page.getByRole('dialog', { name: 'Handoff station' });
+  await dialog.waitFor(); await dialog.locator('.handoff-packet summary').click();
+  for (const value of [handoff.task.goal, handoff.completedWork, handoff.nextSteps, handoff.files[0], handoff.questions[0], 'feat/source-handoff', 'worker-reported']) await dialog.getByText(value, { exact: false }).first().waitFor();
+  assert.equal(await dialog.getByRole('button', { name: /^accept/i }).count(), 0);
+  assert.equal((await tool(recipient, 'read', { id: handoff.id })).handoff.state, 'offered');
+  await page.screenshot({ path: path.join(output, 'station-lite-offered.png'), animations: 'disabled' });
+  await dialog.locator('.body').evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await page.screenshot({ path: path.join(output, 'station-lite-context.png'), animations: 'disabled' });
+  await dialog.locator('.body').evaluate(el => { el.scrollTop = 0; });
+  const modalBox = await dialog.boundingBox(), closeBox = await dialog.getByRole('button', { name: 'Close Handoff station' }).boundingBox();
+  const refreshBox = await dialog.getByRole('button', { name: /Refresh/ }).boundingBox();
+  assert.ok(refreshBox.x + refreshBox.width < closeBox.x, 'Refresh stays clear of the close control');
+  assert.ok(closeBox.x > modalBox.x + modalBox.width - 70 && closeBox.x + closeBox.width < modalBox.x + modalBox.width && closeBox.y < modalBox.y + 60, 'X sits in the modal top-right corner');
+  check('Lite packet evidence', 'Real API packet shows goal, progress, files, checks, questions, source context; viewing remains offered.');
+  const accepted = (await tool(recipient, 'accept', { id: handoff.id })).handoff;
+  assert.equal(accepted.continuationOwner.id, recipient.id);
+  await dialog.getByRole('button', { name: /Refresh/ }).click();
+  await dialog.locator('.handoff-state[data-state="accepted"]').waitFor();
+  await dialog.locator('.handoff-packet summary').click();
+  await dialog.getByText(`Continuation owner: ${recipient.name}.`, { exact: true }).waitFor();
+  await dialog.locator('.body').evaluate(el => { el.scrollTop = el.scrollHeight; });
+  await page.screenshot({ path: path.join(output, 'station-lite-accepted.png'), animations: 'disabled' });
+  await dialog.getByRole('button', { name: 'Close Handoff station' }).click();
+  await page.waitForFunction(() => !document.querySelector('.handoff-station'));
+  check('Explicit worker acceptance', 'Only authenticated recipient accepted; refreshed station shows continuation owner.');
+  await page.goto(base + `/?floor=${floor.id}`);
+  await page.waitForFunction(() => window.__office?.player);
+  const fixture = await page.evaluate(() => { let found = false; window.__office.scene.traverse(o => { if (o.userData?.interact?.kind === 'handoffstation') found = true; }); return found; });
+  assert.ok(fixture); await page.keyboard.press('Tab');
+  await page.getByRole('searchbox', { name: 'Search office menu' }).fill('handoff');
+  await page.getByRole('menuitem', { name: /Handoff station/ }).click();
+  await dialog.waitFor(); await dialog.locator('.handoff-packet summary').click();
+  await dialog.getByText(handoff.task.goal, { exact: true }).waitFor();
+  await page.screenshot({ path: path.join(output, 'station-3d.png'), animations: 'disabled', timeout: 60000 });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.backdrop') && window.__office.player.enabled && window.__office.player.hasMouse);
+  await page.keyboard.press('Tab');
+  await page.getByRole('searchbox', { name: 'Search office menu' }).fill('handoff');
+  await page.getByRole('menuitem', { name: /Handoff station/ }).click(); await dialog.waitFor();
+  await dialog.getByRole('button', { name: 'Close Handoff station' }).click();
+  await page.waitForFunction(() => !document.querySelector('.backdrop') && window.__office.player.enabled && window.__office.player.hasMouse);
+  check('Office fixture/menu and focus', 'Fixture is registered; menu opens packet; Esc and X restore mouse-look immediately.');
+  assert.deepEqual(errors, []);
+  writeFileSync(path.join(output, 'checks.json'), JSON.stringify(checks, null, 2));
+} finally { await browser?.close(); office.shutdown(); await new Promise(resolve => setTimeout(resolve, 300)); rmSync(dir, { recursive: true, force: true }); }
