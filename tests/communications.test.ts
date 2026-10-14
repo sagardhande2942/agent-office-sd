@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { Communications, messageContext } from '../src/server/communications.js';
+import { Communications, MESSAGE_KEEP, messageContext } from '../src/server/communications.js';
 import { renderDashboard, type Dashboard } from '../src/server/tui-dashboard.js';
 import type { FloorView } from '../src/shared/protocol.js';
 
@@ -122,15 +122,25 @@ test('retention removes completed threads together, preserving active requests',
   const f = fixture();
   try {
     const active = f.ledger.request(stranger, ada, { prompt: 'Keep this active' });
-    let first = '';
-    for (let i = 0; i < 250; i++) {
-      const request = f.ledger.request(grace, ada, { prompt: `Question ${i}` });
-      first ||= request.id;
-      const reply = f.ledger.reply(ada, request.id, { prompt: 'Answer' });
-      f.ledger.acknowledge(grace, reply.id);
-    }
+    // Build one real completed thread, then seed the boundary fixture in one write.
+    // Lifecycle/persistence is covered above; this test exercises eviction at capacity.
+    const request = f.ledger.request(grace, ada, { prompt: 'Question' });
+    const reply = f.ledger.reply(ada, request.id, { prompt: 'Answer' });
+    f.ledger.acknowledge(grace, reply.id);
+    const file = path.join(f.dir, 'communications.json');
+    const stored = JSON.parse(readFileSync(file, 'utf8'));
+    const threads = Array.from({ length: (MESSAGE_KEEP - 2) / 2 }, (_, i) => [
+      { ...stored[1], id: `request-${i}`, threadId: `request-${i}` },
+      { ...stored[2], id: `reply-${i}`, threadId: `request-${i}`, replyTo: `request-${i}` },
+    ]).flat();
+    writeFileSync(file, JSON.stringify([stored[0], ...threads]));
+    const ledger = f.reload();
+    const newest = ledger.request(grace, ada, { prompt: 'Cross the retention boundary' });
+    assert.equal(ledger.state().messages.length, MESSAGE_KEEP);
+    ledger.reply(ada, newest.id, { prompt: 'Evict one whole completed thread' });
+    const first = 'request-0';
     const state = f.reload().state();
-    assert.ok(state.messages.length <= 500);
+    assert.equal(state.messages.length, MESSAGE_KEEP - 1);
     assert.ok(state.messages.some((m) => m.id === active.id));
     assert.ok(!state.messages.some((m) => m.threadId === first), 'old completed request and all its replies are evicted together');
     assert.ok(state.messages.every((m) => state.messages.some((root) => root.id === m.threadId && root.kind === 'request')));

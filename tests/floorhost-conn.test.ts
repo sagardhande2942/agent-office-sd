@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import http from 'node:http';
+import { once } from 'node:events';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { Duplex } from 'node:stream';
@@ -77,11 +78,9 @@ async function connect(url: string, token: string, floors: string[] = ['f1'], pr
 }
 
 async function closed(ws: WebSocket) {
-  await new Promise<void>((res) => {
-    if (ws.readyState === WebSocket.CLOSED) return res();
-    ws.once('close', () => res());
-    setTimeout(res, 1500);
-  });
+  if (ws.readyState !== WebSocket.CLOSED) {
+    await once(ws, 'close', { signal: AbortSignal.timeout(1500) });
+  }
   return ws.readyState;
 }
 
