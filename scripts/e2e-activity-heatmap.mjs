@@ -35,8 +35,8 @@ writeFileSync(binary, `#!${process.execPath}\nsetInterval(()=>{},1000);\n`, { mo
 const cfg = loadConfig(['--home', home, '--password', 'heatmap-browser', '--no-open', '--agent', binary]); cfg.port = 0;
 const office = await startServer(cfg, { publicDir: path.resolve('dist/public') });
 const base = `http://127.0.0.1:${office.server.address().port}`;
-const cache = path.join(os.homedir(), '.cache/ms-playwright');
-const executablePath = process.env.CHROMIUM_PATH ?? path.join(cache, readdirSync(cache).find(x => x.startsWith('chromium-')), 'chrome-linux64/chrome');
+const cache = process.platform === 'win32' ? path.join(process.env.LOCALAPPDATA, 'ms-playwright') : path.join(os.homedir(), '.cache/ms-playwright');
+const executablePath = process.env.CHROMIUM_PATH ?? path.join(cache, readdirSync(cache).find(x => x.startsWith('chromium-')), process.platform === 'win32' ? 'chrome-win64/chrome.exe' : 'chrome-linux64/chrome');
 const checks = [], errors = [], screenshots = [];
 const check = name => { checks.push({ name, status: 'passed' }); console.log('PASS ' + name); };
 let browser, page;
@@ -65,6 +65,7 @@ try {
   assert.equal(expected.workerTime, 19 * 60000); assert.equal(expected.wallTime, 12 * 60000);
   assert.match(await dialog().innerText(), /Summed worker-time: 19.0 min/);
   assert.match(await dialog().innerText(), /Observed wall time: 12.0 min/);
+  await dialog().getByText('Recording coverage & limitations', { exact: true }).click();
   assert.match(await dialog().innerText(), /Partial historical coverage/);
   assert.match(await dialog().innerText(), /Truncated history: 4/);
   assert.match(await dialog().innerText(), /Unobserved restart gaps/);
@@ -73,6 +74,15 @@ try {
   const implementation = dialog().getByRole('button', { name: /fixture-alpha,.*Implementation/ }).first();
   await implementation.focus();
   assert.match(await dialog().getByLabel('Time bucket details').innerText(), /Task typed-api · Attempt 1/);
+  await dialog().getByText('Recording coverage & limitations', { exact: true }).click();
+  await dialog().locator('[data-phase=waiting]').click();
+  assert.equal(await dialog().locator('[data-phase=waiting]').getAttribute('aria-pressed'), 'true');
+  assert.ok(await dialog().locator('.heatmap-cell[data-muted=true]').count());
+  await shot('phase-highlight.png');
+  await dialog().locator('[data-phase=waiting]').click();
+  assert.equal(await dialog().locator('.heatmap-cell[data-muted=true]').count(), 0);
+  const closeBox = await dialog().locator('.close').boundingBox(), dialogBox = await dialog().boundingBox();
+  assert.ok(closeBox.x > dialogBox.x + dialogBox.width - 80, 'Close control stays in the top-right corner');
   await shot('recorded-desktop.png'); check('Persisted five phases plus unknown, overlap totals, partial/truncated/gap coverage and accessible details');
   await dialog().getByLabel('Activity', { exact: true }).selectOption('fixture-activity');
   assert.equal(await dialog().locator('tbody tr').count(), 1);
