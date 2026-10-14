@@ -593,6 +593,8 @@ The **☰ Office menu** has a bounded, scrollable action list. Search finds acti
 
 Knowledge is shared immediately across office workers. Use the Knowledge shelf's **Publish review** to persist shared notes in a separate PR. The floor checks pending reviews at startup and every minute, automatically applying merged proposals. **Sync approved** checks immediately. Curator proposals stay separate until approved; stale note edits are rejected. See [Knowledge Tree](docs/knowledge.md) for review policies and recovery. The committed tree also includes concise guides to [PR delivery](.agent-office/knowledge/conventions/pr-delivery.md), [completion evidence](.agent-office/knowledge/conventions/completion-evidence.md), [data recovery](.agent-office/knowledge/project/data-and-recovery.md), and [finding project documentation](.agent-office/knowledge/project/documentation-map.md). A [task reasoning checklist](.agent-office/knowledge/conventions/task-reasoning-checklist.md) links concrete guides for concurrency, remote ownership, authorization, modal focus and module boundaries.
 
+The [Knowledge practical playbook](docs/knowledge.md#practical-playbook) provides implementation recipes, test selection, worker/host troubleshooting, state lifecycle guidance, coordination, and review examples for unfamiliar tasks and compact models.
+
 The shelf keeps review history in an expandable **Reviews** summary so long delivery errors leave room for browsing. Its tree and note panes scroll independently on desktop and mobile.
 
 If a curator plan contains conflicting actions on the same note, it gets one correction attempt before any edits are applied.

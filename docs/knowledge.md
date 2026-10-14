@@ -164,3 +164,22 @@ Read the reported Git error before retrying **Publish review**. For example, cor
 The floor that owns the checkout checks pending Knowledge reviews immediately at startup and every 60 seconds, even when nobody has the shelf open. This also runs on remote floor hosts. A merged review is applied to the live shared notes and its updated tree/review state is broadcast to connected clients. The project branch and staging area are not moved. Open reviews stay pending; closed reviews preserve live notes.
 
 **Sync approved** remains available for an immediate check. Automatic and manual checks share one in-flight sync per knowledge tree. Newer live edits or changes to the approved proposal still trigger reconciliation instead of overwriting notes; the shelf shows the conflicting paths. Temporary forge or fetch failures are reported and retried on the next interval. Repeated identical failures or conflicts do not produce repeated status messages. Pending reviews survive restarts and are checked again when the floor starts. Shutdown stops further polling and notifications; an already-running sync may finish applying its approved review.
+
+## Practical playbook
+
+The committed knowledge tree contains short, repository-sourced recipes for implementation and diagnosis. Start with the note matching the task; consult its cited source before changing behavior.
+
+| Task | Knowledge note |
+| --- | --- |
+| Add a feature, setting or prompt editor | [Feature change recipes](../.agent-office/knowledge/architecture/feature-change-recipes.md) |
+| Add a worker CLI/MCP tool | [Worker tool recipe](../.agent-office/knowledge/architecture/worker-tool-recipe.md) |
+| Choose checks and browser fixtures | [Test selection](../.agent-office/knowledge/project/test-selection.md) |
+| Diagnose a blocked worker | [Worker troubleshooting](../.agent-office/knowledge/gotchas/worker-troubleshooting.md) |
+| Recover a remote floor connection | [Remote floor troubleshooting](../.agent-office/knowledge/gotchas/remote-floor-troubleshooting.md) |
+| Understand persisted versus current state | [State lifecycle reference](../.agent-office/knowledge/architecture/state-lifecycle-reference.md) |
+| Review a changed trust boundary | [Security review recipes](../.agent-office/knowledge/conventions/security-review-recipes.md) |
+| Coordinate requests and helper findings | [Worker coordination](../.agent-office/knowledge/conventions/worker-coordination.md) |
+| Maintain durable, verified notes | [Knowledge quality](../.agent-office/knowledge/conventions/knowledge-quality.md) |
+| Prepare a bounded task for a compact model | [Task brief recipes](../.agent-office/knowledge/conventions/task-brief-recipes.md) |
+
+These notes distinguish repository contracts, worker-reported claims, proposed designs and observed results. They provide navigation and concrete examples rather than promises about a model's performance or external provider availability.
