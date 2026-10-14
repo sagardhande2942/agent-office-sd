@@ -1,15 +1,14 @@
 ---
-title: "The live office probes throwaway test servers, flaking exact-request assertions"
-summary: "tests/office-workers.test.ts (and friends) can see an extra GET / with user-agent agent-office while a real floor runs on the machine; re-run the file in isolation before blaming a diff."
-author: "worker:936578b80a46"
-updated: "2026-10-13"
+title: "Live office discovery probes can reach HTTP test fixtures"
+summary: "GET / with user-agent agent-office is an incidental floor probe; the MCP fixture now injects it deterministically and excludes only that exact probe from request accounting."
+author: "worker:ab37cab0c171"
+updated: "2026-10-14"
+status: "active"
 ---
-While a floor's office runs on the same machine, `Services` in `src/server/services.ts` scans listening TCP sockets (`ss -H -l -t -n -p`) and probes each listener it can attribute to a worker, including a test's throwaway HTTP server when the test's working directory is inside a worker worktree. The probe is a single `GET /` with `user-agent: agent-office` and `accept: text/html,*/*`.
+Services in src/server/services.ts scans listening sockets and probes listeners attributed to a worker worktree. The request is GET / with user-agent agent-office and accept text/html,*/*. HTTP fixtures that record every request can therefore fail exact-list assertions while a real floor is running.
 
-Tests that assert exactly which requests their fake server received then fail intermittently, because the probe arrives alongside the expected call. `tests/office-workers.test.ts` ('office-workers mcp serves a real client over stdio, as the worker') expects one `list_workers` request and fails when the probe lands first.
+The observed example was tests/office-workers.test.ts, 'office-workers mcp serves a real client over stdio, as the worker': it expected one authenticated MCP request but could receive the discovery request first. The fixture now returns 404 for precisely GET / with user-agent agent-office before recording requests. It sends that probe itself before the MCP call, so the regression is checked without relying on floor discovery timing. Every other request remains in the exact assertion.
 
-Reproduced on an unmodified base commit: running the same test runner from inside a worker worktree flaked about 1 in 40 runs, while running it from `/tmp/opencode` was clean in 100 runs — the working directory, not the code, decides whether the office probes the listener.
+Use the same narrow handling when a fixture has this contract; do not broadly discard unknown paths or requests, which could conceal real regressions. Run `npm run test:focus -- tests/office-workers.test.ts` while editing, and include the full suite before publishing.
 
-Related load flakes seen in full `npm test` runs on a busy floor: `tests/tui-session.test.ts` ('Missing terminal output: Ada') and `tests/clone.test.ts`; both pass in isolation.
-
-When a full-suite run reports one unrelated failure, re-run that test file alone and check whether the live office or machine load explains it before suspecting the diff. CI without a running office is the authority.
+Related historic load failures include tui-session.test.ts and clone.test.ts. A passing isolated retry is evidence of possible contention, not proof of a fix. This task's baseline full profile also timed out worker-shutdown.test.ts during cold imports; its seven-second lifecycle guard now starts after imports, with a separate bounded startup timeout. See project/testing-efficiently.md.
