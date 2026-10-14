@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 // Keep this in a child: a leaked timer is only visible after every other handle closes.
-test('a launched worker can shut down without waiting for its startup warning', { skip: process.platform === 'win32', timeout: 10000 }, async () => {
+test('a launched worker can shut down without waiting for its startup warning', { skip: process.platform === 'win32', timeout: 40000 }, async () => {
   const dir = mkdtempSync(path.join(tmpdir(), 'office-worker-shutdown-'));
   const binary = path.join(dir, 'fake-agent');
   writeFileSync(binary, `#!${process.execPath}\nsetInterval(() => {}, 1000);\n`, { mode: 0o755 });
@@ -18,6 +18,7 @@ test('a launched worker can shut down without waiting for its startup warning', 
     const manager = new WorkerManager(root, root, ${JSON.stringify(binary)}, [],
       { url: 'http://127.0.0.1:1', token: '' },
       { update() {}, remove() {}, data() {}, screen() {}, toast() {} }, ledger);
+    console.log('ready');
     const worker = manager.spawn('desk-1', 'test', 'shutdown regression', false, 'agent', 'custom');
     if (typeof worker === 'string') throw new Error(worker);
     manager.shutdown();
@@ -26,11 +27,20 @@ test('a launched worker can shut down without waiting for its startup warning', 
   `;
   try {
     const stdout = await new Promise<string>((resolve, reject) => {
-      execFile(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script],
-        { cwd: process.cwd(), timeout: 7000 }, (error, stdout, stderr) => {
+      let shutdownGuard: ReturnType<typeof setTimeout> | undefined;
+      let output = '';
+      // Imports on a busy floor can take longer than shutdown itself. Keep the
+      // seven-second regression deadline, but start it after module loading.
+      const child = execFile(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', script],
+        { cwd: process.cwd(), timeout: 30000 }, (error, stdout, stderr) => {
+          clearTimeout(shutdownGuard);
           if (error) reject(new Error(`Worker shutdown did not exit promptly: ${error.message}\n${stderr}`));
           else resolve(stdout);
         });
+      child.stdout!.on('data', (data) => {
+        output += data;
+        if (!shutdownGuard && output.includes('ready\n')) shutdownGuard = setTimeout(() => child.kill(), 7000);
+      });
     });
     assert.match(stdout, /stopped/);
   } finally {

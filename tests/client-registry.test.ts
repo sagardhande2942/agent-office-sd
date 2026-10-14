@@ -355,10 +355,14 @@ test('interactions: one definition per kind, with its reach, hint and use', () =
 });
 
 /** Every .ts file in the client, by its path under src/client, with its code (its comments taken out). */
+let sources: { file: string; src: string }[] | undefined;
 function clientSources(): { file: string; src: string }[] {
+  // These guards never edit the checkout. Read one snapshot per isolated test
+  // process instead of walking and reading the entire tree for each assertion.
+  if (sources) return sources;
   const root = path.join(import.meta.dirname, '../src/client');
   const code = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-  return (readdirSync(root, { recursive: true }) as string[]).filter((rel) => rel.endsWith('.ts')).map((file) => ({ file, src: code(readFileSync(path.join(root, file), 'utf8')) }));
+  return sources = (readdirSync(root, { recursive: true }) as string[]).filter((rel) => rel.endsWith('.ts')).map((file) => ({ file, src: code(readFileSync(path.join(root, file), 'utf8')) }));
 }
 
 /**

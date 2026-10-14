@@ -4,13 +4,23 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const client = path.join(import.meta.dirname, '../src/client');
-const read = (file: string) => readFileSync(file, 'utf8');
+// Read-only guards share a snapshot within this process; nothing persists across
+// test runs. Repeated graph traversals must not repeat filesystem round trips.
+const sources = new Map<string, string>();
+const dependencies = new Map<string, string[]>();
+const resolved = new Map<string, string>();
+const read = (file: string) => {
+  if (!sources.has(file)) sources.set(file, readFileSync(file, 'utf8'));
+  return sources.get(file)!;
+};
 
 /**
  * The relative imports of a client module, resolved to files (`./foo` is foo.ts, or foo/index.ts).
  * With `types`, type-only ones too; without, what's loaded at run time.
  */
 function importsOf(file: string, types = true): string[] {
+  const key = `${file}:${types}`;
+  if (dependencies.has(key)) return dependencies.get(key)!;
   const out: string[] = [];
   for (const m of read(file).matchAll(/^\s*(import|export)\s(type\s)?[^'"]*?from\s+'(\.[^']+)'|^\s*import\s+'(\.[^']+)'/gm)) {
     if (m[2] && !types) continue;
@@ -19,10 +29,12 @@ function importsOf(file: string, types = true): string[] {
     if (spec.endsWith('.css') || spec.includes('?')) continue;
     // The shared code (src/shared) names its imports as the server does, with .js for .ts.
     const base = path.resolve(path.dirname(file), spec.replace(/\.js$/, ''));
-    const found = [`${base}.ts`, path.join(base, 'index.ts'), base].find((f) => existsSync(f) && statSync(f).isFile());
+    const found = resolved.get(base) ?? [`${base}.ts`, path.join(base, 'index.ts'), base].find((f) => existsSync(f) && statSync(f).isFile());
     assert.ok(found, `${path.relative(client, file)} imports ${spec}, which is not there`);
+    resolved.set(base, found);
     out.push(found);
   }
+  dependencies.set(key, out);
   return out;
 }
 

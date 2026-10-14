@@ -535,7 +535,7 @@ npm test
 npm run build && npm run e2e:live-view-toggle   # browser check of the live 2D/3D Y toggle
 ```
 
-For quicker iteration, use `npm run test:focus -- tests/<feature>.test.ts` and run the full suite when the change is ready. `npm run test:profile` reports slow tests and file overhead. Build fresh checkouts before integration tests. See [Testing efficiently](docs/testing.md).
+For quicker iteration, use `npm run test:focus -- tests/<feature>.test.ts` and run the full suite when the change is ready. `npm run test:profile` reports slow tests and file overhead; `npm run test:profile:focus -- tests/<feature>.test.ts` profiles just the selected files. Build fresh checkouts before integration tests. Every new implementation worker receives focused-testing guidance in its startup prompt, alongside project knowledge. See [Testing efficiently](docs/testing.md).
 
 Server edits restart the server, not the workers. After changing `ptyhost.ts`, bump `PTY_PROTOCOL` in `ptys.ts` so the next server replaces the PTY host.
 

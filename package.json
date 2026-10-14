@@ -32,7 +32,8 @@
     "e2e:tv-lights": "node --import tsx scripts/e2e-tv-lights.mjs",
     "e2e:tabletennis": "node --import tsx scripts/e2e-tabletennis.mjs",
     "test:focus": "node --import tsx --import=#tests/css --test",
-    "test:profile": "node --import tsx --import=#tests/css --test --test-reporter=spec --test-reporter=./tests/support/timing.mjs --test-reporter-destination=stdout --test-reporter-destination=stderr tests/*.test.ts"
+    "test:profile": "node --import tsx --import=#tests/css --test --test-reporter=spec --test-reporter=./tests/support/timing.mjs --test-reporter-destination=stdout --test-reporter-destination=stderr tests/*.test.ts",
+    "test:profile:focus": "node --import tsx --import=#tests/css --test --test-reporter=spec --test-reporter=./tests/support/timing.mjs --test-reporter-destination=stdout --test-reporter-destination=stderr"
   },
   "engines": {
     "node": ">=20"
