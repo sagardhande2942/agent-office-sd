@@ -82,18 +82,22 @@ declare module '../../world/types' {
 /** The toys, on every seat of the office and of the back office, and on the bean bags round the room. */
 export const deskToys: Fixture<'deskToys'> = (site) => {
   const toys = new Map<string, SeatToy>();
-  const seats: { def: DeskDef; spot: ToySpot }[] = [
+  const seats: { def: DeskDef; spot: ToySpot; turn?: number }[] = [
     ...DESKS.map((def) => ({ def, spot: DESK_TOY_SPOT })),
     ...WING_DESKS.map((def) => ({ def, spot: DESK_TOY_SPOT })),
     // A bean bag's laptop is on the lap desk in front of it (see buildBeanbag in world/office/seats.ts).
-    ...BEANBAGS.map((def) => ({ def, spot: LAP_TOY_SPOT })),
+    // The bags get a turn of their own rather than carrying on from the desks: they are scattered
+    // round the room rather than in pods, and two of them stand close enough to be neighbours, so
+    // continuing the desks' turn ran the same toy onto that pair. Starting one seat along the pod
+    // turn keeps every bean bag different from the bags around it.
+    ...BEANBAGS.map((def) => ({ def, spot: LAP_TOY_SPOT, turn: 1 })),
   ];
-  seats.forEach(({ def, spot }, i) => {
+  seats.forEach(({ def, spot, turn = 0 }, i) => {
     // A seat the floor hasn't built out yet is made by the wing, further down the plan: this lists it
     // either way, and the toy is only hung on once the desk it's standing on exists.
     const view = site.desks.get(def.id);
     if (!view) return;
-    const toy = toyAt(def, spot, i);
+    const toy = toyAt(def, spot, i + turn);
     view.group.add(toy.group);
     toys.set(def.id, toy);
   });
