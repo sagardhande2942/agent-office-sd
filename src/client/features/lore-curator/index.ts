@@ -2,7 +2,6 @@ import type { Ctx } from '../../core/context';
 import type { CuratorState } from '../../../shared/lore-curator';
 import type { LoreNote } from '../../../shared/protocol/lore';
 import { store } from '../../state';
-import { HUD_ACTIONS } from '../../ui/menu';
 import { registerSettingsExtension } from '../../ui/settings-extensions';
 import { h, toast, closeAllModals, type Modal } from '../../ui/dom';
 import { openCurator } from './ui';
@@ -16,7 +15,6 @@ export function installLoreCurator(ctx: Ctx) {
     modal = openCurator({ net: ctx.net, state: () => state,
       listen(fn) { listeners.add(fn); return () => listeners.delete(fn); }, history(fn) { historyListeners.add(fn); return () => historyListeners.delete(fn); } });
   };
-  HUD_ACTIONS.push({ id: 'lore-curator', icon: '🧠', label: 'Knowledge curator', section: 'Office', run: show });
   registerSettingsExtension({ pane: 'workers', create: () => ({ element: h('section.setting', {}, h('h3', {}, 'Knowledge curator'),
     h('p.setting-note', {}, 'Choose this floor’s automatic cleanup schedule, agent and model. Inspect runs and recover archived notes.'), h('button.btn', { type: 'button', onclick: show }, 'Configure curator')), dispose() {} }) });
   ctx.messages.on('curator.state', msg => { if (msg.floor === store.floor) { state = msg.state; listeners.forEach(fn => fn(state!)); } });

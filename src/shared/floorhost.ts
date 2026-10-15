@@ -55,6 +55,8 @@ export interface FloorReady {
   workerBreaks?: boolean;
   /** Supports shared screening-room controls and bounded screenshot fetching. */
   cinema?: boolean;
+  /** Runs independent meeting spaces on this host. */
+  meetingSpaces?: boolean;
   masterWorkers?: boolean;
   /** Compact team tools, task specifications and progress protocol. */
   teamCoordination?: number;
@@ -129,6 +131,7 @@ export const FLOOR_CASES = [
   'jukebox.play',
   'jukebox.skip',
   'jukebox.stop',
+  'meeting-space.create', 'meeting-space.rename',
   'meeting.clear',
   'meeting.finish',
   'meeting.start',

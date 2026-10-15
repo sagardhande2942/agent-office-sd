@@ -33,6 +33,7 @@ import type { AccountsClientMsg, AccountsServerMsg, SignInsClientMsg, TeamClient
 import type { ChangesClientMsg, ChangesServerMsg } from './protocol/changes.js';
 import type { FloorClientMsg, FloorServerMsg, PlanClientMsg } from './protocol/floors.js';
 import type { GitHubClientMsg, GitHubServerMsg } from './protocol/github.js';
+import type { MeetingSpaceClientMsg } from './meeting-spaces.js';
 import type { MeetingClientMsg, MeetingServerMsg } from './protocol/meetings.js';
 import type { PresenceClientMsg, PresenceServerMsg } from './protocol/presence.js';
 import type { QueueClientMsg, QueueServerMsg } from './protocol/queue.js';
@@ -77,6 +78,7 @@ export type ClientMsg = KnowledgeClientMsg | BossClientMsg
   | WorkerClientMsg
   | GitHubClientMsg
   | QueueClientMsg
+  | MeetingSpaceClientMsg
   | MeetingClientMsg
   | FloorClientMsg
   | PlanClientMsg

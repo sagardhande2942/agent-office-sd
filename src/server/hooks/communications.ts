@@ -1,3 +1,4 @@
+import { participantMeeting } from '../../shared/meeting-spaces.js';
 import type http from 'node:http';
 import type { Ctx } from '../office/context.js';
 import { communications } from '../office/communications.js';
@@ -32,7 +33,7 @@ export async function floorCommunications(floor: import('../floor.js').Floor, le
     if (target.planReview?.locked) throw new Error('Planning participants do not receive inbox messages');
       if (target.kind !== 'agent') throw new Error('Tracked messages are for agents, not shells');
     const context = b.context === undefined ? { branch: me.worktree?.branch ?? floor.project.branch } : b.context;
-    const meeting = floor.meetings.state().current;
+    const meeting = participantMeeting(floor.meetings.state(), me.id, target.id);
     const participant = (id: string) => meeting?.seats.some(s => s.workerId === id);
     const link = meeting?.status === 'running' && (participant(me.id) || participant(target.id)) ? { id: meeting.id, round: meeting.round } : undefined;
     const message = action === '/request' ? ledger.request(actor, { id: target.id, name: target.name }, { ...b, context }, link) : ledger.reply(actor, str(b.id, 80), { ...b, context });

@@ -37,7 +37,7 @@ export function installParallelWorlds(ctx: Ctx, parts: Pick<Parts, 'waiting'>) {
   }
   const ui: WorldsUI = { state: () => state, refresh, send: message => ctx.net.send(message), terminal: id => parts.waiting.openWorkerTerminal(id) };
   const open = (index?: number) => { modal?.close(); modal = openWorlds(ui, index); };
-  HUD_ACTIONS.push({ id: 'parallel-worlds', icon: '🌀', label: 'Parallel worlds', section: 'Open', run: () => open() });
+  HUD_ACTIONS.push({ id: 'parallel-worlds', icon: '🌀', label: 'Parallel worlds', section: 'Spaces', run: () => open() });
   PALETTE_ENTRIES.push(() => [{ icon: '🌀', kind: 'Action', title: 'Parallel worlds', keywords: ['universe', 'experiment', 'variants', 'portals'], open: () => open() }]);
   const portals = buildWorldPortals();
   noOutline(portals.root);

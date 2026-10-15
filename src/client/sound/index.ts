@@ -88,6 +88,9 @@ export class OfficeSound {
 
   // ---- The room and you ---------------------------------------------------------------------------
 
+  /** Feature-owned sound recipes share the office master volume, mute, and audio context. */
+  recipe(play: (audio: AudioCore) => void) { play(this.a); }
+
   /** Volume is 0–1; muted silences everything without losing the level. */
   setVolume(volume: number, muted: boolean) {
     this.a.setVolume(volume, muted);

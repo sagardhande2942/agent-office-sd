@@ -6,13 +6,12 @@ import type http from 'node:http';
 import type { Floor } from '../floor.js';
 import type { TeamAction } from '../../shared/master-workers.js';
 import type { FromFloor } from '../../shared/floorhost.js';
-import { Communications } from '../communications.js';
 import { createTeam } from './runtime.js';
 import { TeamPresets, request } from './storage.js';
 import type { TeamCoordinator } from './coordinator.js';
 import { readBody, send } from '../http/util.js';
 import { floorCompletion } from '../hooks/completion.js';
-import { floorCommunications } from '../hooks/communications.js';
+import { meetingHostInbox } from '../meeting-spaces/host.js';
 import { WORKER_FEATURE_PATHS, floorWorkerFeatureHook } from '../hooks/worker-features.js';
 export const TEAM_HOST_CALLS = new Set(['master-workers.start', 'master-workers.control', 'master-workers.capacity']);
 const allowed = new Set(['/office/workers', '/office/workers/inbox', '/office/workers/request', '/office/workers/reply', '/office/workers/ack', '/office/workers/completion', '/office/workers/complete', ...WORKER_FEATURE_PATHS]);
@@ -20,7 +19,6 @@ const allowed = new Set(['/office/workers', '/office/workers/inbox', '/office/wo
 export class HostTeams {
   private budgets = new Map<string, { limit: number | null; paused?: string }>();
   private runs = new Map<string, TeamCoordinator>();
-  private ledgers = new Map<string, Communications>();
   private presets?: TeamPresets;
   private timer?: ReturnType<typeof setInterval>;
   constructor(private dataDir: () => string, private floors: Map<string, Floor>, private emit: (m: FromFloor) => void, private beforeSpawn: () => void = () => {}) {}
@@ -45,7 +43,7 @@ export class HostTeams {
     this.timer = setInterval(() => { for (const run of this.runs.values()) void run.tick().catch(() => {}); }, 2000);
     this.timer.unref();
   }
-  close() { clearInterval(this.timer); this.timer = undefined; this.runs.clear(); this.ledgers.clear(); this.budgets.clear(); }
+  close() { clearInterval(this.timer); this.timer = undefined; this.runs.clear(); this.budgets.clear(); }
   async call(floor: Floor, msg: Record<string, unknown>) {
     if (Object.hasOwn(msg, 'budget')) {
       if (msg.budget !== null && (typeof msg.budget !== 'number' || !Number.isInteger(msg.budget) || msg.budget < 0 || msg.budget > 10000)) return 'Invalid team capacity';
@@ -90,11 +88,7 @@ export class HostTeams {
       if (await floorWorkerFeatureHook(floor, req, res, url, msg => this.emit({ t: 'event', floorId: floor.id, seq: 0, msg }), handoffInbox(floor))) return true;
       if (['/office/workers/completion', '/office/workers/complete'].includes(url.pathname)) await floorCompletion(floor, req, res, url);
       else if (url.pathname === '/office/workers') send(res, 200, { floor: { id: floor.id, name: floor.def.name }, you: id, workers: floor.workers.list() });
-      else {
-        let ledger = this.ledgers.get(floor.id);
-        if (!ledger) { ledger = handoffInbox(floor); this.ledgers.set(floor.id, ledger); }
-        await floorCommunications(floor, ledger, req, res, url);
-      }
+      else await meetingHostInbox(floor, req, res, url, (floor, msg) => this.emit({ t: 'event', floorId: floor.id, seq: 0, msg }));
     } catch (e) { send(res, 400, { error: (e as Error).message }); }
     return true;
   }

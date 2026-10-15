@@ -9,7 +9,7 @@ interface Entry {
 
 /** Categories come from registered actions; search always spans the entire menu. */
 export function menuBrowser(entries: Entry[]) {
-  let category = 'All';
+  let category = entries.some(entry => entry.section === 'Open') ? 'Open' : 'All';
   const search = h('input.menu-search', { type: 'search', placeholder: 'Find an action or setting…', 'aria-label': 'Search office menu' });
   const categories = ['All', 'Pinned', ...new Set(entries.map(entry => entry.section))];
   const tabs = categories.map(name => h('button.menu-filter', {
@@ -35,7 +35,7 @@ export function menuBrowser(entries: Entry[]) {
     for (const group of groups) group.element.hidden = group.members.every(entry => entry.element.hidden);
     tabs.forEach((tab, index) => tab.setAttribute('aria-pressed', String(!query && categories[index] === category)));
     empty.hidden = count > 0;
-    empty.textContent = query ? 'No matches. Try another search.' : 'No pinned actions yet. Use the pin beside any action.';
+    empty.textContent = query ? 'No matches. Try another search.' : category === 'Pinned' ? 'No pinned actions yet. Use the pin beside any action.' : 'No actions in this category.';
     list.scrollTop = 0;
   }
   search.addEventListener('input', refresh);

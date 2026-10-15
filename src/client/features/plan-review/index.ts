@@ -11,7 +11,7 @@ declare module '../../world/types' { interface InteractKinds {
   } }
 export function installPlanReview(ctx: Ctx, parts: Pick<Parts, 'waiting'>) {
   const open = () => openPlanReview(ctx.net, id => parts.waiting.openWorkerTerminal(id));
-  HUD_ACTIONS.push({ id: 'planreview', icon: '📐', label: 'Compare plans', section: 'Open', title: () => 'Independent plans, scored by a reviewer', run: open });
+  HUD_ACTIONS.push({ id: 'planreview', icon: '📐', label: 'Compare plans', section: 'Spaces', title: () => 'Independent plans, scored by a reviewer', run: open });
   PALETTE_ENTRIES.push(() => [{ icon: '📐', kind: 'Action', title: 'Plan comparison', keywords: ['compare plans', 'review plans'], open }]);
   ctx.interactions.define('planreview', { reach: 7, hint: () => ({ k: store.planReview.current?.phase ?? 'free', parts: [hintTitle('Plan comparison table'), aside(store.planReview.current?.phase ?? 'free'), key('E', 'Compare plans')] }), use: onE(open) });
   ctx.interactions.define('planseat', {

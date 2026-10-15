@@ -1,3 +1,4 @@
+import { visibleWorkers } from '../../state/worker-visibility';
 import { visitWorker } from '../../shared/worker-terminal';
 /**
  * Who's waiting on you: N (and the count in the Workers panel) takes you to each in turn, and the
@@ -30,14 +31,14 @@ export function installWaiting(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
   /** N: to the first worker waiting on someone (the ones that need you, then the ones that are done, longest first), and on each press after, the next. */
   function goToNextWaiting() {
     if (core.trip) return;
-    const w = nextUp.next(store.workers.values(), waitingBeside());
+    const w = nextUp.next(visibleWorkers(store), waitingBeside());
     nextToast?.remove();
     if (!w || !goToWorker(w.id)) {
       const other = store.floors.find((f) => f.id !== store.floor && f.waiting > 0);
       nextToast = toast(other ? `🛗 Nobody's waiting on this floor. ${other.waiting} on the ${other.name} floor: take the elevator` : '👍 Nobody is waiting on you');
       return;
     }
-    const waiting = waitingInOrder(store.workers.values());
+    const waiting = waitingInOrder(visibleWorkers(store));
     const of = waiting.length > 1 ? ` (${waiting.findIndex((x) => x.id === w.id) + 1} of ${waiting.length})` : '';
     nextToast = toast(`${w.status === 'needs_input' ? `🙋 ${w.name} needs you` : `✅ ${w.name} is done`}${of}. E opens its terminal`);
   }
@@ -63,7 +64,7 @@ export function installWaiting(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
   function waitingBeside(): string | undefined {
     let best: string | undefined;
     let bestD = 2.5;
-    for (const w of store.workers.values()) {
+    for (const w of visibleWorkers(store)) {
       const v = parts.views.workerViews.get(w.id);
       if (!v || !waitingOnSomeone(w)) continue;
       const d = v.model.root.getWorldPosition(workerPos).distanceTo(player.pos);
@@ -76,7 +77,7 @@ export function installWaiting(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
   }
 
   function renderWaiting() {
-    const waiting = waitingInOrder(store.workers.values());
+    const waiting = waitingInOrder(visibleWorkers(store));
     const el = $('waiting');
     el.classList.toggle('hidden', !waiting.length);
     el.classList.toggle('all-done', waiting.every((w) => w.status === 'done'));
@@ -97,7 +98,7 @@ export function installWaiting(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
   function pointToWaiting(now: number) {
     bearings.length = 0;
     if (!core.trip && !modalOpen()) {
-      for (const w of store.workers.values()) {
+      for (const w of visibleWorkers(store)) {
         const v = parts.views.workerViews.get(w.id);
         if (!v || !waitingOnSomeone(w)) continue;
         const at = v.model.root.getWorldPosition((heads[bearings.length] ??= new THREE.Vector3()));

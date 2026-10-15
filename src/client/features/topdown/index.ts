@@ -3,7 +3,7 @@ import type { Ctx } from '../../core/context';
 import type { CoreState } from '../../core/ctx';
 import type { Parts } from '../../core/parts';
 import { modalOpen, h, openModal } from '../../ui/dom';
-import { HUD_ACTIONS } from '../../ui/menu';
+import { registerViewControl } from '../../shared/view-selector';
 import { groundAt } from '../../player/collide';
 import { PlanCamera } from './camera';
 export { isTopdownRoute } from './camera';
@@ -25,7 +25,7 @@ export function installTopdown(ctx: Ctx, core: CoreState, parts: Parts) {
   const topdown = configureViewMode(ctx, available);
   const exploring = () => topdown() && available();
   const zoom = (amount: number) => { camera.span = THREE.MathUtils.clamp(camera.span * amount, 12, 80); camera.updateProjectionMatrix(); };
-  HUD_ACTIONS.push({ id: 'plan-camera', icon: '🧭', label: '2D view controls', section: 'Office', status: () => true, chip: () => '2D', run: () => {
+  registerViewControl({ label: '2D view controls', run: () => {
     openModal(h('section.modal', {}, h('header', {}, h('h2', {}, '2D view controls')), h('div.body', {},
       h('p', {}, 'WASD / arrows to walk. Click the floor to walk there; click a fixture to approach and use it. E interacts nearby. Tab opens every office action. Use the elevator to change floors, visit the rooftop or garage, or add a project.'),
       h('p', {}, 'Scroll to zoom. Activities use their original camera and controls, then return to the top-down view.'),

@@ -1,3 +1,4 @@
+import { startMeeting } from '../../meeting-spaces/office.js';
 // The meeting room: calling a meeting, stopping it, and clearing the table.
 import { isAgentEffort, isAgentProvider, type MeetingClientMsg, type MeetingRequest } from '../../../shared/protocol.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
@@ -18,6 +19,7 @@ export const meetingHandlers = {
     }
     const count = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : undefined);
     const request: MeetingRequest = {
+      spaceId: msg.spaceId === undefined ? undefined : str(msg.spaceId, 80),
       pattern: msg.pattern,
       prompt: str(msg.prompt, 20000),
       title: str(msg.title, 200) || undefined,
@@ -31,17 +33,17 @@ export const meetingHandlers = {
       model: msg.model === undefined ? undefined : str(msg.model, OPEN_CODE_MODEL_MAX + 1),
       effort: isAgentEffort(msg.effort) ? msg.effort : undefined,
     };
-    ctx.withSignIn(c, ctx.claudeFor(request.provider ?? floor.workers.officeDefault.provider), () => ctx.withFreshBase(c, floor, async () => ctx.warn(c, await floor.meetings.start(request, who, c.accountId))));
+    startMeeting(ctx, c, floor, request, who);
   },
-  async 'meeting.stop'(ctx, c) {
+  async 'meeting.stop'(ctx, c, msg) {
     const who = c.peer.name;
     const floor = here(ctx, c);
-    if (floor) ctx.warn(c, await floor.meetings.stop(who));
+    if (floor) ctx.warn(c, await floor.meetings.stop(who, msg.spaceId === undefined ? undefined : str(msg.spaceId, 80)));
   },
-  async 'meeting.clear'(ctx, c) {
+  async 'meeting.clear'(ctx, c, msg) {
     const who = c.peer.name;
     const floor = here(ctx, c);
-    if (floor) ctx.warn(c, await floor.meetings.clear(who));
+    if (floor) ctx.warn(c, await floor.meetings.clear(who, msg.spaceId === undefined ? undefined : str(msg.spaceId, 80)));
   },
   async 'meeting.finish'(ctx, c, msg) {
     const floor = here(ctx, c);
