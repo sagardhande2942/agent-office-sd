@@ -32,7 +32,7 @@ try {
           o.renderer.render = (scene, camera) => {
             if (scene === o.scene) {
               if (!window.__renderPortalWorld) return;
-              window.__renderPortalWorld = false; render(scene, camera); return;
+              render(scene, camera); return;
             }
             // Keep the destination scene live; skip unrelated first-person hand passes.
             if (scene.background) render(scene, camera);
@@ -112,6 +112,8 @@ try {
   await page.waitForFunction(() => window.__office.store.meeting.current === null && window.__office.store.selectedMeetingSpace !== 'main');
   assert.equal(await page.locator('.reality-crossing').count(), 0); check('Creating an unwritten reality hires nobody and instant entry changes no meeting workflow');
   await open(page); await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForSelector('.reality-arrival', { state: 'detached' });
+  await page.waitForTimeout(250);
   await page.screenshot({ timeout: 90000, path: path.join(output, 'reality-anchor-mobile.png') });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await anchor(page).getByRole('button', { name: 'Close Reality Anchor', exact: true }).click();

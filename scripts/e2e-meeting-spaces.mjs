@@ -96,6 +96,7 @@ try {
   await dialog(page).getByRole('button', { name: 'Rename', exact: true }).click();
   await dialog(page).getByLabel('Space name').fill('Release planning'); await dialog(page).getByRole('button', { name: 'Save', exact: true }).click();
   await page.waitForFunction(() => window.__office.store.meetingSpaces.spaces.some(s => s.name === 'Release planning'));
+  await switchSpace(page, productId);
   await page.setViewportSize({ width: 390, height: 844 }); await shot('mobile.png');
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   assert.ok(await dialog(page).getByLabel('Meeting space', { exact: true }).isVisible());
