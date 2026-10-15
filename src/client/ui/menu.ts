@@ -11,7 +11,7 @@ export interface HudAction {
   id: string;
   icon: string | (() => string);
   label: string | (() => string);
-  section: 'Open' | 'Together' | 'Office';
+  section: 'Open' | 'Together' | 'Office' | 'Account & team' | 'Customize' | 'Spaces';
   /** Its keyboard shortcut, if it has one (now). */
   key?: string | (() => string | undefined);
   /** A number worth knowing before you open it: open issues, tasks waiting… */
@@ -66,6 +66,10 @@ export interface Hud {
  */
 export function mountHud(actions: HudAction[], settings: Settings, save: () => void): Hud {
   actions = [...actions, ...HUD_ACTIONS];
+  // Keep saved shortcuts useful when their old entries have been consolidated.
+  const replacements: Record<string, string> = { lite: 'views', 'toggle-view': 'views', 'plan-camera': 'views', 'plan-graphics': 'views', 'coding-agents': 'settings', 'lore-curator': 'settings', roof: 'elevator' };
+  const pins = [...new Set(settings.pins.map(id => replacements[id] ?? id))];
+  if (pins.join() !== settings.pins.join()) { settings.pins = pins; save(); }
   const dock = $('dock');
   const labelOf = (a: HudAction) => (typeof a.label === 'string' ? a.label : a.label());
   const iconOf = (a: HudAction) => (typeof a.icon === 'string' ? a.icon : a.icon());

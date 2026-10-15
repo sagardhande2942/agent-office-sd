@@ -1,5 +1,5 @@
 import type { Ctx } from '../../core/context';
-import { HUD_ACTIONS } from '../../ui/menu';
+import { registerViewControl } from '../../shared/view-selector';
 import { h, openModal } from '../../ui/dom';
 
 export type GraphicsMode = 'reduced' | 'enhanced';
@@ -28,7 +28,7 @@ export function configureGraphics(ctx: Ctx, exploring: () => boolean) {
     ctx.renderer.setPixelRatio(ratio);
   };
   ctx.view.add({ update });
-  HUD_ACTIONS.push({ id: 'plan-graphics', icon: '✨', label: '2D graphics settings', section: 'Office', status: () => true, chip: () => mode === 'enhanced' ? 'Enhanced' : 'Reduced', run: () => {
+  registerViewControl({ label: '2D graphics settings', run: () => {
     const options = h('div.seg', { role: 'radiogroup', 'aria-label': '2D graphics quality' });
     const paint = () => options.replaceChildren(...(['reduced', 'enhanced'] as const).map(value => h('button.btn', {
       type: 'button', role: 'radio', 'aria-checked': String(mode === value), class: mode === value ? 'on' : '',

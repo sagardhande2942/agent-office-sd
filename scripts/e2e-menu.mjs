@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright-core';
 import { loadConfig } from '../src/server/config.ts';
 import { startServer } from '../src/server/server.ts';
+process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY='1';
 const output=path.resolve(process.env.MENU_ARTIFACTS??'/tmp/agent-office-menu-evidence');mkdirSync(output,{recursive:true});
 const dir=mkdtempSync(path.join(os.tmpdir(),'office-team-browser-')),binary=path.join(dir,'claude');
 writeFileSync(binary,`#!${process.execPath}\nsetInterval(()=>{},1000);\n`,{mode:0o755});
@@ -19,17 +20,45 @@ const check=(name)=>{checks.push({name,status:'passed'});console.log('PASS '+nam
 try {
  browser=await chromium.launch({executablePath:executable,headless:true,args:['--no-sandbox','--enable-unsafe-swiftshader']});
  const context=await browser.newContext({viewport:{width:1440,height:1000}});
+ await context.route('**/fonts.googleapis.com/**', route=>route.abort());
+ await context.route('**/fonts.gstatic.com/**', route=>route.abort());
  // Focus/menu checks exercise the shared game without expensive software-GPU scene draws.
  await context.addInitScript(()=>{const raf=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=cb=>raf(ts=>{const r=window.__office?.renderer;if(r)r.render=()=>{};cb(ts);});});
+ await context.addInitScript(()=>localStorage.setItem('agent-office.settings',JSON.stringify({pins:['lite','toggle-view','coding-agents','lore-curator','roof']})));
  await context.addInitScript(()=>localStorage.setItem('agent-office.profile',JSON.stringify({name:'Team tester',color:'#ef476f',look:{skin:0,hair:0,style:0}})));
  const login=await context.request.post(base+'/api/login',{data:{password:'team-browser'}});assert.ok(login.ok());
  page=await context.newPage();page.setDefaultTimeout(20000);page.on('pageerror',e=>errors.push(e.message));
- await page.goto(base+'/');
+ await page.goto(base+(process.env.MENU_ROUTE??'/'));
  await page.waitForFunction(()=>window.__office?.player);
+ await page.locator('#loading').waitFor({state:'hidden',timeout:30000});
+ assert.deepEqual(await page.evaluate(()=>window.__office.settings.pins),['views','settings','elevator']);
  await page.keyboard.press('Tab');
  const menu=page.getByRole('dialog',{name:'Office menu'});
  await menu.waitFor();
  const search=page.getByRole('searchbox',{name:'Search office menu'});
+ assert.equal(await menu.getByRole('button',{name:'Open',exact:true}).getAttribute('aria-pressed'),'true');
+ await menu.getByRole('menuitem',{name:/Issues/}).waitFor();
+ assert.equal(await menu.getByRole('menuitem',{name:/Settings/}).count(),0);
+ await page.screenshot({path:path.join(output,'menu-work.png')});
+ await page.getByRole('button',{name:'All',exact:true}).click();
+ for(const name of ['Coding Agents','Knowledge curator','Lite','Switch to 2D','Switch to 3D','Rooftop bar','2D view controls','2D graphics settings'])
+   assert.equal(await menu.getByRole('menuitem',{name:new RegExp(name+'$')}).count(),0,name+' should be consolidated');
+ await page.getByRole('button',{name:'Spaces',exact:true}).click();
+ await menu.getByRole('menuitem',{name:/Whiteboard/}).waitFor();
+ await search.fill('View');
+ await menu.getByRole('menuitem',{name:/View$/}).click();
+ const view=page.getByRole('dialog',{name:'Office view'});await view.waitFor();
+ assert.equal(await view.getByLabel('View',{exact:true}).locator('option').count(),3);
+ await page.screenshot({path:path.join(output,'view-settings.png')});
+ const graphics=view.getByRole('button',{name:'2D graphics settings',exact:true});
+ if(await graphics.count()) {
+   await graphics.click();
+   await page.getByRole('dialog',{name:'2D graphics settings'}).waitFor();
+   await page.keyboard.press('Escape');
+ } else await view.getByRole('button',{name:'Close',exact:true}).click();
+ await page.waitForFunction(()=>!document.querySelector('.backdrop')&&window.__office.player.enabled&&(window.__office.player.hasMouse||!window.__office.player.mouseLook));
+ await page.keyboard.press('Tab');
+ check('Work-first menu, consolidated view choices, Spaces category and modal close restoration');
  await search.fill('communications');
  assert.equal(await menu.getByRole('menuitem').count(),1);
  await search.fill('nothing matches xyz');
@@ -55,10 +84,19 @@ try {
  assert.ok(await menu.evaluate(el=>el.getBoundingClientRect().bottom<=innerHeight));
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  await menu.getByRole('button',{name:'Close',exact:true}).click();
- await page.waitForFunction(()=>!document.querySelector('.backdrop')&&window.__office.player.enabled&&window.__office.player.hasMouse);
+ await page.waitForFunction(()=>!document.querySelector('.backdrop')&&window.__office.player.enabled&&(window.__office.player.hasMouse||!window.__office.player.mouseLook));
  await page.keyboard.press('Tab');await page.keyboard.press('Escape');
- await page.waitForFunction(()=>!document.querySelector('.backdrop')&&window.__office.player.enabled&&window.__office.player.hasMouse);
+ await page.waitForFunction(()=>!document.querySelector('.backdrop')&&window.__office.player.enabled&&(window.__office.player.hasMouse||!window.__office.player.mouseLook));
  check('Search, empty results, categories, pinning, display toggles, keyboard navigation, responsive sizing and mouse-look restoration');
+ await page.keyboard.press('Tab');
+ await search.fill('settings');
+ await menu.getByRole('menuitem',{name:/Settings/}).click();
+ const settings=page.getByRole('dialog',{name:'Settings',exact:true});
+ await settings.getByRole('tab',{name:'Workers',exact:true}).click();
+ await settings.getByRole('button',{name:/Configure coding agents/}).waitFor();
+ await settings.getByRole('button',{name:'Configure curator',exact:true}).waitFor();
+ await settings.getByRole('button',{name:'Close',exact:true}).click();
+ check('Coding Agents and Knowledge curator remain reachable in Settings → Workers; legacy pins migrate');
  assert.deepEqual(errors,[]);
  writeFileSync(path.join(output,'checks.json'),JSON.stringify(checks,null,2));
 } finally {await browser?.close();await office.shutdown();rmSync(dir,{recursive:true,force:true});}
