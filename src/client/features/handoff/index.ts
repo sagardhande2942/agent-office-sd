@@ -21,7 +21,7 @@ export function installHandoff(ctx: Ctx, parts: Pick<Parts, 'waiting'>) {
     id: 'handoffstation',
     icon: '🤝',
     label: 'Handoff station',
-    section: 'Open',
+    section: 'Spaces',
     title: () => 'Task packets one worker offered another, and who accepted them',
     run: open,
   });

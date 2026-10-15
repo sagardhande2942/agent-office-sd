@@ -1,4 +1,3 @@
-import { switchView } from '../../shared/view-selector';
 /**
  * The HUD: a few buttons on the top bar, everything else in the ☰ menu (Tab), with H for the controls
  * and F to hang a picture; the project in the corner (click it for the floors); Settings, and your
@@ -7,7 +6,6 @@ import { switchView } from '../../shared/view-selector';
 import { ROOF } from '../../../shared/rooftop';
 import type { Ctx } from '../../core/context';
 import type { CoreState } from '../../core/ctx';
-import { builtFloors } from '../../core/floors';
 import type { Parts } from '../../core/parts';
 import { waitingInOrder, waitingLabel } from '../../nextup';
 import { saveSettings, store } from '../../state';
@@ -56,7 +54,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       { id: 'boss', icon: '👔', label: 'Boss Office', section: 'Open', run: () => parts.boss.showBoss() },
       { id: 'smartphone', icon: '📱', label: 'Smartphone', section: 'Open', key: 'J', count: () => waitingNow().length, title: () => 'Open worker and helper terminals, messages and reports', run: () => parts.smartphone.showSmartphone() },
       { id: 'services', icon: '🌐', label: 'Services', section: 'Open', count: () => store.services.items.length, title: () => 'Web servers the workers are running', run: () => openServices() },
-      { id: 'whiteboard', icon: '📝', label: 'Whiteboard', section: 'Open', title: () => 'Draw together, live', run: () => openWhiteboard(net) },
+      { id: 'whiteboard', icon: '📝', label: 'Whiteboard', section: 'Spaces', title: () => 'Draw together, live', run: () => openWhiteboard(net) },
       // Up on the top bar while a meeting is on: what's being worked through in the meeting room.
       {
         id: 'meeting',
@@ -72,7 +70,6 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       // The office has its bookshelf for them; a map of its own may not.
       { id: 'docs', icon: '📚', label: 'Docs', section: 'Open', shown: () => !inOffice(), title: () => 'Read the project’s docs', run: parts.bookshelf.showBookshelf },
       { id: 'elevator', icon: '🛗', label: () => (inOffice() ? 'Elevator' : 'Floors'), section: 'Open', count: () => store.floors.reduce((n, f) => n + (f.id === store.floor ? 0 : f.waiting), 0), title: () => (inOffice() ? 'Ride to another project' : 'Go to another project, or add one'), run: travel.showElevator },
-      { id: 'roof', icon: '🍸', label: 'Rooftop bar', section: 'Open', shown: () => !core.upTop && inOffice() && builtFloors().length > 0, title: () => 'Ride the elevator up to the roof: a DJ, drinks and the city', run: () => travel.ride(ROOF) },
       // In voice, V is push to talk, so leaving is only from here.
       { id: 'voice', icon: '🎙️', label: () => (voice.inVoice ? 'Leave voice' : 'Join voice'), section: 'Together', key: () => (voice.inVoice ? undefined : 'V'), on: () => voice.inVoice, blocked: noMedia, run: () => void talk.toggleVoice() },
       // While you're in voice, the top bar keeps the mute button handy. Muted is the usual with push to talk, so it doesn't stand out then.
@@ -90,13 +87,12 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
         run: () => voice.toggleMute(),
       },
       { id: 'share', icon: '🖥️', label: () => (voice.sharing ? 'Stop sharing' : 'Share screen'), section: 'Together', on: () => voice.sharing, status: () => voice.sharing, chip: () => 'Sharing', blocked: noMedia, run: () => void talk.toggleShare() },
-      { id: 'decor', icon: '🖼️', label: () => (hanging.hanger.active ? 'Stop hanging the picture' : 'Hang a picture'), section: 'Together', key: 'F', shown: () => inOffice(), on: () => hanging.hanger.active, status: () => hanging.hanger.active, run: () => (hanging.hanger.active ? hanging.hanger.cancel() : hanging.startHanging()) },
-      { id: 'team', icon: '👥', label: 'Invite teammates', section: 'Together', shown: () => store.invites, run: () => openTeam(net) },
-      { id: 'accounts', icon: '🔑', label: 'Accounts', section: 'Together', shown: () => store.me.admin, title: () => 'Invite people, see who has an account, revoke them', run: () => openAccounts(net) },
-      { id: 'signins', icon: '🔐', label: 'Your sign-ins', section: 'Together', shown: () => !!store.me.account, tone: () => (needsSigningIn() ? 'danger' : undefined), status: needsSigningIn, chip: () => 'Sign in to Claude', title: () => 'The Claude plan and GitHub account your workers run on: your own', run: () => openSignIns(net) },
+      { id: 'decor', icon: '🖼️', label: () => (hanging.hanger.active ? 'Stop hanging the picture' : 'Hang a picture'), section: 'Customize', key: 'F', shown: () => inOffice(), on: () => hanging.hanger.active, status: () => hanging.hanger.active, run: () => (hanging.hanger.active ? hanging.hanger.cancel() : hanging.startHanging()) },
+      { id: 'team', icon: '👥', label: 'Invite teammates', section: 'Account & team', shown: () => store.invites, run: () => openTeam(net) },
+      { id: 'accounts', icon: '🔑', label: 'Accounts', section: 'Account & team', shown: () => store.me.admin, title: () => 'Invite people, see who has an account, revoke them', run: () => openAccounts(net) },
+      { id: 'signins', icon: '🔐', label: 'Your sign-ins', section: 'Account & team', shown: () => !!store.me.account, tone: () => (needsSigningIn() ? 'danger' : undefined), status: needsSigningIn, chip: () => 'Sign in to Claude', title: () => 'The Claude plan and GitHub account your workers run on: your own', run: () => openSignIns(net) },
       { id: 'settings', icon: '⚙️', label: 'Settings', section: 'Office', run: showSettings },
       { id: 'help', icon: '❓', label: 'Controls', section: 'Office', key: 'H', run: openHelp },
-      { id: 'lite', icon: '📱', label: 'Lite', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => switchView('/lite', net) },
       {
         id: 'upgrade',
         icon: '⬆️',

@@ -23,6 +23,9 @@ export function viewSelector(net: Net): HTMLElement {
   select.addEventListener('change', () => switchView(select.value, net));
   return h('label.view-selector', {}, 'View ', select);
 }
+/** View modules contribute controls without adding more top-level menu entries. */
+const viewControls: { label: string; run(): void }[] = [];
+export function registerViewControl(control: { label: string; run(): void }) { viewControls.push(control); }
 export function openViewSelector(net: Net) {
-  openModal(h('section.modal', {}, h('header', {}, h('h2', {}, 'Office view')), h('div.body', {}, viewSelector(net))));
+  const modal = openModal(h('section.modal', { role: 'dialog', 'aria-label': 'Office view' }, h('header', {}, h('h2', {}, 'Office view')), h('div.body', {}, viewSelector(net), ...viewControls.map(control => h('p', {}, h('button.btn', { type: 'button', onclick: () => { modal.close(); control.run(); } }, control.label))))));
 }

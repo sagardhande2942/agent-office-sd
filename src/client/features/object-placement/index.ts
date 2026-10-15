@@ -94,7 +94,7 @@ export function installObjectPlacement(ctx: Ctx) {
     modal = openModal(panel, { allowMovement: navigation, backdropCloses: false, doing: 'customizing objects', onClose: () => { end(); select(null); modal = null; ctx.canvas.style.touchAction = touchAction; } });
     modal.backdrop.classList.add('placement-backdrop'); select(null);
   }
-  HUD_ACTIONS.push({ id: 'object-placement', icon: '↔', label: 'Customize objects', section: 'Office', run: open,
+  HUD_ACTIONS.push({ id: 'object-placement', icon: '↔', label: 'Customize objects', section: 'Customize', run: open,
     blocked: () => !ctx.net.up ? 'Reconnect to customize the shared office' : !ctx.inOffice() || ctx.upTop() ? 'Available on office floors' : undefined });
   function aim(x: number, y: number) {
     const r = ctx.canvas.getBoundingClientRect(); ndc.set((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1);

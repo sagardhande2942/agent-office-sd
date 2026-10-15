@@ -155,7 +155,7 @@ On native Windows, Codex lifecycle hooks use an encoded PowerShell command to la
 
 ## Office-scoped Coding Agents configuration & permissions
 
-Admins can configure permissions, access control, models, reasoning effort, and custom launch settings for all available coding agents (`Claude Code`, `OpenCode`, `Codex`, `Antigravity`, `Cursor`, `Grok`, `Muse`, `DeepSeek Harness`, `Pi`, and `Custom`) through **🤖 Coding Agents** in the ☰ menu, or under ⚙️ Settings → **🤖 Workers** → **🤖 Configure coding agents…**.
+Admins can configure permissions, access control, models, reasoning effort, and custom launch settings for all available coding agents (`Claude Code`, `OpenCode`, `Codex`, `Antigravity`, `Cursor`, `Grok`, `Muse`, `DeepSeek Harness`, `Pi`, and `Custom`) through ⚙️ Settings → **🤖 Workers** → **🤖 Configure coding agents…**.
 
 ### Office-scoped, not global
 These settings are stored inside the office building's `.agent-office/coding-agents.json`. They are not machine-global (they never modify your `~/.config`, `~/.claude.json`, or machine environment) and are not browser-local: every connected client on every floor in the office shares this live configuration.
