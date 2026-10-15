@@ -204,6 +204,7 @@ export class HostFloors {
         cinema: true,
         meetingSpaces: true,
         masterWorkers: true,
+        teamCoordination: 1,
         lore: true, curator: true, bossMode: true,
         lights: true,
         projectsDir: this.projectsDir,

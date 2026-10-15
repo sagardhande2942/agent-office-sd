@@ -3,6 +3,7 @@ import type { TeamAction, TeamState } from '../shared/master-workers.js';
 export interface TeamSession {
   member(id: string): 'master' | 'worker' | undefined;
   state(): TeamState;
+  recordResponse?(bytes:number): void;
   action(actor: string, body: TeamAction): Promise<TeamState>;
 }
 const sessions = new WeakMap<Floor, Set<TeamSession>>();

@@ -58,6 +58,8 @@ export interface FloorReady {
   /** Runs independent meeting spaces on this host. */
   meetingSpaces?: boolean;
   masterWorkers?: boolean;
+  /** Compact team tools, task specifications and progress protocol. */
+  teamCoordination?: number;
   lore?: boolean;
   curator?: boolean;
   bossMode?: boolean;

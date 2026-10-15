@@ -1,4 +1,5 @@
 import type { AgentChoice, Usage } from './protocol.js';
+import type { TaskSpecification, TaskProgress, TaskObservation, TaskAlert, ResultSnapshot, TeamMetrics } from './team-coordination.js';
 import type { ReplayLog } from './task-replay.js';
 export interface TeamConfig { master: AgentChoice; models: AgentChoice[]; maxWorkers: number; }
 export interface TeamPreset extends TeamConfig { id: string; name: string; }
@@ -6,16 +7,21 @@ export interface TeamRequest extends TeamConfig { brief: string; requirements: s
 export interface TeamAttempt {
   workerId: string; choice: AgentChoice; base: string;
   status: 'running' | 'submitted' | 'failed' | 'rejected' | 'accepted';
+  assignmentId?: string; startedAt?: number; reportingSince?: number; acknowledgedAt?: number;
+  designSummary?: string; submittedHead?: string; specification?: TaskSpecification; progress?: TaskProgress; observation?: TaskObservation; alerts?: TaskAlert[];
+  corrections?: number; previousResults?: ResultSnapshot[]; correctionFeedback?: string;
   notice?: string; summary?: string; commits?: string[]; checks?: string; review?: string; usage?: Usage;
 }
 export interface TeamTask {
   id: string; title: string; instructions: string; acceptance: string;
-  files: string[]; dependencies: string[];
-  status: 'pending' | 'running' | 'review' | 'takeover' | 'done';
+  files: string[]; dependencies: string[]; specification?: TaskSpecification;
+  recoveryRoot?: string; replacedBy?: string[]; replacementReason?: string;
+  status: 'pending' | 'running' | 'review' | 'takeover' | 'done' | 'superseded';
   attempts: TeamAttempt[]; reason?: string; evidence?: string; integrated?: string[];
 }
 export interface TeamParticipant { workerId: string; choice: AgentChoice; usage?: Usage; }
 export interface TeamRun extends TeamRequest {
+  designSummary?: string; metrics?: TeamMetrics;
   replay?: ReplayLog;
   id: string; owner?: string; createdAt: number; revision: number;
   phase: 'starting' | 'running' | 'paused' | 'stopped' | 'done';
@@ -25,11 +31,17 @@ export interface TeamRun extends TeamRequest {
   notifications: Record<string, string>;
 }
 export interface TeamState { current: TeamRun | null; past: TeamRun[]; presets: TeamPreset[]; error?: string; }
+export type TeamTaskDefinition = Pick<TeamTask, 'id' | 'title' | 'instructions' | 'acceptance' | 'files' | 'dependencies' | 'specification'>;
 export type TeamAction =
-  | { action: 'plan'; id: string; revision: number; plan: string; tasks: Pick<TeamTask, 'id' | 'title' | 'instructions' | 'acceptance' | 'files' | 'dependencies'>[] }
+  | { action: 'acknowledge'; id: string; task: string; assignmentId: string; revision?: number }
+  | { action: 'progress'; id: string; task: string; assignmentId: string; revision?: number; sequence: number; step: string; completed: string; checks: string; next: string; blocker?: string }
+  | { action: 'checkpoint'; id: string; revision: number; task: string; alertId: string; response: string }
+  | { action: 'request_changes'; id: string; revision: number; task: string; evidence: string }
+  | { action: 'replace'; id: string; revision: number; task: string; evidence: string; tasks: TeamTaskDefinition[] }
+  | { action: 'plan'; id: string; revision: number; plan: string; designSummary?: string; tasks: TeamTaskDefinition[] }
   | { action: 'dispatch'; id: string; revision: number; task: string; choice: AgentChoice; reason: string }
-  | { action: 'result'; id: string; revision: number; task: string; summary: string; commits: string[]; checks: string; failed?: boolean }
+  | { action: 'result'; id: string; revision: number; task: string; summary: string; commits: string[]; checks: string; failed?: boolean; assignmentId?: string }
   | { action: 'cancel'; id: string; revision: number; task: string; evidence: string }
-  | { action: 'review'; id: string; revision: number; task: string; accept: boolean; evidence: string }
+  | { action: 'review'; id: string; revision: number; task: string; accept: boolean; evidence: string; scopeException?: string }
   | { action: 'takeover'; id: string; revision: number; task: string; evidence: string; complete?: boolean }
   | { action: 'finish'; id: string; revision: number; pr: string; summary: string; checks: string };

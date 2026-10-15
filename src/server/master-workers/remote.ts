@@ -10,7 +10,7 @@ export class RemoteTeams implements RemoteTeamSurface {
   private budget: { budget: number | null; paused?: string } = { budget: 0 };
   private updating = false;
   private current: TeamState = { current: null, past: [], presets: [] };
-  constructor(private call: (t: string, body: Record<string, unknown>) => Promise<unknown>, private supported: () => boolean) {}
+  constructor(private call: (t: string, body: Record<string, unknown>) => Promise<unknown>, private supported: () => boolean, private contractSupported: () => boolean = () => true) {}
   state() { return this.current; }
   capacity(room: number, workers: number, paused?: string) {
     this.budget = { budget: Number.isFinite(room) ? Math.max(0, Math.floor(workers + room)) : null, ...(paused ? { paused } : {}) };
@@ -28,6 +28,6 @@ export class RemoteTeams implements RemoteTeamSurface {
     if (!this.supported()) return 'Update the floor host to support Master / Workers';
     const r = await this.call(t, body); return typeof r === 'string' ? r : undefined;
   }
-  start(request: TeamRequest, owner?: string) { return this.command('master-workers.start', { request, owner, ...this.budget }); }
-  control(action: 'pause' | 'resume' | 'stop', owner?: string) { return this.command('master-workers.control', { action, owner, ...this.budget }); }
+  start(request: TeamRequest, owner?: string) { if(!this.contractSupported())return Promise.resolve('Update the floor host for task specifications and compact team tools');return this.command('master-workers.start', { request, owner, ...this.budget }); }
+  control(action: 'pause' | 'resume' | 'stop', owner?: string) { if(action==='resume'&&!this.contractSupported())return Promise.resolve('Update the floor host before resuming coordinated work');return this.command('master-workers.control', { action, owner, ...this.budget }); }
 }

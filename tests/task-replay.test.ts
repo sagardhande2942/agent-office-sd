@@ -1,3 +1,4 @@
+import { fixtureAction } from './support/team-contract.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -18,9 +19,9 @@ const DETAIL_KEYS=['instructions','message','evidence','reviewReason','commits',
 function fixture() {
  const dir=mkdtempSync(path.join(tmpdir(),'office-replay-')),file=path.join(dir,'activity.json'),presets=new TeamPresets(path.join(dir,'presets.json'));
  const workers:WorkerInfo[]=[],messages:string[]=[],stopped:string[]=[],integrated=new Set<string>();let next=0,verified=0;
- const io:TeamAdapter={list:()=>workers,spawn:(a,prompt,_owner,base,role)=>{const id=`w${++next}`;const w={id,provider:a.provider,model:a.model,effort:a.effort,status:'working',prompt,masterWorkers:role,worktree:{path:id,branch:`office/${id}`,base:base?.commit??'a'.repeat(40)}} as WorkerInfo;workers.push(w);return w;},prompt:(id,p)=>{messages.push(p);const w=workers.find(v=>v.id===id);if(w)w.status='working';return undefined;},stop:id=>{stopped.push(id);const i=workers.findIndex(w=>w.id===id);if(i>=0)workers.splice(i,1);},head:()=> 'a'.repeat(40),commits:(_id,_base,cs)=>cs,contains:(_id,cs)=>cs.every(c=>integrated.has(c)),prepare:()=>true,verifyPr:async()=>{verified++;},changed:()=>{}};
+ const io:TeamAdapter={list:()=>workers,spawn:(a,prompt,_owner,base,role)=>{const id=`w${++next}`;const w={id,provider:a.provider,model:a.model,effort:a.effort,status:'working',prompt,masterWorkers:role,worktree:{path:id,branch:`office/${id}`,base:base?.commit??'a'.repeat(40)}} as WorkerInfo;workers.push(w);return w;},prompt:(id,p)=>{messages.push(p);const w=workers.find(v=>v.id===id);if(w)w.status='working';return undefined;},stop:id=>{stopped.push(id);const i=workers.findIndex(w=>w.id===id);if(i>=0)workers.splice(i,1);},head:()=> 'a'.repeat(40),commits:(_id,_base,cs)=>cs,contains:(_id,cs)=>cs.every(c=>integrated.has(c)),prepare:()=>true,verifyPr:async()=>{verified++;},changedPaths:()=>[],changed:()=>{}};
  let s=new TeamCoordinator(file,presets,io);s.start({...request});
- const action=(actor:string,b:Record<string,unknown>)=>{const r=s.state().current!;return s.action(actor,{id:r.id,revision:r.revision,...b} as TeamAction);};
+ const action=(actor:string,b:Record<string,unknown>)=>fixtureAction(s,actor,b);
  const plan=()=>action(s.state().current!.masterId!,{action:'plan',plan:'Split independent code and integration work, then verify and create one PR',tasks:[task(),task('two',['one'])]});
  return {dir,file,presets,workers,messages,stopped,integrated,action,plan,get s(){return s;},get verified(){return verified;},restart:()=>{s=new TeamCoordinator(file,presets,io);},dispose:()=>rmSync(dir,{recursive:true,force:true})};
 }
@@ -35,7 +36,7 @@ test('a full activity records a chronological trail with reported and verified e
   await f.action(m,{action:'review',task:'one',accept:true,evidence:'Reviewed the diff and reran tests'});
   await f.action(m,{action:'takeover',task:'two',evidence:'Master completes the remaining integration',complete:true});
   await f.action(m,{action:'finish',pr:'https://example.test/pr/42',summary:'All requirements delivered',checks:'Full validation passed'});
-  const run=f.s.state().current!,events=run.replay!.events;
+  const run=f.s.state().current!,events=run.replay!.events.filter(e=>e.type!=='progress');
   assert.equal(run.phase,'done');assert.equal(f.verified,1);
   assert.deepEqual(events.map(e=>e.type),['start','plan','assignment','result','review','integration','review','integration','final-pr']);
   const [start,planEvent,assignment,result,review,integration,takeoverReview,takeoverIntegration,finalPr]=events;

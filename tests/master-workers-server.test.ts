@@ -1,3 +1,4 @@
+import { fixtureHttpAction } from './support/team-contract.js';
 import { idleAgent } from './fixtures/idle-agent.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,7 +39,7 @@ test('real mixed-provider team uses isolated bases, enforces roles, integrates c
    const token=saved().find((w:any)=>w.id===id)?.hookToken;
    const res=await fetch(`http://127.0.0.1:${office.hookPort}${route}?worker=${id}`,{method:b?'POST':'GET',headers:{authorization:`Bearer ${wrong?'wrong':token}`,'content-type':'application/json'},...(b?{body:JSON.stringify(b)}:{})});return {status:res.status,body:await res.json() as any};
   };
-  const act=async(id:string,b:object)=>{const current=(await call(id,'/office/team')).body.current;return call(id,'/office/team',{id:current.id,revision:current.revision,...b});};
+  const act=(id:string,b:object)=>fixtureHttpAction(call,id,b);
   assert.equal((await call(m,'/office/team',undefined,true)).status,401);
   const observer=floor.workers.spawn('desk-3','test','Observe the office',false,'agent','claude','sonnet');assert.ok(typeof observer!=='string');
   for(const route of ['/office/workers/tell','/office/workers/pr','/office/workers/helper'])assert.equal((await call(observer.id,route,{worker:m,prompt:'Unrelated task',pr:1})).status,403);

@@ -1,3 +1,4 @@
+import { taskCoordination, coordinationMetrics } from '../../shared/team-coordination';
 import './style.css';
 import type { Net } from '../../net';
 import type { AgentChoice } from '../../../shared/protocol';
@@ -69,6 +70,7 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
     body.replaceChildren(h('div.team-overview',{},h('strong',{},r.phase),h('span',{},`${r.workers.filter(w=>store.workers.has(w.workerId)).length} workers · limit ${r.maxWorkers}`)),h('h3',{},r.brief),h('ol',{},...r.requirements.map(v=>h('li',{},v))));
     if(r.error||state.error)body.append(h('p.error',{role:'alert'},r.error??state.error));
     if(r.masterId)body.append(h('section.team-card',{},h('h3',{},`Master · ${r.master.provider}/${r.master.model??'configured default'}`),h('p.muted',{},usage(r.masterId)),terminal(r.masterId,'Master terminal')));
+    body.append(coordinationMetrics(r));
     if(r.plan)body.append(details('plan','Master plan',h('pre',{},r.plan)));
     for(const t of r.tasks){
       const card=h('section.team-card',{},h('h3',{},`${t.title} · ${t.status}`),h('p',{},t.acceptance));
@@ -76,6 +78,7 @@ export function openMasterWorkers(net:Net,openWorker:(id:string)=>void) {
       if(t.reason)card.append(h('p',{},'Model choice: '+t.reason));
       card.append(details(t.id+'-assignment','Assignment',h('pre',{},t.instructions),h('p',{},'Files: '+t.files.join(', '))));
       for(const a of t.attempts)card.append(details(t.id+'-'+a.workerId,`${a.choice.provider}/${a.choice.model??'configured default'} · ${a.status}`,h('p',{},a.summary??`Terminal: ${store.workers.get(a.workerId)?.status??'unavailable'}`),h('pre',{},a.checks??''),h('p',{},a.review??''),h('p.muted',{},a.commits?.join(', ')??''),...(a.workerId?[h('p.muted',{},usage(a.workerId)),terminal(a.workerId,'Worker terminal')]:[])));
+      card.append(taskCoordination(t,r.phase));
       if(t.evidence)card.append(h('p',{},t.evidence));body.append(card);
     }
     if(!r.tasks.length)body.append(h('p.muted',{},'The master is inspecting the project and planning the work.'));

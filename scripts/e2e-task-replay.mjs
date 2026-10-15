@@ -1,3 +1,4 @@
+import { fixturePlan } from '../tests/support/team-contract.ts';
 // npm run build && node --import tsx scripts/e2e-task-replay.mjs
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs';
@@ -50,15 +51,20 @@ try {
  await page.waitForFunction(()=>document.querySelector('.team-overview')?.textContent.includes('running'));
  const master=state.current.masterId;
  const call=async(id,action)=>{
+  action=fixturePlan(action);
   const token=JSON.parse(readFileSync(path.join(dir,'.agent-office/workers.json'),'utf8')).find(w=>w.id===id).hookToken;
   const root=`http://127.0.0.1:${office.hookPort}/office/team?worker=${id}`,headers={authorization:`Bearer ${token}`,'content-type':'application/json'};
-  const r=await fetch(root,{headers});const current=(await r.json()).current;
+  const r=await fetch(root,{headers});const state=await r.json(),current=state.current;
+  if(action.action==='result'&&state.assignment?.assignmentId){
+    action={...action,assignmentId:state.assignment.assignmentId};
+    const ack=await fetch(root,{method:'POST',headers,body:JSON.stringify({action:'acknowledge',id:current.id,task:action.task,assignmentId:action.assignmentId})});assert.equal(ack.status,200);
+  }
   const res=await fetch(root,{method:'POST',headers,body:JSON.stringify({id:current.id,revision:current.revision,...action})});const value=await res.json();assert.equal(res.status,200,JSON.stringify(value));return value;
  };
  const task={id:'api',title:'Users API',instructions:'Implement typed users API; preserve the existing route authorization.',acceptance:'Scoped checks pass',files:['src/api/users.ts'],dependencies:[]};
  await call(master,{action:'plan',plan:'Delegate API implementation, inspect result evidence, integrate reviewed commits.',tasks:[task]});
  const dispatched=await call(master,{action:'dispatch',task:'api',choice:{provider:'claude',model:'haiku'},reason:'A scoped API task for the eligible model.'});
- const worker=dispatched.current.tasks[0].attempts[0].workerId;
+ const worker=dispatched.task.workerId;
  const submitted=await call(worker,{action:'result',task:'api',summary:'API contract inspected.',commits:[],checks:'Reported: scoped contract checks passed.'});
  const replay=()=>page.getByRole('dialog',{name:'Replay task',exact:true});
  const openReplay=async()=>{await page.getByRole('button',{name:'Replay',exact:true}).first().click();await replay().waitFor();};
@@ -78,7 +84,7 @@ try {
  const inspectToken=JSON.parse(readFileSync(path.join(dir,'.agent-office/workers.json'),'utf8')).find(w=>w.id===master).hookToken;
  const inspected=await (await fetch(`http://127.0.0.1:${office.hookPort}/office/team?worker=${master}`,{headers:{authorization:`Bearer ${inspectToken}`}})).json();
  assert.equal(inspected.current.revision,submitted.current.revision,'Replay inspection and filters never mutate activity state');
- assert.equal(inspected.current.workers.length,1,'Replay never launches participants');
+ assert.equal(inspected.current.tasks.filter(t=>t.workerId).length,1,'Replay never launches participants');
  check('Lite filters, chronological events, expandable reported evidence and missing details');
  await call(master,{action:'review',task:'api',accept:true,evidence:'Inspected contract report; no code commits to integrate.'});
  // Open result and all selected filters must survive a live state update.

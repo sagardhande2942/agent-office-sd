@@ -1,3 +1,4 @@
+import { fixturePlan } from '../tests/support/team-contract.ts';
 // npm run build && node --import tsx scripts/e2e-remote-master-workers.mjs
 import { WebSocket } from 'ws';
 import { Hosts } from '../src/server/hosts.ts';
@@ -63,14 +64,19 @@ try {
  await page.waitForFunction(()=>document.querySelector('.team-overview')?.textContent.includes('running'));
  const floor=host.floors.get('remote-team'),master=state.current.masterId;
  const call=async(id,action)=>{
+  action=fixturePlan(action);
   const token=JSON.parse(readFileSync(path.join(dir,'.agent-office/workers.json'),'utf8')).find(w=>w.id===id).hookToken;
   const root=`${hooks.url}/office/team?worker=${id}`,headers={authorization:`Bearer ${token}`,'content-type':'application/json'};
-  const r=await fetch(root,{headers});const current=(await r.json()).current;
+  const r=await fetch(root,{headers});const state=await r.json(),current=state.current;
+  if(action.action==='result'&&state.assignment?.assignmentId){
+    action={...action,assignmentId:state.assignment.assignmentId};
+    const ack=await fetch(root,{method:'POST',headers,body:JSON.stringify({action:'acknowledge',id:current.id,task:action.task,assignmentId:action.assignmentId})});assert.equal(ack.status,200);
+  }
   const res=await fetch(root,{method:'POST',headers,body:JSON.stringify({id:current.id,revision:current.revision,...action})});const value=await res.json();assert.equal(res.status,200,JSON.stringify(value));return value;
  };
  await call(master,{action:'plan',plan:'The master owns architecture, integration and the final PR. Independent API and frontend tasks go to eligible models; final checks wait for both accepted contributions.',tasks:[{id:'api',title:'Typed users API',instructions:'Implement the API in its own module and verify its contract.',acceptance:'Users API returns a typed user list; scoped tests pass.',files:['src/api/users.ts'],dependencies:[]},{id:'frontend',title:'Users screen',instructions:'Build the UI against the agreed API contract.',acceptance:'Screen handles loading, empty and populated responses.',files:['src/client/users.ts'],dependencies:[]},{id:'verify',title:'Final integration and one PR',instructions:'Review worker diffs, integrate, run required checks and create the only PR.',acceptance:'All requirements verified; one ready-for-review PR.',files:[],dependencies:['api','frontend']}]});
  const dispatched=await call(master,{action:'dispatch',task:'api',choice:{provider:'claude',model:'haiku'},reason:'A bounded API task is suitable for a cheaper eligible model.'});
- const worker=dispatched.current.tasks[0].attempts[0].workerId;
+ const worker=dispatched.task.workerId;
  await call(worker,{action:'result',task:'api',summary:'Contract research is ready for master review.',commits:[],checks:'Inspected existing route interfaces; implementation evidence is still required.'});
  await page.getByText('Typed users API · review',{exact:true}).waitFor();
  await page.screenshot({path:path.join(output,'activity-desktop.png')});

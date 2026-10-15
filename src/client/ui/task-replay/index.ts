@@ -7,7 +7,7 @@ import { h, openModal } from '../dom';
 export const EVENT_LABELS: Record<ReplayEventType, string> = {
   start: 'Activity started', plan: 'Plan submitted', assignment: 'Task assigned',
   result: 'Worker result', blocker: 'Blocker', retry: 'Retry', review: 'Review decision',
-  integration: 'Integration', pause: 'Paused', resume: 'Resumed', stop: 'Stopped', 'final-pr': 'Final PR',
+  integration: 'Integration', pause: 'Paused', resume: 'Resumed', stop: 'Stopped', 'final-pr': 'Final PR', progress:'Progress', correction:'Changes requested', replacement:'Task replacement',
 };
 export function safePrUrl(value?: string): string | undefined {
   if (!value) return;
