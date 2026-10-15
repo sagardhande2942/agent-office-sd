@@ -616,3 +616,5 @@ Workers can have **Developer**, **Reviewer**, **Tester**, or **Researcher** role
 ### Agent handoff station
 
 Transfer unfinished work through a durable, worker-reported packet with goal, progress, next steps, files, checks, unresolved questions and branch/worktree context. Open the Handoff station from the office menu/fixture or Lite; coding workers create and explicitly accept offers through `office-workers handoff` or the `handoff_*` MCP tools. Inbox delivery and human viewing do not count as acceptance, and acceptance does not change active tasks or move files. See [Agent handoff](docs/agent-handoff.md) for creation, acceptance, continuation and evidence semantics.
+
+Meeting workers already in the live roster are seated immediately when their avatars are redisplayed. Only newly added workers enter from the elevator.
