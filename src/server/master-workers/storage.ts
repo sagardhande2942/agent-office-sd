@@ -1,3 +1,4 @@
+import { validateCoordination } from './restore-coordination.js';
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { TeamConfig, TeamPreset, TeamRequest, TeamRun } from '../../shared/master-workers.js';
@@ -70,9 +71,10 @@ export function restored(raw: unknown, maxWorkers = 5): { current: TeamRun | nul
     for(const w of r.workers){text(w.workerId,'worker ID',80);choice(w.choice);}
     for(const t of r.tasks){
       text(t.id,'task ID',80);text(t.title,'title',240);text(t.instructions,'instructions');text(t.acceptance,'acceptance');
-      if(!Array.isArray(t.files)||!Array.isArray(t.dependencies)||!Array.isArray(t.attempts)||t.attempts.length>2||!['pending','running','review','takeover','done'].includes(t.status))throw Error('Invalid saved task');
+      if(!Array.isArray(t.files)||!Array.isArray(t.dependencies)||!Array.isArray(t.attempts)||t.attempts.length>2||!['pending','running','review','takeover','done','superseded'].includes(t.status))throw Error('Invalid saved task');
       for(const a of t.attempts){choice(a.choice);if(typeof a.workerId!=='string'||!['running','submitted','failed','rejected','accepted'].includes(a.status)||!Array.isArray(a.commits??[]))throw Error('Invalid saved attempt');}
     }
+    validateCoordination(r);
   }
   return value;
 }

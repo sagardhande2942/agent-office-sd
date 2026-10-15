@@ -1,3 +1,4 @@
+import { taskCoordination, coordinationMetrics } from '../team-coordination';
 import type { BossControl,BossState,BossItem } from '../../../shared/boss-mode/types';
 import { BOSS_CATEGORIES } from '../../../shared/boss-mode/types';
 import { h } from '../../ui/dom';
@@ -19,7 +20,7 @@ function idea(item:BossItem,actions:ViewActions){
 export function renderBossView(tab:BossTab,state:BossState,actions:ViewActions):HTMLElement {
   const page=h('div.boss-page'),run=state.team?.current??state.backlog.find(i=>i.id===state.active)?.run;
   if(tab==='Overview'){
-    const cards:[string,string,BossTab][]=[['Task progress',run?run.tasks.filter(t=>t.status==='done').length+' / '+run.tasks.length:'No active initiative','Work'],['Workers',run?run.workers.filter(w=>store.workers.has(w.workerId)).length+' / '+state.config.maxWorkers:'0 / '+state.config.maxWorkers,'Work'],['Daily starts',state.starts+' / '+state.config.dailyStarts,'Settings'],['Outstanding PRs',String(state.backlog.filter(i=>i.pr&&!i.merged&&store.pulls.items.some(p=>p.url===i.pr&&p.state==='OPEN')).length),'Delivery']];
+    const cards:[string,string,BossTab][]=[['Task progress',run?run.tasks.filter(t=>t.status==='done').length+' / '+run.tasks.filter(t=>t.status!=='superseded').length:'No active initiative','Work'],['Workers',run?run.workers.filter(w=>store.workers.has(w.workerId)).length+' / '+state.config.maxWorkers:'0 / '+state.config.maxWorkers,'Work'],['Daily starts',state.starts+' / '+state.config.dailyStarts,'Settings'],['Outstanding PRs',String(state.backlog.filter(i=>i.pr&&!i.merged&&store.pulls.items.some(p=>p.url===i.pr&&p.state==='OPEN')).length),'Delivery']];
     page.append(h('div.boss-hero',{},h('span.boss-eyebrow',{},'CONTINUOUS ENGINEERING'),h('h2',{},state.message),h('p',{},state.config.mission||'Set a mission and configure your team to begin.')),h('div.boss-metrics',{},...cards.map(([title,value,next])=>h('button.boss-metric',{onclick:()=>actions.tab(next)},h('span',{},title),h('strong',{},value)))),section('Current initiative',run?h('p',{},run.brief):empty('The boss will choose useful work aligned with your mission.')));
     const ids=new Set([run?.masterId,...(run?.workers.map(w=>w.workerId)??[]),state.discovery?.workerId]);
     const workers=[...store.workers.values()].filter(w=>w.bossMode||ids.has(w.id)),usage=workers.flatMap(w=>w.usage?[w.usage]:[]);
@@ -33,10 +34,11 @@ export function renderBossView(tab:BossTab,state:BossState,actions:ViewActions):
     if(store.me.admin)page.append(h('button.btn.danger',{onclick:()=>actions.control({action:'stop-now'})},'Stop now—keep work'));
     page.append(section('Boss activity',h('p',{},state.presence?.activity??state.message)));
     const master=run?.masterId??state.discovery?.workerId;if(master)page.append(h('button.btn',{disabled:!store.workers.has(master),onclick:()=>actions.terminal(master)},'Open boss terminal'));
+    if(run)page.append(coordinationMetrics(run),section('Master usage',h('p',{},(()=>{const u=store.workers.get(run.masterId??'')?.usage??run.masterUsage;return u?fmtTokens(tokensOf(u))+' tokens · '+(u.costKnown===false?'cost unavailable':fmtCost(u.cost))+(u.incomplete?' (partial)':''):'Usage unavailable';})())));
     if(run?.plan)page.append(section('Execution plan',h('pre',{},run.plan)));
     if(run?.tasks.length)page.append(section('Task dependencies',h('div.boss-dependency-map',{},...run.tasks.map(task=>h('div.boss-dependency-node',{},h('a',{href:'#boss-task-'+task.id},task.title),h('span.boss-badge',{},task.status),h('p.muted',{},task.dependencies.length?'After: '+task.dependencies.map(id=>run.tasks.find(t=>t.id===id)?.title??id).join(' → '):'Ready independently'))))));
     for(const task of run?.tasks??[]){const card=section(task.title,h('span.boss-badge',{},task.status),h('p',{},task.acceptance),h('p.muted',{},'Depends on: '+(task.dependencies.join(' → ')||'none')),h('details',{},h('summary',{},'Assignment'),h('pre',{},task.instructions)));
-      card.id='boss-task-'+task.id;
+      card.id='boss-task-'+task.id;card.append(taskCoordination(task,run!.phase));
       for(const attempt of task.attempts){card.append(h('div.boss-assignment',{},h('strong',{},attempt.choice.provider+' / '+(attempt.choice.model??'default')+(attempt.choice.effort?' · '+attempt.choice.effort:'')),h('p',{},attempt.status+' · '+(attempt.summary??'Working')),h('pre',{},attempt.review??attempt.checks??''),h('button.btn',{disabled:!store.workers.has(attempt.workerId),onclick:()=>actions.terminal(attempt.workerId)},'Worker terminal')));}page.append(card);}
     if(!run?.tasks.length)page.append(empty('Planning and assignments appear here when work starts.'));
   }else if(tab==='Delivery'){

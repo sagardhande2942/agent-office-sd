@@ -1,3 +1,4 @@
+import { observeWorktree, changedPaths } from './observation.js';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import type { Floor } from '../floor.js';
@@ -13,6 +14,8 @@ export function teamAdapter(floor: Floor, changed: () => void, beforeSpawn: () =
   };
   const adapter:TeamAdapter={
     list:()=>floor.workers.list(),
+    observe:(id,base)=>observeWorktree(checkout(id).dir,base),
+    changedPaths:(id,base,head)=>changedPaths(checkout(id).dir,base,head),
     spawn:(a,prompt,owner,base,role)=>{
       beforeSpawn();
       if(!floor.project.agentProviders.includes(a.provider)) throw Error(`Provider ${a.provider} is not installed on this floor`);

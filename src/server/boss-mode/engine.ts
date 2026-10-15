@@ -232,7 +232,7 @@ export class BossEngine {
       this.run.control('stop',this.data.owner);this.run=undefined;this.data.active=undefined;this.data.recovery=0;this.persist();return;
     }
     const label=this.data.draining?'Turning off—finishing '+item.title:'Working on '+item.title;
-    const verifying=run.tasks.length>0&&run.tasks.every(t=>t.status==='done')&&this.data.checks.at(-1)?.finishedAt===undefined&&this.data.checks.length>0;
+    const verifying=run.tasks.length>0&&run.tasks.every(t=>['done','superseded'].includes(t.status))&&this.data.checks.at(-1)?.finishedAt===undefined&&this.data.checks.length>0;
     this.status(this.data.draining?'draining':verifying?'verifying':(run.plan?'working':'planning'),verifying?'Running independent verification':label);
   }
   private async abandon(reason:string) {

@@ -6,8 +6,9 @@ export async function main(argv,io={}) {
   const out=io.out??console.log,err=io.err??console.error;
   try {
     if(argv.length===1&&argv[0]==='--help'){out(JSON.stringify(TEAM_TOOLS,null,2));return 0;}
-    if(argv.length!==1||!['state','action'].includes(argv[0]))throw Error('Use state, action (JSON stdin), or --help');
+    if(!['state','action'].includes(argv[0]) || (argv[0]==='action'&&argv.length!==1) || argv.length>3)throw Error('Use state [summary|plan|task TASK_ID|history OFFSET], action (JSON stdin), or --help');
     let args={};
+    if(argv[0]==='state'&&argv[1]){args.view=argv[1];if(argv[1]==='task')args.task=argv[2];if(argv[1]==='history'&&argv[2])args.offset=Number(argv[2]);}
     if(argv[0]==='action') {
       const read=io.read??(async()=>{let body='';for await(const chunk of process.stdin){body+=chunk;if(body.length>200000)throw Error('Input exceeds 200,000 characters');}return body;});
       const body=await read();if(body.length>200000)throw Error('Input exceeds 200,000 characters');args=JSON.parse(body);

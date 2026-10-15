@@ -615,3 +615,9 @@ Workers can have **Developer**, **Reviewer**, **Tester**, or **Researcher** role
 ### Agent handoff station
 
 Transfer unfinished work through a durable, worker-reported packet with goal, progress, next steps, files, checks, unresolved questions and branch/worktree context. Open the Handoff station from the office menu/fixture or Lite; coding workers create and explicitly accept offers through `office-workers handoff` or the `handoff_*` MCP tools. Inbox delivery and human viewing do not count as acceptance, and acceptance does not change active tasks or move files. See [Agent handoff](docs/agent-handoff.md) for creation, acceptance, continuation and evidence semantics.
+
+### Efficient master/worker coordination
+
+Master / Workers and Boss mode give workers bounded implementation specifications with settled interfaces, concrete checks and explicit write scope. The master receives compact state and exception notices; routine progress monitoring runs in code. Workers report milestones, and overdue reports remain visible as progress unknown. Review findings can return to the same worker for one correction round before retry or takeover. Master diff review, integration ancestry and final checks still gate completion.
+
+See [Master / Workers](docs/master-workers.md) for specifications, progress tools, recovery limits and usage accounting, and [Boss mode](docs/boss-mode.md) for independent verification. Agent-response bytes are not measured tokens; update both office and remote hosts for the new CLI/MCP contract.

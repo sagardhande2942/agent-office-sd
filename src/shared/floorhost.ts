@@ -56,6 +56,8 @@ export interface FloorReady {
   /** Supports shared screening-room controls and bounded screenshot fetching. */
   cinema?: boolean;
   masterWorkers?: boolean;
+  /** Compact team tools, task specifications and progress protocol. */
+  teamCoordination?: number;
   lore?: boolean;
   curator?: boolean;
   bossMode?: boolean;

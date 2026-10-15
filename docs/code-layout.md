@@ -129,3 +129,7 @@ Worker appearance factories register through `client/world/character/appearance.
 ## Continuous Boss mode
 
 `src/server/boss-mode/` owns the persisted scheduler, worker lifecycle, independent checks, delivery monitoring, and floor-host bridge. It registers through worker features, WebSocket handlers, hooks, and TUI commands. `team-sessions.ts` lets its initiatives reuse the team coordinator without changing the regular Master / Workers feature. Shared configuration and protocol types live in `src/shared/boss-mode/`; the client state slice, `features/boss-mode/`, and shared console register alongside other modules. See [Boss mode](boss-mode.md) for operation and recovery.
+
+### Team coordination contracts
+
+`server/master-workers/` separates contract validation, role-specific agent views, compact transport, assignment monitoring, asynchronous Git observations, recovery and restored-state validation from the coordinator. Browser snapshots retain complete state while CLI/MCP endpoints use compact projections. Progress identities and sequence numbers are independent of orchestration revisions. `shared/team-coordination.ts` holds the supporting types; `client/shared/team-coordination.ts` renders the same evidence in ordinary teams and Boss mode. Extend the existing team/session registries rather than adding orchestration to entrypoints or worker-manager state.

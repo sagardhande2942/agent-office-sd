@@ -1,5 +1,5 @@
 /** Structured evidence only: never terminal streams or executable actions. */
-export type ReplayEventType = 'start' | 'plan' | 'assignment' | 'result' | 'blocker' | 'retry' | 'review' | 'integration' | 'pause' | 'resume' | 'stop' | 'final-pr';
+export type ReplayEventType = 'start' | 'plan' | 'assignment' | 'result' | 'blocker' | 'retry' | 'review' | 'integration' | 'pause' | 'resume' | 'stop' | 'final-pr' | 'progress' | 'correction' | 'replacement';
 export interface ReplayDetails {
   instructions?: string;
   message?: string;

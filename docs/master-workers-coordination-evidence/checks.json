@@ -1,0 +1,42 @@
+{
+  "checks": [
+    {
+      "name": "Preset editing persists on the server without losing the task draft",
+      "status": "passed"
+    },
+    {
+      "name": "Preset duplicate/delete and loaded explicit model settings",
+      "status": "passed"
+    },
+    {
+      "name": "Mobile layout stays within the viewport",
+      "status": "passed"
+    },
+    {
+      "name": "Healthy progress, deduplicated overdue alerts and explicit blockers are visible",
+      "status": "passed"
+    },
+    {
+      "name": "Review feedback returns to the same worker and preserves prior evidence",
+      "status": "passed"
+    },
+    {
+      "name": "Real team setup, task graph, worker result and pause/resume render correctly",
+      "status": "passed"
+    },
+    {
+      "name": "Shared game menu exposes the mode; Esc and close restore player controls without another click",
+      "status": "passed"
+    },
+    {
+      "name": "No browser runtime errors",
+      "status": "passed"
+    }
+  ],
+  "screenshots": [
+    "progress-healthy.png",
+    "progress-overdue.png",
+    "progress-blocked.png",
+    "review-correction.png"
+  ]
+}

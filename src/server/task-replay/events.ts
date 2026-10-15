@@ -4,7 +4,8 @@ import type { AgentChoice } from '../../shared/protocol.js';
 import { recordEvent } from './recorder.js';
 import { recordedText, shorten } from './sanitize.js';
 
-type TaskDef = Pick<TeamTask, 'id' | 'title' | 'instructions' | 'acceptance' | 'files' | 'dependencies'>;
+type TaskDef = Pick<TeamTask, 'id' | 'title' | 'instructions' | 'acceptance' | 'files' | 'dependencies' | 'specification'>;
+const recordedSpecification=(s:TaskDef['specification'])=>s?JSON.parse(JSON.stringify(s,(_key,value)=>typeof value==='string'?recordedText(value).text:value)):undefined;
 
 function modelOf(choice: AgentChoice): string {
   return `${planModelIdentity(choice.provider, choice.model)}${choice.effort ? ` @ ${choice.effort}` : ''}`;
@@ -16,7 +17,7 @@ export function recordStart(run: TeamRun, req: TeamRequest) {
 }
 
 export function recordPlan(run: TeamRun, plan: string, tasks: TaskDef[]) {
-  const definitions = JSON.stringify(tasks.map((t) => ({ id: t.id, title: recordedText(t.title).text, instructions: recordedText(t.instructions).text, acceptance: recordedText(t.acceptance).text, files: t.files.map(f => recordedText(f).text), dependencies: t.dependencies })));
+  const definitions = JSON.stringify(tasks.map((t) => ({ id: t.id, title: recordedText(t.title).text, instructions: recordedText(t.instructions).text, acceptance: recordedText(t.acceptance).text, files: t.files.map(f => recordedText(f).text), dependencies: t.dependencies, specification:recordedSpecification(t.specification) })));
   return recordEvent(run, { type: 'plan', participantId: run.masterId, summary: `Plan published with ${tasks.length} task${tasks.length === 1 ? '' : 's'}`, details: { instructions: plan, message: `Task definitions: ${definitions}` } });
 }
 
@@ -31,7 +32,7 @@ export interface ReplayDispatch {
 function dispatchDetails(info: ReplayDispatch) {
   return {
     instructions: info.task.instructions,
-    message: [`Attempt: ${info.attempt}`, `Model: ${modelOf(info.choice)}`, `Reason: ${info.reason}`, `Acceptance: ${info.task.acceptance}`, `Files: ${info.task.files.join(', ') || 'none'}`, `Dependencies: ${info.task.dependencies.join(', ') || 'none'}`].join('\n'),
+    message: [`Attempt: ${info.attempt}`, `Model: ${modelOf(info.choice)}`, `Reason: ${info.reason}`, `Acceptance: ${info.task.acceptance}`, `Files: ${info.task.files.join(', ') || 'none'}`, `Dependencies: ${info.task.dependencies.join(', ') || 'none'}`, ...(info.task.specification?[`Specification: ${JSON.stringify(recordedSpecification(info.task.specification))}`]:[])].join('\n'),
   };
 }
 

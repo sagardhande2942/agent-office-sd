@@ -103,7 +103,7 @@ export class BossService {
     };
     const team=new TeamCoordinator(path.join(this.floor.dir,'.agent-office','boss-team-'+item.id+'.json'),new TeamPresets(path.join(this.floor.dir,'.agent-office','boss-team-presets.json')),base,10);
     this.runs.set(item.id,team);
-    this.disposers.push(registerTeamSession(this.floor,{member:id=>team.member(id),state:()=>team.state(),action:async(id,body)=>{
+    this.disposers.push(registerTeamSession(this.floor,{member:id=>team.member(id),state:()=>team.state(),recordResponse:bytes=>team.recordResponse(bytes),action:async(id,body)=>{
       const state=this.engine.state();if(!state.enabled&&!state.draining)throw Error('Boss is off; turn on to continue preserved work');
       const error=this.allowed(config,owner);if(error)throw Error(error);
       if(body.action==='review'||body.action==='cancel'){

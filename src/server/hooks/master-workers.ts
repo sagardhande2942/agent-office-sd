@@ -1,3 +1,4 @@
+import { readTeamAgent, actTeamAgent } from '../master-workers/transport.js';
 import { workerTeamSession } from '../team-sessions.js';
 import type http from 'node:http';
 import type { Ctx } from '../office/context.js';
@@ -16,8 +17,8 @@ export async function workerTeam(ctx:Ctx,req:http.IncomingMessage,res:http.Serve
   if(endpoint) {
     try {
       if(!role) throw Error('Not a participant in this activity');
-      if(req.method==='GET') send(res,200,s.state());
-      else if(req.method==='POST') send(res,200,await s.action(id,JSON.parse((await readBody(req))||'{}')));
+      if(req.method==='GET') send(res,200,readTeamAgent(s,id,url));
+      else if(req.method==='POST') send(res,200,await actTeamAgent(s,id,JSON.parse((await readBody(req))||'{}')));
       else send(res,405,{error:'Use GET state or POST action'});
     } catch(e) { send(res,400,{error:(e as Error).message}); } return true;
   }

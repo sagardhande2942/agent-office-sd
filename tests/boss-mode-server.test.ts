@@ -1,3 +1,4 @@
+import { fixtureHttpAction } from './support/team-contract.js';
 import { idleAgent } from './fixtures/idle-agent.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +32,7 @@ test('real Boss service dispatches ten workers, enforces roles, independently ch
     await boss.control({action:'on'});await boss.tick();let state=boss.state();const discovery=state.discovery!.workerId!;
     const response=await call(discovery,'/office/workers/boss',{action:'propose',revision:state.revision,items:[{title:'Inspect and document modules',problem:'Module roles need documentation',evidence:'README has no module inventory',benefit:'Clear maintenance responsibilities',category:'documentation',priority:90,dependencies:[],acceptance:['Inspect all ten areas and document the result']}],summary:'Identified a documented maintenance task'});
     assert.equal(response.status,200,JSON.stringify(response.body));await boss.tick();await boss.tick();state=boss.state();const master=state.team!.current!.masterId!;
-    const act=async(actor:string,body:Record<string,unknown>)=>{const r=(await call(master,'/office/team')).body.current;return call(actor,'/office/team',{id:r.id,revision:r.revision,...body});};
+    const act=(actor:string,body:Record<string,unknown>)=>fixtureHttpAction(call,actor,body);
     assert.equal((await act(master,{action:'plan',plan:'Inspect ten independent areas',tasks:Array.from({length:10},(_,i)=>({id:'area-'+i,title:'Inspect area '+i,instructions:'Inspect README and report maintenance observations; research only',acceptance:'Document observed evidence',files:[],dependencies:[]}))})).status,200);
     for(let i=0;i<10;i++){const result=await act(master,{action:'dispatch',task:'area-'+i,choice:{provider:'codex',model:'gpt-5.4-mini'},reason:'Independent research assignment'});assert.equal(result.status,200,JSON.stringify(result.body));}
     state=boss.state();assert.equal(state.team!.current!.workers.length,10);assert.equal(floor.workers.list().length,11);

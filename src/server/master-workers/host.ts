@@ -1,3 +1,4 @@
+import { readTeamAgent, actTeamAgent } from './transport.js';
 import { handoffInbox } from '../handoff/service.js';
 import { workerTeamSession } from '../team-sessions.js';
 import path from 'node:path';
@@ -75,8 +76,8 @@ export class HostTeams {
     if (endpoint) {
       try {
         if (!role) throw Error('Not a participant in this activity');
-        if (req.method === 'GET') send(res, 200, run.state());
-        else if (req.method === 'POST') send(res, 200, await run.action(id, JSON.parse(await readBody(req)) as TeamAction));
+        if (req.method === 'GET') send(res, 200, readTeamAgent(run,id,url));
+        else if (req.method === 'POST') send(res, 200, await actTeamAgent(run,id,JSON.parse(await readBody(req)) as TeamAction));
         else send(res, 405, { error: 'Use GET state or POST action' });
       } catch (e) { send(res, 400, { error: (e as Error).message }); }
       return true;

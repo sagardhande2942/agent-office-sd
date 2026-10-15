@@ -84,3 +84,11 @@ Discovery receives outstanding instructions when its terminal becomes idle. Fail
 Hosted Boss mode shows **Connecting to floor host…** or **Reconnecting to floor host…** while the host connects and supplies its live Boss snapshot. The switch shows WAIT and write controls remain disabled; steering drafts and cached work remain available. Controls recover automatically when state arrives. The update-host message appears only when a connected host explicitly lacks Boss support. Refreshing the browser does not speed up host startup; a genuinely old host needs updated code and a restart.
 
 Verify the readiness UI with `node --import tsx scripts/e2e-boss-connection.mjs` after building. Set `CHROMIUM_PATH` and optionally `BOSS_CONNECTION_ARTIFACTS`; the fixture captures connecting and unsupported states and checks automatic recovery without starting agent jobs.
+
+## Bounded delegation and master cost
+
+Boss initiatives use the same task specifications, compact role-specific team tools, write-scope checks and recovery limits as [Master / Workers](master-workers.md). The boss settles architecture and interfaces, delegates one coherent outcome per task, and reviews actual changes and check evidence. A same-worker correction round can address review findings before alternate-model recovery or takeover.
+
+Workers acknowledge assignments and aim for progress updates every two minutes when tools allow. Server code samples Git activity approximately once per minute; routine updates do not wake the boss. Four minutes without a report means progress unknown. Blockers, overdue updates and exceeded estimates queue deduplicated alerts at safe turn boundaries; elapsed time never automatically cancels an assignment. Work shows report ages, observations, alert delivery/responses and correction evidence. Pause/restart preserves work and resets the reporting window on resume.
+
+Master usage appears separately on Work. Response-byte counters are not token measurements, and cost savings are not guaranteed. Existing independently executed final commands remain mandatory and associated with the checked commit; compact summaries never replace review or verification. Rebuild both office and floor hosts together for the updated team CLI/MCP contracts.

@@ -8,7 +8,7 @@ export const REPLAY_COMMITS_LIMIT = 20;
 export const REPLAY_MISSING_LIMIT = 8;
 
 const TEXT_KEYS = ['instructions', 'message', 'evidence', 'reviewReason', 'reportedChecks', 'verifiedChecks', 'pr'] as const;
-const EVENT_TYPES: readonly ReplayEventType[] = ['start', 'plan', 'assignment', 'result', 'blocker', 'retry', 'review', 'integration', 'pause', 'resume', 'stop', 'final-pr'];
+const EVENT_TYPES: readonly ReplayEventType[] = ['start', 'plan', 'assignment', 'result', 'blocker', 'retry', 'review', 'integration', 'pause', 'resume', 'stop', 'final-pr', 'progress', 'correction', 'replacement'];
 const RUN_SCOPED: readonly ReplayEventType[] = ['start', 'plan'];
 
 export interface ReplayInput {

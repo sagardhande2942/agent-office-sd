@@ -38,3 +38,10 @@ test('unknown and disconnected host capabilities produce connecting state, not a
   reachable=true;await assert.rejects(boss.control({action:'on'}),/Update the floor host/);
   assert.equal(boss.state().connection,'unsupported');assert.equal(calls,0);
 });
+
+test('hosts without the coordination contract reject activation but retain stop controls',async()=>{
+ const calls:string[]=[];
+ const boss=new RemoteBoss(async(type)=>{calls.push(type);return bossInitial();},()=>true,()=>true,()=>false);
+ await assert.rejects(boss.control({action:'on'}),/Update the floor host.*compact team tools/);
+ assert.equal(calls.length,0);await boss.control({action:'stop-now'});assert.deepEqual(calls,['boss.control']);
+});

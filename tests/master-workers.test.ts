@@ -1,3 +1,4 @@
+import { fixtureAction } from './support/team-contract.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
@@ -14,9 +15,9 @@ const task=(id='one',dependencies:string[]=[])=>({id,title:`Task ${id}`,instruct
 function fixture(maxWorkers=5) {
  const dir=mkdtempSync(path.join(tmpdir(),'office-team-')),file=path.join(dir,'activity.json'),presets=new TeamPresets(path.join(dir,'presets.json'));
  const workers:WorkerInfo[]=[],messages:string[]=[],stopped:string[]=[],integrated=new Set<string>();let next=0,verified=0;
- const io:TeamAdapter={list:()=>workers,spawn:(a,prompt,_owner,base,role)=>{const id=`w${++next}`;const w={id,provider:a.provider,model:a.model,effort:a.effort,status:'working',prompt,masterWorkers:role,worktree:{path:id,branch:`office/${id}`,base:base?.commit??'a'.repeat(40)}} as WorkerInfo;workers.push(w);return w;},prompt:(id,p)=>{messages.push(p);workers.find(w=>w.id===id)!.status='working';return undefined;},stop:id=>{stopped.push(id);workers.splice(workers.findIndex(w=>w.id===id),1);},head:()=> 'a'.repeat(40),commits:(_id,_base,cs)=>cs,contains:(_id,cs)=>cs.every(c=>integrated.has(c)),prepare:()=>true,verifyPr:async()=>{verified++;},changed:()=>{}};
+ const io:TeamAdapter={list:()=>workers,spawn:(a,prompt,_owner,base,role)=>{const id=`w${++next}`;const w={id,provider:a.provider,model:a.model,effort:a.effort,status:'working',prompt,masterWorkers:role,worktree:{path:id,branch:`office/${id}`,base:base?.commit??'a'.repeat(40)}} as WorkerInfo;workers.push(w);return w;},prompt:(id,p)=>{messages.push(p);workers.find(w=>w.id===id)!.status='working';return undefined;},stop:id=>{stopped.push(id);workers.splice(workers.findIndex(w=>w.id===id),1);},head:()=> 'a'.repeat(40),commits:(_id,_base,cs)=>cs,contains:(_id,cs)=>cs.every(c=>integrated.has(c)),prepare:()=>true,verifyPr:async()=>{verified++;},changedPaths:()=>[],changed:()=>{}};
  let s=new TeamCoordinator(file,presets,io);s.start({...request,maxWorkers});
- const action=(actor:string,b:Record<string,unknown>)=>{const r=s.state().current!;return s.action(actor,{id:r.id,revision:r.revision,...b} as TeamAction);};
+ const action=(actor:string,b:Record<string,unknown>)=>fixtureAction(s,actor,b);
  const plan=()=>action(s.state().current!.masterId!,{action:'plan',plan:'Split independent code and integration work, then verify and create one PR',tasks:[task(),task('two',['one'])]});
  return {dir,file,presets,workers,messages,stopped,integrated,action,plan,get s(){return s;},get verified(){return verified;},restart:()=>{s=new TeamCoordinator(file,presets,io);},dispose:()=>rmSync(dir,{recursive:true,force:true})};
 }
@@ -126,4 +127,18 @@ test('team presets preserve configured model defaults and reject duplicate defau
   assert.deepEqual(loaded.master,{provider:'claude'});assert.deepEqual(loaded.models,[{provider:'codex'},{provider:'claude'}]);
   assert.throws(()=>config({...request,models:[{provider:'codex'},{provider:'codex'}]}),/distinct/);
  }finally{f.dispose();}
+});
+
+test('team CLI requests explicit compact detail views and refuses an old host contract',async()=>{
+ const output:string[]=[],errors:string[]=[];let requested='';
+ const io={env:{AGENT_OFFICE_HOOK_URL:'http://127.0.0.1:1234',AGENT_OFFICE_WORKER_ID:'worker',AGENT_OFFICE_HOOK_TOKEN:'secret'},out:(v:string)=>output.push(v),err:(v:string)=>errors.push(v),fetch:async(url:string)=>{requested=url;return new Response(JSON.stringify({contractVersion:1,current:{id:'activity',revision:2},task:{id:'api'}}));}};
+ assert.equal(await main(['state','task','api'],io),0);assert.match(requested,/view=task/);assert.match(requested,/task=api/);assert.equal(JSON.parse(output[0]).task.id,'api');
+ assert.equal(await main(['state'],{...io,fetch:async()=>new Response(JSON.stringify({current:{id:'old'}}))}),1);assert.match(errors[0],/Update the floor host/);
+});
+
+test('remote team activation requires the coordination capability while stop remains available',async()=>{
+ const { RemoteTeams }=await import('../src/server/master-workers/remote.js');
+ const calls:string[]=[];const remote=new RemoteTeams(async(t)=>{calls.push(t);},()=>true,()=>false);
+ assert.match((await remote.start(request))!,/Update the floor host/);assert.match((await remote.control('resume'))!,/Update the floor host/);assert.deepEqual(calls,[]);
+ await remote.control('stop');assert.deepEqual(calls,['master-workers.control']);
 });
