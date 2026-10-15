@@ -1,4 +1,5 @@
 import { helperCard } from './helper-card';
+import { ArrivalRoster } from './arrival-roster';
 import { HelperWalk } from '../../world/helper';
 import { helperSpot, helperHost } from '../../../shared/helper';
 import { DESKS } from '../../../shared/layout';
@@ -115,6 +116,7 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   );
   /** Set while a floor's workers arrive with it (a welcome, an elevator ride): they're in their seats already. */
   let seatedAlready = false;
+  const arrivalRoster = new ArrivalRoster();
   /** A floor arriving (a welcome, a floor.enter): nobody's still leaving or coming in, and its workers are seated already. */
   function seatedOnArrival() {
     departures.clear();
@@ -124,6 +126,7 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   }
 
   function syncWorkers() {
+    const newWorkers = arrivalRoster.observe(store.floor, store.workers.keys());
     const world = ctx.world();
     const court = parts.worlds.court();
     for (const w of store.workers.values()) {
@@ -175,7 +178,7 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
         const beside = desk.def.station ? new THREE.Vector3(0.62, 0.9, 0) : new THREE.Vector3(0.64, 0.5, -0.1);
         model.setPropSpot(model.root.worldToLocal(desk.laptopAnchor.localToWorld(beside)));
         // Called to a meeting just now: out of the elevator and over to the table, one after another.
-        if (desk.def.room && !seatedAlready) arrivals.add(model, desk);
+        if (desk.def.room && !seatedAlready && newWorkers.has(w.id)) arrivals.add(model, desk);
         // In the castle, a worker at the tables gets up and walks about (see Court): a new one runs in to its seat.
         // In the office it's there for breaks (see features/breaks), and a new one is at its desk as ever.
         else if (court && inCourt(w)) court.add(w.id, model, desk, seatedAlready || plan().style === 'office' ? undefined : cameFrom(w));

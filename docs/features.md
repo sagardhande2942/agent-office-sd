@@ -2,6 +2,8 @@
 
 Everything in the office, room by room. Back to the [README](../README.md).
 
+Redisplaying an existing meeting worker places it directly in its chair. Elevator entrances are reserved for newly added workers; changing the viewer's scene does not call the same worker into the meeting again.
+
 The plant beside the basketball uses a [custom GLB](#custom-plant-model).
 
 ## Model rendering
