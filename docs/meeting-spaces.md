@@ -33,10 +33,18 @@ Each running meeting in a Git project gets its own existing meeting worktree. Ag
 
 A floor supports up to **16 spaces**, with names of **1–60 characters** unique on that floor. Each space uses the existing bounded history of 20 earlier meetings. For non-Git projects, only one space may run a meeting at a time to avoid concurrent writes into one checkout.
 
-Meeting spaces run on **local floors in the 2D and 3D office**. Hosted-floor meeting execution retains its existing refusal (meetings require participants in one building); creating or renaming spaces on a hosted floor reports that a local floor is required. Lite does not have the meeting-room workflow.
+Meeting spaces run on **local and remote floors in the 2D and 3D office**. Update both the office and the floor host to a version supporting meeting spaces, then restart/reconnect the host. Older hosts report “Update the floor host to support meeting spaces” when asked to run meeting commands. Lite does not have the meeting-room workflow.
+
+On a remote floor, create, rename, start, finish, stop, and clear run on its host machine. Its agents use that machine’s installed providers and sign-ins, and its Git checkout supplies the meeting worktrees. The office never opens the remote checkout or sends account credentials. Both the office worker budget and the host’s configured seat limit apply to a start; a meeting needs room for all of its participants. Host-local authenticated inbox requests feed the same round gates, saved notes, and live Messages view.
+
+![Meeting spaces running on a remote floor](images/remote-meeting-spaces.png)
+
+Named spaces and their state live on the host’s disk. Switching spaces or closing the meeting window does not stop a remote meeting. Connection loss uses the existing floor-host reconnect and worker recovery behavior; meeting coordination resumes when the host reconnects, and viewers receive refreshed state. Restarting the host restores saved meetings and workers using that same recovery behavior. Viewer selection remains personal and remembered per floor.
 
 Space labels live in `.agent-office/meeting-spaces.json`. Main meeting uses the original `.agent-office/meetings.json`; other spaces keep their meeting state and archived notes under `.agent-office/meeting-spaces/<id>/`. Space names are display labels; generated IDs determine paths.
 
 ## Verification
 
 Run `npm run typecheck`, `npm run build`, and `npm test`. Focused coverage is in `tests/meeting-spaces.test.ts` and the existing meeting tests. Run `node --import tsx scripts/e2e-meeting-spaces.mjs` against the production bundle for real-server browser checks with idle fixture agents, independent worktrees, two viewers, mobile screenshots, and Esc/✕ control restoration. Set `CHROMIUM_PATH` to an installed Chromium executable if needed. Screenshots and `checks.json` go to `/tmp/agent-office-meeting-spaces-evidence` (override with `MEETING_SPACES_ARTIFACTS`). No paid model calls are used by the harness.
+
+For remote execution, run `node --import tsx scripts/e2e-remote-meeting-spaces.mjs`. It pairs a real host, runs two meetings using idle agents, checks independent viewers, host capacity, authenticated messages and completion gates, finish/stop/clear isolation, and host restart persistence. Screenshots and `checks.json` go to `/tmp/agent-office-remote-meeting-spaces-evidence` (override with `MEETING_SPACES_ARTIFACTS`).

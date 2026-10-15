@@ -275,6 +275,8 @@ export interface FloorTv {
 }
 
 export interface FloorMeetings {
+  create(name: unknown): Awaitable<string | undefined>;
+  rename(id: string, name: unknown): Awaitable<string | undefined>;
   finishAnyway(id: string, by: string): Awaitable<string | undefined>;
   start(req: MeetingRequest, by: string, owner?: string): Awaitable<string | undefined>;
   stop(by: string, spaceId?: string): Awaitable<string | undefined>;

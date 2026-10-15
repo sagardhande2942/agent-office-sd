@@ -135,3 +135,5 @@ Worker appearance factories register through `client/world/character/appearance.
 `server/meeting-spaces/` composes independent instances of the existing meeting workflow. Its catalogue and per-space state persist separately; legacy `meetings.json` remains the Main meeting. The worker seat seam scopes occupancy by meeting identity while retaining the shared worker runtime and physical layout.
 
 `client/features/meeting-spaces/` joins `MEETING_WINDOW_EXTENSIONS` to add the selector and scope meeting commands. Its state slice keeps the full space catalogue and projects the selected meeting locally. `WORKER_VISIBILITY` lets features filter scene and desk projections without deleting background workers from the live roster.
+
+Remote meeting spaces use `server/meeting-spaces/remote.ts` for the proxy, `office.ts` for office capacity reservations and local/remote sign-in routing, and `host.ts` for host command dispatch and the authenticated persistent inbox. They register on the existing host dispatcher and floor action surface. The host announces `meetingSpaces`, streams meeting and communications snapshots, and runs the existing engines against its own checkout.

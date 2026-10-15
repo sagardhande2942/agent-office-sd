@@ -1,3 +1,4 @@
+import { startMeeting } from '../../meeting-spaces/office.js';
 // The meeting room: calling a meeting, stopping it, and clearing the table.
 import { isAgentEffort, isAgentProvider, type MeetingClientMsg, type MeetingRequest } from '../../../shared/protocol.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
@@ -32,7 +33,7 @@ export const meetingHandlers = {
       model: msg.model === undefined ? undefined : str(msg.model, OPEN_CODE_MODEL_MAX + 1),
       effort: isAgentEffort(msg.effort) ? msg.effort : undefined,
     };
-    ctx.withSignIn(c, ctx.claudeFor(request.provider ?? floor.workers.officeDefault.provider), () => ctx.withFreshBase(c, floor, async () => ctx.warn(c, await floor.meetings.start(request, who, c.accountId))));
+    startMeeting(ctx, c, floor, request, who);
   },
   async 'meeting.stop'(ctx, c, msg) {
     const who = c.peer.name;
