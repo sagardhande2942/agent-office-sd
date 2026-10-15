@@ -142,3 +142,5 @@ The animated peace lily model is about 266 KB and is preloaded with the office a
 The **☰ Office menu** has a bounded, scrollable action list. Search finds actions and display settings across all categories; **Open**, **Together**, **Office**, and **Display** narrow browsing. **Pinned** shows your saved favorites, and the pin beside each action adds it to the top bar. Clear search to return to your selected category. Arrow keys navigate results; **Tab**, **Esc**, or the top-right **✕** closes the menu and restores mouse-look.
 
 Menu browser checks: after `npm run build`, run `node --import tsx scripts/e2e-menu.mjs`. Screenshots and checks are saved to `/tmp/agent-office-menu-evidence` (override with `MENU_ARTIFACTS`).
+
+- **Meeting reality portals.** The Reality Anchor previews another meeting’s live roster and output through a doorway. Tune a destination and walk across the portal, or enter immediately with an accessible button. Selection stays personal; other meetings keep working. The original selector remains under Instant switch. See [Meeting reality portals](meeting-reality-portals.md).

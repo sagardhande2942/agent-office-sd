@@ -1,3 +1,4 @@
+import { MEETING_SPACE_NAVIGATION } from '../../ui/meeting-space-navigation';
 import './style.css';
 import type { Ctx } from '../../core/context';
 import { store } from '../../state';
@@ -11,6 +12,8 @@ export function installMeetingSpaces(_ctx: Ctx) {
     command: msg => msg.t === 'meeting.finish' ? msg : { ...msg, spaceId: store.selectedMeetingSpace },
     mount(net, switched) {
       const select = h('select', { 'aria-label': 'Meeting space' });
+      const current = h('span.meeting-space-current');
+      const navigate = h('button.btn.meeting-portal-launch', { type: 'button', onclick: () => MEETING_SPACE_NAVIGATION.open?.() }, 'Reality Anchor');
       const attention = h('span.meeting-space-attention', { role: 'status' });
       const name = h('input', { type: 'text', maxlength: 60, placeholder: 'Name your meeting space', 'aria-label': 'Space name' });
       const editor = h('form.meeting-space-editor', { hidden: true });
@@ -19,6 +22,9 @@ export function installMeetingSpaces(_ctx: Ctx) {
         const spaces = store.meetingSpaces.spaces;
         if (!spaces) { element.hidden = true; return; }
         element.hidden = false;
+        current.textContent = spaces.find(s => s.id === store.selectedMeetingSpace)?.name ?? '';
+        navigate.hidden = !MEETING_SPACE_NAVIGATION.open;
+        navigate.textContent = MEETING_SPACE_NAVIGATION.label ?? 'Switch space';
         if (pending) {
           const created = spaces.find(s => s.name === pending!.name && !pending!.ids.has(s.id));
           if (created) { pending = undefined; selectMeetingSpace(store, created.id); switched(); }
@@ -49,7 +55,7 @@ export function installMeetingSpaces(_ctx: Ctx) {
         editor.hidden = true;
       });
       const element = h('section.meeting-spaces', { 'aria-label': 'Meeting spaces' },
-        h('div.meeting-space-controls', {}, h('label', {}, 'Meeting space', select),
+        h('div.meeting-space-controls', {}, current, navigate, h('details.meeting-space-quick', {}, h('summary', {}, 'Instant switch'), h('label', {}, 'Meeting space', select)),
           h('button.btn', { type: 'button', onclick: () => edit('create') }, '+ New space'),
           h('button.btn', { type: 'button', onclick: () => edit('rename') }, 'Rename')),
         editor, attention,
