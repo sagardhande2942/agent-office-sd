@@ -10,5 +10,6 @@ summary: "Knowledge about architecture."
 - [floor-ownership-and-auth.md](floor-ownership-and-auth.md) — Hosted floors execute on their checkout owner; route through host RPCs and recheck worker identity and role after asynchronous request reads. [tags: remote, auth, workers]
 - [room-light-settings.md](room-light-settings.md) — How the switch by the TV dims and warms the office in three settings, where the numbers live, and why the sky computes them fresh each frame.
 - [state-lifecycle-reference.md](state-lifecycle-reference.md) — A state lifecycle map for checklists, knowledge, communications, task briefs, worker roles and Boss initiatives. [tags: state, workers, persistence]
+- [web-displays.md](web-displays.md) — Web displays use their own registries, central floor/map configuration, native isolated frames and an explicit cross-origin exit/fallback contract.
 - [worker-roles.md](worker-roles.md) — Specialized worker responsibilities use the prompt-tools and worker lifecycle registries. [status: needs-verification]
 - [worker-tool-recipe.md](worker-tool-recipe.md) — Trace registration, authentication, read-only annotations and lifecycle hooks when adding a worker-facing command. [tags: workers, mcp, auth]
