@@ -5,7 +5,6 @@ import { hintTitle, aside, key, onE } from '../../core/hint';
 import { noOutline } from '../../core/outline';
 import { store } from '../../state';
 import { closeAllModals, modalOpen, toast } from '../../ui/dom';
-import { HUD_ACTIONS } from '../../ui/menu';
 import { MEETING_SPACE_NAVIGATION } from '../../ui/meeting-space-navigation';
 import { MEETING_ROOM } from '../../../shared/layout';
 import { spaceName, spaceStatus } from '../../../shared/meeting-spaces';
@@ -82,7 +81,6 @@ export function installMeetingPortals(ctx: Ctx) {
     sync(); lastRender = 0;
   }
   MEETING_SPACE_NAVIGATION.open = openAnchor; MEETING_SPACE_NAVIGATION.label = 'Reality Anchor';
-  HUD_ACTIONS.push({ id: 'meeting-realities', icon: '◉', label: 'Reality Anchor', section: 'Open', shown: available, title: () => 'Open a portal into another meeting reality', run: openAnchor });
   ctx.interactions.define('realityanchor', { reach: 3, hint: () => ({ k: targetId, parts: [hintTitle('Reality Anchor'), aside('same room · another reality'), key('E', 'Tune a destination')] }), use: onE(openAnchor) });
   ctx.interactions.define('realityrift', { reach: 3, hint: () => ({ k: targetId, parts: [hintTitle(destination()?.name ?? 'Meeting portal'), key('E', 'Cross into this reality')] }), use: onE(() => enter()) });
   ctx.keys.add('activity', event => {

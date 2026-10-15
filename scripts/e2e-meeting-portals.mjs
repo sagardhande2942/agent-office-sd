@@ -54,7 +54,13 @@ try {
   };
   const page = await makeViewer();
   const anchor = p => p.getByRole('dialog', { name: 'Reality Anchor', exact: true });
-  const open = async p => { await p.keyboard.press('Tab'); await p.getByRole('menuitem', { name: /Reality Anchor/ }).click(); await anchor(p).waitFor(); };
+  const open = async p => {
+    await p.keyboard.press('Tab');
+    assert.equal(await p.getByRole('menuitem', { name: /Reality Anchor/ }).count(), 0, 'Reality Anchor is not a Tab menu action');
+    await p.getByRole('menuitem', { name: /Meeting room/ }).click();
+    await p.getByRole('dialog', { name: 'Meeting room', exact: true }).getByRole('button', { name: 'Reality Anchor', exact: true }).click();
+    await anchor(p).waitFor();
+  };
   const choose = async (p, name) => { await anchor(p).getByRole('button', { name: `Preview ${name}`, exact: true }).click(); await anchor(p).getByRole('heading', { name, exact: true }).waitFor(); };
   await open(page);
   await anchor(page).getByRole('heading', { name: 'Architecture review', exact: true }).waitFor();

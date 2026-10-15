@@ -8,7 +8,7 @@ The **Reality Anchor** gives the meeting room a walk-through doorway into anothe
 
 ## Cross into a meeting
 
-1. On a floor with meeting spaces, open **Reality Anchor** from the **Tab** menu, the meeting window, or by pressing **E** at its physical device beside the Office meeting-room entrance.
+1. On a floor with meeting spaces, open **Reality Anchor** from the meeting window, or by pressing **E** at its physical device beside the Office meeting-room entrance.
 2. Turn the destination dial with the arrow buttons, Left/Right keys, or named reality buttons. Each persistent space has a stable accent color. The preview shows existing character models for its current participants, live status, meeting progress, and an excerpt of its output.
 3. Choose **Open doorway**. The window closes and a glowing portal opens beside the meeting-room entrance. Walk through its opening, or aim at it and press **E**, to enter the destination. Walking beside it does not switch.
 4. A short ripple marks your crossing. You remain on the same floor, at the same position, while the meeting agents and board change to your selected space. Its name appears briefly on arrival and remains on the anchor plaque.
