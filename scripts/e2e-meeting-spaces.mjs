@@ -69,6 +69,24 @@ try {
   assert.equal(f.floor.workers.handleHook(background.id, token, 'PermissionRequest', { tool_name: 'Read', tool_input: { file_path: 'README.md' } }), true);
   await dialog(page).getByText('1 other space needs attention', { exact: true }).waitFor();
   check('Background input requests appear as attention badges without changing the selected meeting');
+  await page.waitForFunction(() => document.querySelector('#waiting')?.classList.contains('hidden'));
+  await page.getByRole('button', { name: 'Next worker that needs you' }).waitFor({ state: 'hidden' });
+  await page.getByText(`${background.name} needs you`, { exact: true }).waitFor({ state: 'hidden' });
+  await shot('background-waiting-hidden.png');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('n');
+  assert.equal(await page.evaluate(() => window.__office.store.selectedMeetingSpace), productId);
+  await open(page);
+  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption('main');
+  await page.waitForFunction(() => !document.querySelector('#waiting')?.classList.contains('hidden'));
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('n');
+  await page.locator('.toast').filter({ hasText: `${background.name} needs you` }).waitFor();
+  assert.equal(await page.evaluate(deskId => window.__office.store.workerAtDesk(deskId)?.id, background.deskId), background.id);
+  await open(page);
+  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption(productId);
+  check('N indicator excludes background spaces and visits the waiting agent after selecting its space');
+
 
   await page.waitForFunction(id => window.__office.store.meeting.current?.id === id, product.id);
   await shot('product-space.png'); check('Switching changes the local room projection without moving another viewer or stopping background work');

@@ -1,3 +1,4 @@
+import { NextUp, waitingInOrder } from '../src/client/nextup.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -15,7 +16,7 @@ import { Store } from '../src/client/state/store.js';
 import { meeting } from '../src/client/state/slices/meeting.js';
 import { meetingSpaces } from '../src/client/state/slices/meeting-spaces.js';
 import { selectMeetingSpace } from '../src/client/shared/meeting-spaces/state.js';
-import { workerVisible } from '../src/client/state/worker-visibility.js';
+import { visibleWorkers, workerVisible } from '../src/client/state/worker-visibility.js';
 
 function fixture(t: { after(fn: () => void): void }, git = true) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'meeting-spaces-'));
@@ -138,4 +139,31 @@ test('viewer selection stays local across server updates and only projects its a
   participant.status = 'needs_input';
   assert.equal(spaceStatus(msg.state.spaces![1], f.workers), 'Needs attention');
   assert.equal(spaceStatus(msg.state.spaces![0], f.workers), 'Working');
+});
+
+
+test('N and its waiting count include only the selected space and ordinary floor workers', t => {
+  const f = fixture(t); f.room.create('Other'); const id = f.room.state().spaces![1].id;
+  f.start(); f.start(id);
+  const s = new Store([meeting, meetingSpaces]);
+  for (const w of f.workers) { w.status = 'needs_input'; w.acked = false; }
+  const ordinary = { ...f.workers[0], id: 'ordinary', deskId: 'desk-ordinary', meeting: undefined };
+  s.workers = new Map([...f.workers, ordinary].map(w => [w.id, w]));
+  s.apply({ t: 'meeting', state: f.room.state() });
+  const next = new NextUp();
+  for (const spaceId of ['main', id]) {
+    selectMeetingSpace(s, spaceId);
+    const expected = [...s.workers.values()].filter(w => !w.meeting || w.meeting === s.meeting.current!.id);
+    assert.deepEqual(waitingInOrder(visibleWorkers(s)).map(w => w.id), waitingInOrder(expected).map(w => w.id));
+    for (let i = 0; i < expected.length * 2; i++) {
+      const picked = next.next(visibleWorkers(s));
+      assert.ok(expected.some(w => w.id === picked?.id));
+    }
+  }
+  ordinary.status = 'working';
+  for (const w of f.workers.filter(w => w.meeting === s.meeting.current!.id)) w.status = 'working';
+  assert.equal(waitingInOrder(visibleWorkers(s)).length, 0);
+  assert.equal(next.next(visibleWorkers(s)), undefined);
+  assert.equal(s.workers.size, 5);
+  assert.equal(spaceStatus(s.meetingSpaces.spaces![0], s.workers.values()), 'Needs attention');
 });

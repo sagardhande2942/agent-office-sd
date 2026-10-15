@@ -1,3 +1,4 @@
+import { visibleWorkers, workerVisible } from '../../state/worker-visibility';
 /**
  * A worker that needs you is the one thing in the office that can't wait, so it's the hardest to
  * miss: a beacon over its desk you can see from across the room, a banner under the top bar saying
@@ -32,20 +33,20 @@ export function installNeedsYou(ctx: Ctx, parts: Pick<Parts, 'views' | 'waiting'
   const banner = new Banner($('hud'), {
     go: (id) => parts.waiting.goToWorker(id),
     hide: () => {
-      for (const w of needingYou(store.workers.values())) hidden.add(waitKey(w));
+      for (const w of needingYou(visibleWorkers(store))) hidden.add(waitKey(w));
       paintBanner();
     },
   });
 
   function paintBanner() {
-    const asking = needingYou(store.workers.values());
+    const asking = needingYou(visibleWorkers(store));
     for (const key of hidden) if (!asking.some((w) => waitKey(w) === key)) hidden.delete(key);
     banner.show(bannerText(asking.filter((w) => !hidden.has(waitKey(w))), Date.now()));
   }
 
   function sync() {
     // Not ones that were asking already when the page first saw them (a reload, a floor you've just arrived on).
-    if (fresh.take(store.workers).length) {
+    if (fresh.take(new Map(visibleWorkers(store).map(w => [w.id, w]))).length) {
       banner.flash();
       if (settings.needsYouSound !== 'off') {
         sound.needsYou();
@@ -53,11 +54,12 @@ export function installNeedsYou(ctx: Ctx, parts: Pick<Parts, 'views' | 'waiting'
       }
     }
     for (const [id, b] of beacons) {
-      if (store.workers.get(id)?.status === 'needs_input') continue;
+      const w = store.workers.get(id);
+      if (w?.status === 'needs_input' && workerVisible(w, store)) continue;
       b.dispose();
       beacons.delete(id);
     }
-    for (const w of needingYou(store.workers.values())) {
+    for (const w of needingYou(visibleWorkers(store))) {
       if (beacons.has(w.id)) continue;
       const b = new Beacon();
       b.root.visible = false;
@@ -73,7 +75,7 @@ export function installNeedsYou(ctx: Ctx, parts: Pick<Parts, 'views' | 'waiting'
 
   // How long it has waited ticks on, and the reminder comes round, whether or not a frame is drawn.
   setInterval(() => {
-    const asking = needingYou(store.workers.values());
+    const asking = needingYou(visibleWorkers(store));
     if (asking.length) paintBanner();
     if (reminders.due(asking, performance.now()) && settings.needsYouSound === 'remind') sound.needsYou(true);
   }, 1000);

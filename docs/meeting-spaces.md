@@ -21,6 +21,8 @@ Each space has its own current meeting and earlier meeting records. Each meeting
 
 A running meeting continues its rounds when you select another space or close the window. Its agents count toward the existing machine worker limit and budget. Creating or viewing spaces does not start additional background work.
 
+The **N** waiting indicator, top-bar shortcut, and needs-you banner include only agents in your selected space and ordinary floor workers. Background spaces do not appear in that count or navigation; select their space to visit their waiting agents.
+
 The selector shows **Ready**, **Working**, **Needs attention**, **Done**, or **Stopped**. An attention badge identifies other spaces with a worker awaiting input, an offline/exited participant, or an output waiting on communication. Use the space's Overview or Messages to see what needs resolving.
 
 **Stop meeting** and **Clear the room** act only on the selected space. Stop ends that meeting's workflow; it is not a resumable pause. Clear sends that meeting's workers home and archives its result. Other spaces and their workers keep going. Closing with **✕** or **Esc** returns directly to the normal scene controls.
