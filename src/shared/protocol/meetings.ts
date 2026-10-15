@@ -1,4 +1,5 @@
 // The meeting room.
+import type { MeetingSpace } from '../meeting-spaces.js';
 
 import type { AgentEffort, AgentProvider } from './agents.js';
 
@@ -114,6 +115,7 @@ export interface MeetingRecord {
 }
 
 export interface MeetingState {
+  spaces?: MeetingSpace[];
   /** The meeting in the room: the one running, or the last one until the room is cleared or the next is called. */
   current: Meeting | null;
   /** Earlier meetings on the floor, newest first. */
@@ -122,6 +124,7 @@ export interface MeetingState {
 
 /** What calling a meeting asks for (see shared/meetings.ts for each pattern's defaults and limits). */
 export interface MeetingRequest {
+  spaceId?: string;
   pattern: MeetingPattern;
   prompt: string;
   title?: string;
@@ -142,10 +145,10 @@ export type MeetingClientMsg =
   /** Call a meeting: workers sit down round the meeting room's table and work through it in rounds. */
   | ({ t: 'meeting.start' } & MeetingRequest)
   /** Stop the meeting that's running; its workers stay at the table. */
-  | { t: 'meeting.stop' }
+  | { t: 'meeting.stop'; spaceId?: string }
   | { t: 'meeting.finish'; id: string; allowUnresolved: true }
   /** Send the last meeting's workers home and clear the table. */
-  | { t: 'meeting.clear' };
+  | { t: 'meeting.clear'; spaceId?: string };
 
 export type MeetingServerMsg =
   | { t: 'meeting'; state: MeetingState };

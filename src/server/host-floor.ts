@@ -1,4 +1,4 @@
-import { hostTrackedInbox } from './handoff/host-inbox.js';
+import { meetingHostCalls, meetingHostCommunications, meetingHostInbox } from './meeting-spaces/host.js';
 import { HostTeams, TEAM_HOST_CALLS } from './master-workers/host.js';
 import { cinemaHostCalls, cinemaHostState } from './cinema/host.js';
 import { HOST_CINEMA_PATHS, hostCinemaHook } from './cinema/host-hooks.js';
@@ -79,7 +79,8 @@ export class HostFloors {
     const max = this.parts.seats;
     if (max > 0 && [...this.floors.values()].reduce((n, f) => n + f.workers.list().length, 0) >= max) throw Error('The floor host is at its configured seat limit');
   });
-  constructor(private parts: HostParts) {}
+  private meetingCalls: ReturnType<typeof meetingHostCalls>;
+  constructor(private parts: HostParts) { this.meetingCalls = meetingHostCalls(this.floors, parts.seats); }
 
   /**
    * The floor a worker sits on. Worker ids are unique per machine, and the index is kept as workers
@@ -151,6 +152,7 @@ export class HostFloors {
     state('ball', { state: floor.court.state() });
     state('cars', { state: floor.garage.state() });
     state('meeting', { state: floor.meetings.state() });
+    state('communications', { state: meetingHostCommunications(floor) });
     state('tv', { state: floor.tv.state() });
     this.reportCinema(floorId, floor);
     for (const msg of workerFeatureSnapshots(floor)) this.reportWorkerFeature(floorId, msg);
@@ -200,6 +202,7 @@ export class HostFloors {
         bossGuard: true,
         workerBreaks: true,
         cinema: true,
+        meetingSpaces: true,
         masterWorkers: true,
         lore: true, curator: true, bossMode: true,
         lights: true,
@@ -247,6 +250,7 @@ export class HostFloors {
       people: (_floor: Floor) => 0,
       peers: (_floor: Floor): PeerInfo[] => [],
       leaveOnMerge: () => false,
+      communications: meetingHostCommunications,
       // Another floor of the building is not reachable from here, deliberately: a worker on a hosted
       // floor must not reach into a checkout on the office's disk (finding 9).
       floor: (_id: string) => undefined,
@@ -293,6 +297,7 @@ export class HostFloors {
   /** The floor cases, each against this machine's own floor. */
   private async apply(floor: Floor, msg: ToOffice): Promise<unknown> {
     const m = msg as unknown as Record<string, unknown>;
+    if (Object.hasOwn(this.meetingCalls, msg.t)) return this.meetingCalls[msg.t](floor, m);
     if (TEAM_HOST_CALLS.has(msg.t)) return this.teams.call(floor, m);
     if (Object.hasOwn(cinemaHostCalls, msg.t)) return cinemaHostCalls[msg.t](floor, m);
     if (Object.hasOwn(workerFeatureHostCalls, msg.t)) return workerFeatureHostCalls[msg.t](floor, m);
@@ -425,8 +430,6 @@ export class HostFloors {
       case 'car.honk':
         return await floor.garage.honk(s('clientId'));
 
-      // A meeting needs the room's people, which this machine does not know. Refused by kind, and the
-      // office refuses it too: a hosted floor cannot hold one.
       case 'tv.play':
         return await floor.tv.play((m.input ?? {}) as { url?: unknown; position?: unknown }, s('by'));
       case 'tv.pause':
@@ -441,14 +444,6 @@ export class HostFloors {
         // Coerced here as the office does for `tv.theatre`, so the office and its host agree on what
         // a setting is rather than the host quietly accepting something the office would not.
         return await floor.tv.lights(checkTvLight(m.light), s('by'));
-
-      case 'meeting.start':
-      case 'meeting.stop':
-      case 'meeting.clear':
-      case 'meeting.finish':
-        // A meeting needs the room's people, which this machine does not know. Refused by kind; the
-        // office refuses it too.
-        return 'a meeting needs everyone in one building';
 
       default:
         return `this machine does not serve ${String(msg.t)}`;
@@ -504,7 +499,7 @@ export function startHooks(
     }
     if (workerTools && await workerTools(req, res, url)) return;
     const featureFloor = cinema?.floorOf(url.searchParams.get('worker') ?? '');
-    if (await hostTrackedInbox(featureFloor, req, res, url)) return;
+    if (await meetingHostInbox(featureFloor, req, res, url, (floor, msg) => cinema?.publish?.(floor, msg))) return;
     if (await floorWorkerFeatureHook(featureFloor, req, res, url, msg => { if (featureFloor) cinema?.publish?.(featureFloor, msg); })) return;
     if (HOST_CINEMA_PATHS.has(url.pathname)) {
       const id = url.searchParams.get('worker') ?? '';

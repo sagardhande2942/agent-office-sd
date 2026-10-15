@@ -25,6 +25,7 @@ export function communications(ctx: Ctx, floor: FloorActions): Communications {
 export function startCommunicationClock(ctx: Ctx): () => void {
   const clock = setInterval(() => {
     for (const [id, ledger] of stores.get(ctx) ?? []) {
+      if (ctx.remoteFloors.has(id)) continue;
       const state = ledger.state();
       for (const c of ctx.clients.values()) if (c.peer.floor === id) ctx.sendTo(c, { t: 'communications', state });
     }

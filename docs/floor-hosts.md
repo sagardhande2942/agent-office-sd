@@ -181,9 +181,7 @@ the point:
 | **Sent up the socket** | everything the floor would have said to the room: terminal output, status changes, boards, toasts, what a worker changed. |
 | **Never given** | `runAs` and `forgeAs` — both per-account **sign-ins**. Their absence is the guarantee that a hosted floor runs on the host's own, and the office has no way to hand it anyone else's. |
 
-One consequence worth knowing: a hosted floor **cannot hold a meeting**, because a meeting needs the
-people in the room and the host machine does not know who they are. It refuses by kind, and the
-office refuses it too.
+Hosted floors can run independent [meeting spaces](meeting-spaces.md). The host runs their agents and meeting engines against its own worktrees and streams state to the office; viewer presence and personal space selection stay office-side.
 
 ## What is not done
 
@@ -274,3 +272,9 @@ The meeting-room cinema works over the paired floor connection. Update both ends
 ## Master / Workers on a remote floor
 
 Update and rebuild both ends, reconnect the floor host, and enter its Git floor. Open **Master / Workers** from the menu or Lite header. The host runs the team with its installed, signed-in coding CLIs and preserves its activity, branches and worktrees. Start, pause, resume and stop are available from the office UI. Both office capacity and host seat limits apply. See [the team guide](master-workers.md#remote-floors).
+
+## Meeting spaces on a remote floor
+
+The meeting room supports independent named spaces on hosted floors too. Update and restart both the office and floor host to use this capability; older hosts ask you to update instead of silently ignoring commands. See [Meeting spaces](meeting-spaces.md).
+
+Create and rename a space without hiring anyone, then start its meeting explicitly. Agents, Git worktrees, notes, outputs, and saved history stay on the host and use its installed providers and sign-ins. Concurrent spaces require a Git checkout and enough room under both the office worker limit and the host’s `--seats` setting (0 means no host seat ceiling). Stop, finish, and clear target one meeting space. Other viewers keep their own selection, and background meetings continue while viewers switch spaces or close the window. Connection loss uses the existing host reconnect and worker recovery behavior; meeting coordination resumes after reconnection.

@@ -1,3 +1,4 @@
+import { installMeetingSpaces } from './features/meeting-spaces';
 import { installKnowledge } from './features/knowledge';
 import { installPerformance } from './features/performance';
 import { installObjectPlacement } from './features/object-placement';
@@ -218,6 +219,7 @@ installHandoff(ctx, parts);
 installPlanReview(ctx, parts);
 installMasterWorkers(ctx, parts);
 installActivityHeatmap(ctx);
+  installMeetingSpaces(ctx);
 installParallelWorlds(ctx, parts);
 installViewSelector(ctx);
 installTopdown(ctx, core, parts);

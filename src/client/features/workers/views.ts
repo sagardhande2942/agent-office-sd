@@ -1,3 +1,4 @@
+import { workerVisible } from '../../state/worker-visibility';
 import { helperCard } from './helper-card';
 import { HelperWalk } from '../../world/helper';
 import { helperSpot, helperHost } from '../../../shared/helper';
@@ -127,6 +128,7 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
     const world = ctx.world();
     const court = parts.worlds.court();
     for (const w of store.workers.values()) {
+      if (!workerVisible(w, store)) continue;
       let v = workerViews.get(w.id);
       const desk = world.desks.get(w.deskId);
       // A helper stands at somebody else's desk: it has no seat of its own, so there is no desk group to
@@ -216,7 +218,7 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
       v.laptop?.setPlaceholder(w.lost ? `🌿 ${w.name}'s worktree was deleted — press E to fix it` : w.status === 'offline' ? `💤 ${w.name} is asleep — press R to ${again}` : w.status === 'exited' ? `${w.name} exited` : 'booting…');
     }
     for (const [id, v] of workerViews) {
-      if (store.workers.has(id)) continue;
+      if (store.workers.has(id) && workerVisible(store.workers.get(id)!, store)) continue;
       arrivals.forget(v.model);
       const desk = world.desks.get(v.deskId);
       // Up and about in the castle: it sets off from where it's standing.

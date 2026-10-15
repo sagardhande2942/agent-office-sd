@@ -18,8 +18,8 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 test('the protocol includes registered Boss floor messages', () => {
   // handleSignIns, 6 in handleAccounts); only these act on a Floor and need to travel. If this drifts,
   // a case started or stopped touching a floor and nobody decided where it should run.
-  assert.equal(FLOOR_CASES.length, 75);
-  assert.equal(new Set(FLOOR_CASES).size, 75, 'no duplicates');
+  assert.equal(FLOOR_CASES.length, 77);
+  assert.equal(new Set(FLOOR_CASES).size, 77, 'no duplicates');
   for (const c of FLOOR_CASES) assert.match(c, /^[a-z-]+\.[a-zA-Z]+$/, `${c} is not a namespaced case`);
 });
 
@@ -58,7 +58,8 @@ const NO_MESSAGE_CASE = new Set(['ball.left', 'jukebox.place']);
 function floorHandlers() {
   const dir = path.join(root, 'src/server/ws/handlers');
   const source = readdirSync(dir).filter(f => f.endsWith('.ts')).map(f => readFileSync(path.join(dir, f), 'utf8')).join('\n');
-  return new Set([...source.matchAll(/'([a-z-]+\.[a-zA-Z]+)'\s*(?:\(|:)/g)].map(m => m[1]));
+  const extensions = readFileSync(path.join(root, 'src/server/meeting-spaces/handlers.ts'), 'utf8');
+  return new Set([...(source + extensions).matchAll(/'([a-z-]+\.[a-zA-Z]+)'\s*(?:\(|:)/g)].map(m => m[1]));
 }
 test('every shipped floor case has a registered handler', () => {
   const names = floorHandlers();
