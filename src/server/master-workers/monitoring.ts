@@ -14,9 +14,13 @@ export function alert(r:TeamRun,t:TeamTask,a:TeamAttempt,kind:TaskAlert['kind'],
   if(a.alerts.some(v=>v.kind===kind&&!v.clearedAt&&v.message===message))return false;
   for(const v of a.alerts)if(v.kind===kind&&!v.clearedAt)v.clearedAt=now;
   a.alerts.push({id:randomUUID(),kind,message,at:now});a.alerts=a.alerts.slice(-20);
-  notify(r,`Task ${t.id}: ${message}. Read the compact team summary, inspect evidence and record checkpoint.`);
   recordEvent(r,{type:'blocker',taskId:t.id,participantId:a.workerId,summary:message,details:{message:`Assignment ${a.assignmentId}; observed at ${now}. Missing reports mean progress unknown, not failure.`}});
   return true;
+}
+/** Compose automatic notices from current alerts, keeping them separate from user instructions. */
+export function pendingAlerts(r:TeamRun) {
+  return r.tasks.filter(t=>t.status==='running').flatMap(t=>(t.attempts.at(-1)?.alerts??[])
+    .filter(v=>!v.clearedAt&&!v.response&&!v.deliveredAt).map(v=>({task:t.id,alert:v})));
 }
 export function report(r:TeamRun,actor:string,b:Extract<TeamAction,{action:'acknowledge'|'progress'}>,now:number) {
   const t=r.tasks.find(t=>t.id===b.task),a=t?.attempts.at(-1);

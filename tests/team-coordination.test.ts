@@ -13,8 +13,8 @@ const cheap={provider:'claude',model:'haiku'} as const,other={provider:'codex',m
 const task=(id='one',files=[`src/${id}.ts`],dependencies:string[]=[]):TeamTaskDefinition=>fixturePlan({action:'plan',tasks:[{id,title:id,instructions:'Implement the agreed outcome using existing patterns',acceptance:'Preserve authorization and handle empty responses',files,dependencies}]}).tasks[0];
 function fixture(){
  const dir=mkdtempSync(path.join(tmpdir(),'team-contract-')),file=path.join(dir,'activity.json');
- const workers:WorkerInfo[]=[],messages:{id:string;prompt:string}[]=[];let now=1000000,next=0,changed:string[]=[],observeFails=false;
- const io:TeamAdapter={now:()=>now,list:()=>workers,spawn:(choice,prompt,_owner,_base,role)=>{const w={id:`w${++next}`,status:'working',provider:choice.provider,model:choice.model,prompt,masterWorkers:role,worktree:{path:`w${next}`,branch:`office/w${next}`}} as WorkerInfo;workers.push(w);return w;},prompt:(id,prompt)=>{messages.push({id,prompt});workers.find(w=>w.id===id)!.status='working';},stop:id=>{workers.find(w=>w.id===id)!.status='offline';},head:()=> 'a'.repeat(40),commits:(_id,_base,cs)=>cs,contains:()=>true,prepare:()=>true,verifyPr:async()=>{},changedPaths:()=>changed,observe:async()=>{if(observeFails)throw Error('git unavailable');return {at:now,head:'a'.repeat(40),paths:changed,additions:1,deletions:0};},changed:()=>{}};
+ const workers:WorkerInfo[]=[],messages:{id:string;prompt:string}[]=[];let now=1000000,next=0,changed:string[]=[],observeFails=false,promptError:string|undefined;
+ const io:TeamAdapter={now:()=>now,list:()=>workers,spawn:(choice,prompt,_owner,_base,role)=>{const w={id:`w${++next}`,status:'working',provider:choice.provider,model:choice.model,prompt,masterWorkers:role,worktree:{path:`w${next}`,branch:`office/w${next}`}} as WorkerInfo;workers.push(w);return w;},prompt:(id,prompt)=>{if(promptError)return promptError;messages.push({id,prompt});workers.find(w=>w.id===id)!.status='working';},stop:id=>{workers.find(w=>w.id===id)!.status='offline';},head:()=> 'a'.repeat(40),commits:(_id,_base,cs)=>cs,contains:()=>true,prepare:()=>true,verifyPr:async()=>{},changedPaths:()=>changed,observe:async()=>{if(observeFails)throw Error('git unavailable');return {at:now,head:'a'.repeat(40),paths:changed,additions:1,deletions:0};},changed:()=>{}};
  let s=new TeamCoordinator(file,new TeamPresets(path.join(dir,'presets.json')),io);
  s.start({master:{provider:'claude',model:'opus'},models:[cheap,other],maxWorkers:5,brief:'Implement a bounded outcome',requirements:['Keep quality gates']});
  const master=()=>s.state().current!.masterId!;
@@ -24,7 +24,7 @@ function fixture(){
  const acknowledge=(id='one')=>{const a=s.state().current!.tasks.find(t=>t.id===id)!.attempts.at(-1)!;return act(a.workerId,{action:'acknowledge',task:id,assignmentId:a.assignmentId});};
  const progress=(extra:object={})=>{const a=s.state().current!.tasks[0].attempts.at(-1)!;return act(a.workerId,{action:'progress',task:'one',assignmentId:a.assignmentId,sequence:1,step:'Implementing handler',completed:'Read existing interfaces',checks:'No checks yet',next:'Add empty-state behavior',...extra});};
  const result=async(id='one')=>{const a=s.state().current!.tasks.find(t=>t.id===id)!.attempts.at(-1)!;await acknowledge(id);return act(a.workerId,{action:'result',task:id,assignmentId:a.assignmentId,summary:'Implemented agreed behavior',checks:'npm run typecheck passed at '+ 'a'.repeat(40),commits:['a'.repeat(40)]});};
- return {dir,file,workers,messages,master,act,plan,dispatch,acknowledge,progress,result,get s(){return s;},advance:(ms:number)=>{now+=ms;},setPaths:(v:string[])=>{changed=v;},failObserve:()=>{observeFails=true;},restart:()=>{s=new TeamCoordinator(file,new TeamPresets(path.join(dir,'presets.json')),io);},close:()=>rmSync(dir,{recursive:true,force:true})};
+ return {dir,file,workers,messages,master,act,plan,dispatch,acknowledge,progress,result,get s(){return s;},advance:(ms:number)=>{now+=ms;},setPaths:(v:string[])=>{changed=v;},failObserve:()=>{observeFails=true;},setPromptError:(value?:string)=>{promptError=value;},restart:()=>{s=new TeamCoordinator(file,new TeamPresets(path.join(dir,'presets.json')),io);},close:()=>rmSync(dir,{recursive:true,force:true})};
 }
 test('agent views are compact, role-specific, detailed on demand and receipts do not repeat history',async()=>{
  const f=fixture();try{await f.plan([task(),task('two')]);const a=await f.dispatch();
@@ -69,7 +69,7 @@ test('healthy monitoring has no master wakeups; overdue alerts deduplicate and o
  }finally{f.close();}
 });
 test('blockers alert immediately; observation failure and long estimates do not stop assignments',async()=>{
- const f=fixture();try{const t=task();t.specification!.expectedMinutes=20;await f.plan([t]);await f.dispatch();await f.acknowledge();await f.progress({blocker:'Need master decision on response contract'});assert.match(f.s.state().current!.notifications[f.master()],/response contract/);
+ const f=fixture();try{const t=task();t.specification!.expectedMinutes=20;await f.plan([t]);await f.dispatch();await f.acknowledge();await f.progress({blocker:'Need master decision on response contract'});assert.match(f.s.state().current!.tasks[0].attempts[0].alerts![0].message,/response contract/);
  f.failObserve();f.advance(21*60000);await f.s.tick();const a=f.s.state().current!.tasks[0].attempts[0];assert.equal(a.status,'running');assert.ok(a.observation!.error);assert.ok(a.alerts!.some(v=>v.kind==='estimate'));
  }finally{f.close();}
 });
@@ -131,5 +131,25 @@ test('assignment design stays stable across replanning while original requiremen
  await f.act(f.master(),{action:'plan',plan:'Revised approach for future assignments',designSummary:'Future tasks use an additional interface',tasks:r.tasks});
  const worker=agentView(f.s.state(),a.workerId) as any;assert.equal(worker.designSummary,'Use existing interfaces and keep authorization intact');
  const plan=agentView(f.s.state(),f.master(),{view:'plan'}) as any;assert.deepEqual(plan.requirements,['Keep quality gates']);assert.equal(plan.brief,'Implement a bounded outcome');
+ }finally{f.close();}
+});
+
+test('recovered reporting cancels an undelivered automatic alert without waking the master',async()=>{
+ const f=fixture();try{await f.plan();await f.dispatch();await f.acknowledge();f.advance(240001);await f.s.tick();assert.equal(f.messages.length,0);
+ await f.progress();f.workers.find(w=>w.id===f.master())!.status='idle';await f.s.tick();assert.equal(f.messages.length,0);assert.equal(f.s.state().current!.metrics?.masterNotices??0,0);
+ }finally{f.close();}
+});
+test('clearing an automatic alert preserves queued user instructions and excludes stale alert text',async()=>{
+ const f=fixture();try{await f.plan();await f.dispatch();await f.acknowledge();await f.progress({blocker:'Need contract decision'});f.s.enqueue('USER DIRECTION: preserve the existing response shape.');
+ await f.progress({sequence:2});f.workers.find(w=>w.id===f.master())!.status='idle';await f.s.tick();assert.equal(f.messages.length,1);assert.match(f.messages[0].prompt,/USER DIRECTION/);assert.doesNotMatch(f.messages[0].prompt,/Need contract decision/);
+ const alert=f.s.state().current!.tasks[0].attempts[0].alerts![0];assert.ok(alert.clearedAt);assert.equal(alert.deliveredAt,undefined);
+ }finally{f.close();}
+});
+
+test('failed notice delivery preserves user instructions and retries only unresolved automatic alerts',async()=>{
+ const f=fixture();try{await f.plan();await f.dispatch();await f.acknowledge();await f.progress({blocker:'Need retryable contract decision'});f.s.enqueue('USER DIRECTION: maintain authorization.');
+ f.setPromptError('Provider is temporarily busy');f.workers.find(w=>w.id===f.master())!.status='idle';await f.s.tick();
+ let r=f.s.state().current!;assert.equal(f.messages.length,0);assert.equal(r.tasks[0].attempts[0].alerts![0].deliveredAt,undefined);assert.match(r.notifications[f.master()],/USER DIRECTION/);assert.doesNotMatch(r.notifications[f.master()],/retryable contract/);
+ await f.progress({sequence:2});f.setPromptError();await f.s.tick();assert.equal(f.messages.length,1);assert.match(f.messages[0].prompt,/USER DIRECTION/);assert.doesNotMatch(f.messages[0].prompt,/retryable contract/);r=f.s.state().current!;assert.equal(r.metrics!.masterNotices,1);
  }finally{f.close();}
 });

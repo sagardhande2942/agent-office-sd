@@ -1,5 +1,5 @@
 import { definition, validateGraph, dispatchContract, owns } from './contracts.js';
-import { metrics, notify, report, monitor, checkpoint } from './monitoring.js';
+import { metrics, notify, report, monitor, checkpoint, pendingAlerts } from './monitoring.js';
 import { replaceTasks, recoveryBudget } from './recovery.js';
 import { randomUUID } from 'node:crypto';
 import type { TaskObservation } from '../../shared/team-coordination.js';
@@ -335,15 +335,21 @@ export class TeamCoordinator {
           a.status='failed'; a.summary='Worker stopped without submitting a result; inspect and preserve its work'; t.status='pending'; recordBlocker(r, { task: t, workerId: a.workerId || undefined, summary: `Task ${t.id} worker stopped without a result`, message: 'Worker exited without submitting a result; its work was preserved' }); this.notify(r,`task ${t.id} stopped without a result`); changed=true;
         }
       }
-      for (const [id,message] of Object.entries(r.notifications)) {
+      const notices=new Map(Object.entries(r.notifications)),alerts=pendingAlerts(r);
+      if(r.masterId&&alerts.length){
+        const summary=alerts.map(v=>`Task ${v.task}: ${v.alert.message.slice(0,400)}`).join('\n');
+        notices.set(r.masterId,[notices.get(r.masterId),summary,'Read compact team_state, inspect evidence and record checkpoint.'].filter(Boolean).join('\n'));
+      }
+      for (const [id,message] of notices) {
         const w=list.find(v=>v.id===id);
         if (!w || !(id===r.masterId?['idle','done']:['idle','done','offline','exited']).includes(w.status)) continue;
+        const queued=r.notifications[id];
         delete r.notifications[id];
         this.persist(); // Delivery intent does not change orchestration revision.
         const err=this.io.prompt(id,message);
-        if(err) { r.notifications[id]=message; r.error=err; observed=true; }
+        if(err) { if(queued!==undefined)r.notifications[id]=queued; r.error=err; observed=true; }
         else {
-          if(id===r.masterId){metrics(r).masterNotices++;for(const t of r.tasks)for(const v of t.attempts.at(-1)?.alerts??[])if(!v.deliveredAt&&!v.clearedAt)v.deliveredAt=this.now();}
+          if(id===r.masterId){metrics(r).masterNotices++;for(const v of alerts)v.alert.deliveredAt=this.now();}
           observed=true;
         }
       }
