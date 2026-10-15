@@ -30,6 +30,7 @@ try {
   };
   const page = await makeViewer();
   const dialog = p => p.getByRole('dialog', { name: 'Meeting room', exact: true });
+  const switchSpace = async (p, id) => { const select = dialog(p).getByLabel('Meeting space', { exact: true }); if (!await select.isVisible()) await dialog(p).getByText('Instant switch', { exact: true }).click(); await select.selectOption(id); };
   const open = async p => { await p.keyboard.press('Tab'); await p.getByRole('menuitem', { name: /Meeting room/ }).click(); await dialog(p).waitFor(); };
   const create = async name => {
     await dialog(page).getByRole('button', { name: '+ New space', exact: true }).click();
@@ -51,7 +52,7 @@ try {
   const productId = await create('Remote product');
   assert.equal(f.floor.workers.list().length, 0); check('Remote space creation persists on the host without hiring agents');
   await start(productId, 'Product cache');
-  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption('main');
+  await switchSpace(page, 'main');
   await start('main', 'Bug cache');
   const spaces = f.floor.meetings.state().spaces, product = spaces.find(s => s.id === productId).current, main = spaces[0].current;
   assert.equal(f.floor.workers.list().length, 4); assert.notEqual(product.worktree.path, main.worktree.path);
@@ -59,7 +60,7 @@ try {
   assert.equal(f.floor.workers.list().every(w => w.meeting === main.id || w.meeting === product.id), true);
   check('Two hosted meetings run on separate host worktrees and shared physical chairs; office opens no checkout');
   const other = await makeViewer(); await open(other);
-  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption(productId);
+  await switchSpace(page, productId);
   assert.equal(await dialog(other).getByLabel('Meeting space', { exact: true }).inputValue(), 'main');
   check('Remote space selection belongs to each viewer');
   const thirdId = await create('Over capacity');
@@ -95,14 +96,14 @@ try {
   assert.equal(f.floor.meetings.state().current.status, 'running');
   await page.waitForFunction(() => window.__office.store.meetingSpaces.spaces[0].current.waitingForCommunications);
   check('Host meeting completion waits for unresolved requests using the same persistent inbox');
-  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption('main');
+  await switchSpace(page, 'main');
   await dialog(page).getByRole('button', { name: 'Finish anyway', exact: true }).click();
   await page.getByRole('button', { name: 'Finish anyway', exact: true }).last().click();
   await page.waitForFunction(() => window.__office.store.meeting.current.status === 'done');
   assert.equal(f.floor.meetings.state().spaces.find(s => s.id === productId).current.status, 'running');
   await page.screenshot({ path: path.join(output, 'remote-meeting-completed.png') });
   check('Finish override is routed to its meeting and leaves the other remote meeting running');
-  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption(productId);
+  await switchSpace(page, productId);
   await dialog(page).getByRole('button', { name: 'Rename', exact: true }).click(); await dialog(page).getByLabel('Space name').fill('Remote release'); await dialog(page).getByRole('button', { name: 'Save', exact: true }).click();
   await page.waitForFunction(id => window.__office.store.meetingSpaces.spaces.find(s => s.id === id)?.name === 'Remote release', productId);
   await page.screenshot({ path: path.join(output, 'remote-meeting-spaces.png') });

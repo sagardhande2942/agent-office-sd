@@ -1,7 +1,7 @@
 import { codexBlocked } from '../src/server/providers/codex-screen.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createServer } from 'node:http';
+import { createServer, get } from 'node:http';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -163,6 +163,10 @@ test('helper forwards only the bounded root event fields to the authenticated br
   const dir = mkdtempSync(path.join(tmpdir(), 'agent-office-codex-'));
   const received: { url?: string; authorization?: string; body?: unknown } = {};
   const server = createServer((req, res) => {
+    // The live floor discovers listeners with this exact probe, not a hook POST.
+    if (req.method === 'GET' && req.url === '/' && req.headers['user-agent'] === 'agent-office') {
+      res.writeHead(404).end(); return;
+    }
     const chunks: Buffer[] = [];
     req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', () => {
@@ -177,6 +181,13 @@ test('helper forwards only the bounded root event fields to the authenticated br
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     const address = server.address();
     assert.ok(address && typeof address === 'object');
+    await new Promise<void>((resolve, reject) => {
+      get(`http://127.0.0.1:${address.port}/`, { headers: { 'user-agent': 'agent-office' } }, res => {
+        assert.equal(res.statusCode, 404);
+        res.resume(); res.on('end', resolve);
+      }).on('error', reject);
+    });
+    assert.deepEqual(received, {});
     const child = spawn(process.execPath, [file, 'UserPromptSubmit'], {
       env: {
         PATH: process.env.PATH,

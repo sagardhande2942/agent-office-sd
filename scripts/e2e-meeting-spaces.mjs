@@ -31,6 +31,7 @@ try {
     await p.waitForSelector('#loading', { state: 'hidden' });
   };
   const dialog = p => p.getByRole('dialog', { name: 'Meeting room', exact: true });
+  const switchSpace = async (p, id) => { const select = dialog(p).getByLabel('Meeting space', { exact: true }); if (!await select.isVisible()) await dialog(p).getByText('Instant switch', { exact: true }).click(); await select.selectOption(id); };
   const open = async p => { await p.keyboard.press('Tab'); await p.getByRole('menuitem', { name: /Meeting room/ }).click(); await dialog(p).waitFor(); };
   const shot = async name => { await page.screenshot({ path: path.join(output, name) }); screenshots.push(name); };
   const start = async title => {
@@ -49,7 +50,7 @@ try {
   const productId = await dialog(page).getByLabel('Meeting space', { exact: true }).inputValue();
   assert.equal(f.floor.workers.list().length, 0); check('Creating a persistent named space hires no agents');
   await start('Product roadmap'); const product = f.floor.meetings.state().spaces.find(s => s.id === productId).current;
-  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption('main');
+  await switchSpace(page, 'main');
   await start('Bug investigation'); const main = f.floor.meetings.state().current;
   assert.equal(f.floor.workers.list().length, 6);
   assert.notEqual(product.worktree.path, main.worktree.path);
@@ -57,7 +58,7 @@ try {
   await page.waitForFunction(() => [...window.__office.workerViews.keys()].every(id => window.__office.store.workers.get(id)?.meeting === window.__office.store.meeting.current.id));
   await shot('main-space.png'); check('Two real meetings share physical chairs but run in independent worktrees; only selected agents are drawn');
   const other = await makeViewer('Other viewer'); await arrive(other); await open(other);
-  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption(productId);
+  await switchSpace(page, productId);
   assert.equal(await dialog(other).getByLabel('Meeting space', { exact: true }).inputValue(), 'main');
   const background = f.floor.workers.list().find(w => w.meeting === main.id);
   const savedWorkers = JSON.parse(readFileSync(path.join(f.project, '.agent-office/workers.json'), 'utf8'));
@@ -77,14 +78,14 @@ try {
   await page.keyboard.press('n');
   assert.equal(await page.evaluate(() => window.__office.store.selectedMeetingSpace), productId);
   await open(page);
-  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption('main');
+  await switchSpace(page, 'main');
   await page.waitForFunction(() => !document.querySelector('#waiting')?.classList.contains('hidden'));
   await page.keyboard.press('Escape');
   await page.keyboard.press('n');
   await page.locator('.toast').filter({ hasText: `${background.name} needs you` }).waitFor();
   assert.equal(await page.evaluate(deskId => window.__office.store.workerAtDesk(deskId)?.id, background.deskId), background.id);
   await open(page);
-  await dialog(page).getByLabel('Meeting space', { exact: true }).selectOption(productId);
+  await switchSpace(page, productId);
   check('N indicator excludes background spaces and visits the waiting agent after selecting its space');
 
 
@@ -95,6 +96,7 @@ try {
   await dialog(page).getByRole('button', { name: 'Rename', exact: true }).click();
   await dialog(page).getByLabel('Space name').fill('Release planning'); await dialog(page).getByRole('button', { name: 'Save', exact: true }).click();
   await page.waitForFunction(() => window.__office.store.meetingSpaces.spaces.some(s => s.name === 'Release planning'));
+  await switchSpace(page, productId);
   await page.setViewportSize({ width: 390, height: 844 }); await shot('mobile.png');
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   assert.ok(await dialog(page).getByLabel('Meeting space', { exact: true }).isVisible());

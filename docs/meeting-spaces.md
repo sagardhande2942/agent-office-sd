@@ -11,7 +11,7 @@ The floor has one physical meeting room. **Meeting spaces** let you switch which
 1. Open **Meeting room** from the **Tab** menu, or press **E** at the meeting table.
 2. Use **+ New space** to give a space a name. Creating a space starts no agents and makes no model calls.
 3. Select a pattern and **Start the meeting** when you want its agents to work. The existing Debate, Lead & team, Map-reduce, Red / blue and Review panel workflows remain available.
-4. Use **Meeting space** to switch at any time. The selected space supplies the room's seated agents, output board, overview, linked messages and history. **Rename** changes its label without changing its work.
+4. Open **Reality Anchor** to preview another meeting, tune its destination, and open a walk-through portal beside the meeting-room entrance. **Enter now** switches where you stand; **Instant transition** skips the sweep. For the original selector, expand **Instant switch** and choose **Meeting space**. See [Meeting reality portals](meeting-reality-portals.md). The selected space supplies the room's seated agents, output board, overview, linked messages and history. **Rename** changes its label without changing its work.
 
 Spaces are shared by everyone on a floor, but **selection belongs to each viewer**. Switching yours does not move another person to it. Your selection is remembered per floor in browser storage and restored on reload; with storage disabled it lasts for the current connection.
 
