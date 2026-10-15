@@ -9,6 +9,7 @@
 // registered in (./slices/index.ts), and that order is the order their topics fire in.
 
 import type { ChatLine, FloorInfo, FloorView, GhIssue, GhPull, GhState, Me, PeerInfo, ProjectInfo, ProjectsDirState, QueueState, QueueTask, RepoChoice, Run, ServerMsg, WorkerInfo } from '../../shared/protocol';
+import { workerVisible } from './worker-visibility';
 import { randomLook } from '../../shared/avatar';
 import { AVATAR_COLORS, type Profile } from './persist';
 
@@ -156,7 +157,7 @@ export class Store {
   }
 
   workerAtDesk(deskId: string): WorkerInfo | undefined {
-    for (const w of this.workers.values()) if (w.deskId === deskId) return w;
+    for (const w of this.workers.values()) if (w.deskId === deskId && workerVisible(w, this)) return w;
     return undefined;
   }
 

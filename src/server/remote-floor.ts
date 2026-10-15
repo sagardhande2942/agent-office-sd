@@ -1,3 +1,4 @@
+import { RemoteMeetings } from './meeting-spaces/remote.js';
 import { RemoteHandoff } from './handoff/remote.js';
 import { RemoteKnowledge } from './knowledge/surface.js';
 import { RemoteActivityHeatmap } from './activity-heatmap/remote.js';
@@ -6,7 +7,7 @@ import { RemoteCurator } from './lore-curator/surface.js';
 import { RemoteTeams } from './master-workers/remote.js';
 import { RemoteCinema } from './cinema/remote.js';
 import { RemoteLore } from './lore/remote.js';
-import type { AgentEffort, AgentProvider, ForgeKind, FloorInfo, GhComment, GhIssue, GhLabel, GhPull, GhState, JailState, MeetingRequest, MeetingState, ProjectInfo, QueueState, TerminalHit, WorkerInfo, WorktreeCleanup, WorktreeState } from '../shared/protocol.js';
+import type { AgentEffort, AgentProvider, ForgeKind, FloorInfo, GhComment, GhIssue, GhLabel, GhPull, GhState, JailState, MeetingState, ProjectInfo, QueueState, TerminalHit, WorkerInfo, WorktreeCleanup, WorktreeState } from '../shared/protocol.js';
 import type { BallState } from '../shared/hoop.js';
 import type { CarPose, CarState } from '../shared/garage.js';
 import type { Decoration } from '../shared/decor.js';
@@ -16,7 +17,7 @@ import type { DeskLabel, FloorPlan } from '../shared/floorplan.js';
 import { EMPTY_PLAN } from '../shared/floorplan.js';
 import type { Landed } from './leave-on-merge.js';
 import type { OpenedPr } from './workers.js';
-import type { FloorActions, FloorChanges, FloorCourt, FloorDecor, FloorForge, FloorGarage, FloorMeetings, FloorPlan as FloorPlanActions, FloorQueue, FloorRoom, FloorTv, FloorWorkers } from './floor-actions.js';
+import type { FloorActions, FloorChanges, FloorCourt, FloorDecor, FloorForge, FloorGarage, FloorPlan as FloorPlanActions, FloorQueue, FloorRoom, FloorTv, FloorWorkers } from './floor-actions.js';
 import type { HostRegistry, HostSocket } from './floor-hosts.js';
 import type { FromFloor, ToOffice } from '../shared/floorhost.js';
 
@@ -72,6 +73,8 @@ interface Pending {
  */
 export class RemoteFloor implements FloorActions {
   readonly dir: string;
+  readonly meetings = new RemoteMeetings((t, body) => this.call(t, body), () => this.announced.meetingSpaces === true, () => this.last<MeetingState>('meeting', { current: null, past: [] }));
+  meetingCommunications() { return this.last<import('../shared/communications.js').CommunicationsState>('communications', { messages: [] }); }
   readonly masterWorkers = new RemoteTeams((t, body) => this.call(t, body), () => this.announced.masterWorkers === true);
   readonly cinema = new RemoteCinema((t, body) => this.call(t, body), () => this.reachable, () => this.announced.cinema === true);
   readonly bossMode = new RemoteBoss((t, body) => this.call(t, body), () => this.announced.bossMode, () => this.reachable);
@@ -108,7 +111,7 @@ export class RemoteFloor implements FloorActions {
     /** The floor's identity, as the host announced it. Named so refusals and the elevator can use it. */
     readonly def: { id: string; name: string; dir: string; repo?: string; palette: number; addedBy: string; addedAt: number },
     /** What the host's `ready` frame said, kept here so the office can describe the floor it is in. */
-    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean; cinema?: boolean; masterWorkers?: boolean; lore?: boolean; curator?: boolean; bossMode?: boolean; lights?: boolean } = { providers: [], forge: 'github' },
+    private announced: { branch?: string; providers: AgentProvider[]; forge: ForgeKind; bossGuard?: boolean; workerBreaks?: boolean; cinema?: boolean; meetingSpaces?: boolean; masterWorkers?: boolean; lore?: boolean; curator?: boolean; bossMode?: boolean; lights?: boolean } = { providers: [], forge: 'github' },
   ) {
     // The office keeps this for identity, and must never use it: it is a path on the host.
     this.dir = '';
@@ -202,7 +205,7 @@ export class RemoteFloor implements FloorActions {
       // The same frame is where the host says which branch it is on and which agents it has, which is
       // what `project` and `officeDefault` answer from. Recorded here rather than in the constructor,
       // because the office registers a hosted floor from the building long before its machine pairs.
-      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true, cinema: msg.floor.cinema === true, masterWorkers: msg.floor.masterWorkers === true, lore: msg.floor.lore === true, curator: msg.floor.curator === true, bossMode: msg.floor.bossMode === true, lights: msg.floor.lights === true };
+      this.announced = { branch: msg.floor.branch, providers: msg.floor.providers ?? [], forge: msg.floor.forge, bossGuard: msg.floor.bossGuard === true, workerBreaks: msg.floor.workerBreaks === true, cinema: msg.floor.cinema === true, meetingSpaces: msg.floor.meetingSpaces === true, masterWorkers: msg.floor.masterWorkers === true, lore: msg.floor.lore === true, curator: msg.floor.curator === true, bossMode: msg.floor.bossMode === true, lights: msg.floor.lights === true };
       return;
     }
     // An unaddressed refusal (no floor) is about the connection, not a call, so it never settles one.
@@ -505,19 +508,6 @@ export class RemoteFloor implements FloorActions {
       // derives its title from, so there is nothing to ask the host for.
       title: () => tvTitle(remote.last<TvState>('tv', TV_OFF).url),
       state: () => remote.last<TvState>('tv', TV_OFF),
-    };
-  }
-
-  get meetings(): FloorMeetings {
-    const remote = this;
-    return {
-      start: async (req: MeetingRequest, by, owner) => String((await remote.call('meeting.start', { req, by, owner })) ?? ''),
-      stop: async (by) => String((await remote.call('meeting.stop', { by })) ?? ''),
-      finishAnyway: async (id, by) => String((await remote.call('meeting.finish', { id, by, allowUnresolved: true })) ?? ''),
-      // A meeting is refused by kind on a hosted floor — the room's people are in the office, not here
-      // — so this asks the host only so the refusal is the host's own words rather than a guess.
-      clear: async (by) => String((await remote.call('meeting.clear', { by })) ?? ''),
-      state: () => remote.last<MeetingState>('meeting', { current: null, past: [] }),
     };
   }
 

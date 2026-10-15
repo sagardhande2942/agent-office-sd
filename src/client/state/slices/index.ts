@@ -1,3 +1,4 @@
+import { meetingSpaces } from './meeting-spaces';
 import { knowledge } from './knowledge';
 import { bossMode } from './boss-mode';
 import { lore } from './lore';
@@ -88,4 +89,5 @@ export const SLICES: readonly Slice[] = [
   tableTennis,
   bossMode,
   knowledge,
+  meetingSpaces,
 ];

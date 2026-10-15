@@ -13,7 +13,7 @@ import path from 'node:path';
 import type { AgentChoice, AgentEffort, AgentProvider, TerminalHit, WorkerInfo, WorkerKind, WorkerRepo, WorkerStatus } from '../../shared/protocol.js';
 import { AGENT_PROVIDERS, providerMeta, takesEffort, takesModel } from '../../shared/providers.js';
 import { Worktrees, workspaceOf, type WorktreeCleanup, type WorktreeState } from '../worktrees.js';
-import { DESK_BY_ID, STATION_AGENT, deskBuilt } from '../../shared/layout.js'; import { stationBrief } from '../stations.js';
+import { DESK_BY_ID, STATION_AGENT, deskBuilt } from '../../shared/layout.js'; import { meetingSeatOccupied } from '../meeting-spaces/seats.js'; import { stationBrief } from '../stations.js';
 import type { CodingAgents } from '../coding-agents.js'; import type { PromptSource } from '../prompts.js';
 import type { GhAs } from '../signins.js'; import type { ServiceOwner } from '../services.js';
 import { addUsage, newTracker, scanTracker, trackerUsage, zeroUsage, type Ledger } from '../usage.js';
@@ -132,7 +132,7 @@ export class WorkerManager {
     this.host = new PtyHost(dataDir, () => this.events.toast("The workers' terminal host stopped — resuming them", 'warn'));
     this.scrollback = new ScrollbackStore(dataDir);
     this.drops = new DropStore(dataDir);
-    restoreWorkers(this.statePath, this.workers, this.defaultProvider, (deskId) => this.deskOccupied(deskId));
+    restoreWorkers(this.statePath, this.workers, this.defaultProvider, (deskId, meeting) => meetingSeatOccupied(this.workers.values(), deskId, meeting));
     this.scrollback.prune(new Set(this.workers.keys()));
     this.drops.prune(new Set(this.workers.keys()));
     // A session may have ended (and written its final tally) while the office was down.
@@ -248,7 +248,7 @@ export class WorkerManager {
     if (!deskBuilt(seat, this.wing())) return `${seat.label} isn't built yet: expand the back office first`;
     // A helper stands at a desk somebody is already sitting at, so only the host's desk being taken
     // is a problem, and only for anything that isn't a helper.
-    if (this.deskOccupied(deskId) && !(helper && isHelperId(deskId))) return seat.station ? `The ${STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
+    if (meetingSeatOccupied(this.workers.values(), deskId, meeting?.id) && !(helper && isHelperId(deskId))) return seat.station ? `The ${STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
     if (kind === 'shell' && seat.station) return 'A board agent is always an agent, not a shell';
     if (seat.station && !prompt?.trim()) return 'Tell the board agent what to do';
     const planError = planningSeat(seat, planReview, kind, worktree, selectedProvider, model, binScript('office-workers.js'), (selectedProvider === this.defaultProvider ? this.agentPath : resolveCommand('opencode')) ?? 'opencode');

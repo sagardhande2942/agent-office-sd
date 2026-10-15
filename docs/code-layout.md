@@ -129,3 +129,14 @@ Worker appearance factories register through `client/world/character/appearance.
 ## Continuous Boss mode
 
 `src/server/boss-mode/` owns the persisted scheduler, worker lifecycle, independent checks, delivery monitoring, and floor-host bridge. It registers through worker features, WebSocket handlers, hooks, and TUI commands. `team-sessions.ts` lets its initiatives reuse the team coordinator without changing the regular Master / Workers feature. Shared configuration and protocol types live in `src/shared/boss-mode/`; the client state slice, `features/boss-mode/`, and shared console register alongside other modules. See [Boss mode](boss-mode.md) for operation and recovery.
+
+### Meeting spaces
+
+`server/meeting-spaces/` composes independent instances of the existing meeting workflow. Its catalogue and per-space state persist separately; legacy `meetings.json` remains the Main meeting. The worker seat seam scopes occupancy by meeting identity while retaining the shared worker runtime and physical layout.
+
+`client/features/meeting-spaces/` joins `MEETING_WINDOW_EXTENSIONS` to add the selector and scope meeting commands. Its state slice keeps the full space catalogue and projects the selected meeting locally. `WORKER_VISIBILITY` lets features filter scene and desk projections without deleting background workers from the live roster.
+
+Remote meeting spaces use `server/meeting-spaces/remote.ts` for the proxy, `office.ts` for office capacity reservations and local/remote sign-in routing, and `host.ts` for host command dispatch and the authenticated persistent inbox. They register on the existing host dispatcher and floor action surface. The host announces `meetingSpaces`, streams meeting and communications snapshots, and runs the existing engines against its own checkout.
+
+
+Meeting reality portals live in `client/features/meeting-portals/`: `logic.ts` owns dial and crossing rules; `preview.ts` renders a bounded destination scene using existing character models and live state; `world.ts` owns the anchor and doorway; `ui.ts` owns the destination dial; `transition.ts` commits personal selection and cancels pending effects on floor changes; `sound.ts` supplies synthesized cues through the office’s sound recipe seam. The module installs through the interaction, usable, tick, and message registries. `ui/meeting-space-navigation.ts` lets the existing meeting window launch the navigator without importing the feature. No server execution or meeting lifecycle is added.

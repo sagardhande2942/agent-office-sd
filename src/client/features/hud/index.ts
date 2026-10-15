@@ -1,3 +1,4 @@
+import { visibleWorkers } from '../../state/worker-visibility';
 /**
  * The HUD: a few buttons on the top bar, everything else in the ☰ menu (Tab), with H for the controls
  * and F to hang a picture; the project in the corner (click it for the floors); Settings, and your
@@ -44,7 +45,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
   });
 
   // ---- The HUD: a few buttons on the top bar, everything else in the ☰ menu ----------------------------
-  const waitingNow = () => waitingInOrder(store.workers.values());
+  const waitingNow = () => waitingInOrder(visibleWorkers(store));
   const noMedia = () => (window.isSecureContext ? undefined : 'Voice and screen sharing need HTTPS or localhost — use a TLS proxy, --self-signed, or an SSH tunnel');
   const hud = mountHud(
     [
