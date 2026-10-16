@@ -1,3 +1,4 @@
+import { renovation, renovatable } from '../../features/renovation/world';
 import { planReviewTable } from '../../features/plan-review/world';
 import { handoffStation } from '../../features/handoff/world';
 import { enhancements } from './enhancements';
@@ -57,22 +58,22 @@ function floorPlan() {
     ...downstairs(cars, street, green, scenic),
     plug,
     tower,
-    desks,
+    renovatable(desks, 'desks'),
     beanbags,
-    kiosks,
-    boards,
+    renovatable(kiosks, 'kiosks'),
+    renovatable(boards, 'boards'),
     // The lounge: the TV, the couch and its table and poufs, and the jukebox and the arcade in the corner.
-    tv,
-    machineMonitor,
-    lounge,
+    renovatable(tv, 'tv'),
+    renovatable(machineMonitor, 'monitor'),
+    renovatable(lounge, 'lounge'),
     jukebox,
-    cabinet,
-    bookshelf,
-    loreShelf,
-    samsungKitchen,
+    renovatable(cabinet, 'cabinet'),
+    renovatable(bookshelf, 'bookshelf'),
+    renovatable(loreShelf, 'lore'),
+    renovatable(samsungKitchen, 'kitchen'),
     plants,
     basketballPlant,
-    lamps,
+    renovatable(lamps, 'lamps'),
     wing,
     signs,
     deskToys,
@@ -88,6 +89,7 @@ function floorPlan() {
     whiteboard,
     clearOfStairs,
     enhancements,
+    renovation,
   ] as const;
 }
 

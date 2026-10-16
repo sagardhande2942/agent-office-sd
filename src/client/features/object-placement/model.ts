@@ -1,8 +1,10 @@
 import * as THREE from 'three';
 import type { Collider } from '../../world/types';
 
+export let placementRevision = 0;
+
 export interface Transform { position: number[]; rotation: number[]; scale: number[] }
-export interface Editable { id: string; label: string; object: THREE.Object3D; initial: Transform; collider?: Collider; collisionBox?: THREE.Box3 }
+export interface Editable { id: string; label: string; object: THREE.Object3D; initial: Transform; collider?: Collider; colliders?: Collider[]; onApply?: () => void; collisionBox?: THREE.Box3 }
 export function snapshot(o: THREE.Object3D): Transform {
   return { position: o.position.toArray(), rotation: [o.rotation.x, o.rotation.y, o.rotation.z], scale: o.scale.toArray() };
 }
@@ -18,10 +20,12 @@ export function apply(e: Editable, t: Transform) {
   e.object.rotation.set(t.rotation[0], t.rotation[1], t.rotation[2]);
   e.object.scale.fromArray(t.scale);
   e.object.updateWorldMatrix(true, true);
+  placementRevision++;
   if (e.collider) {
     const b = e.collisionBox!.clone().applyMatrix4(e.object.matrixWorld);
     Object.assign(e.collider, { minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z, bottom: b.min.y, top: b.max.y });
   }
+  e.onApply?.();
 }
 /** Explicit opt-in; gameplay fixtures remain protected by default. IDs must survive rebuilds. */
 export function editable(object: THREE.Object3D, id: string, label: string, collider?: Collider) {

@@ -45,7 +45,8 @@ try {
   await page.waitForFunction(() => window.__office?.store.floor === 'f2' && window.__office.player.enabled);
   async function openEditor() {
     await page.getByRole('button', {name:'Menu', exact:true}).click();
-    await page.getByRole('menuitem', {name:'Customize objects'}).click();
+    await page.getByLabel('Search office menu').fill('Renovation');
+    await page.getByRole('menuitem', {name:'Renovation mode'}).click();
     await page.waitForSelector('.object-placement');
   }
   async function objectPixel(id) {
@@ -108,7 +109,7 @@ try {
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>document.querySelector('.object-placement p').textContent.includes('Potted plant'));
   await page.getByRole('button',{name:'Rotate',exact:true}).click();
-  await page.getByRole('checkbox').click();
+  await page.getByLabel('Snap 15°').click();
   await page.getByLabel('Rotation degrees').fill('23'); await page.getByLabel('Rotation degrees').press('Tab');
   assert.ok(Math.abs(Number(await page.getByLabel('Rotation degrees').inputValue())-30)<1e-6);
   await page.getByRole('button',{name:'Reset Transform',exact:true}).click();

@@ -9,3 +9,7 @@
 .placement-controls input[type=number] { width: 74px; }
 .placement-controls input[type=number] { font: inherit; border: 2px solid var(--ink); border-radius: 8px; padding: 4px; }
 .placement-backdrop ~ .backdrop { pointer-events: auto; }
+
+.renovation-tools { display: grid; gap: 8px; margin-bottom: 10px; }
+.renovation-tools label { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.renovation-tools select { min-width: 0; max-width: 100%; flex: 1; padding: 6px; border: 2px solid var(--ink); border-radius: 8px; font: inherit; }
