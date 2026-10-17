@@ -1,3 +1,4 @@
+import { PLACEMENT_TOOLS } from './extensions';
 import * as THREE from 'three';
 import type { Ctx } from '../../core/context';
 import { store } from '../../state';
@@ -22,11 +23,13 @@ export function installObjectPlacement(ctx: Ctx) {
   let mode: 'move' | 'rotate' | 'scale' = 'move', startX = 0, startAngle = 0, startScale = 1;
   let snap = false;
   let cursorX = 0, cursorY = 0;
-  const status = h('p', {}, 'Select a plant, rug or coffee table. Changes save automatically.');
+  const status = h('p', {}, 'Choose furniture from the list or click it in the room. Changes save automatically.');
   const controls = h('div.placement-controls');
+  let tools: ReturnType<(typeof PLACEMENT_TOOLS)[number]>[] = [];
+  const toolHost = h('div');
   const validBounds = (e: Editable) => {
     box.setFromObject(e.object);
-    return box.min.x >= FLOOR.minX + .15 && box.max.x <= FLOOR.maxX - .15 && box.min.z >= FLOOR.minZ + .15 && box.max.z <= FLOOR.maxZ - .15 && box.min.y >= -.05 && box.max.y <= 6.7;
+    return box.min.x >= FLOOR.minX - .05 && box.max.x <= FLOOR.maxX + .05 && box.min.z >= FLOOR.minZ - .05 && box.max.z <= FLOOR.maxZ + .05 && box.min.y >= -.05 && box.max.y <= 6.85;
   };
   const save = new PlacementSave(localStorage, () => { status.textContent = 'Browser cache unavailable; shared saving continues through the office.'; });
   const live = new LivePlacements(msg => ctx.net.send(msg), () => ctx.net.up);
@@ -35,15 +38,16 @@ export function installObjectPlacement(ctx: Ctx) {
   function flush() { const [floor, map] = sceneKey(); save.flush(); live.flush(floor, map); }
   const visible = (o: THREE.Object3D) => { for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) return false; return true; };
   function select(e: Editable | null) {
-    flush(); selected = e; outline.visible = !!e; controls.hidden = !e;
-    status.textContent = e ? `${e.label} · drag to ${mode}. Auto-save enabled.` : 'Select a plant, rug or coffee table. Changes save automatically.';
-    if (e) { angle.value = String(e.object.rotation.y * 180 / Math.PI); size.value = String(e.object.scale.x / e.initial.scale[0]); box.setFromObject(e.object); }
+    flush(); selected = e;
+    for (const tool of tools) tool.refresh?.(); outline.visible = !!e; controls.hidden = !e;
+    status.textContent = e ? `${e.label} · drag to ${mode}. Auto-save enabled.` : 'Choose furniture from the list or click it in the room. Changes save automatically.';
+    if (e) { positions.forEach((input, i) => { input.value = String(e.object.position.getComponent(i)); }); angle.value = String(e.object.rotation.y * 180 / Math.PI); size.value = String(e.object.scale.x / e.initial.scale[0]); box.setFromObject(e.object); }
   }
   function change(t = selected && snapshot(selected.object)) {
     if (!selected || !t) return;
     const old = snapshot(selected.object);
     apply(selected, t); box.setFromObject(selected.object);
-    if (!validBounds(selected)) {
+    if (!validPlacement(selected.id, t) || !validBounds(selected)) {
       apply(selected, old); box.setFromObject(selected.object);
       (outline.material as THREE.LineBasicMaterial).color.set(0xef476f); status.textContent = 'Keep the entire object inside the room.'; return;
     }
@@ -51,11 +55,17 @@ export function installObjectPlacement(ctx: Ctx) {
     save.queue(scope, selected.id, snapshot(selected.object));
     const [floor, map] = sceneKey(); if (floor) live.queue(floor, map, selected.id, snapshot(selected.object));
     status.textContent = `${selected.label} · syncing with office`;
+    positions.forEach((input, i) => { input.value = String(selected!.object.position.getComponent(i)); });
     angle.value = String(selected.object.rotation.y * 180 / Math.PI);
     size.value = String(selected.object.scale.x / selected.initial.scale[0]);
   }
   const button = (label: string, run: () => void) => h('button.btn', { type: 'button', onclick: run }, label);
   const angle = h('input', { type: 'number', step: '.1', 'aria-label': 'Rotation degrees' });
+  const positions = ['X', 'Y', 'Z'].map(axis => h('input', { type: 'number', step: '.1', 'aria-label': `Position ${axis}` }));
+  positions.forEach((input, axis) => {
+    input.addEventListener('input', () => { if (selected && Number.isFinite(input.valueAsNumber)) { const t = snapshot(selected.object); t.position[axis] = input.valueAsNumber; change(t); } });
+    input.addEventListener('change', flush);
+  });
   const size = h('input', { type: 'number', min: '.25', max: '3', step: '.01', 'aria-label': 'Scale multiplier' });
   function rotate(degrees: number) {
     if (!selected || !Number.isFinite(degrees)) return;
@@ -70,6 +80,7 @@ export function installObjectPlacement(ctx: Ctx) {
   for (const input of [angle, size]) input.addEventListener('change', flush);
   const snapInput = h('input', { type: 'checkbox' }); snapInput.onchange = () => { snap = snapInput.checked; };
   controls.append(
+    ...positions.map((input, i) => h('label', {}, ['X ', 'Height ', 'Z '][i], input)),
     ...(['move', 'rotate', 'scale'] as const).map(m => button(m[0].toUpperCase() + m.slice(1), () => { mode = m; select(selected); })),
     h('label', {}, 'Angle ° ', angle), h('label', {}, snapInput, ' Snap 15°'),
     button('Reset rotation', () => { if (selected) { const t = snapshot(selected.object); t.rotation = [...selected.initial.rotation]; change(t); flush(); } }),
@@ -88,13 +99,15 @@ export function installObjectPlacement(ctx: Ctx) {
     ctx.activities.stopAll('start');
     const touchAction = ctx.canvas.style.touchAction; ctx.canvas.style.touchAction = 'none';
     const navigation = !isTopdownRoute();
-    const panel = h('section.object-placement', { 'aria-label': 'Customize objects' }, h('header', {}, h('h2', {}, 'Customize objects')), status,
+    const panel = h('section.object-placement', { 'aria-label': 'Renovation mode' }, h('header', {}, h('h2', {}, 'Renovation mode')), status, toolHost,
       navigation ? h('p', {}, 'WASD / arrows to walk · right-drag to look · left-drag to edit') : null, controls);
     panel.addEventListener('focusin', () => ctx.player.clearKeys());
-    modal = openModal(panel, { allowMovement: navigation, backdropCloses: false, doing: 'customizing objects', onClose: () => { end(); select(null); modal = null; ctx.canvas.style.touchAction = touchAction; } });
+    tools = PLACEMENT_TOOLS.map(create => create({ entries: entries.filter(e => visible(e.object)), select, selected: () => selected }));
+    toolHost.replaceChildren(...tools.map(t => t.element));
+    modal = openModal(panel, { allowMovement: navigation, backdropCloses: false, doing: 'renovating the office', onClose: () => { end(); select(null); for (const tool of tools) tool.close?.(); tools = []; modal = null; ctx.canvas.style.touchAction = touchAction; } });
     modal.backdrop.classList.add('placement-backdrop'); select(null);
   }
-  HUD_ACTIONS.push({ id: 'object-placement', icon: '↔', label: 'Customize objects', section: 'Customize', run: open,
+  HUD_ACTIONS.push({ id: 'object-placement', icon: '↔', label: 'Renovation mode', section: 'Customize', run: open,
     blocked: () => !ctx.net.up ? 'Reconnect to customize the shared office' : !ctx.inOffice() || ctx.upTop() ? 'Available on office floors' : undefined });
   function aim(x: number, y: number) {
     const r = ctx.canvas.getBoundingClientRect(); ndc.set((x - r.left) / r.width * 2 - 1, -(y - r.top) / r.height * 2 + 1);
@@ -153,6 +166,7 @@ export function installObjectPlacement(ctx: Ctx) {
     apply(entry, msg.transform);
     save.queue(scope, entry.id, msg.transform);
     if (selected === entry) {
+      positions.forEach((input, i) => { input.value = String(entry.object.position.getComponent(i)); });
       box.setFromObject(entry.object); angle.value = String(entry.object.rotation.y * 180 / Math.PI); size.value = String(entry.object.scale.x / entry.initial.scale[0]);
       status.textContent = msg.t === 'placement.rejected' ? msg.reason : `${entry.label} · ${msg.saved ? 'saved to shared office' : 'live update'}`;
     }

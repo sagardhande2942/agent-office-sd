@@ -42,6 +42,8 @@ curl -fsSL https://raw.githubusercontent.com/sagardhande2942/agent-office-sd/mai
 
 ## What it is
 
+- **Renovation mode.** Open **Menu → Renovation mode** to rearrange desks (with their chairs, laptops and workers), lounge furniture, boards, screens, shelves, the kitchen, ceiling lamps, plants and rugs. Pick an object from the list or click it, then drag, rotate, scale or enter X/Height/Z values. Furniture may overlap. **Walk through furniture while renovating** is enabled by default; closing with ✕ or Esc restores collisions and mouse-look. Layouts save to the server and sync across the floor. Structural surfaces and activity fixtures remain fixed. See [renovation controls](docs/object-placement.md).
+
 - **Parallel worlds.** Explore three implementations of one task: **🌀 Parallel worlds** launches isolated agents from the same commit, with distinct approaches and branches. Gates appear while a variant is starting, working, or waiting for input; completed results remain in the menu. Enter a glowing portal in the Office map's south aisle to inspect its working preview, compare all three, give feedback and select a winner for a PR. See [docs/parallel-worlds.md](docs/parallel-worlds.md) for preview tunnels, requirements and preservation behavior.
 
 - **A floor per project.** Ride the elevator, pick one of your GitHub repos, and the office clones it (showing how far along it is) and opens a floor for it. Every worker, board and queue on that floor works in that checkout.

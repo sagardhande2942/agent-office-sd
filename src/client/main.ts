@@ -1,3 +1,4 @@
+import { installRenovation } from './features/renovation';
 import { installMeetingPortals } from './features/meeting-portals';
 import { installMeetingSpaces } from './features/meeting-spaces';
 import { installKnowledge } from './features/knowledge';
@@ -226,6 +227,7 @@ installParallelWorlds(ctx, parts);
 installViewSelector(ctx);
 installTopdown(ctx, core, parts);
 installPerformance(ctx);
+installRenovation(ctx);
 installObjectPlacement(ctx);
 installCodingAgents(ctx);
 parts.hud = installHud(ctx, core, parts);

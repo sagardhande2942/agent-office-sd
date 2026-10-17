@@ -1,3 +1,4 @@
+import { officeNavigationSource } from './navigation-source.js';
 // Getting around a floor on a coarse grid, round the furniture: the dog's walks (server/dog.ts), a
 // worker's way out when it's sent home, and on a map of its own (see shared/maps), a worker's walks
 // about the hall. The office's grid is below; a map builds one from its plan (NavGrid).
@@ -316,6 +317,7 @@ export const pathLength = (pts: Pt[]) => pts.reduce((n, p, i) => (i ? n + Math.h
 /** The office floor downstairs (no stairs, no loft, no elevator), built out `wing` rows, made the first time it's needed. */
 const OFFICE_NAVS: NavGrid[] = [];
 export function officeNav(wing = 0): NavGrid {
+  const live = officeNavigationSource(wing); if (live) return live;
   const level = wingLevel(wing);
   // Through where the north wall was, into the back office: between its walls, short of its back one.
   const on: Floorplan = (x, z, m) =>
