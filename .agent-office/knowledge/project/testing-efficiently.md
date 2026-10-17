@@ -1,8 +1,8 @@
 ---
 title: "Fast, reliable test iteration"
 summary: "Use npm run test:focus -- tests/<affected>.test.ts and test:profile:focus; finish builds before integrations, run final checks once, and investigate probe/startup flakes."
-author: "worker:ab37cab0c171"
-updated: "2026-10-14"
+author: "worker:76f668848730"
+updated: "2026-10-15"
 status: "active"
 pinned: true
 tags: ["testing","performance"]
@@ -31,3 +31,5 @@ The observed full profile also found registry guards at 26.956 seconds and compo
 Known flakes: the live floor probes fake HTTP servers with GET / and user-agent agent-office. Exclude only that discovery probe from exact request accounting; office-workers.test.ts injects it deterministically. worker-shutdown.test.ts starts its seven-second shutdown guard after module imports and bounds startup separately. Record failures and passing isolation runs honestly; retries alone do not prove a fix.
 
 New implementation worker prompts include focused-testing guidance via WORKER_COORDINATION in src/server/prompts.ts. The worker manager appends it for normal implementation launches, including customized prompts and providers. Read-only planning launches retain their plan-only restrictions.
+
+The same discovery probe can reach the HTTP fixture in `tests/codex.test.ts` and cause `Unexpected end of JSON input` when an empty GET body is parsed as hook JSON. The fixture excludes only `GET /` with `user-agent: agent-office` and injects that probe before the real helper POST, retaining authorization, path, and bounded-payload assertions. Verify with `npm run test:focus -- tests/codex.test.ts`.
