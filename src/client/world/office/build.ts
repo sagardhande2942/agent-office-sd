@@ -1,6 +1,6 @@
 import { renovation, renovatable } from '../../features/renovation/world';
 import { planReviewTable } from '../../features/plan-review/world';
-import { handoffStation } from '../../features/handoff/world';
+import { serverRack } from '../../features/server-rack/world';
 import { enhancements } from './enhancements';
 import { basketballPlant } from './basketball-plant';
 import * as THREE from 'three';
@@ -65,6 +65,7 @@ function floorPlan() {
     // The lounge: the TV, the couch and its table and poufs, and the jukebox and the arcade in the corner.
     renovatable(tv, 'tv'),
     renovatable(machineMonitor, 'monitor'),
+    serverRack,
     renovatable(lounge, 'lounge'),
     jukebox,
     renovatable(cabinet, 'cabinet'),
@@ -81,7 +82,6 @@ function floorPlan() {
     meetingRoom,
     screeningRoom,
     planReviewTable,
-    handoffStation,
     elevator,
     garageLift,
     gong,

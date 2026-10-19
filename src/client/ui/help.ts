@@ -18,6 +18,7 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['🤖', 'An agent stands by the issues board, the PR board and the task queue. Press E at one and type what you want: it runs as an agent that knows that board. O there opens its terminal, X sends it home'],
   ['📝', 'The whiteboard on wheels between the desks and the lounge: press E to draw on it with everyone on your floor, live. What you draw stays up on the board'],
   ['📜', 'The Knowledge shelf on the west wall beside the basketball hoop: browse the project knowledge tree, review local handovers, or edit durable project notes. Also in the ☰ menu.'],
+  ['🗄️', 'The Server Rack on the west wall beneath the machine monitor: press E to inspect CPU & memory telemetry, manage worker capacity, and open, preview or stop active worker dev servers.'],
   ['🕹️', 'The arcade cabinet in the lounge plays BLOCKFALL: arrows (or WASD) move and turn, Space drops, C holds, P pauses. Everyone on the floor sees your game on it, and E there watches whoever is playing. One of your workers needing input pauses it'],
   ['🎬', 'The screening room in the meeting room: the reels its workers recorded of the build, each shot captioned. E at the screen opens the window and puts a reel on the wall for everyone on your floor'],
   ['🎉', 'Whenever a pull request merges, the gong next to the PR board rings, confetti rains down all over the floor and every worker gets up on its desk for a quick dance. Walk up to the gong and press E to bang it yourself'],

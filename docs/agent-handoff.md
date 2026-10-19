@@ -1,6 +1,6 @@
 # Agent handoff station
 
-The Handoff station preserves unfinished work as a durable packet on its floor. Open **Handoff station** from the office menu, its fixture, or Lite to inspect offers, acceptance, cancellation and inbox receipts. Observers can inspect evidence and open participant terminals; viewing a packet never accepts it.
+The Handoff station preserves unfinished work as a durable packet on its floor. Open **Handoff station** from the office menu (`☰`), command palette (`Ctrl+K`), or Lite to inspect offers, acceptance, cancellation and inbox receipts. Observers can inspect evidence and open participant terminals; viewing a packet never accepts it.
 
 ## Create an offer
 

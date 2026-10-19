@@ -106,17 +106,15 @@ test('fetching a floor asks for it by name and surfaces what the office said', a
   await assert.rejects(() => fetchHandoffs('f', respond({ nope: true })), /unexpected response/);
 });
 
-test('the office installs the station once, as its own feature with its own fixture', () => {
+test('the office installs the station once, as its own feature without a physical floor booth', () => {
   const main = client('main.ts');
   assert.equal(main.split('installHandoff(ctx').length - 1, 1, 'main.ts installs the handoff station once');
   const index = client('features/handoff/index.ts');
-  assert.match(index, /export function installHandoff\(ctx: Ctx, parts: Pick<Parts, 'waiting'>\)/);
-  assert.match(index, /interactions\.define\('handoffstation'/);
+  assert.match(index, /export function installHandoff\(_?ctx: Ctx, parts: Pick<Parts, 'waiting'>\)/);
   assert.match(index, /HUD_ACTIONS\.push/);
+  assert.match(index, /PALETTE_ENTRIES\.push/);
   const build = client('world/office/build.ts');
-  assert.match(build, /import \{ handoffStation \} from '\.\.\/\.\.\/features\/handoff\/world'/);
-  assert.match(build, /^\s*handoffStation,$/m);
-  assert.match(client('features/handoff/world.ts'), /kind: 'handoffstation'/);
+  assert.doesNotMatch(build, /handoffStation/);
 });
 
 test('Lite opens the station through the shared module alone, which loads no three.js', () => {
