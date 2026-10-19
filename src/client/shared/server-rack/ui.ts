@@ -6,7 +6,7 @@ import { store } from '../../state';
 import { h, openModal, timeAgo, toast, type Modal } from '../../ui/dom';
 import { autoTunnel, serviceUrl } from '../../ui/services';
 import { copyButton } from '../../ui/team';
-import { stopServicePort } from './api';
+import { scanServicePorts, stopServicePort } from './api';
 import {
   buildServiceBlades,
   formatGb,
@@ -71,6 +71,7 @@ export function openServerRack(net: Net, openWorker: (workerId: string) => void)
 
   let previewPort: number | null = null;
   let stoppingPort: number | null = null;
+  let scanning = false;
 
   const badge = h('span.rack-badge', { 'data-level': 'ok' });
   const close = h('button.btn.close.corner', { type: 'button', 'aria-label': 'Close Server Rack', title: 'Close (Esc)' }, '✕');
@@ -78,6 +79,15 @@ export function openServerRack(net: Net, openWorker: (workerId: string) => void)
   const memSpark = h('canvas.rack-spark') as HTMLCanvasElement;
   const gauges = h('div.rack-grid');
   const capacity = h('div.rack-capacity');
+  const scanBtn = h(
+    'button.btn.rack-scan-btn',
+    {
+      type: 'button',
+      title: 'Scan worker processes for newly opened HTTP ports right now',
+      onclick: () => void handleScan(),
+    },
+    '🔄 Scan ports',
+  ) as HTMLButtonElement;
   const blades = h('div.rack-blades');
   const previewHost = h('div');
   const tunnelBox = h(
@@ -120,13 +130,36 @@ export function openServerRack(net: Net, openWorker: (workerId: string) => void)
       {},
       gauges,
       capacity,
-      h('h3.rack-section-h', {}, 'Server Blades — Active Worker Dev Servers'),
+      h(
+        'div.rack-section-bar',
+        {},
+        h('h3.rack-section-h', {}, 'Server Blades — Active Worker Dev Servers'),
+        scanBtn,
+      ),
       blades,
       previewHost,
       tunnelBox,
     ),
     h('footer', {}, h('span.grow', {}, 'Live CPU & memory telemetry from this machine, plus HTTP ports opened by workers across the floor.')),
   );
+
+  async function handleScan() {
+    if (scanning) return;
+    scanning = true;
+    scanBtn.disabled = true;
+    scanBtn.textContent = '🔄 Scanning…';
+    try {
+      const { count } = await scanServicePorts();
+      toast(count === 1 ? 'Scanned — 1 active dev server' : `Scanned — ${count} active dev servers`);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not scan worker ports', 'error');
+    } finally {
+      scanning = false;
+      scanBtn.disabled = false;
+      scanBtn.textContent = '🔄 Scan ports';
+      render();
+    }
+  }
 
   async function handleStop(svc: ServiceInfo) {
     if (stoppingPort !== null) return;

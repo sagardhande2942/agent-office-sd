@@ -30,7 +30,9 @@
 .rack-cap-admin { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .rack-cap-admin input { width: 76px; padding: 5px 8px; }
 
-.rack-section-h { margin: 14px 0 8px; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.rack-section-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 14px 0 8px; }
+.rack-section-h { margin: 0; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.rack-scan-btn { padding: 4px 10px; font-size: 12px; }
 .rack-blades { display: flex; flex-direction: column; gap: 8px; }
 .rack-blade { border: 2px solid var(--ink); border-radius: 10px; background: #1e2235; color: #f8f9fa; padding: 10px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .rack-blade.idle { background: var(--paper-2); color: var(--muted); border-style: dashed; }

@@ -39,6 +39,13 @@ export function rackHintSummary(m: MachineState, servicesCount: number): string 
   return `${m.cpu}% CPU · ${memPct}% RAM · ${srv}`;
 }
 
+export function beaconState(m: MachineState): { level: LoadLevel; hex: string; peak: number } {
+  const peak = Math.max(m.cpu, memoryPercent(m));
+  if (m.pressure || peak >= 85) return { level: 'critical', hex: '#ef476f', peak };
+  if (officeFull(m) || peak >= 65) return { level: 'warn', hex: '#ffd166', peak };
+  return { level: 'ok', hex: '#06d6a0', peak };
+}
+
 export interface ServiceBladeSlot {
   slot: number;
   service?: ServiceInfo;

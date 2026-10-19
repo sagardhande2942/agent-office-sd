@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import type { MachineState, ServiceInfo } from '../src/shared/protocol.js';
 import {
   RACK_BLADE_SLOTS,
+  beaconState,
   buildServiceBlades,
   formatGb,
   loadHex,
@@ -12,8 +13,8 @@ import {
   memoryPercent,
   rackHintSummary,
 } from '../src/client/shared/server-rack/format.js';
-import { stopServicePort, type RackStopResponse } from '../src/client/shared/server-rack/api.js';
-import { parseStopPort, stopTrackedService } from '../src/server/server-rack/routes.js';
+import { scanServicePorts, stopServicePort, type RackStopResponse } from '../src/client/shared/server-rack/api.js';
+import { parseStopPort, scanTrackedServices, stopTrackedService } from '../src/server/server-rack/routes.js';
 import { buildServerRack } from '../src/client/features/server-rack/world.js';
 
 const client = (p: string) => readFileSync(new URL(`../src/client/${p}`, import.meta.url), 'utf8');
@@ -42,7 +43,7 @@ const sampleService: ServiceInfo = {
   since: 1_700_000_000_000,
 };
 
-test('telemetry formatting computes load levels, memory percent, badges and hint summary', () => {
+test('telemetry formatting computes load levels, memory percent, badges, beacon state and hint summary', () => {
   assert.equal(loadLevel(42), 'ok');
   assert.equal(loadLevel(75), 'warn');
   assert.equal(loadLevel(92), 'critical');
@@ -66,6 +67,10 @@ test('telemetry formatting computes load levels, memory percent, badges and hint
     level: 'critical',
   });
 
+  assert.deepEqual(beaconState(sampleMachine), { level: 'ok', hex: '#06d6a0', peak: 50 });
+  assert.deepEqual(beaconState({ ...sampleMachine, cpu: 72 }), { level: 'warn', hex: '#ffd166', peak: 72 });
+  assert.deepEqual(beaconState({ ...sampleMachine, cpu: 90 }), { level: 'critical', hex: '#ef476f', peak: 90 });
+
   assert.equal(rackHintSummary(sampleMachine, 2), '42% CPU · 50% RAM · 2 dev servers');
   assert.equal(rackHintSummary(sampleMachine, 1), '42% CPU · 50% RAM · 1 dev server');
 });
@@ -82,7 +87,7 @@ test('service blades pad up to RACK_BLADE_SLOTS and expand when more servers run
   assert.equal(expanded[5].service?.port, 3005);
 });
 
-test('stopServicePort posts port and surfaces server errors', async () => {
+test('stopServicePort and scanServicePorts post to server rack endpoints and surface errors', async () => {
   const calls: { url: string; init: RequestInit }[] = [];
   const respond = (body: unknown, ok = true, status = 200) =>
     async (url: string, init: RequestInit): Promise<RackStopResponse> => {
@@ -96,11 +101,17 @@ test('stopServicePort posts port and surfaces server errors', async () => {
   assert.equal(calls[0].init.method, 'POST');
   assert.equal(calls[0].init.body, JSON.stringify({ port: 5173 }));
 
+  const scanRes = await scanServicePorts(respond({ ok: true, count: 2 }));
+  assert.deepEqual(scanRes, { ok: true, count: 2 });
+  assert.equal(calls[1].url, '/api/server-rack/scan');
+  assert.equal(calls[1].init.method, 'POST');
+
   await assert.rejects(() => stopServicePort(5173, respond({ error: 'No active worker server on :5173.' }, false, 404)), /No active worker server/);
   await assert.rejects(() => stopServicePort(5173, respond({ nope: true })), /unexpected response/);
+  await assert.rejects(() => scanServicePorts(respond({ error: 'Scan failed' }, false, 500)), /Scan failed/);
 });
 
-test('server-side stopTrackedService only terminates tracked worker services and scans immediately', async () => {
+test('server-side stopTrackedService and scanTrackedServices manage worker services and scan immediately', async () => {
   assert.equal(parseStopPort({ port: 5173 }), 5173);
   assert.equal(parseStopPort({ port: 0 }), undefined);
   assert.equal(parseStopPort({ port: 70000 }), undefined);
@@ -125,14 +136,22 @@ test('server-side stopTrackedService only terminates tracked worker services and
   assert.deepEqual(ok, { ok: true, port: 5173, pid: 4242 });
   assert.deepEqual(killed, [{ pid: 4242, sig: 'SIGTERM' }]);
   assert.equal(scanned, 1);
+
+  const scanResult = await scanTrackedServices(fakeCtx as never);
+  assert.deepEqual(scanResult, { ok: true, count: 1 });
+  assert.equal(scanned, 2);
 });
 
-test('buildServerRack constructs the 3D fixture and updates blade LEDs with machine and service state', () => {
+test('buildServerRack constructs the 3D fixture and updates blade LEDs and thermal beacon', () => {
   const rack = buildServerRack();
   assert.equal(rack.interactable.kind, 'serverrack');
   assert.ok(rack.collider.top > 1.3);
   rack.update(1.5, sampleMachine, 2, false);
+  assert.equal(rack.beaconMat.color.getHexString(), '06d6a0');
+  rack.update(1.8, { ...sampleMachine, cpu: 72 }, 1, true);
+  assert.equal(rack.beaconMat.color.getHexString(), 'ffd166');
   rack.update(2.0, { ...sampleMachine, cpu: 95, pressure: 'CPU is 95% busy' }, 0, true);
+  assert.equal(rack.beaconMat.color.getHexString(), 'ef476f');
 });
 
 test('the office and Lite wire the server rack cleanly without Lite loading 3D modules', () => {
@@ -145,4 +164,5 @@ test('the office and Lite wire the server rack cleanly without Lite loading 3D m
   const ui = client('shared/server-rack/ui.ts');
   assert.match(ui, /h\('button\.btn\.close\.corner'/);
   assert.match(ui, /openModal\(el,/);
+  assert.match(ui, /🔄 Scan ports/);
 });

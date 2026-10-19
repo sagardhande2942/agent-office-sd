@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { FLOOR, MACHINE_MONITOR } from '../../../shared/layout';
 import type { MachineState } from '../../../shared/protocol';
-import { loadHex, memoryPercent } from '../../shared/server-rack/format';
+import { beaconState, loadHex, memoryPercent } from '../../shared/server-rack/format';
 import { mergeByMaterial, mesh, roundedBox, textPlane, toon, toonUnique } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
@@ -19,6 +19,7 @@ export interface ServerRack {
   group: THREE.Group;
   collider: Collider;
   interactable: Interactable;
+  beaconMat: THREE.MeshToonMaterial;
   update(t: number, machine: MachineState, servicesCount: number, reduceMotion?: boolean): void;
 }
 
@@ -50,6 +51,11 @@ export function buildServerRack(): ServerRack {
   for (const sx of [-1, 1]) {
     staticParts.add(mesh(new THREE.BoxGeometry(0.08, 0.05, 0.08), trim, sx * (W / 2 - 0.07), 0.025, 0));
   }
+
+  // Top-mounted thermal beacon collar + glowing status dome visible across the room.
+  staticParts.add(mesh(new THREE.CylinderGeometry(0.068, 0.08, 0.03, 12), trim, 0, H + 0.015, D / 2 - 0.12));
+  const beaconMat = makeLedMat('#06d6a0');
+  group.add(mesh(new THREE.CylinderGeometry(0.046, 0.056, 0.075, 12), beaconMat, 0, H + 0.065, D / 2 - 0.12, false));
 
   // Six horizontal rack blades inside the cabinet.
   const bladeBulb = new THREE.BoxGeometry(0.032, 0.022, 0.014);
@@ -126,9 +132,22 @@ export function buildServerRack(): ServerRack {
     group,
     collider,
     interactable,
+    beaconMat,
     update(t, machine, servicesCount, reduceMotion = false) {
       paintGaugeRow(cpuLeds, machine.cpu, t, reduceMotion);
       paintGaugeRow(memLeds, memoryPercent(machine), t + 0.8, reduceMotion);
+
+      const beacon = beaconState(machine);
+      beaconMat.color.set(beacon.hex);
+      beaconMat.emissive.set(beacon.hex);
+      if (beacon.level === 'critical') {
+        beaconMat.emissiveIntensity = reduceMotion ? 1.15 : 0.35 + 1.1 * (0.5 + 0.5 * Math.sin(t * 14));
+      } else if (beacon.level === 'warn') {
+        beaconMat.emissiveIntensity = reduceMotion ? 0.85 : 0.35 + 0.7 * (0.5 + 0.5 * Math.sin(t * 6));
+      } else {
+        beaconMat.emissiveIntensity = 0.35;
+      }
+
       for (let b = 0; b < serviceBlades.length; b++) {
         const active = b < servicesCount;
         const row = serviceBlades[b];
