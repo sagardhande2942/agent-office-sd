@@ -1,9 +1,9 @@
 ---
 summary: "Features are folders that register through the client and server registries; do not add code to main.ts, server.ts, the store or protocol.ts."
 title: "Features plug in through registries, not into the big files"
-author: "agent:codex"
-updated: "2026-10-14"
-status: "active"
+author: "curator"
+updated: "2026-10-19"
+status: "needs-verification"
 tags: ["architecture","modules"]
 sources: ["AGENTS.md","docs/code-layout.md","src/client/core/registry.ts","src/server/ws/handlers/index.ts","src/client/state/slices/index.ts"]
 paths: ["src/client/features/**","src/server/ws/handlers/**"]
