@@ -1,6 +1,5 @@
 import { renovation, renovatable } from '../../features/renovation/world';
 import { planReviewTable } from '../../features/plan-review/world';
-import { handoffStation } from '../../features/handoff/world';
 import { serverRack } from '../../features/server-rack/world';
 import { enhancements } from './enhancements';
 import { basketballPlant } from './basketball-plant';
@@ -83,7 +82,6 @@ function floorPlan() {
     meetingRoom,
     screeningRoom,
     planReviewTable,
-    handoffStation,
     elevator,
     garageLift,
     gong,

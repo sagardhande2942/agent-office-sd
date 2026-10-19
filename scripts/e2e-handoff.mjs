@@ -75,8 +75,7 @@ try {
   check('Explicit worker acceptance', 'Only authenticated recipient accepted; refreshed station shows continuation owner.');
   await page.goto(base + `/?floor=${floor.id}`);
   await page.waitForFunction(() => window.__office?.player);
-  const fixture = await page.evaluate(() => { let found = false; window.__office.scene.traverse(o => { if (o.userData?.interact?.kind === 'handoffstation') found = true; }); return found; });
-  assert.ok(fixture); await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
   await page.getByRole('searchbox', { name: 'Search office menu' }).fill('handoff');
   await page.getByRole('menuitem', { name: /Handoff station/ }).click();
   await dialog.waitFor(); await dialog.locator('.handoff-packet summary').click();
@@ -89,7 +88,7 @@ try {
   await page.getByRole('menuitem', { name: /Handoff station/ }).click(); await dialog.waitFor();
   await dialog.getByRole('button', { name: 'Close Handoff station' }).click();
   await page.waitForFunction(() => !document.querySelector('.backdrop') && window.__office.player.enabled && window.__office.player.hasMouse);
-  check('Office fixture/menu and focus', 'Fixture is registered; menu opens packet; Esc and X restore mouse-look immediately.');
+  check('Office menu and focus', 'Menu opens packet; Esc and X restore mouse-look immediately.');
   assert.deepEqual(errors, []);
   writeFileSync(path.join(output, 'checks.json'), JSON.stringify(checks, null, 2));
 } finally { await browser?.close(); office.shutdown(); await new Promise(resolve => setTimeout(resolve, 300)); rmSync(dir, { recursive: true, force: true }); }
