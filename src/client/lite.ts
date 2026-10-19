@@ -6,6 +6,7 @@ import { openPlanReview } from './ui/plan-review';
 import { completionLabel } from '../shared/completion';
 import { openCommunications } from './ui/communications';
 import { openHandoffStation } from './shared/handoff/ui';
+import { openServerRack } from './shared/server-rack/ui';
 // The 2D view (/lite): the office without the 3D, for a phone or a computer the 3D office is too
 // much for. Every worker on the floor and how it's doing, the ones waiting on someone first; its
 // terminal, with the keys a phone's keyboard hasn't got and a box to send it a prompt; and the boards
@@ -338,6 +339,7 @@ $('btn-plans').addEventListener('click',()=>openPlanReview(net,openWorker));
 $('btn-meeting').addEventListener('click', () => showMeeting());
 $('btn-messages').addEventListener('click', () => openCommunications(openWorker));
 $('btn-handoffs').addEventListener('click', () => openHandoffStation(openWorker));
+$('btn-server-rack').addEventListener('click', () => openServerRack(net, openWorker));
 $('btn-queue').addEventListener('click', () => openQueue(net, { openTerminal: openWorker }));
 $('btn-new').addEventListener('click', () => sendToWorker('✨ New task'));
 
@@ -346,12 +348,14 @@ function renderNav() {
   count('btn-issues', store.issues.items.filter((i) => i.state === 'OPEN').length);
   count('btn-pulls', store.pulls.items.filter((p) => p.state === 'OPEN').length);
   count('btn-messages', store.communications.messages.filter((m) => m.kind === 'request' && !['completed', 'expired'].includes(m.status)).length);
+  count('btn-server-rack', store.services.items.length);
   count('btn-queue', store.queue.tasks.filter((t) => t.status !== 'done').length);
 }
 store.on('issues', renderNav);
 store.on('pulls', renderNav);
 store.on('queue', renderNav);
 store.on('communications', renderNav);
+store.on('services', renderNav);
 
 // ---- What you have open, for the others (see PeerInfo.doing) -----------------------------------
 let doingSent: string | undefined;

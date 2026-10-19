@@ -430,6 +430,8 @@ TV playback controls and the room's lighting setting update every viewer on the 
 
 At side angles, TV video is masked by the whiteboard’s thin panel and stand rather than its wider walking envelope.
 
+Walk up to the **🗄️ Server Rack** beneath the west-wall machine monitor and press **E** (or open **Server rack** from the menu, command palette, or Lite's **🗄️ Rack** button) to inspect live CPU & memory sparklines, manage the machine's worker capacity limit, and control active worker dev servers (open in a new tab, toggle an inline preview iframe, jump to the owning worker's terminal, or stop a listening port with `SIGTERM`).
+
 ### Instant product cinema
 
 The meeting room has a screening room: a screen on its far wall, a projector beside it, and the caption under the screen. When a worker finishes a feature it can record a short demonstration of what it built **against the actual build** — a real browser over the production bundle, one screenshot per step — caption each shot with the behaviour it shows, and put the reel on the screen with `office-workers cinema add`. Everyone on the floor watches the same shot at the same moment; the office keeps only the captions and the PNGs, so nothing video-shaped crosses the wire. At most twelve shots per reel, and a reel with an uncaptioned shot is refused. See [the screening room](docs/cinema.md).
