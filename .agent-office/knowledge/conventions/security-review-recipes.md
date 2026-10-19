@@ -4,10 +4,10 @@ summary: "Check authorization, input ownership, path confinement, shell argument
 tags: ["security","review","auth"]
 paths: ["src/server/http/**","src/server/hooks/**","src/server/knowledge/**"]
 sources: ["src/server/http/router.ts","src/server/knowledge/hooks.ts","src/server/knowledge/store.ts","src/server/knowledge/delivery.ts","docs/knowledge-architecture.md","docs/floor-hosts.md","AGENTS.md"]
-status: "active"
+status: "needs-verification"
 verified_at: "3679129"
-author: "agent:codex"
-updated: "2026-10-14"
+author: "curator"
+updated: "2026-10-19"
 ---
 # Review the changed path, not a generic checklist
 

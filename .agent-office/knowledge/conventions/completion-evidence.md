@@ -4,10 +4,10 @@ summary: "Completion reports are worker claims; use the current revision, actual
 tags: ["workers","testing","knowledge"]
 paths: ["docs/completion-checklist.md","docs/knowledge.md"]
 sources: ["docs/completion-checklist.md","docs/knowledge.md"]
-status: "active"
+status: "needs-verification"
 verified_at: "3679129"
-author: "agent:codex"
-updated: "2026-10-14"
+author: "curator"
+updated: "2026-10-19"
 ---
 # Task completion evidence
 

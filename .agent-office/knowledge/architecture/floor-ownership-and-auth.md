@@ -4,10 +4,10 @@ summary: "Hosted floors execute on their checkout owner; route through host RPCs
 tags: ["remote","auth","workers"]
 sources: ["docs/floor-hosts.md","docs/knowledge-architecture.md","src/server/hooks/worker-features.ts","src/server/knowledge/hooks.ts"]
 paths: ["src/server/hooks/worker-features.ts","src/server/knowledge/hooks.ts"]
-status: "active"
+status: "needs-verification"
 verified_at: "3679129"
-author: "agent:codex"
-updated: "2026-10-14"
+author: "curator"
+updated: "2026-10-19"
 ---
 # Which machine owns the operation?
 

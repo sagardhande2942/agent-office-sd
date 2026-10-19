@@ -4,10 +4,10 @@ summary: "Write reusable facts with applicability, evidence, failure cases and v
 tags: ["knowledge","documentation","review"]
 paths: [".agent-office/knowledge/**"]
 sources: ["docs/knowledge.md","docs/knowledge-architecture.md","src/server/knowledge/store.ts","src/shared/knowledge-index.ts"]
-status: "active"
+status: "needs-verification"
 verified_at: "3679129"
-author: "agent:codex"
-updated: "2026-10-14"
+author: "curator"
+updated: "2026-10-19"
 ---
 # Durable knowledge earns its place
 

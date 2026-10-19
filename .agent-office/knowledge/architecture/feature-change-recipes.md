@@ -4,10 +4,10 @@ summary: "Concrete file and registry recipes for floor features, browser-local s
 tags: ["architecture","ui","modules"]
 paths: ["src/client/features/**","src/client/ui/**","src/server/ws/handlers/**"]
 sources: ["docs/code-layout.md","src/client/ui/settings-extensions.ts","src/client/ui/prompt-tools.ts","src/client/features/performance/index.ts","src/server/http/router.ts","src/server/ws/handlers/types.ts"]
-status: "active"
+status: "needs-verification"
 verified_at: "3679129"
-author: "agent:codex"
-updated: "2026-10-14"
+author: "curator"
+updated: "2026-10-19"
 ---
 # Start by deciding who owns the state
 

@@ -4,10 +4,10 @@ summary: "Trace registration, authentication, read-only annotations and lifecycl
 tags: ["workers","mcp","auth"]
 paths: ["bin/office-worker-extensions.js","src/server/hooks/**","src/server/worker-features.ts"]
 sources: ["docs/code-layout.md","bin/office-worker-extensions.js","bin/office-knowledge-tools.js","src/server/hooks/worker-features.ts","src/server/knowledge/hooks.ts","src/server/worker-features.ts","src/server/workers/features.ts"]
-status: "active"
+status: "needs-verification"
 verified_at: "3679129"
-author: "agent:codex"
-updated: "2026-10-14"
+author: "curator"
+updated: "2026-10-19"
 ---
 # A schema is only one layer
 
