@@ -20,7 +20,7 @@ for (const dir of [recorded, empty]) {
   execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.test', 'commit', '--allow-empty', '-qm', 'fixture'], { cwd: dir });
 }
 const now = Date.now(), since = now - 30 * 60000;
-const intervals = ACTIVITY_PHASES.map((phase, n) => ({ workerId: 'fixture-alpha', activityId: 'fixture-activity', taskId: 'typed-api', attempt: phase === 'retries' ? 2 : 1, phase, start: since + n * 2 * 60000, end: since + (n * 2 + 2) * 60000 }));
+const intervals = ACTIVITY_PHASES.map((phase, n) => ({ workerId: 'fixture-alpha', workerName: 'Ada', activityId: 'fixture-activity', taskId: 'typed-api', attempt: phase === 'retries' ? 2 : 1, phase, start: since + n * 2 * 60000, end: since + (n * 2 + 2) * 60000 }));
 intervals.push({ workerId: 'fixture-beta', activityId: 'other-activity', taskId: 'auth-tests', attempt: 1, phase: 'waiting', start: since + 60000, end: since + 8 * 60000 });
 mkdirSync(path.join(recorded, '.agent-office'));
 writeFileSync(path.join(recorded, '.agent-office/activity-heatmap.json'), JSON.stringify({ version: 1, now: now - 60000, intervals,
@@ -60,6 +60,9 @@ try {
   await shot('empty.png'); check('Empty real floor shows missing recorded intervals without invented cells');
   await openLite('recorded');
   await dialog().locator('.heatmap-cell').first().waitFor();
+  assert.equal(await dialog().locator('tbody th').first().innerText(), 'Ada');
+  assert.equal(await dialog().getByLabel('Worker', { exact: true }).locator('option[value="fixture-alpha"]').innerText(), 'Ada');
+  assert.equal(await dialog().locator('tbody th').nth(1).innerText(), 'fixture-beta');
   const api = await context.request.get(base + '/api/activity-heatmap?floor=recorded'); assert.ok(api.ok());
   const snapshot = await api.json(), expected = aggregateActivity(snapshot);
   assert.equal(expected.workerTime, 19 * 60000); assert.equal(expected.wallTime, 12 * 60000);
@@ -71,8 +74,9 @@ try {
   assert.match(await dialog().innerText(), /Unobserved restart gaps/);
   assert.match(await dialog().innerText(), /signal unavailable/);
   assert.equal(await dialog().getByLabel('Phase legend').locator('span').count(), 6);
-  const implementation = dialog().getByRole('button', { name: /fixture-alpha,.*Implementation/ }).first();
+  const implementation = dialog().getByRole('button', { name: /Ada,.*Implementation/ }).first();
   await implementation.focus();
+  assert.match(await dialog().getByLabel('Time bucket details').innerText(), /Ada/);
   assert.match(await dialog().getByLabel('Time bucket details').innerText(), /Task typed-api · Attempt 1/);
   await dialog().getByText('Recording coverage & limitations', { exact: true }).click();
   await dialog().locator('[data-phase=waiting]').click();

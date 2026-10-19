@@ -4,6 +4,8 @@ export type ActivityPhase = typeof ACTIVITY_PHASES[number];
 export const ACTIVITY_INTERVAL_LIMIT = 2000;
 export interface ActivityInterval {
   workerId: string;
+  /** Last observed display name, retained after removal and restart. */
+  workerName?: string;
   activityId?: string;
   taskId?: string;
   attempt?: number;

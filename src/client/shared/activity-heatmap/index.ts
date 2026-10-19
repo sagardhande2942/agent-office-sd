@@ -1,6 +1,7 @@
 import { h, openModal } from '../../ui/dom';
 import { ACTIVITY_PHASES, aggregateActivity, type ActivityCell, type ActivityPhase, type ActivitySnapshot } from '../../../shared/activity-heatmap';
 import './style.css';
+import { workerLabels } from './labels';
 
 export const PHASE_LABELS: Record<ActivityPhase, string> = {
   implementation: 'Implementation', waiting: 'Waiting for input', checks: 'Checks', retries: 'Retry attempt work', review: 'Review', unknown: 'Unknown / unobserved phase',
@@ -27,8 +28,10 @@ export function openActivityHeatmap(floorId: string) {
     return h('label', {}, label, input);
   };
   const details = h('section.heatmap-details', { 'aria-label': 'Time bucket details', 'aria-live': 'polite' });
+  let labels = new Map<string, string>();
+  const workerLabel = (id: string) => labels.get(id) ?? id;
   const describe = (cell?: ActivityCell, worker?: string, start?: number, end?: number) => {
-    details.replaceChildren(h('h3', {}, cell || worker ? `${cell?.workerId ?? worker} · ${stamp(cell?.start ?? start!)} – ${stamp(cell?.end ?? end!)}` : 'Time bucket details'));
+    details.replaceChildren(h('h3', {}, cell || worker ? `${workerLabel((cell?.workerId ?? worker)!)} · ${stamp(cell?.start ?? start!)} – ${stamp(cell?.end ?? end!)}` : 'Time bucket details'));
     if (!cell) { details.append(h('p', {}, worker ? 'No recorded interval in this bucket. This does not establish that the worker was idle.' : 'Select a colored cell to explore a worker’s activity. Hover for a quick preview. Use the phase cards to highlight waits, review, or work.')); return; }
     details.append(h('p', {}, cell.live ? 'Live interval; duration extends on refresh.' : 'Closed recorded intervals.'),
       h('p', {}, ACTIVITY_PHASES.filter(p => cell.durations[p] > 0).map(p => `${PHASE_LABELS[p]}: ${duration(cell.durations[p])}`).join(' · ')),
@@ -36,6 +39,7 @@ export function openActivityHeatmap(floorId: string) {
   };
   const render = () => {
     if (!snapshot) return;
+    labels = workerLabels(snapshot);
     const focus = document.activeElement?.getAttribute('aria-label'), focusKey = document.activeElement?.getAttribute('data-key');
     const scroll = content.querySelector('.heatmap-scroll')?.scrollLeft ?? 0;
     const displayBucket = Math.max(bucketMs, Math.ceil(windowMs / 120 / 60000) * 60000);
@@ -46,7 +50,7 @@ export function openActivityHeatmap(floorId: string) {
     const refresh = h('button.btn', { type: 'button', onclick: () => { void load(); } }, 'Refresh');
     content.replaceChildren(h('div.heatmap-intro', {}, h('h3', {}, 'Where is your team’s time going?'), h('p', {}, 'Explore recorded work, spot waits, and inspect what happened. Select a phase below to highlight it on the timeline.')),
       h('div.heatmap-controls', {},
-        select('Worker', workerId, [['', 'All workers'], ...workers.map(id => [id, id] as [string, string])], v => workerId = v),
+        select('Worker', workerId, [['', 'All workers'], ...workers.map(id => [id, workerLabel(id)] as [string, string])], v => workerId = v),
         select('Activity', activityId, [['', 'All activities'], ...activities.map(id => [id, id] as [string, string])], v => activityId = v),
         select('Time window', String(windowMs), [['900000', 'Last 15 minutes'], ['3600000', 'Last hour'], ['21600000', 'Last 6 hours'], ['86400000', 'Last 24 hours']], v => windowMs = Number(v)),
         select('Bucket size', String(bucketMs), [['60000', '1 minute'], ['300000', '5 minutes'], ['900000', '15 minutes']], v => bucketMs = Number(v)), refresh),
@@ -80,10 +84,10 @@ export function openActivityHeatmap(floorId: string) {
     const table = h('table.heatmap-table', {}, h('caption', {}, `${stamp(data.start)} – ${stamp(data.end)} · color shows longest recorded phase; ◉ marks live time`),
       h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Worker'), ...columns.map(t => h('th', { scope: 'col' }, new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))))));
     const rows = h('tbody');
-    for (const id of visibleWorkers) rows.append(h('tr', {}, h('th', { scope: 'row', title: id }, id), ...columns.map(t => {
+    for (const id of visibleWorkers) rows.append(h('tr', {}, h('th', { scope: 'row', title: id }, workerLabel(id)), ...columns.map(t => {
       const key = `${id}:${t}`, cell = lookup.get(key), end = Math.min(t + displayBucket, data.end);
       const phase = cell && phaseFilter && cell.durations[phaseFilter] > 0 ? phaseFilter : cell ? ACTIVITY_PHASES.reduce((best, p) => cell.durations[p] > cell.durations[best] ? p : best, 'unknown' as ActivityPhase) : undefined;
-      const label = `${id}, ${stamp(t)} – ${stamp(end)}: ${cell ? ACTIVITY_PHASES.filter(p => cell.durations[p] > 0).map(p => `${PHASE_LABELS[p]} ${duration(cell.durations[p])}`).join(', ') + (cell.live ? ', live' : '') : 'no recorded evidence'}`;
+      const label = `${workerLabel(id)}, ${stamp(t)} – ${stamp(end)}: ${cell ? ACTIVITY_PHASES.filter(p => cell.durations[p] > 0).map(p => `${PHASE_LABELS[p]} ${duration(cell.durations[p])}`).join(', ') + (cell.live ? ', live' : '') : 'no recorded evidence'}`;
       const button = h('button.heatmap-cell', { type: 'button', 'aria-label': label, title: label, 'data-key': key, 'data-live': cell?.live, 'data-muted': phaseFilter && !cell?.durations[phaseFilter] ? 'true' : undefined, 'aria-pressed': String(selected === key), style: phase ? `background:${COLORS[phase]};opacity:${.35 + .65 * Math.min(1, Object.values(cell!.durations).reduce((a, b) => a + b, 0) / (end - t))}` : 'background:transparent' }, cell?.live ? '◉' : '');
       const inspect = () => { selected = key; content.querySelectorAll('.heatmap-cell').forEach(node => node.setAttribute('aria-pressed', String(node.getAttribute('data-key') === key))); describe(cell, id, t, end); };
       button.addEventListener('focus', inspect); button.addEventListener('click', inspect);
