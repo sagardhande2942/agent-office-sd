@@ -164,5 +164,5 @@ export function meetingSummary(m: Meeting): string {
 }
 
 export function meetingRecord(m: Meeting): MeetingRecord {
-  return { id: m.id, pattern: m.pattern, title: m.title, status: m.status, summary: meetingSummary(m), calledBy: m.calledBy, finishedAt: m.finishedAt ?? Date.now(), branch: m.worktree?.branch, output: m.output };
+  return { id: m.id, ...(m.routingKey ? { routingKey: m.routingKey } : {}), pattern: m.pattern, title: m.title, status: m.status, summary: meetingSummary(m), calledBy: m.calledBy, finishedAt: m.finishedAt ?? Date.now(), branch: m.worktree?.branch, output: m.output };
 }

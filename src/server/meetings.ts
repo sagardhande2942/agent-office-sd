@@ -15,6 +15,7 @@ import { providerMeta, takesEffort, takesModel } from '../shared/providers.js';
 import { gitError, type WorktreeRef, type WorktreeState } from './worktrees.js';
 import { PROMPTS, fillPrompt, type PromptId, type PromptVars } from '../shared/prompts.js';
 import { planMeeting, researchBrief, validateResearchOutput } from './meeting-patterns/index.js';
+import { archiveStrategySource } from './meeting-patterns/source.js';
 import { researchPattern } from '../shared/research-patterns.js';
 
 export const execFileP = promisify(execFile);
@@ -128,7 +129,7 @@ export class MeetingRoom {
 
   /** Calls a meeting. Returns why it couldn't, or undefined once everyone is sitting down. */
   /** `owner` is the account calling it: the workers run on its sign-ins, and a review panel's review is posted as it. */
-  start(req: MeetingRequest, by: string, owner?: string): string | undefined {
+  start(req: MeetingRequest, by: string, owner?: string, execution?: { key: string; id: string }): string | undefined {
     if (this.current?.status === 'running') return `The meeting room is busy with “${this.current.title}”: stop that meeting first`;
     if (!isMeetingPattern(req.pattern)) return 'Unknown meeting pattern';
     const pattern = MEETING_PATTERNS[req.pattern];
@@ -159,7 +160,7 @@ export class MeetingRoom {
     const issue = Number.isInteger(req.issue) && (req.issue as number) > 0 ? (req.issue as number) : undefined;
     const rounds = clamp(Math.floor(Number(req.rounds) || pattern.rounds.default), pattern.rounds.min, pattern.rounds.max);
     const title = (String(req.title ?? '').replace(/\s+/g, ' ').trim() || (pr !== undefined && req.pattern === 'review' ? `Review of PR #${pr}` : firstLine(prompt))).slice(0, 100);
-    const id = randomBytes(4).toString('hex');
+    const id = execution?.id ?? randomBytes(4).toString('hex');
     const slug = slugify(title, 32);
     const output = String(req.output ?? '').trim() || pattern.output(slug, pr);
     const outputBad = outputProblem(output);
@@ -181,6 +182,7 @@ export class MeetingRoom {
     }
     const m: Meeting = {
       id,
+      ...(execution ? { routingKey: execution.key } : {}),
       pattern: req.pattern,
       ...(researchPattern(req.pattern) ? { patternVersion: 1 } : {}),
       title,
@@ -677,6 +679,7 @@ export class MeetingRoom {
       const out = path.join(this.cwd(m), m.output);
       if (existsSync(out)) cpSync(out, path.join(to, `output-${path.basename(m.output)}`));
       if (researchPattern(m.pattern) && existsSync(out + '.md')) cpSync(out + '.md', path.join(to, `output-${path.basename(m.output)}.md`));
+      if (m.pattern === 'research.strategy-build') archiveStrategySource(this.cwd(m), m.output, to);
       keepMeetingCommunications(to, m, this.events.communications?.() ?? { messages: [] });
     } catch {
       // the notes are a courtesy; the meeting is over either way

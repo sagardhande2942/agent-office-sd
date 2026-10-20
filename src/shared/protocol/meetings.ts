@@ -46,6 +46,8 @@ export interface Meeting {
   pattern: MeetingPattern;
   /** Research workflow version, fixed at session start. */
   patternVersion?: number;
+  /** Server-assigned key for a durable middleware task; never taken from a browser request. */
+  routingKey?: string;
   title: string;
   /** The question or task, as whoever called the meeting put it. */
   prompt: string;
@@ -108,6 +110,7 @@ export interface Meeting {
 
 /** A meeting that's over, in a line. */
 export interface MeetingRecord {
+  routingKey?: string;
   id: string;
   pattern: MeetingPattern;
   title: string;

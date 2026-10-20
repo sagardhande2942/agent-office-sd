@@ -634,3 +634,5 @@ Meeting workers already in the live roster are seated immediately when their ava
 Research teams can use seven dedicated [research meeting patterns](docs/research-meeting-patterns.md) inside existing meeting spaces: discovery, design, strategy build, backtest investigation, validation, portfolio review and retrospective. Structured outputs are checked before session completion; they remain recommendations until research evidence is verified.
 
 Research meeting teams share [versioned Knowledge context and session reviews](docs/research-shared-memory.md). Active participants read the floor tree; chairs write scoped unverified observations and review the exact final outputs before required completion.
+
+An opt-in [continuous research dispatcher](docs/research-routing.md) connects local research meeting teams to durable middleware queues, with persistent claims, evidence routing, backtest handoffs and acknowledged seat cleanup. It is disabled without explicit private configuration.

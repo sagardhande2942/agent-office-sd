@@ -54,3 +54,7 @@ Pattern version 1 is saved with each session. A running session with an unsuppor
 The room delegates round planning to `src/server/meeting-patterns/index.ts`. Legacy patterns use the compatibility planner and preserve existing prompt IDs. Research planning and completion validation live in dedicated modules. Pattern metadata drives the existing UI and host validation: update Office and floor host together before selecting a new pattern remotely.
 
 Run `npm run typecheck`, `npm test`, `npm run build`, and `node --import tsx scripts/e2e-research-patterns.mjs` with `CHROMIUM_PATH` when needed. Focused tests cover all workflows, structured completion, restart/versioning, space/remote compatibility and size limits. Browser checks use idle fixtures and make no paid model calls.
+
+## Continuous department routing
+
+The optional [research dispatcher](research-routing.md) supplies queue context, publishes checked strategy source through the middleware, routes development backtests and collects recommendations. It preserves the existing meeting/memory completion gates; it does not turn recommendations into scientific acceptance or live deployment.

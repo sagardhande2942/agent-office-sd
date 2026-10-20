@@ -1,3 +1,4 @@
+import { installResearchRouting, closeResearchRouting } from './research-routing/service.js';
 import { HANDOFF_WORKER_TOOLS } from './handoff/hooks.js';
 import { handoffHostCalls } from './handoff/host.js';
 import { knowledgeHostCalls } from './knowledge/host.js';
@@ -28,8 +29,9 @@ export const workerFeatureSnapshots = (floor: Floor): ServerMsg[] => [loreHostSn
 const FEATURES = [workerLore] as const;
 export function floorWorkerFeatures(floor: Floor, publish: (msg: ServerMsg) => void, context: FloorContext): WorkerFeature[] {
   installFloorBoss(floor, context, publish);
+  installResearchRouting(floor, context);
   installKnowledgeAutoSync(floor, publish);
   return [providerSpendFeature(context.ledger, floor.def.id), workerKnowledge(floor), ...(loadKnowledgeConfig(floor.def.dir).legacyLore ? FEATURES.map(install => install(floor.lore, publish)) : []), floor.curator.feature(), workerRoles(floor.dir), installActivityHeatmap(floor), activitySignalFeature(floor)];
 }
 
-export function closeFloorWorkerFeatures(floor: Floor) { closeActivitySignals(floor); closeActivityHeatmap(floor); closeFloorBoss(floor); closeKnowledgeAutoSync(floor); }
+export function closeFloorWorkerFeatures(floor: Floor) { closeResearchRouting(floor); closeActivitySignals(floor); closeActivityHeatmap(floor); closeFloorBoss(floor); closeKnowledgeAutoSync(floor); }
