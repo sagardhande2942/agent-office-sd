@@ -135,3 +135,15 @@ test('restart cannot resurrect review for a removed worker from retained team st
   s.at(2000); const recovered = s.create(); recovered.team(team);
   assert.equal(recovered.snapshot().intervals.filter(i => i.end === undefined).length, 0);
 });
+
+test('worker names follow renames and survive removal and restart without changing intervals', t => {
+  const s = setup(t);
+  s.recorder.update({ ...worker(), name: 'Ada' });
+  s.at(1100); s.recorder.signal('w', 'checks');
+  s.recorder.update({ ...worker(), name: 'Grace' });
+  assert.ok(s.recorder.snapshot().intervals.every(i => i.workerName === 'Grace'));
+  assert.equal(s.recorder.snapshot().intervals.length, 2);
+  s.at(1200); s.recorder.remove(worker());
+  s.at(2000);
+  assert.ok(s.create().snapshot().intervals.every(i => i.workerName === 'Grace'));
+});

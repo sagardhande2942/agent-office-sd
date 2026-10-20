@@ -10,7 +10,7 @@ export interface RecorderOptions { file: string; now?: () => number; maxInterval
 /** One instance per floor. Synchronous atomic replacement keeps transitions ordered. */
 export class ActivityHeatmapRecorder {
   private data: ActivitySnapshot;
-  private workers = new Map<string, Pick<WorkerInfo, 'id' | 'status' | 'kind' | 'suspended' | 'sessionId' | 'completionRevision'>>();
+  private workers = new Map<string, Pick<WorkerInfo, 'id' | 'name' | 'status' | 'kind' | 'suspended' | 'sessionId' | 'completionRevision'>>();
   private contexts = new Map<string, Context>();
   private signals = new Map<string, 'implementation' | 'checks'>();
   private removed = new Set<string>();
@@ -31,7 +31,9 @@ export class ActivityHeatmapRecorder {
 
   update(worker: WorkerInfo): void {
     this.removed.delete(worker.id);
-    this.workers.set(worker.id, { id: worker.id, status: worker.status, kind: worker.kind, suspended: worker.suspended, sessionId: worker.sessionId, completionRevision: worker.completionRevision });
+    this.workers.set(worker.id, { id: worker.id, name: worker.name, status: worker.status, kind: worker.kind, suspended: worker.suspended, sessionId: worker.sessionId, completionRevision: worker.completionRevision });
+    const name = worker.name?.trim().slice(0, 120);
+    for (const interval of this.data.intervals) if (interval.workerId === worker.id && name) interval.workerName = name;
     if (worker.status !== 'working') this.signals.delete(worker.id);
     this.reconcile(worker.id);
     this.checkpoint();
@@ -109,7 +111,8 @@ export class ActivityHeatmapRecorder {
     if (current && current.phase === phase && current.activityId === context?.activityId && current.taskId === context?.taskId && current.attempt === context?.attempt) return;
     const now = this.time();
     if (current) current.end = now;
-    if (phase) this.data.intervals.push({ workerId, phase, start: now, ...(context ? { activityId: context.activityId, taskId: context.taskId, attempt: context.attempt } : {}) });
+    const name = this.workers.get(workerId)?.name?.trim().slice(0, 120);
+    if (phase) this.data.intervals.push({ workerId, ...(name ? { workerName: name } : {}), phase, start: now, ...(context ? { activityId: context.activityId, taskId: context.taskId, attempt: context.attempt } : {}) });
   }
 
   private prune(now: number): void {
@@ -133,6 +136,7 @@ export class ActivityHeatmapRecorder {
     for (const interval of value.intervals) {
       if (!interval || typeof interval.workerId !== 'string' || !interval.workerId || interval.workerId.length > 80 || !ACTIVITY_PHASES.includes(interval.phase) || !Number.isFinite(interval.start) || interval.start > observed || (interval.end !== undefined && (!Number.isFinite(interval.end) || interval.end < interval.start))) { this.data.coverage.dropped++; continue; }
       this.data.intervals.push({ workerId: interval.workerId, phase: interval.phase, start: interval.start, end: Math.min(interval.end ?? observed, observed),
+        ...(typeof interval.workerName === 'string' && interval.workerName.trim() ? { workerName: interval.workerName.trim().slice(0, 120) } : {}),
         ...(typeof interval.activityId === 'string' ? { activityId: interval.activityId.slice(0, 80) } : {}),
         ...(typeof interval.taskId === 'string' ? { taskId: interval.taskId.slice(0, 80) } : {}),
         ...(Number.isInteger(interval.attempt) && interval.attempt! > 0 ? { attempt: interval.attempt } : {}) });
