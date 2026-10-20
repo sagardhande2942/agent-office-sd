@@ -4,7 +4,7 @@ import type { Floor } from '../floor.js';
 import { readBody, send } from '../http/util.js';
 import { KnowledgeStore } from './store.js';
 import { loadKnowledgeConfig } from './settings.js';
-import { researchMeetingFor, meetingKnowledgeAllowed, assertMeetingWrite, recordMeetingReview } from './meetings.js';
+import { memoryMeetingFor, meetingKnowledgeAllowed, assertMeetingWrite, recordMeetingReview } from './meetings.js';
 import type { WorkerInfo } from '../../shared/protocol.js';
 const allowed = (floor: Floor, w: WorkerInfo) => w.kind === 'agent' && !w.helper && !w.planReview?.locked &&
   (w.meeting ? meetingKnowledgeAllowed(floor, w) : !DESK_BY_ID.get(w.deskId)?.station);
@@ -13,7 +13,7 @@ export async function floorWorkerKnowledge(floor: Floor | undefined, req: http.I
   const id = url.searchParams.get('worker') ?? ''; const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
   const worker = floor?.workers.authenticate(id, token);
   if (!floor || !worker) return send(res, 401, { error: 'Send your own worker ID and hook token' });
-  if (!allowed(floor, worker)) return send(res, 403, { error: 'Only coding workers or active research meeting participants may use knowledge tools' });
+  if (!allowed(floor, worker)) return send(res, 403, { error: 'Only coding workers or active memory-enabled meeting participants may use knowledge tools' });
   if (req.method !== 'POST') return send(res, 405, { error: 'POST a knowledge action' });
   try {
     const body = JSON.parse(await readBody(req, 256 * 1024)) as Record<string, unknown>;
@@ -25,7 +25,7 @@ export async function floorWorkerKnowledge(floor: Floor | undefined, req: http.I
     const expectedVersion = (body.expectedVersion ?? null) as string | null;
     const store = new KnowledgeStore(floor.def.dir, loadKnowledgeConfig(floor.def.dir));
     store.seed(); let result: unknown;
-    const meeting = researchMeetingFor(floor, active);
+    const meeting = memoryMeetingFor(floor, active);
     if (meeting) assertMeetingWrite(meeting, active, body.action, body.path);
     switch (body.action) {
       case 'index': result = { text: store.index(body.path as string | undefined) }; break;

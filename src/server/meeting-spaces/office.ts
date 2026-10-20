@@ -2,7 +2,8 @@ import type { Ctx } from '../office/context.js';
 import type { Client } from '../office/client.js';
 import type { FloorActions } from '../floor-actions.js';
 import type { MeetingRequest } from '../../shared/protocol.js';
-import { isMeetingPattern, MEETING_PATTERNS } from '../../shared/meetings.js';
+import { isMeetingPattern, meetingDefinition } from '../../shared/meetings.js';
+import { DEFAULT_WORKFLOW, workflowProblem } from '../../shared/meeting-workflows.js';
 const reserved = new WeakMap<Ctx, number>();
 /** Remote agents use host sign-ins; reserve the office's capacity until its roster arrives. */
 export function startMeeting(ctx: Ctx, c: Client, floor: FloorActions, request: MeetingRequest, by: string) {
@@ -12,7 +13,11 @@ export function startMeeting(ctx: Ctx, c: Client, floor: FloorActions, request: 
     return;
   }
   if (!isMeetingPattern(request.pattern)) return ctx.warn(c, 'Unknown meeting pattern');
-  const seats = request.roles?.length || MEETING_PATTERNS[request.pattern].seats.default;
+  const workflow=request.pattern==='custom'?request.workflow??DEFAULT_WORKFLOW:undefined;
+  if(workflow) { const bad=workflowProblem(workflow);if(bad)return ctx.warn(c,bad); }
+  const pattern=meetingDefinition({pattern:request.pattern,workflow});
+  const seats = request.roles?.length || pattern.seats.default;
+  if(seats<pattern.seats.min||seats>pattern.seats.max)return ctx.warn(c,'Invalid meeting worker count');
   const room = ctx.machine.room() - (reserved.get(ctx) ?? 0);
   if (ctx.ledger.hiringPaused) return ctx.warn(c, ctx.ledger.hiringPaused);
   if (room < seats) return ctx.warn(c, `The office needs room for ${seats} meeting workers; send workers home first`);

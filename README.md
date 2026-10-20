@@ -631,8 +631,8 @@ See [Master / Workers](docs/master-workers.md) for specifications, progress tool
 
 Meeting workers already in the live roster are seated immediately when their avatars are redisplayed. Only newly added workers enter from the elevator.
 
-Research teams can use seven dedicated [research meeting patterns](docs/research-meeting-patterns.md) inside existing meeting spaces: discovery, design, strategy build, backtest investigation, validation, portfolio review and retrospective. Structured outputs are checked before session completion; they remain recommendations until research evidence is verified.
+Custom teams use caller-defined [meeting workflows](docs/custom-meetings.md) with named roles, bounded stages, structured result rules and checked file attachments. Definitions are saved with each session.
 
-Research meeting teams share [versioned Knowledge context and session reviews](docs/research-shared-memory.md). Active participants read the floor tree; chairs write scoped unverified observations and review the exact final outputs before required completion.
+Memory-enabled meetings share [versioned Knowledge context and session reviews](docs/meeting-memory.md). Active participants read the floor tree; chairs write scoped unverified observations and review the exact final outputs before required completion.
 
-An opt-in [continuous research dispatcher](docs/research-routing.md) connects local research meeting teams to durable middleware queues, with persistent claims, evidence routing, backtest handoffs and acknowledged seat cleanup. It is disabled without explicit private configuration.
+An opt-in [task dispatcher](docs/task-routing.md) connects local meeting teams to a caller-owned queue, with durable claims, restart recovery and acknowledged room cleanup. Workflow definitions, task content and lifecycle decisions come from the integration. Routing is disabled without explicit private configuration.

@@ -4,6 +4,7 @@ import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { DEFAULT_WORKFLOW } from '../src/shared/meeting-workflows.js';
 import type { Floor } from '../src/server/floor.js';
 import type { Meeting, WorkerInfo } from '../src/shared/protocol.js';
 import { KnowledgeStore } from '../src/server/knowledge/store.js';
@@ -13,7 +14,7 @@ import { meetingMemoryContext, meetingMemoryGate, recordMeetingReview, observati
 function fixture(t: test.TestContext) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'meeting-memory-'));
   const store = new KnowledgeStore(dir); store.seed();
-  const m = { id: 'session-a', pattern: 'research.validation-council', status: 'running', prompt: 'Investigate breakout costs',
+  const m = { id: 'session-a', pattern: 'custom', workflow: DEFAULT_WORKFLOW, status: 'running', prompt: 'Investigate document references',
     output: 'results/result.json', seats: [{ workerId: 'chair' }, { workerId: 'peer' }] } as Meeting;
   const chair = { id: 'chair', kind: 'agent', meeting: m.id } as WorkerInfo;
   const peer = { id: 'peer', kind: 'agent', meeting: m.id } as WorkerInfo;
@@ -27,15 +28,15 @@ function fixture(t: test.TestContext) {
 
 test('all seats share a frozen bounded packet; later sessions see newer versioned summaries', t => {
   const f = fixture(t);
-  f.store.write('research/costs.md', { title: 'Breakout costs', summary: 'Original cost assumptions', pinned: true }, 'Detailed evidence', 'worker:fixture');
+  f.store.write('meetings/costs.md', { title: 'Document references', summary: 'Original reference assumptions', pinned: true }, 'Detailed evidence', 'worker:fixture');
   const first = meetingMemoryContext(f.dir, f.m);
-  assert.match(first, /Original cost assumptions/); assert.match(first, /version /);
+  assert.match(first, /Original reference assumptions/); assert.match(first, /version /);
   assert.ok(first.length < 4200);
-  const note = f.store.read('research/costs.md');
-  f.store.write('research/costs.md', { summary: 'Updated cost assumptions' }, 'New details', 'worker:other', note.version);
+  const note = f.store.read('meetings/costs.md');
+  f.store.write('meetings/costs.md', { summary: 'Updated reference assumptions' }, 'New details', 'worker:other', note.version);
   assert.equal(meetingMemoryContext(f.dir, f.m), first);
-  assert.match(meetingMemoryContext(f.dir, { ...f.m, id: 'session-b' }), /Updated cost assumptions/);
-  f.store.write('research/unverified.md', { title: 'Breakout costs', summary: 'UNVERIFIED SECRET SUMMARY', status: 'needs-verification', pinned: true }, 'Hypothesis', 'worker:fixture');
+  assert.match(meetingMemoryContext(f.dir, { ...f.m, id: 'session-b' }), /Updated reference assumptions/);
+  f.store.write('meetings/unverified.md', { title: 'Document references', summary: 'UNVERIFIED SECRET SUMMARY', status: 'needs-verification', pinned: true }, 'Observation', 'worker:fixture');
   assert.doesNotMatch(meetingMemoryContext(f.dir, { ...f.m, id: 'session-c' }), /UNVERIFIED SECRET SUMMARY/);
 });
 
@@ -55,7 +56,7 @@ test('review binds session chair, packet, exact outputs and changed note version
   assert.equal(meetingMemoryGate(f.dir, f.m), undefined);
   const prior = f.store.read(p); f.store.write(p, {}, 'Changed finding', 'worker:chair', prior.version);
   assert.match(meetingMemoryGate(f.dir, f.m)!, /required/);
-  assert.throws(() => recordMeetingReview(f.dir, f.m, f.chair, ['research/other.md'], undefined), /observation/);
+  assert.throws(() => recordMeetingReview(f.dir, f.m, f.chair, ['meetings/other.md'], undefined), /observation/);
 });
 
 test('review policy is frozen and legacy meetings are unaffected', t => {
@@ -68,7 +69,7 @@ test('review policy is frozen and legacy meetings are unaffected', t => {
   assert.equal(meetingMemoryGate(f.dir, { ...f.m, pattern: 'debate' }), undefined);
 });
 
-test('authenticated active research participants read shared memory; only their chair writes scoped unverified observations', async t => {
+test('authenticated active meeting participants read shared memory; only their chair writes scoped unverified observations', async t => {
   const f = fixture(t); meetingMemoryContext(f.dir, f.m); f.output();
   let removed = false; let calls = 0; let stale = false; let pumps = 0;
   const floor = { def: { dir: f.dir }, meetings: { state: () => ({ spaces: [{ current: f.m }] }), pump: () => pumps++ },

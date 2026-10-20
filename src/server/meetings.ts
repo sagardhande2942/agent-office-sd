@@ -8,15 +8,15 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFil
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { MEETING_SEATS } from '../shared/layout.js';
-import { MEETING_NOTES_DIR, MEETING_PATTERNS, isMeetingPattern, meetingRecord, outputProblem, slugify } from '../shared/meetings.js';
+import { MEETING_NOTES_DIR, MEETING_PATTERNS, meetingDefinition, isMeetingPattern, meetingRecord, outputProblem, slugify } from '../shared/meetings.js';
 import { isAgentEffort, isAgentProvider, tokensOf, type AgentChoice, type AgentEffort, type AgentProvider, type Meeting, type MeetingRecord, type MeetingRequest, type MeetingState, type MeetingTurn, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
 import { providerMeta, takesEffort, takesModel } from '../shared/providers.js';
 import { gitError, type WorktreeRef, type WorktreeState } from './worktrees.js';
 import { PROMPTS, fillPrompt, type PromptId, type PromptVars } from '../shared/prompts.js';
-import { planMeeting, researchBrief, validateResearchOutput } from './meeting-patterns/index.js';
-import { archiveStrategySource } from './meeting-patterns/source.js';
-import { researchPattern } from '../shared/research-patterns.js';
+import { planMeeting, customBrief, validateCustomOutput } from './meeting-patterns/index.js';
+import { resolveAttachments } from './meeting-patterns/attachments.js';
+import { DEFAULT_WORKFLOW, workflowProblem } from '../shared/meeting-workflows.js';
 
 export const execFileP = promisify(execFile);
 
@@ -132,7 +132,10 @@ export class MeetingRoom {
   start(req: MeetingRequest, by: string, owner?: string, execution?: { key: string; id: string }): string | undefined {
     if (this.current?.status === 'running') return `The meeting room is busy with “${this.current.title}”: stop that meeting first`;
     if (!isMeetingPattern(req.pattern)) return 'Unknown meeting pattern';
-    const pattern = MEETING_PATTERNS[req.pattern];
+    const workflow = req.pattern === 'custom' ? structuredClone(req.workflow ?? DEFAULT_WORKFLOW) : undefined;
+    if (workflow) { const bad = workflowProblem(workflow); if (bad) return bad; }
+    else if (req.workflow !== undefined) return 'Only a custom meeting accepts a workflow';
+    const pattern = meetingDefinition({ pattern: req.pattern, workflow });
     const paused = this.events.hiringPaused();
     if (paused) return paused;
     const prompt = String(req.prompt ?? '').replace(/\r\n?/g, '\n').trim().slice(0, PROMPT_MAX);
@@ -184,7 +187,7 @@ export class MeetingRoom {
       id,
       ...(execution ? { routingKey: execution.key } : {}),
       pattern: req.pattern,
-      ...(researchPattern(req.pattern) ? { patternVersion: 1 } : {}),
+      ...(workflow ? { workflow, patternVersion: workflow.version } : {}),
       title,
       prompt,
       output,
@@ -466,14 +469,14 @@ export class MeetingRoom {
     if (gate.changed) this.dirty = true;
     if (gate.notice) this.events.toast(gate.notice, 'warn');
     if (gate.blocked) return;
-    const outputError = validateResearchOutput(m, this.cwd(m));
+    const outputError = validateCustomOutput(m, this.cwd(m));
     if (outputError) return this.halt(m, outputError);
     m.status = 'done';
     m.finishedAt = Date.now();
     m.turns = [];
     this.readPreview(m);
     this.keepNotes(m);
-    const p = MEETING_PATTERNS[m.pattern];
+    const p = meetingDefinition(m);
     this.events.toast(`🤝 The ${p.label} meeting on “${m.title}” is done: it wrote ${m.output}`, 'info');
     const cwd = this.cwd(m);
     if (m.pattern === 'review' && m.pr !== undefined) {
@@ -579,7 +582,7 @@ export class MeetingRoom {
 
   /** What every worker is told when it sits down, ahead of its first part. */
   private brief(m: Meeting, i: number): string {
-    const p = MEETING_PATTERNS[m.pattern];
+    const p = meetingDefinition(m);
     const role = m.seats[i].role;
     const others = m.seats.filter((_, j) => j !== i).map((s) => `the ${s.role}`);
     const head = m.seats[0].role;
@@ -602,7 +605,7 @@ export class MeetingRoom {
       role,
       pattern: p.label,
       others: list(others),
-      how: researchBrief(m) ?? how[m.pattern] ?? '',
+      how: customBrief(m) ?? how[m.pattern] ?? '',
       about: m.prompt,
       pullRequest: m.pr !== undefined ? `The pull request is #${m.pr}: read it with gh pr view ${m.pr} and gh pr diff ${m.pr}.` : '',
       issue: m.issue !== undefined ? `It comes from GitHub issue #${m.issue}: gh issue view ${m.issue} --comments.` : '',
@@ -678,8 +681,14 @@ export class MeetingRoom {
       if (path.resolve(from) !== path.resolve(to) && existsSync(from)) cpSync(from, to, { recursive: true });
       const out = path.join(this.cwd(m), m.output);
       if (existsSync(out)) cpSync(out, path.join(to, `output-${path.basename(m.output)}`));
-      if (researchPattern(m.pattern) && existsSync(out + '.md')) cpSync(out + '.md', path.join(to, `output-${path.basename(m.output)}.md`));
-      if (m.pattern === 'research.strategy-build') archiveStrategySource(this.cwd(m), m.output, to);
+      if (m.pattern === 'custom' && m.workflow) {
+        if (existsSync(out + '.md')) cpSync(out + '.md', path.join(to, `output-${path.basename(m.output)}.md`));
+        writeFileSync(path.join(to, 'workflow.json'), JSON.stringify(m.workflow));
+        if (m.status === 'done') {
+          const result = resolveAttachments(this.cwd(m), JSON.parse(readFileSync(out,'utf8')), m.workflow.result.attachments ?? []);
+          writeFileSync(path.join(to, `output-${path.basename(m.output)}`), JSON.stringify(result));
+        }
+      }
       keepMeetingCommunications(to, m, this.events.communications?.() ?? { messages: [] });
     } catch {
       // the notes are a courtesy; the meeting is over either way
@@ -709,8 +718,8 @@ export class MeetingRoom {
       // The workers at the table outlive a restart of the office, so a meeting carries on where it was.
       if (m && typeof m.id === 'string' && isMeetingPattern(m.pattern) && Array.isArray(m.seats) && Array.isArray(m.turns)) {
         this.current = m;
-        if (researchPattern(m.pattern) && m.patternVersion !== 1 && m.status === 'running') {
-          m.status = 'stopped'; m.reason = 'Research pattern version unavailable; preserve evidence and start a compatible session.';
+        if (m.pattern === 'custom' && (!m.workflow || workflowProblem(m.workflow) || m.patternVersion !== m.workflow.version) && m.status === 'running') {
+          m.status = 'stopped'; m.reason = 'Workflow definition/version unavailable; preserve notes and start a compatible session.';
         }
       }
     } catch {

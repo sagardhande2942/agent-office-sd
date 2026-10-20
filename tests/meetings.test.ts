@@ -549,62 +549,56 @@ test('a pattern with a set number of rounds says so, and names them; a range is 
   assert.equal(f.room.state().current!.rounds, 3);
 });
 
-// Research uses the real room lifecycle, persistence and completion gate, with fake agent turns.
-import { RESEARCH_PATTERNS, researchPattern } from '../src/shared/research-patterns.js';
-for (const pattern of Object.keys(RESEARCH_PATTERNS) as (keyof typeof RESEARCH_PATTERNS)[]) {
-  test(`${pattern} runs to structured completion and restores its pattern version`, t => {
-    const f = fixture(); t.after(() => f.close());
-    assert.equal(f.start({ pattern, prompt: 'Review the supplied research packet' }), undefined);
-    f.settle();
-    assert.equal(f.room.state().current!.patternVersion, 1);
-    f.restart();
-    while (f.room.state().current!.status === 'running') {
-      const m = f.room.state().current!;
-      const turns = [...m.turns];
-      if (m.round < m.rounds) for (const turn of turns) f.take(turn.seat, '# Evidence assessment');
-      else {
-        const p = researchPattern(pattern)!;
-        mkdirSync(path.dirname(path.join(f.cwd(), m.output)), { recursive: true });
-        writeFileSync(path.join(f.cwd(), m.output + '.md'), '# Findings and missing evidence');
-        f.take(0, JSON.stringify({ schema_version: 1, meeting_id: m.id, pattern, pattern_version: 1,
-          summary: 'Missing required external inputs', outcome: 'blocked', evidence_run_ids: [], findings: [], dissent: [],
-          next_action: 'Supply evidence', details: Object.fromEntries(p.required.map(k => [k, k === 'mode' ? 'preflight' : 'Missing: request input'])) }));
-      }
-    }
-    assert.equal(f.room.state().current!.status, 'done');
-    assert.equal(f.reviews.length, 0);
-    assert.ok(existsSync(path.join(f.dir, '.agent-office', 'meetings', f.room.state().current!.id)));
-  });
-}
-
-test('research completion rejects malformed output even through finish-anyway', t => {
-  const f = fixture(); t.after(() => f.close());
-  assert.equal(f.start({ pattern: 'research.validation-council' }), undefined); f.settle();
-  for (let round = 0; round < 2; round++) for (const turn of [...f.room.state().current!.turns]) f.take(turn.seat);
-  f.take(0, 'not JSON');
-  assert.equal(f.room.state().current!.status, 'stopped');
-  assert.match(f.room.state().current!.reason!, /Invalid research result/);
+// Caller definitions use the real room lifecycle, persistence and completion gates.
+import { DEFAULT_WORKFLOW } from '../src/shared/meeting-workflows.js';
+import { meetingMemoryContext, meetingMemoryGate, recordMeetingReview } from '../src/server/knowledge/meetings.js';
+test('custom workflow completes and restores its frozen definition', t => {
+  const f=fixture(); t.after(()=>f.close());
+  const workflow=structuredClone(DEFAULT_WORKFLOW);
+  assert.equal(f.start({pattern:'custom',workflow,prompt:'Review the supplied document'}),undefined); f.settle();
+  workflow.label='Mutated caller object'; f.restart();
+  const m=f.room.state().current!; assert.equal(m.patternVersion,1); assert.equal(m.workflow!.label,'Team review');
+  for(const turn of [...m.turns])f.take(turn.seat,'# Assessment');
+  mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true}); writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');
+  f.take(0,JSON.stringify({summary:'Document reviewed'}));
+  assert.equal(f.room.state().current!.status,'done'); assert.equal(f.reviews.length,0);
+  assert.ok(existsSync(path.join(f.dir,'.agent-office','meetings',m.id,'workflow.json')));
+});
+test('custom completion rejects malformed output even through finish-anyway', t => {
+  const f=fixture(); t.after(()=>f.close()); assert.equal(f.start({pattern:'custom'}),undefined); f.settle();
+  for(const turn of [...f.room.state().current!.turns])f.take(turn.seat);
+  f.take(0,'not JSON'); assert.equal(f.room.state().current!.status,'stopped');
+  assert.match(f.room.state().current!.reason!,/Invalid workflow result/);
+});
+test('custom session requires output-bound chair review across restart', t => {
+  const f=fixture({memory:true}); t.after(()=>f.close()); assert.equal(f.start({pattern:'custom'}),undefined); f.settle();
+  let m=f.room.state().current!; assert.ok(f.prompts.every(p=>p.text.includes('MEETING SHARED MEMORY')));
+  for(const turn of [...m.turns])f.take(turn.seat);
+  mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true}); writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');
+  f.take(0,JSON.stringify({summary:'Document reviewed'})); m=f.room.state().current!;
+  assert.equal(m.status,'running'); assert.equal(m.knowledgeReviewPending,true);
+  assert.equal(f.prompts.filter(p=>p.text.startsWith('Knowledge review required')).length,1);
+  f.room.finishAnyway(m.id,'Ada'); assert.equal(m.status,'running'); f.restart();
+  recordMeetingReview(f.dir,f.room.state().current!,f.workers[0],[],'No durable document changes'); f.room.pump();
+  assert.equal(f.room.state().current!.status,'done'); assert.equal(f.room.state().current!.knowledgeReviewPending,false);
 });
 
-
-import { meetingMemoryContext, meetingMemoryGate, recordMeetingReview } from '../src/server/knowledge/meetings.js';
-test('research session waits for chair review, preserves it across restart, and cannot override it', t => {
-  const f = fixture({ memory: true }); t.after(() => f.close());
-  assert.equal(f.start({ pattern: 'research.validation-council' }), undefined); f.settle();
-  let m = f.room.state().current!;
-  assert.ok(f.prompts.every(p => p.text.includes('RESEARCH SHARED MEMORY')));
-  for (let round = 0; round < 2; round++) for (const turn of [...f.room.state().current!.turns]) f.take(turn.seat);
-  mkdirSync(path.dirname(path.join(f.cwd(), m.output)), { recursive: true });
-  writeFileSync(path.join(f.cwd(), m.output + '.md'), '# Missing evidence');
-  f.take(0, JSON.stringify({ schema_version: 1, meeting_id: m.id, pattern: m.pattern, pattern_version: 1,
-    summary: 'Missing evaluation inputs', outcome: 'blocked', evidence_run_ids: [], findings: [], dissent: [], next_action: 'Supply evidence',
-    details: { revision_id: 'missing', protocol_digest: 'missing', criteria_assessment: 'not assessed', exposure_limits: 'not released' } }));
-  m = f.room.state().current!;
-  assert.equal(m.status, 'running'); assert.equal(m.knowledgeReviewPending, true);
-  assert.equal(f.prompts.filter(p => p.text.startsWith('Knowledge review required')).length, 1);
-  f.room.finishAnyway(m.id, 'Ada'); assert.equal(m.status, 'running');
-  f.restart();
-  recordMeetingReview(f.dir, f.room.state().current!, f.workers[0], [], 'No supported durable finding without evaluation inputs');
-  f.room.pump(); assert.equal(f.room.state().current!.status, 'done');
-  assert.equal(f.room.state().current!.knowledgeReviewPending, false);
+import { createHash } from 'node:crypto';
+test('custom attachments are checked at completion and retained as inline archived content', t => {
+  const f=fixture();t.after(()=>f.close());
+  const workflow=structuredClone(DEFAULT_WORKFLOW);workflow.memory=false;
+  workflow.result.rules.push({path:'document.text',type:'string'});
+  workflow.result.attachments=[{path:'document.path',content:'document.text',sha256:'document.digest',maxBytes:200000}];
+  assert.equal(f.start({pattern:'custom',workflow}),undefined);f.settle();const m=f.room.state().current!;
+  for(const turn of [...m.turns])f.take(turn.seat);
+  const text='Reviewed document\n',digest=createHash('sha256').update(text).digest('hex');
+  writeFileSync(path.join(f.cwd(),'document.txt'),text);
+  mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true});writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');
+  f.take(0,JSON.stringify({summary:'Reviewed',document:{path:'document.txt',digest}}));
+  assert.equal(f.room.state().current!.status,'done');
+  const archive=path.join(f.dir,'.agent-office','meetings',m.id);
+  const output=JSON.parse(readFileSync(path.join(archive,'output-'+path.basename(m.output)),'utf8'));
+  assert.equal(output.document.text,text);
+  rmSync(path.join(f.cwd(),'document.txt'));
+  assert.equal(JSON.parse(readFileSync(path.join(archive,'workflow.json'),'utf8')).id,workflow.id);
 });

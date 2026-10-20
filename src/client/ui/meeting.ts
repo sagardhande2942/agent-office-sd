@@ -2,8 +2,8 @@ import { MEETING_WINDOW_EXTENSIONS, meetingCommand } from './meeting-extensions'
 import { meetingMessages, unresolvedRequests } from '../../shared/communications';
 import { renderCommunicationList } from './communications';
 import './meeting.css';
-import { researchPattern } from '../../shared/research-patterns';
-import { MEETING_PATTERNS, MEETING_PATTERN_IDS, fixedRounds, meetingSpend, meetingStage, outputProblem, slugify } from '../../shared/meetings';
+import { DEFAULT_WORKFLOW, workflowProblem, type MeetingWorkflow } from '../../shared/meeting-workflows';
+import { MEETING_PATTERNS, meetingDefinition, MEETING_PATTERN_IDS, fixedRounds, meetingSpend, meetingStage, outputProblem, slugify } from '../../shared/meetings';
 import { fmtTokens, type Meeting, type MeetingPattern, type MeetingTurn } from '../../shared/protocol';
 import type { Net } from '../net';
 import { store } from '../state';
@@ -107,7 +107,7 @@ export function openMeeting(net: Net, actions: MeetingActions, preset?: MeetingP
 function renderStatus(m: Meeting, body: HTMLElement, foot: HTMLElement, net: Net, actions: MeetingActions, callAnother: () => void) {
   const stop = meetingCommand({ t: 'meeting.stop' });
   const clear = meetingCommand({ t: 'meeting.clear' });
-  const p = MEETING_PATTERNS[m.pattern];
+  const p = meetingDefinition(m);
   const running = m.status === 'running';
   const pill = h('span.pill', { class: running ? 'working' : m.status === 'done' ? 'done' : 'needs_input' }, running ? 'in a meeting' : m.status);
   const seats = h(
@@ -176,6 +176,10 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
   const prRow = h('div.meeting-field', {}, h('label', {}, 'Pull request'), prSel);
   const partsIn = h('textarea', { rows: 3, placeholder: 'src/server/\nsrc/client/\nsrc/shared/', 'aria-label': 'Parts', spellcheck: 'false' }) as HTMLTextAreaElement;
   const partsRow = h('div.meeting-field', {}, h('label', {}, 'Parts, one per line'), partsIn, h('small.muted', {}, 'Handed out to the mappers in turn: files, folders, modules or issues.'));
+  const workflowIn = h('textarea', { rows: 8, 'aria-label': 'Workflow definition', spellcheck: 'false' }) as HTMLTextAreaElement;
+  workflowIn.value = JSON.stringify(DEFAULT_WORKFLOW, null, 2);
+  let workflow = structuredClone(DEFAULT_WORKFLOW);
+  const workflowRow = h('div.meeting-field', {}, h('label', {}, 'Workflow definition (JSON)'), workflowIn, h('small.muted', {}, 'Roles, stages, result rules and optional file attachments. The server saves a copy with this meeting.'));
   const count = h('b');
   const minus = h('button.btn.small', { type: 'button', 'aria-label': 'Fewer workers' }, '−');
   const plus = h('button.btn.small', { type: 'button', 'aria-label': 'More workers' }, '+');
@@ -189,13 +193,13 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
   const submit = h('button.btn.primary', { type: 'submit' }, '🤝 Start the meeting');
   const cancel = h('button.btn', { type: 'button', onclick: store.meeting.current ? back : done }, store.meeting.current ? '← Back' : 'Cancel');
 
-  const def = () => MEETING_PATTERNS[pattern];
+  const def = () => meetingDefinition({ pattern, workflow: pattern === 'custom' ? workflow : undefined });
   const slug = () => slugify(titleIn.value.trim() || about.value.trim().split('\n')[0] || 'meeting', 32);
   const pr = () => Number(prSel.value) || undefined;
   const syncOutput = () => {
     if (!outputTouched) outputIn.value = def().output(slug(), pr());
     const problem = outputProblem(outputIn.value.trim());
-    outputNote.textContent = problem ? `⚠️ ${problem}` : researchPattern(pattern) ? 'Requires valid research JSON and a readable report at the output path + .md. Recommendations do not approve strategies or submit jobs.' : pattern === 'review' ? 'It ends when this file is written; the office then posts it on the PR as one review.' : store.project?.branch ? 'It ends when this file is written; the office commits it on the meeting’s own branch.' : 'It ends when this file is written.';
+    outputNote.textContent = problem ? `⚠️ ${problem}` : pattern === 'custom' ? 'Requires JSON matching the workflow rules and a readable report at the output path + .md.' : pattern === 'review' ? 'It ends when this file is written; the office then posts it on the PR as one review.' : store.project?.branch ? 'It ends when this file is written; the office commits it on the meeting’s own branch.' : 'It ends when this file is written.';
     outputNote.classList.toggle('bad', !!problem);
   };
   const renderRoles = () => {
@@ -226,11 +230,16 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
     roundsFixed.textContent = fixed ? `🔒 ${fixed.line}` : '';
     roundsFixed.title = fixed?.why ?? '';
     roundsNote.textContent = fixed ? fixed.stages : `${d.rounds.min} to ${d.rounds.max}. ${d.roundsNote ?? ''}`.trim();
+    workflowRow.classList.toggle('hidden', p !== 'custom');
     prRow.classList.toggle('hidden', d.needs !== 'pr');
     partsRow.classList.toggle('hidden', d.needs !== 'parts');
     renderRoles();
     syncOutput();
   };
+  workflowIn.addEventListener('change', () => {
+    try { const value: unknown = JSON.parse(workflowIn.value); const bad = workflowProblem(value); if (bad) throw Error(bad); workflow = value as MeetingWorkflow; pickPattern('custom'); }
+    catch (error) { toast((error as Error).message, 'warn'); }
+  });
   for (const id of MEETING_PATTERN_IDS) {
     const d = MEETING_PATTERNS[id];
     patterns.append(h('button.meeting-pattern', { type: 'button', role: 'radio', 'data-pattern': id, onclick: () => pickPattern(id) }, h('b', {}, `${d.icon} ${d.label}`), h('small', {}, d.blurb)));
@@ -259,6 +268,7 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
     h('div.meeting-field', {}, titleIn),
     prRow,
     partsRow,
+    workflowRow,
     h('div.meeting-field', {}, h('label', {}, 'Output file'), outputIn, outputNote),
     h('div.meeting-field', {}, h('label.meeting-count', {}, 'Workers at the table', minus, count, plus), roleList),
     h('div.meeting-field', {}, h('label', {}, 'Round limit'), roundsSel, roundsFixed, roundsNote),
@@ -269,6 +279,11 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
 
   const send = () => {
     if (store.meeting.current?.status === 'running') return;
+    if (pattern === 'custom') {
+      try { const value: unknown = JSON.parse(workflowIn.value); const bad = workflowProblem(value); if (bad) throw Error(bad); workflow = value as MeetingWorkflow; }
+      catch (error) { toast((error as Error).message, 'warn'); return workflowIn.focus(); }
+      if (roles.length !== workflow.roles.length) { pickPattern('custom'); toast('Workflow roles changed; review the team before starting', 'warn'); return; }
+    }
     const prompt = about.value.trim();
     if (!prompt) return about.focus();
     if (def().needs === 'pr' && !pr()) return prSel.focus();
@@ -283,6 +298,7 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
     net.send(meetingCommand({
       t: 'meeting.start',
       pattern,
+      ...(pattern === 'custom' ? { workflow } : {}),
       prompt,
       title: titleIn.value.trim() || undefined,
       output,

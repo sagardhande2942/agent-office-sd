@@ -3,25 +3,25 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { TeamRouter, type RoutedMeeting, type RoutingIO } from '../src/server/research-routing/router.js';
-import { ResearchBridge, type Bridge, type QueueTask } from '../src/server/research-routing/bridge.js';
-import { readRouting, saveRouting } from '../src/server/research-routing/storage.js';
+import { TeamRouter, type RoutedMeeting, type RoutingIO } from '../src/server/task-routing/router.js';
+import { TaskBridge, type Bridge, type QueueTask } from '../src/server/task-routing/bridge.js';
+import { readRouting, saveRouting } from '../src/server/task-routing/storage.js';
 import { childEnv } from '../src/server/workers/env.js';
 
 function fixture(t: test.TestContext) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'research-routing-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = mkdtempSync(path.join(tmpdir(), 'task-routing-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   const file = path.join(dir, 'state.json');
-  const task: QueueTask = { id: 'task-1', candidate_id: 'candidate', department: 'edge-discovery', pattern: 'research.edge-discovery', version: 1, input: {} };
+  const task: QueueTask = { id: 'task-1', group: 'documentation', title: 'Review documentation', workflow: DEFAULT_WORKFLOW, version: 1, input: {} };
   const meetings = new Map<string, RoutedMeeting>(); let starts = 0, claims = 0, completions = 0;
-  let lostStart = false, lostClaim = false, lostResult = false; let paused = false; let accepted = false;
+  let lostStart = false, lostClaim = false, lostResult = false; let paused = false; let accepted = false; let changedClaim = false;
   const bridge: Bridge = { async call<T>(op: string, body?: any): Promise<T> {
-    if (op === 'health') return { schema_version: 1, capabilities: ['team-queues-v1'] } as T;
+    if (op === 'health') return { schema_version: 1, capabilities: ['meeting-tasks-v1'] } as T;
     if (op === 'ready') return { tasks: accepted ? [] : [task] } as T;
     if (op === 'claim') {
       claims++;
       if (lostClaim) { lostClaim = false; throw Error('Claim response lost'); }
       assert.equal(body.version, 1);
-      return { ...task, version: 2, claim_token: 'claim-token', execution_key: 'execution-key' } as T;
+      return { ...task, ...(changedClaim ? {group:'different-team'} : {}), version: 2, claim_token: 'claim-token', execution_key: 'execution-key' } as T;
     }
     if (op === 'heartbeat') return {} as T;
     if (op === 'complete') {
@@ -39,7 +39,7 @@ function fixture(t: test.TestContext) {
   const router = () => new TeamRouter(file, bridge, io, 'floor-a');
   const retry = () => { const s = readRouting(file); for (const a of Object.values(s.attempts)) a.nextPoll = 0; saveRouting(file, s); };
   return { file, task, meetings, router, retry, counts: () => ({ starts, claims, completions }),
-    loseStart: () => lostStart = true, loseClaim: () => lostClaim = true, loseResult: () => lostResult = true, pause: () => paused = true };
+    loseStart: () => lostStart = true, loseClaim: () => lostClaim = true, loseResult: () => lostResult = true, pause: () => paused = true, changeClaim: () => changedClaim = true };
 }
 
 test('router persists claim/start and resumes the same meeting after restart', async t => {
@@ -74,42 +74,54 @@ test('unknown start outcomes are held, not replayed; revoked authorization preve
 });
 
 test('bridge refuses non-loopback endpoints and controller secrets are scrubbed from worker environments', () => {
-  for (const endpoint of ['https://127.0.0.1/research/v1/', 'http://example.com/research/v1/', 'http://127.0.0.1/other', 'http://x:y@127.0.0.1/research/v1/'])
-    assert.throws(() => new ResearchBridge(endpoint, 'floor', 'x'.repeat(32)));
-  process.env.AGENT_OFFICE_RESEARCH_BRIDGE_TOKEN = 'fixture-controller-secret';
-  try { assert.equal(childEnv().AGENT_OFFICE_RESEARCH_BRIDGE_TOKEN, undefined); }
-  finally { delete process.env.AGENT_OFFICE_RESEARCH_BRIDGE_TOKEN; }
+  for (const endpoint of ['https://127.0.0.1/tasks/v1/', 'http://example.com/tasks/v1/', 'http://127.0.0.1/other', 'http://x:y@127.0.0.1/tasks/v1/'])
+    assert.throws(() => new TaskBridge(endpoint, 'floor', 'x'.repeat(32)));
+  process.env.AGENT_OFFICE_TASK_BRIDGE_TOKEN = 'fixture-controller-secret';
+  try { assert.equal(childEnv().AGENT_OFFICE_TASK_BRIDGE_TOKEN, undefined); }
+  finally { delete process.env.AGENT_OFFICE_TASK_BRIDGE_TOKEN; }
 });
 
 import { mkdirSync, writeFileSync, existsSync, symlinkSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { installResearchRouting, closeResearchRouting } from '../src/server/research-routing/service.js';
+import { installTaskRouting, closeTaskRouting } from '../src/server/task-routing/service.js';
 import type { Floor, FloorContext } from '../src/server/floor.js';
-import { strategySource } from '../src/server/meeting-patterns/source.js';
+import { resolveAttachments } from '../src/server/meeting-patterns/attachments.js';
+import { DEFAULT_WORKFLOW, type FileAttachment } from '../src/shared/meeting-workflows.js';
 import { createHash } from 'node:crypto';
 test('startup never removes another controller lock and graceful shutdown releases only its own', t => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'research-service-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const dir = mkdtempSync(path.join(tmpdir(), 'task-service-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
   execFileSync('git', ['init', '-q'], { cwd: dir }); mkdirSync(path.join(dir, '.agent-office'));
-  const config = path.join(dir, '.agent-office/research-routing.json');
-  writeFileSync(config, JSON.stringify({ enabled: true, endpoint: 'http://127.0.0.1:8765/research/v1/', tokenEnv: 'AGENT_OFFICE_TEST_RESEARCH', maxMeetings: 1 }), { mode: 0o600 });
-  const lock = path.join(dir, '.agent-office/research-routing.lock'); mkdirSync(lock);
-  process.env.AGENT_OFFICE_TEST_RESEARCH = 'x'.repeat(40);
+  const config = path.join(dir, '.agent-office/task-routing.json');
+  writeFileSync(config, JSON.stringify({ enabled: true, endpoint: 'http://127.0.0.1:8765/tasks/v1/', tokenEnv: 'AGENT_OFFICE_TEST_TASKS', maxMeetings: 1 }), { mode: 0o600 });
+  const lock = path.join(dir, '.agent-office/task-routing.lock'); mkdirSync(lock);
+  process.env.AGENT_OFFICE_TEST_TASKS = 'x'.repeat(40);
   const floor = { def: { dir }, id: 'fixture' } as Floor;
   const notices: string[] = []; const ctx = { toast: (_f: unknown, message: string) => notices.push(message) } as FloorContext;
   try {
-    installResearchRouting(floor, ctx); assert.ok(existsSync(lock)); assert.match(notices[0], /disabled/);
-    rmSync(lock, { recursive: true }); installResearchRouting(floor, ctx); assert.ok(existsSync(lock));
-    closeResearchRouting(floor); assert.equal(existsSync(lock), false);
-  } finally { delete process.env.AGENT_OFFICE_TEST_RESEARCH; closeResearchRouting(floor); }
+    installTaskRouting(floor, ctx); assert.ok(existsSync(lock)); assert.match(notices[0], /disabled/);
+    rmSync(lock, { recursive: true }); installTaskRouting(floor, ctx); assert.ok(existsSync(lock));
+    closeTaskRouting(floor); assert.equal(existsSync(lock), false);
+  } finally { delete process.env.AGENT_OFFICE_TEST_TASKS; closeTaskRouting(floor); }
 });
 
-test('source transfer checks digests and refuses paths and symlinks outside the meeting', t => {
-  const dir = mkdtempSync(path.join(tmpdir(), 'research-source-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const cwd = path.join(dir, 'meeting'); mkdirSync(cwd); const code = 'class Strategy: pass\n';
-  const sha = createHash('sha256').update(code).digest('hex'); writeFileSync(path.join(cwd, 'strategy.py'), code);
-  assert.equal(strategySource(cwd, { details: { source_path: 'strategy.py', source_digest: sha } }), code);
-  writeFileSync(path.join(dir, 'outside.py'), code); symlinkSync(path.join(dir, 'outside.py'), path.join(cwd, 'link.py'));
-  assert.throws(() => strategySource(cwd, { details: { source_path: '../outside.py', source_digest: sha } }));
-  assert.throws(() => strategySource(cwd, { details: { source_path: 'link.py', source_digest: sha } }));
-  assert.throws(() => strategySource(cwd, { details: { source_path: 'strategy.py', source_digest: 'wrong' } }));
+test('declared file attachments check digests and refuse outside paths and symlinks', t => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'meeting-attachment-')); t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const cwd = path.join(dir, 'meeting'); mkdirSync(cwd); const content = 'Reviewed document\n';
+  const sha = createHash('sha256').update(content).digest('hex'); writeFileSync(path.join(cwd, 'document.txt'), content);
+  const attachments: FileAttachment[] = [{ path:'document.path',content:'document.text',sha256:'document.digest',maxBytes:200000 }];
+  const output = (file:string,digest=sha) => ({ document: { path:file,digest } });
+  assert.equal((resolveAttachments(cwd,output('document.txt'),attachments).document as any).text, content);
+  writeFileSync(path.join(dir,'outside.txt'),content); symlinkSync(path.join(dir,'outside.txt'),path.join(cwd,'link.txt'));
+  assert.throws(()=>resolveAttachments(cwd,output('../outside.txt'),attachments));
+  assert.throws(()=>resolveAttachments(cwd,output('link.txt'),attachments));
+  assert.throws(()=>resolveAttachments(cwd,output('document.txt','wrong'),attachments));
+  assert.throws(()=>resolveAttachments(cwd,output('document.txt'),attachments,true));
+});
+
+test('malformed tasks and changed claim definitions cannot start paid meetings', async t => {
+  const bad=fixture(t); bad.task.workflow={...DEFAULT_WORKFLOW,roles:[]} ; await bad.router().poll();
+  assert.equal(bad.counts().claims,0); assert.equal(bad.counts().starts,0);
+  const changed=fixture(t); changed.changeClaim(); await changed.router().poll();
+  assert.equal(changed.counts().starts,0); assert.match(readRouting(changed.file).attempts['task-1'].error!,/changed claim/);
+  changed.retry(); await changed.router().poll(); assert.equal(changed.counts().starts,0);
 });

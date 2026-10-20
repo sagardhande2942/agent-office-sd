@@ -6,9 +6,9 @@ export interface RoutingState { version: 1; attempts: Record<string, Attempt>; e
 export function readRouting(file: string): RoutingState {
   if (!existsSync(file)) return { version: 1, attempts: {} };
   const state = JSON.parse(readFileSync(file, 'utf8'));
-  if (state.version !== 1 || !state.attempts || Array.isArray(state.attempts)) throw Error('Invalid research routing state; preserve it for recovery');
+  if (state.version !== 1 || !state.attempts || Array.isArray(state.attempts)) throw Error('Invalid task routing state; preserve it for recovery');
   for (const a of Object.values(state.attempts) as Attempt[]) {
-    if (!a.task?.id || !a.claimKey || !['claiming','starting','running','done','unresolved'].includes(a.state)) throw Error('Invalid research attempt');
+    if (!a.task?.id || !a.claimKey || !['claiming','starting','running','done','unresolved'].includes(a.state)) throw Error('Invalid task attempt');
   }
   return state;
 }

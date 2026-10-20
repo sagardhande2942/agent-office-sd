@@ -1,11 +1,12 @@
+import { isDeepStrictEqual } from 'node:util';
 import { randomBytes, createHash } from 'node:crypto';
-import { BridgeError, type Bridge, type QueueTask } from './bridge.js';
+import { BridgeError, taskProblem, type Bridge, type QueueTask } from './bridge.js';
 import { readRouting, saveRouting, type Attempt } from './storage.js';
 
 export interface RoutedMeeting { id: string; key?: string; state: 'running' | 'done' | 'stopped'; result?: unknown; error?: string }
 export interface RoutingIO {
   allowed(): string | undefined;
-  available(pattern: string, department: string): boolean;
+  available(task: QueueTask): boolean;
   find(key: string): RoutedMeeting | undefined;
   retire?(meetingId: string, key: string): Promise<void>;
   start(task: QueueTask, key: string, id: string): Promise<RoutedMeeting>;
@@ -25,7 +26,7 @@ export class TeamRouter {
     try {
       this.save(); // Never make a new external mutation while local intent cannot be persisted.
       const health = await this.bridge.call<{ schema_version: number; capabilities: string[] }>('health');
-      if (health.schema_version !== 1 || !health.capabilities.includes('team-queues-v1')) throw Error('Incompatible research bridge');
+      if (health.schema_version !== 1 || !health.capabilities.includes('meeting-tasks-v1')) throw Error('Incompatible task bridge');
       for (const a of Object.values(this.state.attempts)) {
         if (a.state === 'done' || (a.nextPoll ?? 0) > Date.now()) continue;
         try { await this.advance(a); delete a.error; a.failures = 0; delete a.nextPoll; }
@@ -36,7 +37,8 @@ export class TeamRouter {
       const { tasks } = await this.bridge.call<{ tasks: QueueTask[] }>('ready');
       for (const task of tasks.slice(0, 100)) {
         if (Object.values(this.state.attempts).filter(a => a.state !== 'done').length >= this.maxMeetings) break;
-        if (this.state.attempts[task.id] || !this.io.available(task.pattern, task.department)) continue;
+        if (taskProblem(task)) continue;
+        if (this.state.attempts[task.id] || !this.io.available(task)) continue;
         const a: Attempt = { task, claimKey: randomBytes(24).toString('hex'), state: 'claiming' };
         this.state.attempts[task.id] = a; this.save();
         try { await this.advance(a); }
@@ -64,18 +66,20 @@ export class TeamRouter {
     }
     if (a.state === 'claiming') {
       const denied = this.io.allowed(); if (denied) throw Error(denied);
-      a.task = await this.bridge.call<QueueTask>('claim', { task_id: a.task.id, version: a.task.version,
+      const claimed = await this.bridge.call<QueueTask>('claim', { task_id: a.task.id, version: a.task.version,
         dispatcher: this.dispatcher, claim_key: a.claimKey });
-      if (!a.task.claim_token || !a.task.execution_key) throw Error('Malformed claim response');
+      if (taskProblem(claimed) || claimed.version !== a.task.version+1 || !claimed.claim_token || !claimed.execution_key
+        || !isDeepStrictEqual([claimed.id,claimed.group,claimed.title,claimed.workflow,claimed.input,claimed.references], [a.task.id,a.task.group,a.task.title,a.task.workflow,a.task.input,a.task.references])) throw Error('Malformed or changed claim response');
+      a.task = claimed;
       a.state = 'starting'; this.save();
       // Only this fresh execution of the acknowledged claim may initiate a meeting.
-      const existing = this.io.find(a.task.execution_key);
+      const existing = this.io.find(a.task.execution_key!);
       if (existing) a.meetingId = existing.id;
       else {
         const refused = this.io.allowed(); if (refused) throw Error(refused);
-        if (!this.io.available(a.task.pattern, a.task.department)) throw Error('Department capacity changed after claim; inspect durable start intent');
-        const id = createHash('sha256').update(a.task.execution_key).digest('hex').slice(0, 16);
-        const m = await this.io.start(a.task, a.task.execution_key, id);
+        if (!this.io.available(a.task)) throw Error('Team capacity changed after claim; inspect durable start intent');
+        const id = createHash('sha256').update(a.task.execution_key!).digest('hex').slice(0, 16);
+        const m = await this.io.start(a.task, a.task.execution_key!, id);
         a.meetingId = m.id;
       }
       a.state = 'running'; this.save();
