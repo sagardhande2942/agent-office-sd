@@ -44,6 +44,8 @@ export interface MeetingTrees {
 }
 
 export interface MeetingEvents {
+  memoryContext?(meeting: Meeting): string;
+  memoryGate?(meeting: Meeting): string | undefined;
   communications?(): CommunicationsState;
   update(state: MeetingState): void;
   toast(text: string, level: 'info' | 'warn' | 'error'): void;
@@ -208,9 +210,15 @@ export class MeetingRoom {
     };
     mkdirSync(path.join(this.cwd(m), m.notes), { recursive: true });
     const first = this.plan(m, 1, 1) ?? [];
+    let memory = '';
+    try { memory = this.events.memoryContext?.(m) ?? ''; }
+    catch (error) {
+      if (worktree && this.trees) void this.trees.remove(worktree, 'all');
+      return `Meeting memory unavailable: ${(error as Error).message}`;
+    }
     for (let i = 0; i < m.seats.length; i++) {
       const part = first.find((p) => p.seat === i);
-      const text = `${this.brief(m, i)}\n\n${part ? this.ask(m, part) : this.say('meeting.wait')}`;
+      const text = `${this.brief(m, i)}${memory}\n\n${part ? this.ask(m, part) : this.say('meeting.wait')}`;
       const w = this.workers.seat(m.seats[i].deskId, `${by} (meeting)`, text, provider, model, effort, { id, worktree }, owner);
       if (typeof w === 'string') {
         for (const s of m.seats) if (s.workerId) void this.workers.kill(s.workerId);
@@ -311,7 +319,7 @@ export class MeetingRoom {
       if (!m.cleared && m.seats.every((s) => !s.workerId || !byId.has(s.workerId))) void this.dismiss(m);
       return;
     }
-    if (m.waitingForCommunications) {
+    if (m.waitingForCommunications || m.knowledgeReviewPending) {
       this.finish(m);
       if (this.dirty) this.changed();
       return;
@@ -443,6 +451,14 @@ export class MeetingRoom {
 
   /** The output is written. Commit it on the meeting's branch, or post the review on its pull request. */
   private finish(m: Meeting, allowUnresolved = false) {
+    const instruction = this.events.memoryGate?.(m);
+    if (instruction) {
+      m.knowledgeReviewPending = true; m.coordinationError = instruction; this.dirty = true;
+      const chair = this.workers.list().find(w => w.id === m.seats[0].workerId);
+      if (!m.knowledgeReviewPrompted && chair && ready(chair.status) && !this.workers.prompt(chair.id, instruction, BY)) m.knowledgeReviewPrompted = true;
+      return;
+    }
+    if (m.knowledgeReviewPending) { m.knowledgeReviewPending = false; m.knowledgeReviewPrompted = false; delete m.coordinationError; }
     if (this.readPreview(m)) this.dirty = true;
     const gate = communicationGate(m, this.events.communications?.() ?? { messages: [] }, allowUnresolved);
     if (gate.changed) this.dirty = true;

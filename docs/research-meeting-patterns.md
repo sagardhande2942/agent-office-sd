@@ -18,7 +18,7 @@ Strategy build assigns planning to the lead, sole code implementation to the eng
 
 ## Inputs and output
 
-Supply exact candidate/revision/specification and accessible evidence in the agenda. The pattern does not assume an automatically delivered memory packet. Participants may use existing authenticated Knowledge tools where available; the regular worker Knowledge bootstrap/completion gate still excludes meeting agents. Dedicated memory and continuous pipeline integration are subsequent changes.
+Supply exact candidate/revision/specification and accessible evidence in the agenda. Research sessions receive a frozen summary packet and authenticated shared Knowledge access through dedicated meeting hooks. The chair records an output-bound review before required completion. See [Research shared memory](research-shared-memory.md). Ordinary worker completion hooks remain separate; continuous pipeline integration is a subsequent change.
 
 Default output is `docs/research/<pattern>/<title>.json` and a readable companion `<output>.md`. The chair receives required fields in its final prompt. Example validation result:
 

@@ -12,7 +12,7 @@ import type { AgentChoice, MeetingRequest, WorkerInfo } from '../src/shared/prot
 import { MEETING_PATTERNS, MEETING_PATTERN_IDS, fixedRounds, isMeetingPattern } from '../src/shared/meetings.js';
 import { PROMPTS, type PromptId } from '../src/shared/prompts.js';
 
-function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, string>>; officeDefault?: AgentChoice; communications?: () => CommunicationsState } = {}) {
+function fixture(opts: { memory?: boolean; git?: boolean; rewritten?: Partial<Record<PromptId, string>>; officeDefault?: AgentChoice; communications?: () => CommunicationsState } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'office-meeting-'));
   const dataDir = path.join(dir, '.agent-office');
   mkdirSync(dataDir, { recursive: true });
@@ -66,6 +66,7 @@ function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, str
   };
   let room: MeetingRoom;
   const createRoom = () => new MeetingRoom(dir, dataDir, manager, opts.git ? new Worktrees(dir) : undefined, {
+    ...(opts.memory ? { memoryContext: (m: import('../src/shared/protocol.js').Meeting) => meetingMemoryContext(dir, m), memoryGate: (m: import('../src/shared/protocol.js').Meeting) => meetingMemoryGate(dir, m) } : {}),
     communications: opts.communications,
     update() {},
     toast: (text) => toasts.push(text),
@@ -583,4 +584,27 @@ test('research completion rejects malformed output even through finish-anyway', 
   f.take(0, 'not JSON');
   assert.equal(f.room.state().current!.status, 'stopped');
   assert.match(f.room.state().current!.reason!, /Invalid research result/);
+});
+
+
+import { meetingMemoryContext, meetingMemoryGate, recordMeetingReview } from '../src/server/knowledge/meetings.js';
+test('research session waits for chair review, preserves it across restart, and cannot override it', t => {
+  const f = fixture({ memory: true }); t.after(() => f.close());
+  assert.equal(f.start({ pattern: 'research.validation-council' }), undefined); f.settle();
+  let m = f.room.state().current!;
+  assert.ok(f.prompts.every(p => p.text.includes('RESEARCH SHARED MEMORY')));
+  for (let round = 0; round < 2; round++) for (const turn of [...f.room.state().current!.turns]) f.take(turn.seat);
+  mkdirSync(path.dirname(path.join(f.cwd(), m.output)), { recursive: true });
+  writeFileSync(path.join(f.cwd(), m.output + '.md'), '# Missing evidence');
+  f.take(0, JSON.stringify({ schema_version: 1, meeting_id: m.id, pattern: m.pattern, pattern_version: 1,
+    summary: 'Missing evaluation inputs', outcome: 'blocked', evidence_run_ids: [], findings: [], dissent: [], next_action: 'Supply evidence',
+    details: { revision_id: 'missing', protocol_digest: 'missing', criteria_assessment: 'not assessed', exposure_limits: 'not released' } }));
+  m = f.room.state().current!;
+  assert.equal(m.status, 'running'); assert.equal(m.knowledgeReviewPending, true);
+  assert.equal(f.prompts.filter(p => p.text.startsWith('Knowledge review required')).length, 1);
+  f.room.finishAnyway(m.id, 'Ada'); assert.equal(m.status, 'running');
+  f.restart();
+  recordMeetingReview(f.dir, f.room.state().current!, f.workers[0], [], 'No supported durable finding without evaluation inputs');
+  f.room.pump(); assert.equal(f.room.state().current!.status, 'done');
+  assert.equal(f.room.state().current!.knowledgeReviewPending, false);
 });

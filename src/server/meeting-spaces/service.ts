@@ -4,6 +4,7 @@ import path from 'node:path';
 import { MeetingRoom, type MeetingEvents, type MeetingTrees, type MeetingWorkers } from '../meetings.js';
 import type { MeetingRequest, MeetingState, WorkerInfo } from '../../shared/protocol.js';
 import { DEFAULT_MEETING_SPACE, MEETING_SPACE_LIMIT, spaceName } from '../../shared/meeting-spaces.js';
+import { meetingMemoryContext, meetingMemoryGate } from '../knowledge/meetings.js';
 
 interface Space { id: string; name: string; createdAt: number; room: MeetingRoom }
 /** Each space runs the existing meeting workflow independently; selecting one is a browser concern. */
@@ -39,7 +40,7 @@ export class MeetingSpaces {
       kill: wid => this.workers.kill(wid),
     };
     const source = this.workers;
-    room = new MeetingRoom(this.dir, data, workers, this.trees, { ...this.events, update: () => this.events.update(this.state()) });
+    room = new MeetingRoom(this.dir, data, workers, this.trees, { memoryContext: m => meetingMemoryContext(this.dir, m), memoryGate: m => meetingMemoryGate(this.dir, m), ...this.events, update: () => this.events.update(this.state()) });
     this.spaces.set(id, { id, name, createdAt, room });
   }
   state(): MeetingState {

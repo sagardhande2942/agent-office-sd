@@ -80,6 +80,9 @@ export interface Meeting {
   status: MeetingStatus;
   /** Finished output is held until linked requests resolve or a viewer explicitly overrides. */
   waitingForCommunications?: boolean;
+  /** Session-level Knowledge review, separate from a worker completion checklist. */
+  knowledgeReviewPending?: boolean;
+  knowledgeReviewPrompted?: boolean;
   coordinationError?: string;
   communicationOverride?: { by: string; at: number };
   /** Why it stopped short. */

@@ -632,3 +632,5 @@ See [Master / Workers](docs/master-workers.md) for specifications, progress tool
 Meeting workers already in the live roster are seated immediately when their avatars are redisplayed. Only newly added workers enter from the elevator.
 
 Research teams can use seven dedicated [research meeting patterns](docs/research-meeting-patterns.md) inside existing meeting spaces: discovery, design, strategy build, backtest investigation, validation, portfolio review and retrospective. Structured outputs are checked before session completion; they remain recommendations until research evidence is verified.
+
+Research meeting teams share [versioned Knowledge context and session reviews](docs/research-shared-memory.md). Active participants read the floor tree; chairs write scoped unverified observations and review the exact final outputs before required completion.

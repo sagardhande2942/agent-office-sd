@@ -183,3 +183,7 @@ The committed knowledge tree contains short, repository-sourced recipes for impl
 | Prepare a bounded task for a compact model | [Task brief recipes](../.agent-office/knowledge/conventions/task-brief-recipes.md) |
 
 These notes distinguish repository contracts, worker-reported claims, proposed designs and observed results. They provide navigation and concrete examples rather than promises about a model's performance or external provider availability.
+
+## Research meeting teams
+
+Research patterns use dedicated [shared-memory hooks](research-shared-memory.md): frozen summary packets, authenticated read access for active participants, scoped observation writes by the chair, and a session-level output-bound review. Generic meeting restrictions and ordinary worker completion reviews remain separate.

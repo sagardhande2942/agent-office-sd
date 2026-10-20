@@ -12,7 +12,7 @@ export function researchBrief(m: Meeting): string | undefined {
     (m.pattern === 'research.strategy-build' ? 'Only seat 2 implements the strategy, only within the lead’s explicit write set during Implementation; the reviewer writes review notes only. ' : 'Write only your assigned notes; do not edit strategy code. ') +
     'Do not submit external jobs, run trading code, push, commit or switch branches from this meeting. ' +
     'Read supplied evidence and relevant Knowledge using existing authenticated tools when available; do not invent missing memory or results. ' +
-    'No automatic shared-memory bootstrap, backtest submission or pipeline routing is claimed by these patterns. ' +
+    'No automatic backtest submission or pipeline routing is claimed by these patterns. ' +
     'A verdict is a research recommendation, not permission for live trading or proof of an accepted pipeline transition.';
 }
 
