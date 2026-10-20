@@ -547,3 +547,40 @@ test('a pattern with a set number of rounds says so, and names them; a range is 
   assert.equal(f.start({ pattern: 'lead', rounds: 5 }), undefined);
   assert.equal(f.room.state().current!.rounds, 3);
 });
+
+// Research uses the real room lifecycle, persistence and completion gate, with fake agent turns.
+import { RESEARCH_PATTERNS, researchPattern } from '../src/shared/research-patterns.js';
+for (const pattern of Object.keys(RESEARCH_PATTERNS) as (keyof typeof RESEARCH_PATTERNS)[]) {
+  test(`${pattern} runs to structured completion and restores its pattern version`, t => {
+    const f = fixture(); t.after(() => f.close());
+    assert.equal(f.start({ pattern, prompt: 'Review the supplied research packet' }), undefined);
+    f.settle();
+    assert.equal(f.room.state().current!.patternVersion, 1);
+    f.restart();
+    while (f.room.state().current!.status === 'running') {
+      const m = f.room.state().current!;
+      const turns = [...m.turns];
+      if (m.round < m.rounds) for (const turn of turns) f.take(turn.seat, '# Evidence assessment');
+      else {
+        const p = researchPattern(pattern)!;
+        mkdirSync(path.dirname(path.join(f.cwd(), m.output)), { recursive: true });
+        writeFileSync(path.join(f.cwd(), m.output + '.md'), '# Findings and missing evidence');
+        f.take(0, JSON.stringify({ schema_version: 1, meeting_id: m.id, pattern, pattern_version: 1,
+          summary: 'Missing required external inputs', outcome: 'blocked', evidence_run_ids: [], findings: [], dissent: [],
+          next_action: 'Supply evidence', details: Object.fromEntries(p.required.map(k => [k, k === 'mode' ? 'preflight' : 'Missing: request input'])) }));
+      }
+    }
+    assert.equal(f.room.state().current!.status, 'done');
+    assert.equal(f.reviews.length, 0);
+    assert.ok(existsSync(path.join(f.dir, '.agent-office', 'meetings', f.room.state().current!.id)));
+  });
+}
+
+test('research completion rejects malformed output even through finish-anyway', t => {
+  const f = fixture(); t.after(() => f.close());
+  assert.equal(f.start({ pattern: 'research.validation-council' }), undefined); f.settle();
+  for (let round = 0; round < 2; round++) for (const turn of [...f.room.state().current!.turns]) f.take(turn.seat);
+  f.take(0, 'not JSON');
+  assert.equal(f.room.state().current!.status, 'stopped');
+  assert.match(f.room.state().current!.reason!, /Invalid research result/);
+});

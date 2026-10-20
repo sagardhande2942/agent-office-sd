@@ -1,6 +1,7 @@
 // The meeting room's patterns: how 2–5 workers at the table work on one question or task together.
 // The server runs them (server/meetings.ts); the client offers them when a meeting is called.
 
+import { RESEARCH_PATTERNS } from './research-patterns.js';
 import { fmtCost, fmtTokens, type Meeting, type MeetingPattern, type MeetingRecord } from './protocol.js';
 
 export interface PatternDef {
@@ -25,6 +26,7 @@ export interface PatternDef {
 }
 
 export const MEETING_PATTERNS: Record<MeetingPattern, PatternDef> = {
+  ...RESEARCH_PATTERNS,
   debate: {
     icon: '🗣️',
     label: 'Debate',

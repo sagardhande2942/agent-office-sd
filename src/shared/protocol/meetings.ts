@@ -1,10 +1,11 @@
 // The meeting room.
 import type { MeetingSpace } from '../meeting-spaces.js';
 
+import type { ResearchPatternId } from '../research-patterns.js';
 import type { AgentEffort, AgentProvider } from './agents.js';
 
 /** How the workers at the meeting table work together (see shared/meetings.ts). */
-export type MeetingPattern = 'debate' | 'lead' | 'mapreduce' | 'redblue' | 'review';
+export type MeetingPattern = 'debate' | 'lead' | 'mapreduce' | 'redblue' | 'review' | ResearchPatternId;
 
 /** A worker's place at a meeting. */
 export interface MeetingSeat {
@@ -43,6 +44,8 @@ export type MeetingStatus = 'running' | 'done' | 'stopped';
 export interface Meeting {
   id: string;
   pattern: MeetingPattern;
+  /** Research workflow version, fixed at session start. */
+  patternVersion?: number;
   title: string;
   /** The question or task, as whoever called the meeting put it. */
   prompt: string;
