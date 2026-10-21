@@ -21,7 +21,7 @@ export interface MeetingWorkflow {
   brief: string;
   roles: string[];
   memory: boolean;
-  stages: { label: string; turns: { seats: 'all' | number[]; prompt: string; output?: boolean }[] }[];
+  stages: { label: string; when?: { round: number; seat: number; field: string; equals: string | number | boolean }; turns: { seats: 'all' | number[]; prompt: string; output?: boolean }[] }[];
   result: { rules: ResultRule[]; attachments?: FileAttachment[] };
 }
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -39,7 +39,13 @@ export function workflowProblem(value: unknown): string | undefined {
   if (!Array.isArray(w.stages) || !w.stages.length || w.stages.length > 8) return 'Workflow needs 1–8 stages';
   let final = 0;
   for (const [i, s] of w.stages.entries()) {
-    if (!record(s) || !keys(s, ['label','turns']) || !text(s.label, 100) || !Array.isArray(s.turns) || !s.turns.length || s.turns.length > 5) return 'Invalid workflow stage';
+    if (!record(s) || !keys(s, ['label','turns','when']) || !text(s.label, 100) || !Array.isArray(s.turns) || !s.turns.length || s.turns.length > 5) return 'Invalid workflow stage';
+    if (s.when !== undefined && (!record(s.when) || !keys(s.when, ['round','seat','field','equals']) || !Number.isInteger(s.when.round) || Number(s.when.round) < 1 || Number(s.when.round) > i
+      || !Number.isInteger(s.when.seat) || Number(s.when.seat) < 0 || Number(s.when.seat) >= w.roles.length || !field(s.when.field) || !primitive(s.when.equals) || i === w.stages.length - 1)) return 'Invalid workflow stage condition';
+    if (record(s.when)) {
+      const producer = w.stages[Number(s.when.round) - 1];
+      if (producer.when || !producer.turns.some((t: { seats: 'all' | number[] }) => t.seats === 'all' || t.seats.includes(Number((s.when as Record<string, unknown>).seat)))) return 'Condition must reference an unconditional producer seat';
+    }
     const occupied = new Set<number>();
     for (const t of s.turns) {
       if (!record(t) || !keys(t, ['seats','prompt','output']) || !text(t.prompt, 8000) || t.output !== undefined && typeof t.output !== 'boolean') return 'Invalid workflow turn';

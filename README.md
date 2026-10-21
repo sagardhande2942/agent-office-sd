@@ -631,7 +631,7 @@ See [Master / Workers](docs/master-workers.md) for specifications, progress tool
 
 Meeting workers already in the live roster are seated immediately when their avatars are redisplayed. Only newly added workers enter from the elevator.
 
-Custom teams use caller-defined [meeting workflows](docs/custom-meetings.md) with named roles, bounded stages, structured result rules and checked file attachments. Definitions are saved with each session. Routed teams receive bounded, digest-checked predecessor reports inside their own checkout. Archives preserve the exact reviewed output bytes and keep attachment expansion in a separate derived file.
+Custom teams use caller-defined [meeting workflows](docs/custom-meetings.md) with named roles, bounded stages, structured result rules and checked file attachments. Definitions are saved with each session. Optional conditional stages skip unnecessary work; invalid final results receive at most two chair-only correction turns. Routed teams receive bounded, digest-checked predecessor reports inside their own checkout. Archives preserve the exact reviewed output bytes and keep attachment expansion in a separate derived file.
 
 Memory-enabled meetings share [versioned Knowledge context and session reviews](docs/meeting-memory.md). Active participants read the floor tree; chairs write scoped unverified observations and review the exact final outputs before required completion.
 

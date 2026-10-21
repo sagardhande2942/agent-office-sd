@@ -564,11 +564,25 @@ test('custom workflow completes and restores its frozen definition', t => {
   assert.equal(f.room.state().current!.status,'done'); assert.equal(f.reviews.length,0);
   assert.ok(existsSync(path.join(f.dir,'.agent-office','meetings',m.id,'workflow.json')));
 });
-test('custom completion rejects malformed output even through finish-anyway', t => {
+test('custom output repair retries only the chair, persists, and stops after two corrections', t => {
   const f=fixture(); t.after(()=>f.close()); assert.equal(f.start({pattern:'custom'}),undefined); f.settle();
   for(const turn of [...f.room.state().current!.turns])f.take(turn.seat);
-  f.take(0,'not JSON'); assert.equal(f.room.state().current!.status,'stopped');
-  assert.match(f.room.state().current!.reason!,/Invalid workflow result/);
+  const peerPrompts=()=>f.prompts.filter(p=>p.id===f.workers[1].id).length;
+  const before=peerPrompts();
+  f.take(0,'not JSON'); let m=f.room.state().current!;
+  assert.equal(m.status,'running'); assert.equal(m.outputRepairAttempts,1);
+  f.room.finishAnyway(m.id,'Ada'); assert.equal(m.outputRepairAttempts,1);
+  f.restart(); m=f.room.state().current!; assert.equal(m.outputRepairAttempts,1);
+  f.take(0,'still not JSON'); m=f.room.state().current!; assert.equal(m.outputRepairAttempts,2);
+  f.take(0,'third invalid report'); m=f.room.state().current!; assert.equal(m.status,'stopped');
+  assert.match(m.reason!,/Invalid workflow result/); assert.equal(peerPrompts(),before);
+});
+test('corrected custom output completes without repeating assessments', t => {
+  const f=fixture(); t.after(()=>f.close()); assert.equal(f.start({pattern:'custom'}),undefined);f.settle();
+  for(const turn of [...f.room.state().current!.turns])f.take(turn.seat);
+  f.take(0,'invalid'); const m=f.room.state().current!;
+  writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Corrected findings');
+  f.take(0,JSON.stringify({summary:'Corrected'})); assert.equal(f.room.state().current!.status,'done');
 });
 test('custom session requires output-bound chair review across restart', t => {
   const f=fixture({memory:true}); t.after(()=>f.close()); assert.equal(f.start({pattern:'custom'}),undefined); f.settle();
@@ -607,4 +621,32 @@ test('custom attachments are checked at completion and retained as inline archiv
   assert.equal(output.document.text,text);
   rmSync(path.join(f.cwd(),'document.txt'));
   assert.equal(JSON.parse(readFileSync(path.join(archive,'workflow.json'),'utf8')).id,workflow.id);
+});
+
+test('custom room runs corrections only when an independent note requests them',t=>{
+  for(const needed of [false,true]) {
+    const f=fixture();t.after(()=>f.close());const workflow=structuredClone(DEFAULT_WORKFLOW);
+    workflow.stages[0].turns[0].seats=[1];
+    workflow.stages.splice(1,0,{label:'Correction',when:{round:1,seat:1,field:'needs_changes',equals:true},turns:[{seats:[0],prompt:'Correct the document issue'}]});
+    assert.equal(f.start({pattern:'custom',workflow}),undefined);f.settle();
+    f.take(1,JSON.stringify({needs_changes:needed}));
+    assert.equal(f.room.state().current!.round,needed?2:3);
+    if(needed)f.take(0,'Corrected the document issue');
+    const m=f.room.state().current!;assert.equal(m.round,3);
+    mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true});
+    writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');f.take(0,JSON.stringify({summary:'Reviewed'}));
+    assert.equal(f.room.state().current!.status,'done');
+    assert.equal(f.prompts.filter(p=>p.text.includes('Correct the document issue')).length,needed?1:0);
+  }
+});
+test('a repaired result needs a fresh Knowledge receipt for its corrected bytes',t=>{
+  const f=fixture({memory:true});t.after(()=>f.close());assert.equal(f.start({pattern:'custom'}),undefined);f.settle();
+  for(const turn of [...f.room.state().current!.turns])f.take(turn.seat);
+  let m=f.room.state().current!;mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true});writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Initial findings');
+  f.take(0,'invalid JSON');m=f.room.state().current!;
+  recordMeetingReview(f.dir,m,f.workers[0],[],'Initial review');
+  writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Corrected findings');f.take(0,JSON.stringify({summary:'Corrected'}));
+  m=f.room.state().current!;assert.equal(m.status,'running');assert.equal(m.knowledgeReviewPending,true);
+  recordMeetingReview(f.dir,m,f.workers[0],[],'Reviewed corrected bytes');f.room.pump();
+  assert.equal(f.room.state().current!.status,'done');
 });

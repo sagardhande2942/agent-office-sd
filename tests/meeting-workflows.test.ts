@@ -40,3 +40,22 @@ test('generic conditional result rules enforce caller identity, enums and requir
   assert.equal(validateCustomResult(m,{...v,outcome:'ready',references:['a']}),undefined);
   assert.match(validateCustomResult({...m,patternVersion:2},v)!,/version/);
 });
+
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+test('conditional stages skip needless work and fail closed on absent, mistyped or escaped notes',t=>{
+  const root=mkdtempSync(path.join(tmpdir(),'workflow-condition-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+  const m=meeting(),w=m.workflow!;
+  w.stages.splice(1,0,{label:'Correction',when:{round:1,seat:1,field:'needs_changes',equals:true},turns:[{seats:[1],prompt:'Correct the reported issue'}]});
+  assert.equal(workflowProblem(w),undefined);
+  mkdirSync(path.join(root,m.notes),{recursive:true}); const file=path.join(root,m.notes,'r1-seat2.md');
+  assert.throws(()=>planMeeting(m,2,1,root,()=>''));
+  writeFileSync(file,JSON.stringify({needs_changes:false}));assert.deepEqual(planMeeting(m,2,1,root,()=>''),[]);
+  writeFileSync(file,JSON.stringify({needs_changes:true}));assert.equal(planMeeting(m,2,1,root,()=>'')!.length,1);
+  for(const value of ['not JSON','{}','{"needs_changes":"false"}']) {writeFileSync(file,value);assert.throws(()=>planMeeting(m,2,1,root,()=>''));}
+  rmSync(file);symlinkSync('/etc/hosts',file);assert.throws(()=>planMeeting(m,2,1,root,()=>''));
+  for(const mutate of [(v:any)=>v.stages[1].when.round=2,(v:any)=>v.stages[1].when.field='__proto__.x',(v:any)=>v.stages[2].when={round:1,seat:1,field:'x',equals:true},(v:any)=>v.stages[0].turns[0].seats=[0]]) {
+    const invalid=structuredClone(w);mutate(invalid);assert.ok(workflowProblem(invalid));
+  }
+});

@@ -1,3 +1,4 @@
+import { repairCustomOutput, repairOutputChanged } from './meeting-patterns/efficiency.js';
 import type { CommunicationsState } from '../shared/communications.js';
 import { communicationGate, keepMeetingCommunications } from './meeting-communications.js';
 import { commitAll, readStart, numbered, list, firstLine, clamp } from './meeting-output.js';
@@ -456,6 +457,13 @@ export class MeetingRoom {
 
   /** The output is written. Commit it on the meeting's branch, or post the review on its pull request. */
   private finish(m: Meeting, allowUnresolved = false) {
+    const outputError = validateCustomOutput(m, this.cwd(m));
+    if (outputError) {
+      if (m.outputRepairError && !repairOutputChanged(m, this.cwd(m))) return;
+      if (!repairCustomOutput(m, outputError, this.cwd(m))) return this.halt(m, outputError);
+      this.dirty = true; this.again = true; return;
+    }
+    delete m.outputRepairError;
     const instruction = this.events.memoryGate?.(m);
     if (instruction) {
       m.knowledgeReviewPending = true; m.coordinationError = instruction; this.dirty = true;
@@ -469,8 +477,6 @@ export class MeetingRoom {
     if (gate.changed) this.dirty = true;
     if (gate.notice) this.events.toast(gate.notice, 'warn');
     if (gate.blocked) return;
-    const outputError = validateCustomOutput(m, this.cwd(m));
-    if (outputError) return this.halt(m, outputError);
     m.status = 'done';
     m.finishedAt = Date.now();
     m.turns = [];
@@ -625,12 +631,14 @@ export class MeetingRoom {
 
   /** A part, as the prompt that hands it over. */
   private ask(m: Meeting, part: Part): string {
-    return `Round ${m.round} of ${m.rounds}, ${part.doing}. ${part.ask}\nCheck office-workers inbox --json before writing your final notes for this round. Requests involving this table are tracked with the meeting and round; unresolved requests hold completion until resolved, expired, or explicitly overridden.`;
+    const repair = part.file === m.output && m.outputRepairError ? `Correct only the final JSON/report: ${m.outputRepairError}. Preserve completed notes and substantive evidence. Rewrite both output files, then obtain a fresh output-bound Knowledge review.\n` : '';
+    return repair + `Round ${m.round} of ${m.rounds}, ${part.doing}. ${part.ask}\nCheck office-workers inbox --json before writing your final notes for this round. Requests involving this table are tracked with the meeting and round; unresolved requests hold completion until resolved, expired, or explicitly overridden.`;
   }
 
   /** The parts of step `step` of round `round`, or null when that round has no such step. */
   private plan(m: Meeting, round: number, step: number): Part[] | null {
-    return planMeeting(m, round, step, this.cwd(m), (id, vars) => this.say(id, vars));
+    try { return planMeeting(m, round, step, this.cwd(m), (id, vars) => this.say(id, vars)); }
+    catch (error) { this.halt(m, 'Workflow condition unavailable: ' + (error as Error).message); return null; }
   }
 
   // --- Files -----------------------------------------------------------------
@@ -641,6 +649,7 @@ export class MeetingRoom {
 
   /** Whether a part's file is there, with something in it, written since the part was handed over. */
   private written(m: Meeting, t: MeetingTurn): boolean {
+    if (t.file === m.output && m.outputRepairError && !repairOutputChanged(m, this.cwd(m))) return false;
     try {
       const st = statSync(path.join(this.cwd(m), t.file));
       return st.isFile() && st.size > 0 && st.mtimeMs >= (t.sentAt ?? 0) - 2000;

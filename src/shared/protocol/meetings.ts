@@ -85,6 +85,10 @@ export interface Meeting {
   waitingForCommunications?: boolean;
   /** Session-level Knowledge review, separate from a worker completion checklist. */
   knowledgeReviewPending?: boolean;
+  /** Bounded chair-only repairs of malformed custom output; prior rounds remain intact. */
+  outputRepairAttempts?: number;
+  outputRepairError?: string;
+  outputRepairBaseline?: string;
   knowledgeReviewPrompted?: boolean;
   coordinationError?: string;
   communicationOverride?: { by: string; at: number };

@@ -3,6 +3,7 @@ import { readFileSync, statSync } from 'node:fs';
 import type { Meeting } from '../../shared/protocol.js';
 import { matches, workflowProblem, workflowValue } from '../../shared/meeting-workflows.js';
 import type { PatternPart } from './types.js';
+import { stageEnabled } from './efficiency.js';
 import { resolveAttachments } from './attachments.js';
 
 export function customBrief(m: Meeting): string | undefined {
@@ -12,6 +13,7 @@ export function customBrief(m: Meeting): string | undefined {
 export function customPlan(m: Meeting, round: number, step: number, cwd: string): PatternPart[] | null {
   const w = m.workflow; const stage = w?.stages[round - 1];
   if (!w || !stage || step !== 1) return null;
+  if (!stageEnabled(m, round, cwd)) return [];
   const note = (r: number, i: number) => `${m.notes}/r${r}-seat${i + 1}.md`;
   const vars: Record<string,string> = { cwd, notes: path.join(cwd,m.notes), output: path.join(cwd,m.output), report: path.join(cwd,m.output+'.md'), meeting_id: m.id, workflow_id: w.id, workflow_version: String(w.version), round: String(round) };
   for (let r=1;r<=w.stages.length;r++) {
