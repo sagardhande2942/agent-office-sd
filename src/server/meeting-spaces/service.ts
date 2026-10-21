@@ -1,3 +1,4 @@
+import type { MeetingExecution } from '../meeting-patterns/artifacts.js';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -73,7 +74,7 @@ export class MeetingSpaces {
       renameSync(this.file + '.tmp', this.file);
     } catch { return 'Could not save the meeting space; check the floor storage'; }
   }
-  start(req: MeetingRequest, by: string, owner?: string, execution?: { key: string; id: string }): string | undefined {
+  start(req: MeetingRequest, by: string, owner?: string, execution?: MeetingExecution): string | undefined {
     const space = this.spaces.get(req.spaceId ?? DEFAULT_MEETING_SPACE);
     if (!space) return 'No such meeting space';
     if (!this.trees && [...this.spaces.values()].some(s => s.id !== space.id && s.room.state().current?.status === 'running')) return 'Parallel meetings need a Git project so each meeting has its own worktree';

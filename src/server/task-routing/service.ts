@@ -73,10 +73,11 @@ export function installTaskRouting(floor: Floor, ctx: FloorContext) {
         await floor.workers.fetchBase();
         if (allowed() || ctx.capacity.room() < task.workflow.roles.length) throw Error('Authorization or whole-meeting capacity changed');
         const previous = Array.isArray(task.references) ? task.references.filter((id): id is string => typeof id === 'string').slice(0,20) : [];
-        const prompt = JSON.stringify({ task_id: task.id, input: task.input, previous_artifacts: meetingArtifacts(floor,previous) });
+        const artifacts = meetingArtifacts(floor, previous);
+        const prompt = JSON.stringify({ task_id: task.id, input: task.input, previous_artifacts: artifacts.references });
         if (prompt.length > 19000) throw Error('Task packet exceeds meeting brief capacity');
         const error = floor.meetings.start({ pattern: 'custom', workflow: task.workflow, spaceId: group(task.group),
-          title: task.title, prompt, roles: [...task.workflow.roles] }, 'Task router', c.owner, { key, id });
+          title: task.title, prompt, roles: [...task.workflow.roles] }, 'Task router', c.owner, { key, id, inputs: artifacts.files });
         if (error) throw Error(error);
         const m = current().find(m => m.routingKey === key); if (!m) throw Error('Meeting start acceptance ambiguous');
         return { id: m.id, key, state: m.status } as RoutedMeeting;

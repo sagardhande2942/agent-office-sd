@@ -15,7 +15,7 @@ import { providerMeta, takesEffort, takesModel } from '../shared/providers.js';
 import { gitError, type WorktreeRef, type WorktreeState } from './worktrees.js';
 import { PROMPTS, fillPrompt, type PromptId, type PromptVars } from '../shared/prompts.js';
 import { planMeeting, customBrief, validateCustomOutput } from './meeting-patterns/index.js';
-import { resolveAttachments } from './meeting-patterns/attachments.js';
+import { archiveCustomArtifacts, stageMeetingInputs, type MeetingExecution } from './meeting-patterns/artifacts.js';
 import { DEFAULT_WORKFLOW, workflowProblem } from '../shared/meeting-workflows.js';
 
 export const execFileP = promisify(execFile);
@@ -129,7 +129,7 @@ export class MeetingRoom {
 
   /** Calls a meeting. Returns why it couldn't, or undefined once everyone is sitting down. */
   /** `owner` is the account calling it: the workers run on its sign-ins, and a review panel's review is posted as it. */
-  start(req: MeetingRequest, by: string, owner?: string, execution?: { key: string; id: string }): string | undefined {
+  start(req: MeetingRequest, by: string, owner?: string, execution?: MeetingExecution): string | undefined {
     if (this.current?.status === 'running') return `The meeting room is busy with “${this.current.title}”: stop that meeting first`;
     if (!isMeetingPattern(req.pattern)) return 'Unknown meeting pattern';
     const workflow = req.pattern === 'custom' ? structuredClone(req.workflow ?? DEFAULT_WORKFLOW) : undefined;
@@ -216,10 +216,10 @@ export class MeetingRoom {
     mkdirSync(path.join(this.cwd(m), m.notes), { recursive: true });
     const first = this.plan(m, 1, 1) ?? [];
     let memory = '';
-    try { memory = this.events.memoryContext?.(m) ?? ''; }
+    try { stageMeetingInputs(this.cwd(m), execution?.inputs); memory = this.events.memoryContext?.(m) ?? ''; }
     catch (error) {
       if (worktree && this.trees) void this.trees.remove(worktree, 'all');
-      return `Meeting memory unavailable: ${(error as Error).message}`;
+      return `Meeting inputs or memory unavailable: ${(error as Error).message}`;
     }
     for (let i = 0; i < m.seats.length; i++) {
       const part = first.find((p) => p.seat === i);
@@ -681,14 +681,7 @@ export class MeetingRoom {
       if (path.resolve(from) !== path.resolve(to) && existsSync(from)) cpSync(from, to, { recursive: true });
       const out = path.join(this.cwd(m), m.output);
       if (existsSync(out)) cpSync(out, path.join(to, `output-${path.basename(m.output)}`));
-      if (m.pattern === 'custom' && m.workflow) {
-        if (existsSync(out + '.md')) cpSync(out + '.md', path.join(to, `output-${path.basename(m.output)}.md`));
-        writeFileSync(path.join(to, 'workflow.json'), JSON.stringify(m.workflow));
-        if (m.status === 'done') {
-          const result = resolveAttachments(this.cwd(m), JSON.parse(readFileSync(out,'utf8')), m.workflow.result.attachments ?? []);
-          writeFileSync(path.join(to, `output-${path.basename(m.output)}`), JSON.stringify(result));
-        }
-      }
+      archiveCustomArtifacts(this.cwd(m), to, m);
       keepMeetingCommunications(to, m, this.events.communications?.() ?? { messages: [] });
     } catch {
       // the notes are a courtesy; the meeting is over either way

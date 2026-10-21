@@ -36,3 +36,5 @@ The output may provide inline content or a path inside its own checkout. Office 
 Set `memory: true` to enable [meeting shared memory](meeting-memory.md). Use the optional [task router](task-routing.md) to connect a caller-owned queue. Decisions about what task follows, retries, domain evidence or acceptance remain with that caller.
 
 Verify with typecheck, the full test suite and build. `scripts/e2e-custom-meetings.mjs` checks the actual client/server form and authenticated meeting memory using idle fixtures, without paid providers.
+
+Reviewed JSON and readable reports are archived without reformatting. Attachment-expanded results use a separate `resolved-output-*` sidecar; the original files remain the byte-level evidence for the Knowledge review. Generic routed input snapshots and their bounds are documented in [task routing](task-routing.md#predecessor-artifact-handoff).

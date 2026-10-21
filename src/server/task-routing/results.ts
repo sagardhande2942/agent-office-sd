@@ -1,10 +1,11 @@
 import path from 'node:path';
-import { statSync, readFileSync } from 'node:fs';
+import { existsSync, statSync, readFileSync } from 'node:fs';
 import { validateCustomResult } from '../meeting-patterns/custom.js';
 import type { Meeting } from '../../shared/protocol.js';
 import { resolveAttachments } from '../meeting-patterns/attachments.js';
 import { workflowProblem, type MeetingWorkflow } from '../../shared/meeting-workflows.js';
 import type { Floor } from '../floor.js';
+import { artifactHash, archivedResult, readArtifact, INPUT_LIMIT, type MeetingInput } from '../meeting-patterns/artifacts.js';
 import type { RoutedMeeting } from './router.js';
 
 function result(file: string) {
@@ -14,7 +15,7 @@ function result(file: string) {
 function completed(id: string, key: string, cwd: string, file: string, workflow: MeetingWorkflow, archived = false): RoutedMeeting {
   try {
     if (workflowProblem(workflow)) throw Error('Missing or invalid archived workflow');
-    const output = resolveAttachments(cwd, result(file), workflow.result.attachments ?? [], archived);
+    const output = archived ? archivedResult(cwd, file, workflow) : resolveAttachments(cwd, result(file), workflow.result.attachments ?? []);
     const error=validateCustomResult({id,pattern:'custom',workflow,patternVersion:workflow.version} as Meeting,output);
     if(error)throw Error(error);
     return { id, key, state: 'done', result: output };
@@ -39,18 +40,40 @@ export function findRoutedMeeting(floor: Floor, key: string): RoutedMeeting | un
   }
 }
 
+/** Copy selected predecessor artifacts into the next checkout, never send external paths to workers. */
 export function meetingArtifacts(floor: Floor, ids: string[]) {
-  const refs: { meeting_id: string; output_path: string; report_path: string }[] = [];
-  for (const space of floor.meetings.state().spaces ?? []) {
-    if (space.current && ids.includes(space.current.id)) {
-      const m=space.current; const cwd=m.worktree?path.resolve(floor.def.dir,m.worktree.path):floor.def.dir;
-      const file=path.join(cwd,m.output); refs.push({meeting_id:m.id,output_path:file,report_path:file+'.md'});
+  const references: { meeting_id: string; output_path: string; report_path: string; output_sha256: string; report_sha256: string; resolved_output_path?: string; resolved_output_sha256?: string }[] = [];
+  const files: MeetingInput[] = [];
+  for (const id of [...new Set(ids)]) {
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(id)) throw Error('Invalid predecessor meeting identity');
+    let output: string | undefined, archived = false;
+    for (const space of floor.meetings.state().spaces ?? []) {
+      if (space.current?.id === id && space.current.status === 'done') {
+        const m = space.current, cwd = m.worktree ? path.resolve(floor.def.dir, m.worktree.path) : floor.def.dir;
+        output = path.join(cwd, m.output); break;
+      }
+      const m = space.past.find(m => m.id === id && m.status === 'done');
+      if (m) {
+        const data = space.id === 'main' ? '.agent-office' : `.agent-office/meeting-spaces/${space.id}`;
+        output = path.join(floor.def.dir, data, 'meetings', id, 'output-' + path.basename(m.output)); archived = true; break;
+      }
     }
-    for (const m of space.past.filter(m=>ids.includes(m.id))) {
-      const data=space.id==='main'?'.agent-office':`.agent-office/meeting-spaces/${space.id}`;
-      const file=path.join(floor.def.dir,data,'meetings',m.id,'output-'+path.basename(m.output));
-      refs.push({meeting_id:m.id,output_path:file,report_path:file+'.md'});
+    if (!output) throw Error('Completed predecessor meeting unavailable: ' + id);
+    if (archived) archivedResult(path.dirname(output), output, result(path.join(path.dirname(output), 'workflow.json')));
+    const add = (source: string, name: string) => {
+      const content = readArtifact(floor.def.dir, source), sha256 = artifactHash(content);
+      const destination = `.meeting/inputs/${id}/${name}`;
+      files.push({ path: destination, content, sha256 }); return { path: destination, sha256 };
+    };
+    const body = add(output, 'output.json'), report = add(output + '.md', 'report.json.md');
+    const ref = { meeting_id: id, output_path: body.path, report_path: report.path, output_sha256: body.sha256, report_sha256: report.sha256 };
+    const resolved = path.join(path.dirname(output), 'resolved-' + path.basename(output));
+    if (archived && existsSync(resolved)) {
+      const expanded = add(resolved, 'resolved-output.json');
+      Object.assign(ref, { resolved_output_path: expanded.path, resolved_output_sha256: expanded.sha256 });
     }
+    references.push(ref);
+    if (files.reduce((n, f) => n + Buffer.byteLength(f.content), 0) > INPUT_LIMIT) throw Error('Predecessor artifacts exceed meeting input budget');
   }
-  return refs;
+  return { references, files };
 }

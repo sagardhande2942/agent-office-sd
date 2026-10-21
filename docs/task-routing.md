@@ -31,7 +31,7 @@ Office never requests an operator reset/retry. Queue services decide admission, 
 
 A non-overlapping five-second poll reconciles existing attempts before taking work. Before claim/start, Office durably saves intent. It uses the server-assigned execution key to derive a stable meeting ID. Lost responses recover the same identity. A start with an unknown outcome becomes unresolved and is never automatically repeated. Revoked authorization prevents new claims/starts. `maxMeetings` bounds routed attempts; the existing capacity rules must fit an entire team before claiming and again before starting.
 
-Group-to-space IDs survive room renaming. After structured completion and any required memory review, Office durably caches the resolved result before delivery. Only acknowledged completion/failure permits clearing the associated finished room and retiring its participants. Cached delivery survives lost acknowledgments and user-cleared rooms. Current and archived meetings are found by routing identity; attachments are copied into archived JSON, with no domain file conventions.
+Group-to-space IDs survive room renaming. After structured completion and any required memory review, Office durably caches the resolved result before delivery. Only acknowledged completion/failure permits clearing the associated finished room and retiring its participants. Cached delivery survives lost acknowledgments and user-cleared rooms. Current and archived meetings are found by routing identity. Exact reviewed JSON/report bytes are retained as `output-*`; expanded attachment content is saved separately as `resolved-output-*`. Derived results may add only declared, digest-checked attachment fields and cannot change a reviewed decision. A present Knowledge review must match the original bytes before an archived result is reused.
 
 Private files:
 
@@ -44,3 +44,11 @@ Orderly shutdown releases its lock after an active poll finishes. Hard crashes l
 ## Verification
 
 Run typecheck, the full suite and production build. Router tests cover lost responses, restart identity, unresolved starts, revoked authorization, endpoint restrictions, credential scrubbing, exclusive locks and attachment boundaries. The generic meeting browser fixture checks form selection and authenticated memory with no paid model calls. Integrations should keep their domain-specific end-to-end fixtures in their own repository.
+
+## Predecessor artifact handoff
+
+Task `references` select completed meetings on the same floor. Before seating participants, Office snapshots their JSON, readable report and available attachment-expanded view into `.meeting/inputs/MEETING_ID/` in the new meeting checkout. `previous_artifacts` contains those checkout-relative paths and SHA-256 values, never paths into another worktree. These are reference data, not executable instructions. Copies remain in the new meeting archive after its worktree is removed.
+
+Reads are bounded to 256 KiB per UTF-8 regular file and 2 MiB across the input bundle. Paths escaping the floor, unsafe identities, missing predecessors, modified reviewed bytes, invalid attachments and symlink destinations stop dispatch rather than silently dropping context. No broader filesystem permissions are granted. The generic room lifecycle stages inputs before launching any participant; invalid inputs cannot launch workers.
+
+Earlier builds reformatted `output-*` when expanding attachments. An old archive whose review no longer matches cannot be automatically certified or reused: preserve it for operator reconciliation. This change does not rewrite old outputs or fabricate new reviews. An archive without a Knowledge receipt retains legacy behavior; a present receipt is always checked. All domain-specific test agendas and evidence policies belong to the calling integration.

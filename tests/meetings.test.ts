@@ -575,12 +575,18 @@ test('custom session requires output-bound chair review across restart', t => {
   let m=f.room.state().current!; assert.ok(f.prompts.every(p=>p.text.includes('MEETING SHARED MEMORY')));
   for(const turn of [...m.turns])f.take(turn.seat);
   mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true}); writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');
-  f.take(0,JSON.stringify({summary:'Document reviewed'})); m=f.room.state().current!;
+  f.take(0,JSON.stringify({summary:'Document reviewed'},null,2)+'\n'); m=f.room.state().current!;
   assert.equal(m.status,'running'); assert.equal(m.knowledgeReviewPending,true);
   assert.equal(f.prompts.filter(p=>p.text.startsWith('Knowledge review required')).length,1);
   f.room.finishAnyway(m.id,'Ada'); assert.equal(m.status,'running'); f.restart();
   recordMeetingReview(f.dir,f.room.state().current!,f.workers[0],[],'No durable document changes'); f.room.pump();
   assert.equal(f.room.state().current!.status,'done'); assert.equal(f.room.state().current!.knowledgeReviewPending,false);
+  const folder=path.join(f.dir,'.agent-office','meetings',m.id);
+  const original=readFileSync(path.join(folder,'output-'+path.basename(m.output)),'utf8');
+  const report=readFileSync(path.join(folder,'output-'+path.basename(m.output)+'.md'),'utf8');
+  const review=JSON.parse(readFileSync(path.join(folder,'knowledge-review.json'),'utf8'));
+  assert.equal(review.output,createHash('sha256').update(JSON.stringify([original,report])).digest('hex'));
+
 });
 
 import { createHash } from 'node:crypto';
@@ -597,7 +603,7 @@ test('custom attachments are checked at completion and retained as inline archiv
   f.take(0,JSON.stringify({summary:'Reviewed',document:{path:'document.txt',digest}}));
   assert.equal(f.room.state().current!.status,'done');
   const archive=path.join(f.dir,'.agent-office','meetings',m.id);
-  const output=JSON.parse(readFileSync(path.join(archive,'output-'+path.basename(m.output)),'utf8'));
+  const output=JSON.parse(readFileSync(path.join(archive,'resolved-output-'+path.basename(m.output)),'utf8'));
   assert.equal(output.document.text,text);
   rmSync(path.join(f.cwd(),'document.txt'));
   assert.equal(JSON.parse(readFileSync(path.join(archive,'workflow.json'),'utf8')).id,workflow.id);
