@@ -59,3 +59,12 @@ test('conditional stages skip needless work and fail closed on absent, mistyped 
     const invalid=structuredClone(w);mutate(invalid);assert.ok(workflowProblem(invalid));
   }
 });
+
+test('bounded string arrays support an explicit empty reference list',()=>{
+  const m=meeting();m.workflow!.result.rules.push({path:'references',type:'strings',maxItems:0});
+  assert.equal(workflowProblem(m.workflow),undefined);
+  assert.equal(validateCustomResult(m,{summary:'Reviewed',references:[]}),undefined);
+  assert.match(validateCustomResult(m,{summary:'Reviewed',references:['unscoped']})!,/references/);
+  for(const bound of [-1,1.5,101]) {m.workflow!.result.rules.at(-1)!.maxItems=bound;assert.ok(workflowProblem(m.workflow));}
+  m.workflow!.result.rules.at(-1)!.maxItems=0;m.workflow!.result.rules.at(-1)!.minItems=1;assert.ok(workflowProblem(m.workflow));
+});

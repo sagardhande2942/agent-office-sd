@@ -37,7 +37,7 @@ export function validateCustomResult(m: Meeting, value: unknown): string | undef
     if (!matches(value,r.when)) continue;
     const v=workflowValue(value,r.path);
     const valid = r.type === 'string' ? typeof v === 'string' && !!v.trim()
-      : r.type === 'strings' ? Array.isArray(v) && v.every(x=>typeof x==='string'&&!!x.trim()) && new Set(v).size===v.length && v.length >= (r.minItems??0)
+      : r.type === 'strings' ? Array.isArray(v) && v.every(x=>typeof x==='string'&&!!x.trim()) && new Set(v).size===v.length && v.length >= (r.minItems??0) && v.length <= (r.maxItems??Infinity)
       : r.type === 'object' ? !!v && typeof v === 'object' && !Array.isArray(v)
       : r.type === 'integer' ? Number.isInteger(v) : v!==undefined && v!==null && (typeof v!=='string'||!!v.trim());
     const expected = r.equals === '{{meeting_id}}' ? m.id : r.equals;

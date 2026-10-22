@@ -5,6 +5,7 @@ export interface ResultRule {
   equals?: string | number | boolean;
   enum?: string[];
   minItems?: number;
+  maxItems?: number;
   when?: Record<string, string | number | boolean>;
 }
 export interface FileAttachment {
@@ -59,10 +60,11 @@ export function workflowProblem(value: unknown): string | undefined {
   if (final !== 1) return 'Workflow needs one final chair output';
   if (!record(w.result) || !keys(w.result, ['rules','attachments']) || !Array.isArray(w.result.rules) || w.result.rules.length > 80) return 'Invalid workflow result rules';
   for (const r of w.result.rules) {
-    if (!record(r) || !keys(r, ['path','type','equals','enum','minItems','when']) || !field(r.path)
+    if (!record(r) || !keys(r, ['path','type','equals','enum','minItems','maxItems','when']) || !field(r.path)
       || !['string','strings','object','integer','value'].includes(String(r.type)) || !condition(r.when)
       || r.equals !== undefined && !primitive(r.equals) || r.enum !== undefined && (!Array.isArray(r.enum) || !r.enum.length || r.enum.length > 50 || r.enum.some(x => !text(x, 200)))
-      || r.minItems !== undefined && (r.type !== 'strings' || !Number.isInteger(r.minItems) || Number(r.minItems) < 0 || Number(r.minItems) > 100)) return 'Invalid workflow result rule';
+      || r.minItems !== undefined && (r.type !== 'strings' || !Number.isInteger(r.minItems) || Number(r.minItems) < 0 || Number(r.minItems) > 100)
+      || r.maxItems !== undefined && (r.type !== 'strings' || !Number.isInteger(r.maxItems) || Number(r.maxItems) < (Number(r.minItems) || 0) || Number(r.maxItems) > 100)) return 'Invalid workflow result rule';
   }
   if (w.result.attachments !== undefined) {
     if (!Array.isArray(w.result.attachments) || w.result.attachments.length > 4) return 'Invalid workflow attachments';
