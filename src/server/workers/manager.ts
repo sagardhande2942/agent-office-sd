@@ -229,7 +229,7 @@ export class WorkerManager {
    * (see meetings.ts), in the meeting's own worktree, which everyone at the table shares. `repos` are
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
-  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', helper?: { hostId: string; hostName: string; worktree?: WorkerInfo['worktree'] }, planReview?: PlanReviewWorker, teamBase?: { commit: string; from: string }, teamRole?: WorkerInfo['masterWorkers']): WorkerInfo | string {
+  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', helper?: { hostId: string; hostName: string; worktree?: WorkerInfo['worktree'] }, planReview?: PlanReviewWorker, teamBase?: { commit: string; from: string }, teamRole?: WorkerInfo['masterWorkers'], deskTask?: { id: string; worktree?: WorkerInfo['worktree'] }): WorkerInfo | string {
     // Nobody picked (a board agent, say): the office's default worker, model and effort included.
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
@@ -271,7 +271,7 @@ export class WorkerManager {
     const agent = seat.station && STATION_AGENT[seat.station];
     const name = agent ? agent.name : (NAMES.find((n) => !used.has(n)) ?? `Worker ${this.workers.size + 1}`);
     const id = randomBytes(6).toString('hex');
-    let wt: WorkerInfo['worktree'] = meeting?.worktree ?? helper?.worktree;
+    let wt: WorkerInfo['worktree'] = meeting?.worktree ?? helper?.worktree ?? deskTask?.worktree;
     let others: WorkerRepo[] | undefined;
     if (worktree) {
       const slug = `${name.toLowerCase()}-${id.slice(0, 4)}`;
@@ -308,7 +308,7 @@ export class WorkerManager {
       viewers: [],
       viewerIds: [],
       activity: prompt ? truncate(prompt, 80) : undefined,
-      meeting: meeting?.id,
+      meeting: meeting?.id, routedTask: deskTask?.id,
       planReview, masterWorkers: teamRole,
       helper: helper && { hostId: helper.hostId, hostName: helper.hostName },
     };

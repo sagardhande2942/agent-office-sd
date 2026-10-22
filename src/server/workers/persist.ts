@@ -43,7 +43,7 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     completion: info.completion,
     pr: info.pr,
     pastPrs: info.pastPrs,
-    meeting: info.meeting,
+    meeting: info.meeting, routedTask: info.routedTask,
     planReview: info.planReview,
     masterWorkers: info.masterWorkers,
     bossMode: info.bossMode, suspended: info.suspended,
@@ -115,6 +115,7 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         masterWorkers: restoreTeamRole(s.masterWorkers),
         suspended: s.suspended === true,
         bossMode: s.bossMode?.role === 'boss' || s.bossMode?.role === 'worker' ? s.bossMode : undefined,
+        routedTask: typeof s.routedTask === 'string' && /^[a-f0-9]{16}$/.test(s.routedTask) ? s.routedTask : undefined,
         meeting: typeof s.meeting === 'string' && DESK_BY_ID.get(s.deskId)?.room ? s.meeting : undefined,
         workedMs: typeof s.workedMs === 'number' && Number.isFinite(s.workedMs) && s.workedMs > 0 ? s.workedMs : undefined,
       };

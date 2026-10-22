@@ -7,7 +7,7 @@ import { loadKnowledgeConfig } from './settings.js';
 import { memoryMeetingFor, meetingKnowledgeAllowed, assertMeetingWrite, recordMeetingReview } from './meetings.js';
 import type { WorkerInfo } from '../../shared/protocol.js';
 const allowed = (floor: Floor, w: WorkerInfo) => w.kind === 'agent' && !w.helper && !w.planReview?.locked &&
-  (w.meeting ? meetingKnowledgeAllowed(floor, w) : !DESK_BY_ID.get(w.deskId)?.station);
+  ((w.meeting || w.routedTask) ? meetingKnowledgeAllowed(floor, w) : !DESK_BY_ID.get(w.deskId)?.station);
 export const KNOWLEDGE_WORKER_TOOLS = ['index', 'read', 'search', 'write', 'move', 'archive', 'review_done'].map(action => ({ name: `knowledge_${action}`, readOnly: ['index', 'read', 'search'].includes(action) }));
 export async function floorWorkerKnowledge(floor: Floor | undefined, req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
   const id = url.searchParams.get('worker') ?? ''; const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');

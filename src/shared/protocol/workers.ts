@@ -98,6 +98,8 @@ export interface WorkerInfo {
   completion?: CompletionReport;
   /** Reported session tokens and cost, when the provider supplies them (agents only). */
   usage?: Usage;
+  /** Server-owned identity of a routed desk task; it retains scoped Knowledge access. */
+  routedTask?: string;
   /** Who last typed into its terminal (or sent it a prompt), and when. */
   lastInput?: { by: string; at: number };
   /** The meeting it was called to, for a worker at the meeting room's table (see Meeting). */

@@ -10,7 +10,7 @@ import { knowledgeBootstrapContext } from '../../shared/worker-knowledge.js';
 import { KnowledgeStore, atomicWrite } from './store.js';
 import { loadKnowledgeConfig } from './settings.js';
 declare module '../../shared/completion.js' { interface CompletionReport { knowledgeReview?: string } }
-const regular = (w: WorkerInfo) => w.kind === 'agent' && !w.helper && !w.meeting && !w.planReview?.locked && !DESK_BY_ID.get(w.deskId)?.station;
+const regular = (w: WorkerInfo) => w.kind === 'agent' && !w.helper && !w.meeting && !w.routedTask && !w.planReview?.locked && !DESK_BY_ID.get(w.deskId)?.station;
 export function workerKnowledgeStore(floor: Pick<Floor, 'def'>, _worker: WorkerInfo) { return new KnowledgeStore(floor.def.dir, loadKnowledgeConfig(floor.def.dir)); }
 export function knowledgeMrSection(store: KnowledgeStore, changed: string[], none?: string) {
   const notes = new Map(store.tree().map(n => [n.path, n]));

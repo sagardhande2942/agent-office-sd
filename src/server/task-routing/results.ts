@@ -40,6 +40,24 @@ export function findRoutedMeeting(floor: Floor, key: string): RoutedMeeting | un
   }
 }
 
+/** Desk executions use private controller records, not physical meeting spaces. */
+export function workerTaskArchive(floor: Floor, id: string): string | undefined {
+  if (!/^[a-f0-9]{16}$/.test(id)) return;
+  const dir=path.join(floor.def.dir,'.agent-office/worker-tasks',id),file=path.join(dir,'meetings.json');
+  if(!existsSync(file))return;
+  const state=result(file),m=[state.current,...(state.past??[])].find(m=>m?.id===id&&m.status==='done');
+  if(m)return path.join(dir,'meetings',id,'output-'+path.basename(m.output));
+}
+export function findWorkerTask(floor: Floor, key: string): RoutedMeeting | undefined {
+  const index=path.join(floor.def.dir,'.agent-office/worker-tasks/index.json');if(!existsSync(index))return;
+  const id=result(index)[key];if(typeof id!=='string'||!/^[a-f0-9]{16}$/.test(id))return;
+  const dir=path.join(floor.def.dir,'.agent-office/worker-tasks',id),file=path.join(dir,'meetings.json');if(!existsSync(file))return;
+  const state=result(file),m=[state.current,...(state.past??[])].find(m=>m?.id===id&&m.routingKey===key);if(!m)return;
+  if(m.status!=='done')return {id,key,state:m.status};
+  const output=workerTaskArchive(floor,id);if(!output)return {id,key,state:'done',error:'Worker task archive unavailable'};
+  return completed(id,key,path.dirname(output),output,result(path.join(path.dirname(output),'workflow.json')),true);
+}
+
 /** Copy selected predecessor artifacts into the next checkout, never send external paths to workers. */
 export function meetingArtifacts(floor: Floor, ids: string[]) {
   const references: { meeting_id: string; output_path: string; report_path: string; output_sha256: string; report_sha256: string; resolved_output_path?: string; resolved_output_sha256?: string }[] = [];
@@ -58,6 +76,7 @@ export function meetingArtifacts(floor: Floor, ids: string[]) {
         output = path.join(floor.def.dir, data, 'meetings', id, 'output-' + path.basename(m.output)); archived = true; break;
       }
     }
+    if (!output) { output=workerTaskArchive(floor,id);archived=!!output; }
     if (!output) throw Error('Completed predecessor meeting unavailable: ' + id);
     if (archived) archivedResult(path.dirname(output), output, result(path.join(path.dirname(output), 'workflow.json')));
     const add = (source: string, name: string) => {

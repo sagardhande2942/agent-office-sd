@@ -19,7 +19,7 @@ Example:
 }
 ```
 
-Definitions allow 2–5 roles, 1–8 stages, at most one turn per seat per stage, and exactly one final output turn by seat 0. Stages run sequentially; their assigned participants run concurrently. Names may be customized without changing seat ownership. A stage cannot call tools or execute server code. Provider permissions and existing hiring/capacity budgets still apply; all agents share a checkout, so prompt instructions are not a filesystem sandbox.
+Definitions allow 1–5 roles, 1–8 stages, at most one turn per seat per stage, and exactly one final output turn by seat 0. Stages run sequentially; their assigned participants run concurrently. Names may be customized without changing seat ownership. A stage cannot call tools or execute server code. Provider permissions and existing hiring/capacity budgets still apply; all agents share a checkout, so prompt instructions are not a filesystem sandbox.
 
 Templates support `{{cwd}}`, `{{notes}}`, `{{output}}`, `{{report}}`, `{{meeting_id}}`, `{{workflow_id}}`, `{{workflow_version}}`, `{{role}}`, `{{round}}`, `{{note_R_S}}` (one-based round and seat) and `{{notes_R}}` (all seat note paths for a round). Nonparticipants do not have notes for that stage. Unknown variables are refused. The controller appends the assigned note path, or final result/report instructions, to each prompt.
 
@@ -45,3 +45,5 @@ Reviewed JSON and readable reports are archived without reformatting. Attachment
 A nonfinal stage may include `"when":{"round":1,"seat":1,"field":"needs_changes","equals":true}`. Round numbers are one-based; seat indexes are zero-based. The referenced seat must participate in an earlier unconditional stage and write its assigned note as JSON. A matching typed value runs the stage; a nonmatching value skips it without prompting workers. Missing, malformed, mistyped, oversized or escaped notes stop the session. The final chair output is always unconditional. This is declarative equality checking, with no executable conditions.
 
 If a custom final result, companion report or attachment fails validation, Office reuses the chair for at most two correction turns. Completed assessments stay intact. Attempts and the invalid output fingerprint persist across restart; unchanged files and repeated finish requests cannot consume another attempt. Exhausted corrections stop the meeting with the validation error. Corrected bytes require a fresh output-bound Knowledge receipt; communication gates still apply. Corrections address the output contract and do not authorize a caller to weaken its substantive evidence requirements.
+
+Single-role definitions also power generic [routed desk tasks](task-routing.md#individual-desk-tasks), without reserving physical meeting spaces.

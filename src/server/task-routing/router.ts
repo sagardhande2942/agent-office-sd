@@ -37,7 +37,7 @@ export class TeamRouter {
       const { tasks } = await this.bridge.call<{ tasks: QueueTask[] }>('ready');
       for (const task of tasks.slice(0, 100)) {
         if (Object.values(this.state.attempts).filter(a => a.state !== 'done').length >= this.maxMeetings) break;
-        if (taskProblem(task)) continue;
+        if (taskProblem(task) || task.execution === 'worker' && !health.capabilities.includes('worker-tasks-v1')) continue;
         if (this.state.attempts[task.id] || !this.io.available(task)) continue;
         const a: Attempt = { task, claimKey: randomBytes(24).toString('hex'), state: 'claiming' };
         this.state.attempts[task.id] = a; this.save();
@@ -69,7 +69,7 @@ export class TeamRouter {
       const claimed = await this.bridge.call<QueueTask>('claim', { task_id: a.task.id, version: a.task.version,
         dispatcher: this.dispatcher, claim_key: a.claimKey });
       if (taskProblem(claimed) || claimed.version !== a.task.version+1 || !claimed.claim_token || !claimed.execution_key
-        || !isDeepStrictEqual([claimed.id,claimed.group,claimed.title,claimed.workflow,claimed.input,claimed.references], [a.task.id,a.task.group,a.task.title,a.task.workflow,a.task.input,a.task.references])) throw Error('Malformed or changed claim response');
+        || !isDeepStrictEqual([claimed.execution,claimed.id,claimed.group,claimed.title,claimed.workflow,claimed.input,claimed.references], [a.task.execution,a.task.id,a.task.group,a.task.title,a.task.workflow,a.task.input,a.task.references])) throw Error('Malformed or changed claim response');
       a.task = claimed;
       a.state = 'starting'; this.save();
       // Only this fresh execution of the acknowledged claim may initiate a meeting.

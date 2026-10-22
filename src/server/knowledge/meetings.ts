@@ -1,3 +1,4 @@
+import { workerTaskFor } from '../task-routing/worker-memory.js';
 import { createHash } from 'node:crypto';
 import { readFileSync, existsSync, statSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
@@ -24,6 +25,8 @@ export const observationPrefix = (m: Meeting) => `meetings/observations/${m.id}/
 
 /** Membership comes from live server-owned space state, never the request payload. */
 export function memoryMeetingFor(floor: Floor, worker: WorkerInfo): Meeting | undefined {
+  const task = workerTaskFor(floor, worker);
+  if (task && worker.kind === 'agent' && !worker.helper && !worker.planReview?.locked) return task;
   if (!worker.meeting || worker.kind !== 'agent' || worker.helper || worker.planReview?.locked) return;
   const state = floor.meetings?.state();
   const meetings = state?.spaces?.map(s => s.current) ?? [state?.current];

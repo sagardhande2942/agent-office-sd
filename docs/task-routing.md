@@ -52,3 +52,14 @@ Task `references` select completed meetings on the same floor. Before seating pa
 Reads are bounded to 256 KiB per UTF-8 regular file and 2 MiB across the input bundle. Paths escaping the floor, unsafe identities, missing predecessors, modified reviewed bytes, invalid attachments and symlink destinations stop dispatch rather than silently dropping context. No broader filesystem permissions are granted. The generic room lifecycle stages inputs before launching any participant; invalid inputs cannot launch workers.
 
 Earlier builds reformatted `output-*` when expanding attachments. An old archive whose review no longer matches cannot be automatically certified or reused: preserve it for operator reconciliation. This change does not rewrite old outputs or fabricate new reviews. An archive without a Knowledge receipt retains legacy behavior; a present receipt is always checked. All domain-specific test agendas and evidence policies belong to the calling integration.
+
+
+## Individual desk tasks
+
+The optional envelope field `execution: "worker"` requests one ordinary desk worker. Its workflow must have exactly one role and one final-output stage; omitted `execution` retains the existing meeting path. `worker-tasks-v1` is advertised by compatible queue bridges. The router dispatches these tasks only when that capability is present, validates immutable execution mode across claim responses, and shares its existing concurrency, capacity, authorization and durable no-replay controls across both modes. The legacy configuration key `maxMeetings` now bounds all routed executions.
+
+Desk tasks reuse the generic worktree/output/gate engine internally but reserve no meeting space and hire no chair or waiting specialist. They keep private records under `.agent-office/worker-tasks/`, carry a server-owned `routedTask` identity across restart, and archive exact originals separately from resolved attachments. The legacy report field `meeting_id` identifies either execution kind. Predecessor handoff supports both archive locations.
+
+A desk task receives the existing scoped observation and output-bound Knowledge review contract. It cannot move/archive notes, write outside its observation scope or mark observations verified. Ordinary worker curation/checklist follow-ups are suppressed because the task engine owns its review gate. Knowledge access closes when the task finishes or its controller is unavailable. The task engine owns worktree cleanup after acknowledgment; sending the worker home does not separately delete its checkout.
+
+Empty queues and external-job waiting trigger no worker prompts. Task admission, research policies, usage allowances, meeting escalation and batch scheduling remain caller-owned. A session allowance limits dispatch, not provider tokens or in-flight usage.

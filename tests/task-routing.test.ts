@@ -125,3 +125,9 @@ test('malformed tasks and changed claim definitions cannot start paid meetings',
   assert.equal(changed.counts().starts,0); assert.match(readRouting(changed.file).attempts['task-1'].error!,/changed claim/);
   changed.retry(); await changed.router().poll(); assert.equal(changed.counts().starts,0);
 });
+
+test('worker tasks wait without claiming when a bridge lacks the worker capability',async t=>{
+  const f=fixture(t);f.task.execution='worker';f.task.workflow=structuredClone(DEFAULT_WORKFLOW);
+  f.task.workflow.roles=['Writer'];f.task.workflow.stages=[{label:'Task',turns:[{seats:[0],output:true,prompt:'Write the result'}]}];
+  await f.router().poll();await f.router().poll();assert.deepEqual(f.counts(),{starts:0,claims:0,completions:0});
+});

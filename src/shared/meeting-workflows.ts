@@ -35,7 +35,7 @@ export function workflowProblem(value: unknown): string | undefined {
   const w = value;
   if (!text(w.id, 100) || !/^[a-z][a-z0-9.-]*$/.test(w.id) || !Number.isInteger(w.version) || Number(w.version) < 1 || Number(w.version) > 1000000
     || !text(w.label, 100) || !text(w.brief, 8000) || typeof w.memory !== 'boolean') return 'Invalid workflow identity or brief';
-  if (!Array.isArray(w.roles) || w.roles.length < 2 || w.roles.length > 5 || w.roles.some(r => !text(r, 40))) return 'Workflow needs 2–5 named roles';
+  if (!Array.isArray(w.roles) || w.roles.length < 1 || w.roles.length > 5 || w.roles.some(r => !text(r, 40))) return 'Workflow needs 1–5 named roles';
   if (!Array.isArray(w.stages) || !w.stages.length || w.stages.length > 8) return 'Workflow needs 1–8 stages';
   let final = 0;
   for (const [i, s] of w.stages.entries()) {

@@ -1,3 +1,4 @@
+import { RoutedWorkers } from './workers.js';
 import path from 'node:path';
 import { existsSync, readFileSync, mkdirSync, rmdirSync, statSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -51,6 +52,7 @@ export function installTaskRouting(floor: Floor, ctx: FloorContext) {
       }
       atomicWrite(mapFile, JSON.stringify(mapping)); return mapping[name];
     };
+    const deskTasks = new RoutedWorkers(floor,ctx,c.owner);
     let closing = false;
     const allowed = () => closing ? 'Task router is stopping' : !floor.project.branch ? 'Task routing requires a Git floor' : !ctx.mayAct || !ctx.mayAct(c.owner)
       ? 'Task routing requires current local admin authorization; remote autonomous dispatch is not enabled'
@@ -58,17 +60,20 @@ export function installTaskRouting(floor: Floor, ctx: FloorContext) {
     const router = new TeamRouter(path.join(floor.def.dir, '.agent-office/task-routing-state.json'), bridge, {
       allowed,
       available: task => {
+        if (task.execution === 'worker') return deskTasks.available();
         if (workflowProblem(task.workflow) || typeof task.group !== 'string' || !task.group.trim() || task.group.length > 100 || ctx.capacity.room() < task.workflow.roles.length) return false;
         const id = group(task.group);
         return floor.meetings.state().spaces!.find(s => s.id === id)?.current?.status !== 'running';
       },
-      find: key => findRoutedMeeting(floor, key),
+      find: key => deskTasks.find(key) ?? findRoutedMeeting(floor, key),
       retire: async (id, key) => {
+        if (deskTasks.find(key)) { await deskTasks.retire(id,key); return; }
         const space = floor.meetings.state().spaces!.find(s => s.current?.id === id && s.current.routingKey === key);
         if (space) { const error = floor.meetings.clear('Task router', space.id); if (error) throw Error(error); }
       },
       start: async (task: QueueTask, key, id) => {
         const refused = allowed(); if (refused) throw Error(refused);
+        if (task.execution === 'worker') { await floor.workers.fetchBase(); if (allowed() || !deskTasks.available()) throw Error('Worker capacity or authorization changed'); return deskTasks.start(task,key,id); }
         const bad = workflowProblem(task.workflow); if (bad) throw Error(bad);
         await floor.workers.fetchBase();
         if (allowed() || ctx.capacity.room() < task.workflow.roles.length) throw Error('Authorization or whole-meeting capacity changed');
@@ -86,7 +91,7 @@ export function installTaskRouting(floor: Floor, ctx: FloorContext) {
     let polling: Promise<void> | undefined;
     const timer = setInterval(() => { if (!closing && !polling) polling = router.poll().catch(() => { if (!closing) ctx.toast(floor, 'Task routing could not persist its state; inspect storage before retrying.', 'warn'); }).finally(() => { polling = undefined; }); }, 5000); timer.unref();
     const release = () => { try { rmdirSync(lockPath); } catch { /* Retain an explicit recovery blocker if removal fails. */ } };
-    services.set(floor, { close() { closing = true; clearInterval(timer); if (polling) void polling.finally(release); else release(); } });
+    services.set(floor, { close() { closing = true; clearInterval(timer); deskTasks.close(); if (polling) void polling.finally(release); else release(); } });
     lock = undefined; // Owned by the installed service until orderly shutdown.
   } catch (error) {
     if (lock) { try { rmdirSync(lock); } catch { /* Another process owns an existing lock. */ } }
