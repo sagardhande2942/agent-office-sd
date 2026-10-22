@@ -12,7 +12,7 @@ import type { AgentChoice, MeetingRequest, WorkerInfo } from '../src/shared/prot
 import { MEETING_PATTERNS, MEETING_PATTERN_IDS, fixedRounds, isMeetingPattern } from '../src/shared/meetings.js';
 import { PROMPTS, type PromptId } from '../src/shared/prompts.js';
 
-function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, string>>; officeDefault?: AgentChoice; communications?: () => CommunicationsState } = {}) {
+function fixture(opts: { memory?: boolean; git?: boolean; rewritten?: Partial<Record<PromptId, string>>; officeDefault?: AgentChoice; communications?: () => CommunicationsState } = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), 'office-meeting-'));
   const dataDir = path.join(dir, '.agent-office');
   mkdirSync(dataDir, { recursive: true });
@@ -66,6 +66,7 @@ function fixture(opts: { git?: boolean; rewritten?: Partial<Record<PromptId, str
   };
   let room: MeetingRoom;
   const createRoom = () => new MeetingRoom(dir, dataDir, manager, opts.git ? new Worktrees(dir) : undefined, {
+    ...(opts.memory ? { memoryContext: (m: import('../src/shared/protocol.js').Meeting) => meetingMemoryContext(dir, m), memoryGate: (m: import('../src/shared/protocol.js').Meeting) => meetingMemoryGate(dir, m) } : {}),
     communications: opts.communications,
     update() {},
     toast: (text) => toasts.push(text),
@@ -546,4 +547,106 @@ test('a pattern with a set number of rounds says so, and names them; a range is 
   const f = fixture(); t.after(() => f.close());
   assert.equal(f.start({ pattern: 'lead', rounds: 5 }), undefined);
   assert.equal(f.room.state().current!.rounds, 3);
+});
+
+// Caller definitions use the real room lifecycle, persistence and completion gates.
+import { DEFAULT_WORKFLOW } from '../src/shared/meeting-workflows.js';
+import { meetingMemoryContext, meetingMemoryGate, recordMeetingReview } from '../src/server/knowledge/meetings.js';
+test('custom workflow completes and restores its frozen definition', t => {
+  const f=fixture(); t.after(()=>f.close());
+  const workflow=structuredClone(DEFAULT_WORKFLOW);
+  assert.equal(f.start({pattern:'custom',workflow,prompt:'Review the supplied document'}),undefined); f.settle();
+  workflow.label='Mutated caller object'; f.restart();
+  const m=f.room.state().current!; assert.equal(m.patternVersion,1); assert.equal(m.workflow!.label,'Team review');
+  for(const turn of [...m.turns])f.take(turn.seat,'# Assessment');
+  mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true}); writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');
+  f.take(0,JSON.stringify({summary:'Document reviewed'}));
+  assert.equal(f.room.state().current!.status,'done'); assert.equal(f.reviews.length,0);
+  assert.ok(existsSync(path.join(f.dir,'.agent-office','meetings',m.id,'workflow.json')));
+});
+test('custom output repair retries only the chair, persists, and stops after two corrections', t => {
+  const f=fixture(); t.after(()=>f.close()); assert.equal(f.start({pattern:'custom'}),undefined); f.settle();
+  for(const turn of [...f.room.state().current!.turns])f.take(turn.seat);
+  const peerPrompts=()=>f.prompts.filter(p=>p.id===f.workers[1].id).length;
+  const before=peerPrompts();
+  f.take(0,'not JSON'); let m=f.room.state().current!;
+  assert.equal(m.status,'running'); assert.equal(m.outputRepairAttempts,1);
+  f.room.finishAnyway(m.id,'Ada'); assert.equal(m.outputRepairAttempts,1);
+  f.restart(); m=f.room.state().current!; assert.equal(m.outputRepairAttempts,1);
+  f.take(0,'still not JSON'); m=f.room.state().current!; assert.equal(m.outputRepairAttempts,2);
+  f.take(0,'third invalid report'); m=f.room.state().current!; assert.equal(m.status,'stopped');
+  assert.match(m.reason!,/Invalid workflow result/); assert.equal(peerPrompts(),before);
+});
+test('corrected custom output completes without repeating assessments', t => {
+  const f=fixture(); t.after(()=>f.close()); assert.equal(f.start({pattern:'custom'}),undefined);f.settle();
+  for(const turn of [...f.room.state().current!.turns])f.take(turn.seat);
+  f.take(0,'invalid'); const m=f.room.state().current!;
+  writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Corrected findings');
+  f.take(0,JSON.stringify({summary:'Corrected'})); assert.equal(f.room.state().current!.status,'done');
+});
+test('custom session requires output-bound chair review across restart', t => {
+  const f=fixture({memory:true}); t.after(()=>f.close()); assert.equal(f.start({pattern:'custom'}),undefined); f.settle();
+  let m=f.room.state().current!; assert.ok(f.prompts.every(p=>p.text.includes('MEETING SHARED MEMORY')));
+  for(const turn of [...m.turns])f.take(turn.seat);
+  mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true}); writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');
+  f.take(0,JSON.stringify({summary:'Document reviewed'},null,2)+'\n'); m=f.room.state().current!;
+  assert.equal(m.status,'running'); assert.equal(m.knowledgeReviewPending,true);
+  assert.equal(f.prompts.filter(p=>p.text.startsWith('Knowledge review required')).length,1);
+  f.room.finishAnyway(m.id,'Ada'); assert.equal(m.status,'running'); f.restart();
+  recordMeetingReview(f.dir,f.room.state().current!,f.workers[0],[],'No durable document changes'); f.room.pump();
+  assert.equal(f.room.state().current!.status,'done'); assert.equal(f.room.state().current!.knowledgeReviewPending,false);
+  const folder=path.join(f.dir,'.agent-office','meetings',m.id);
+  const original=readFileSync(path.join(folder,'output-'+path.basename(m.output)),'utf8');
+  const report=readFileSync(path.join(folder,'output-'+path.basename(m.output)+'.md'),'utf8');
+  const review=JSON.parse(readFileSync(path.join(folder,'knowledge-review.json'),'utf8'));
+  assert.equal(review.output,createHash('sha256').update(JSON.stringify([original,report])).digest('hex'));
+
+});
+
+import { createHash } from 'node:crypto';
+test('custom attachments are checked at completion and retained as inline archived content', t => {
+  const f=fixture();t.after(()=>f.close());
+  const workflow=structuredClone(DEFAULT_WORKFLOW);workflow.memory=false;
+  workflow.result.rules.push({path:'document.text',type:'string'});
+  workflow.result.attachments=[{path:'document.path',content:'document.text',sha256:'document.digest',maxBytes:200000}];
+  assert.equal(f.start({pattern:'custom',workflow}),undefined);f.settle();const m=f.room.state().current!;
+  for(const turn of [...m.turns])f.take(turn.seat);
+  const text='Reviewed document\n',digest=createHash('sha256').update(text).digest('hex');
+  writeFileSync(path.join(f.cwd(),'document.txt'),text);
+  mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true});writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');
+  f.take(0,JSON.stringify({summary:'Reviewed',document:{path:'document.txt',digest}}));
+  assert.equal(f.room.state().current!.status,'done');
+  const archive=path.join(f.dir,'.agent-office','meetings',m.id);
+  const output=JSON.parse(readFileSync(path.join(archive,'resolved-output-'+path.basename(m.output)),'utf8'));
+  assert.equal(output.document.text,text);
+  rmSync(path.join(f.cwd(),'document.txt'));
+  assert.equal(JSON.parse(readFileSync(path.join(archive,'workflow.json'),'utf8')).id,workflow.id);
+});
+
+test('custom room runs corrections only when an independent note requests them',t=>{
+  for(const needed of [false,true]) {
+    const f=fixture();t.after(()=>f.close());const workflow=structuredClone(DEFAULT_WORKFLOW);
+    workflow.stages[0].turns[0].seats=[1];
+    workflow.stages.splice(1,0,{label:'Correction',when:{round:1,seat:1,field:'needs_changes',equals:true},turns:[{seats:[0],prompt:'Correct the document issue'}]});
+    assert.equal(f.start({pattern:'custom',workflow}),undefined);f.settle();
+    f.take(1,JSON.stringify({needs_changes:needed}));
+    assert.equal(f.room.state().current!.round,needed?2:3);
+    if(needed)f.take(0,'Corrected the document issue');
+    const m=f.room.state().current!;assert.equal(m.round,3);
+    mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true});
+    writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Findings');f.take(0,JSON.stringify({summary:'Reviewed'}));
+    assert.equal(f.room.state().current!.status,'done');
+    assert.equal(f.prompts.filter(p=>p.text.includes('Correct the document issue')).length,needed?1:0);
+  }
+});
+test('a repaired result needs a fresh Knowledge receipt for its corrected bytes',t=>{
+  const f=fixture({memory:true});t.after(()=>f.close());assert.equal(f.start({pattern:'custom'}),undefined);f.settle();
+  for(const turn of [...f.room.state().current!.turns])f.take(turn.seat);
+  let m=f.room.state().current!;mkdirSync(path.dirname(path.join(f.cwd(),m.output)),{recursive:true});writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Initial findings');
+  f.take(0,'invalid JSON');m=f.room.state().current!;
+  recordMeetingReview(f.dir,m,f.workers[0],[],'Initial review');
+  writeFileSync(path.join(f.cwd(),m.output+'.md'),'# Corrected findings');f.take(0,JSON.stringify({summary:'Corrected'}));
+  m=f.room.state().current!;assert.equal(m.status,'running');assert.equal(m.knowledgeReviewPending,true);
+  recordMeetingReview(f.dir,m,f.workers[0],[],'Reviewed corrected bytes');f.room.pump();
+  assert.equal(f.room.state().current!.status,'done');
 });

@@ -86,3 +86,17 @@ test('remote starts reserve office capacity without asking for office account si
   start(); assert.equal(calls.length, 2, 'reservation is released after the host replies');
   await new Promise(resolve => setImmediate(resolve));
 });
+
+import { DEFAULT_WORKFLOW } from '../src/shared/meeting-workflows.js';
+test('host capacity uses the supplied workflow team size even when roles are omitted',async()=>{
+  let started=0;
+  const floor={id:'hosted',project:{agentProviders:['claude']},workers:{officeDefault:{provider:'claude'},list:()=>[],fetchBase:async()=>{}},meetings:{start:()=>{started++;}}} as unknown as Floor;
+  const calls=meetingHostCalls(new Map([[floor.id,floor]]),5);
+  const workflow={...DEFAULT_WORKFLOW,roles:['Chair','Editor','Reviewer','Auditor']};
+  const req={pattern:'custom',workflow,prompt:'Review a document'};
+  const call=(room:number,request:unknown=req)=>calls['meeting.start'](floor,{req:request,by:'Ada',capacity:{room}});
+  assert.match(String(await call(2)),/worker limit/);assert.equal(started,0);
+  assert.match(String(await call(5,{...req,roles:['Chair','Reviewer']})),/worker count/);assert.equal(started,0);
+  assert.equal(await call(4),undefined);assert.equal(started,1);
+  assert.match(String(await call(5,{...req,workflow:{...workflow,stages:[]}})),/stages/);assert.equal(started,1);
+});

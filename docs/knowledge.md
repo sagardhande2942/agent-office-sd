@@ -183,3 +183,7 @@ The committed knowledge tree contains short, repository-sourced recipes for impl
 | Prepare a bounded task for a compact model | [Task brief recipes](../.agent-office/knowledge/conventions/task-brief-recipes.md) |
 
 These notes distinguish repository contracts, worker-reported claims, proposed designs and observed results. They provide navigation and concrete examples rather than promises about a model's performance or external provider availability.
+
+## Meeting teams
+
+Custom workflows can enable [shared-memory hooks](meeting-memory.md): frozen summary packets, authenticated read access for active participants, scoped observation writes by the chair, and a session-level output-bound review. Other meetings and ordinary worker completion reviews retain their existing behavior.

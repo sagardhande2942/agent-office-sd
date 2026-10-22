@@ -1,6 +1,7 @@
 // The meeting room's patterns: how 2–5 workers at the table work on one question or task together.
 // The server runs them (server/meetings.ts); the client offers them when a meeting is called.
 
+import type { MeetingWorkflow } from './meeting-workflows.js';
 import { fmtCost, fmtTokens, type Meeting, type MeetingPattern, type MeetingRecord } from './protocol.js';
 
 export interface PatternDef {
@@ -25,6 +26,11 @@ export interface PatternDef {
 }
 
 export const MEETING_PATTERNS: Record<MeetingPattern, PatternDef> = {
+  custom: {
+    icon: '🧩', label: 'Custom workflow', blurb: 'A caller-defined team, bounded stages and structured result contract.',
+    roles: ['Chair', 'Reviewer'], seats: { min: 2, max: 5, default: 2 },
+    rounds: { min: 1, max: 8, default: 2 }, roundsNote: 'Stages and turn assignments come from the supplied definition.', output: slug => `docs/meetings/${slug}.json`,
+  },
   debate: {
     icon: '🗣️',
     label: 'Debate',
@@ -78,6 +84,14 @@ export const MEETING_PATTERNS: Record<MeetingPattern, PatternDef> = {
     needs: 'pr',
   },
 };
+
+/** Metadata for a frozen caller definition, or an existing built-in pattern. */
+export function meetingDefinition(m: { pattern: MeetingPattern; workflow?: MeetingWorkflow }): PatternDef {
+  const w=m.pattern==='custom'?m.workflow:undefined;
+  return w ? { ...MEETING_PATTERNS.custom, label: w.label, blurb: w.brief, roles: w.roles,
+    seats: { min:w.roles.length,max:w.roles.length,default:w.roles.length },
+    rounds: { min:w.stages.length,max:w.stages.length,default:w.stages.length }, stages:w.stages.map(s=>s.label) } : MEETING_PATTERNS[m.pattern];
+}
 
 export const MEETING_PATTERN_IDS = Object.keys(MEETING_PATTERNS) as MeetingPattern[];
 
@@ -152,7 +166,7 @@ export function meetingStage(m: Meeting): string {
  * file it wrote (and where), or why it stopped.
  */
 export function meetingSummary(m: Meeting): string {
-  const p = MEETING_PATTERNS[m.pattern];
+  const p = meetingDefinition(m);
   const ran = m.status === 'done' ? rounds(m.round) : `${m.status === 'stopped' ? 'in ' : ''}round ${m.round} of ${m.rounds}`;
   const head = `${p.icon} ${p.label} · ${ran} · ${meetingSpend(m)}`;
   if (m.status === 'stopped') return `${head} · ⛔ ${m.reason ?? 'stopped'}`;
@@ -162,5 +176,5 @@ export function meetingSummary(m: Meeting): string {
 }
 
 export function meetingRecord(m: Meeting): MeetingRecord {
-  return { id: m.id, pattern: m.pattern, title: m.title, status: m.status, summary: meetingSummary(m), calledBy: m.calledBy, finishedAt: m.finishedAt ?? Date.now(), branch: m.worktree?.branch, output: m.output };
+  return { id: m.id, ...(m.routingKey ? { routingKey: m.routingKey } : {}), pattern: m.pattern, title: m.title, status: m.status, summary: meetingSummary(m), calledBy: m.calledBy, finishedAt: m.finishedAt ?? Date.now(), branch: m.worktree?.branch, output: m.output };
 }

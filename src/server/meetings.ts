@@ -1,3 +1,4 @@
+import { repairCustomOutput, repairOutputChanged } from './meeting-patterns/efficiency.js';
 import type { CommunicationsState } from '../shared/communications.js';
 import { communicationGate, keepMeetingCommunications } from './meeting-communications.js';
 import { commitAll, readStart, numbered, list, firstLine, clamp } from './meeting-output.js';
@@ -8,12 +9,15 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFil
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { MEETING_SEATS } from '../shared/layout.js';
-import { MEETING_NOTES_DIR, MEETING_PATTERNS, isMeetingPattern, meetingRecord, outputProblem, slugify } from '../shared/meetings.js';
+import { MEETING_NOTES_DIR, MEETING_PATTERNS, meetingDefinition, isMeetingPattern, meetingRecord, outputProblem, slugify } from '../shared/meetings.js';
 import { isAgentEffort, isAgentProvider, tokensOf, type AgentChoice, type AgentEffort, type AgentProvider, type Meeting, type MeetingRecord, type MeetingRequest, type MeetingState, type MeetingTurn, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
 import { providerMeta, takesEffort, takesModel } from '../shared/providers.js';
 import { gitError, type WorktreeRef, type WorktreeState } from './worktrees.js';
 import { PROMPTS, fillPrompt, type PromptId, type PromptVars } from '../shared/prompts.js';
+import { planMeeting, customBrief, validateCustomOutput } from './meeting-patterns/index.js';
+import { archiveCustomArtifacts, stageMeetingInputs, type MeetingExecution } from './meeting-patterns/artifacts.js';
+import { DEFAULT_WORKFLOW, workflowProblem } from '../shared/meeting-workflows.js';
 
 export const execFileP = promisify(execFile);
 
@@ -42,6 +46,8 @@ export interface MeetingTrees {
 }
 
 export interface MeetingEvents {
+  memoryContext?(meeting: Meeting): string;
+  memoryGate?(meeting: Meeting): string | undefined;
   communications?(): CommunicationsState;
   update(state: MeetingState): void;
   toast(text: string, level: 'info' | 'warn' | 'error'): void;
@@ -124,10 +130,13 @@ export class MeetingRoom {
 
   /** Calls a meeting. Returns why it couldn't, or undefined once everyone is sitting down. */
   /** `owner` is the account calling it: the workers run on its sign-ins, and a review panel's review is posted as it. */
-  start(req: MeetingRequest, by: string, owner?: string): string | undefined {
+  start(req: MeetingRequest, by: string, owner?: string, execution?: MeetingExecution): string | undefined {
     if (this.current?.status === 'running') return `The meeting room is busy with “${this.current.title}”: stop that meeting first`;
     if (!isMeetingPattern(req.pattern)) return 'Unknown meeting pattern';
-    const pattern = MEETING_PATTERNS[req.pattern];
+    const workflow = req.pattern === 'custom' ? structuredClone(req.workflow ?? DEFAULT_WORKFLOW) : undefined;
+    if (workflow) { const bad = workflowProblem(workflow); if (bad) return bad; }
+    else if (req.workflow !== undefined) return 'Only a custom meeting accepts a workflow';
+    const pattern = meetingDefinition({ pattern: req.pattern, workflow });
     const paused = this.events.hiringPaused();
     if (paused) return paused;
     const prompt = String(req.prompt ?? '').replace(/\r\n?/g, '\n').trim().slice(0, PROMPT_MAX);
@@ -155,7 +164,7 @@ export class MeetingRoom {
     const issue = Number.isInteger(req.issue) && (req.issue as number) > 0 ? (req.issue as number) : undefined;
     const rounds = clamp(Math.floor(Number(req.rounds) || pattern.rounds.default), pattern.rounds.min, pattern.rounds.max);
     const title = (String(req.title ?? '').replace(/\s+/g, ' ').trim() || (pr !== undefined && req.pattern === 'review' ? `Review of PR #${pr}` : firstLine(prompt))).slice(0, 100);
-    const id = randomBytes(4).toString('hex');
+    const id = execution?.id ?? randomBytes(4).toString('hex');
     const slug = slugify(title, 32);
     const output = String(req.output ?? '').trim() || pattern.output(slug, pr);
     const outputBad = outputProblem(output);
@@ -177,7 +186,9 @@ export class MeetingRoom {
     }
     const m: Meeting = {
       id,
+      ...(execution ? { routingKey: execution.key } : {}),
       pattern: req.pattern,
+      ...(workflow ? { workflow, patternVersion: workflow.version } : {}),
       title,
       prompt,
       output,
@@ -205,9 +216,15 @@ export class MeetingRoom {
     };
     mkdirSync(path.join(this.cwd(m), m.notes), { recursive: true });
     const first = this.plan(m, 1, 1) ?? [];
+    let memory = '';
+    try { stageMeetingInputs(this.cwd(m), execution?.inputs); memory = this.events.memoryContext?.(m) ?? ''; }
+    catch (error) {
+      if (worktree && this.trees) void this.trees.remove(worktree, 'all');
+      return `Meeting inputs or memory unavailable: ${(error as Error).message}`;
+    }
     for (let i = 0; i < m.seats.length; i++) {
       const part = first.find((p) => p.seat === i);
-      const text = `${this.brief(m, i)}\n\n${part ? this.ask(m, part) : this.say('meeting.wait')}`;
+      const text = `${this.brief(m, i)}${memory}\n\n${part ? this.ask(m, part) : this.say('meeting.wait')}`;
       const w = this.workers.seat(m.seats[i].deskId, `${by} (meeting)`, text, provider, model, effort, { id, worktree }, owner);
       if (typeof w === 'string') {
         for (const s of m.seats) if (s.workerId) void this.workers.kill(s.workerId);
@@ -308,7 +325,7 @@ export class MeetingRoom {
       if (!m.cleared && m.seats.every((s) => !s.workerId || !byId.has(s.workerId))) void this.dismiss(m);
       return;
     }
-    if (m.waitingForCommunications) {
+    if (m.waitingForCommunications || m.knowledgeReviewPending) {
       this.finish(m);
       if (this.dirty) this.changed();
       return;
@@ -440,6 +457,21 @@ export class MeetingRoom {
 
   /** The output is written. Commit it on the meeting's branch, or post the review on its pull request. */
   private finish(m: Meeting, allowUnresolved = false) {
+    const outputError = validateCustomOutput(m, this.cwd(m));
+    if (outputError) {
+      if (m.outputRepairError && !repairOutputChanged(m, this.cwd(m))) return;
+      if (!repairCustomOutput(m, outputError, this.cwd(m))) return this.halt(m, outputError);
+      this.dirty = true; this.again = true; return;
+    }
+    delete m.outputRepairError;
+    const instruction = this.events.memoryGate?.(m);
+    if (instruction) {
+      m.knowledgeReviewPending = true; m.coordinationError = instruction; this.dirty = true;
+      const chair = this.workers.list().find(w => w.id === m.seats[0].workerId);
+      if (!m.knowledgeReviewPrompted && chair && ready(chair.status) && !this.workers.prompt(chair.id, instruction, BY)) m.knowledgeReviewPrompted = true;
+      return;
+    }
+    if (m.knowledgeReviewPending) { m.knowledgeReviewPending = false; m.knowledgeReviewPrompted = false; delete m.coordinationError; }
     if (this.readPreview(m)) this.dirty = true;
     const gate = communicationGate(m, this.events.communications?.() ?? { messages: [] }, allowUnresolved);
     if (gate.changed) this.dirty = true;
@@ -450,7 +482,7 @@ export class MeetingRoom {
     m.turns = [];
     this.readPreview(m);
     this.keepNotes(m);
-    const p = MEETING_PATTERNS[m.pattern];
+    const p = meetingDefinition(m);
     this.events.toast(`🤝 The ${p.label} meeting on “${m.title}” is done: it wrote ${m.output}`, 'info');
     const cwd = this.cwd(m);
     if (m.pattern === 'review' && m.pr !== undefined) {
@@ -556,11 +588,11 @@ export class MeetingRoom {
 
   /** What every worker is told when it sits down, ahead of its first part. */
   private brief(m: Meeting, i: number): string {
-    const p = MEETING_PATTERNS[m.pattern];
+    const p = meetingDefinition(m);
     const role = m.seats[i].role;
     const others = m.seats.filter((_, j) => j !== i).map((s) => `the ${s.role}`);
     const head = m.seats[0].role;
-    const how: Record<Meeting['pattern'], string> = {
+    const how: Partial<Record<Meeting['pattern'], string>> = {
       debate: `Round 1: everyone proposes an answer. Each round after that until the last: everyone reads the others' latest notes, critiques them and revises their own. Last round: the ${head} writes the decision.`,
       lead: `Round 1: the ${head} splits the task into a part for each of the others and writes the plan. Round 2: each of them does their part. Round 3: the ${head} merges the work, checks it and writes it up.`,
       mapreduce: `Round 1: each mapper does the task over its own parts. Round 2: the ${head} combines what they found into one result.`,
@@ -579,7 +611,7 @@ export class MeetingRoom {
       role,
       pattern: p.label,
       others: list(others),
-      how: how[m.pattern],
+      how: customBrief(m) ?? how[m.pattern] ?? '',
       about: m.prompt,
       pullRequest: m.pr !== undefined ? `The pull request is #${m.pr}: read it with gh pr view ${m.pr} and gh pr diff ${m.pr}.` : '',
       issue: m.issue !== undefined ? `It comes from GitHub issue #${m.issue}: gh issue view ${m.issue} --comments.` : '',
@@ -599,85 +631,14 @@ export class MeetingRoom {
 
   /** A part, as the prompt that hands it over. */
   private ask(m: Meeting, part: Part): string {
-    return `Round ${m.round} of ${m.rounds}, ${part.doing}. ${part.ask}\nCheck office-workers inbox --json before writing your final notes for this round. Requests involving this table are tracked with the meeting and round; unresolved requests hold completion until resolved, expired, or explicitly overridden.`;
+    const repair = part.file === m.output && m.outputRepairError ? `Correct only the final JSON/report: ${m.outputRepairError}. Preserve completed notes and substantive evidence. Rewrite both output files, then obtain a fresh output-bound Knowledge review.\n` : '';
+    return repair + `Round ${m.round} of ${m.rounds}, ${part.doing}. ${part.ask}\nCheck office-workers inbox --json before writing your final notes for this round. Requests involving this table are tracked with the meeting and round; unresolved requests hold completion until resolved, expired, or explicitly overridden.`;
   }
 
   /** The parts of step `step` of round `round`, or null when that round has no such step. */
   private plan(m: Meeting, round: number, step: number): Part[] | null {
-    const n = m.seats.length;
-    // Parts name their files by full path: a worktree sits inside the project's own folder, and an
-    // agent can take a relative path to be the project's (and then it's asked about writing outside).
-    const A = (rel: string) => path.join(this.cwd(m), rel);
-    const note = (r: number, i: number) => `${m.notes}/r${r}-${i + 1}-${slugify(m.seats[i].role, 24)}.md`;
-    const notes = (r: number, seats: number[]) => seats.map((i) => A(note(r, i))).join(', ');
-    const all = m.seats.map((_, i) => i);
-    const last = this.isLast(m, round);
-    switch (m.pattern) {
-      case 'debate': {
-        if (step > 1) return null;
-        if (last) {
-          return [{ seat: 0, doing: 'writing the decision', file: m.output, ask: this.say('meeting.debate.decide', { notes: A(m.notes), lastNotes: notes(round - 1, all), output: A(m.output) }) }];
-        }
-        if (round === 1) return all.map((i) => ({ seat: i, doing: 'proposing', file: note(1, i), ask: this.say('meeting.debate.propose', { role: m.seats[i].role, file: A(note(1, i)) }) }));
-        return all.map((i) => ({
-          seat: i,
-          doing: 'critiquing',
-          file: note(round, i),
-          ask: this.say('meeting.debate.critique', { previousRound: round - 1, theirNotes: notes(round - 1, all.filter((j) => j !== i)), file: A(note(round, i)) }),
-        }));
-      }
-      case 'lead': {
-        const team = all.slice(1);
-        if (step > 1) return null;
-        const plan = `${m.notes}/plan.md`;
-        if (round === 1) {
-          const parts = `${team.length} part${team.length === 1 ? '' : 's'}`;
-          return [{ seat: 0, doing: 'planning', file: plan, ask: this.say('meeting.lead.plan', { parts, team: list(team.map((i) => `the ${m.seats[i].role}`)), exampleRole: m.seats[team[0]].role, file: A(plan) }) }];
-        }
-        if (round === 2) {
-          return team.map((i) => ({ seat: i, doing: 'doing their part', file: note(2, i), ask: this.say('meeting.lead.part', { plan: A(plan), role: m.seats[i].role, lead: m.seats[0].role, file: A(note(2, i)) }) }));
-        }
-        return [{ seat: 0, doing: 'merging the work', file: m.output, ask: this.say('meeting.lead.merge', { reports: notes(2, team), output: A(m.output) }) }];
-      }
-      case 'mapreduce': {
-        if (step > 1) return null;
-        const mappers = all.slice(1);
-        if (round === 1) {
-          return mappers.map((i, k) => {
-            const mine = (m.parts ?? []).filter((_, j) => j % mappers.length === k);
-            return { seat: i, doing: 'mapping', file: note(1, i), ask: this.say('meeting.mapreduce.map', { parts: mine.map((x) => `- ${x}`).join('\n'), file: A(note(1, i)) }) };
-          });
-        }
-        return [{ seat: 0, doing: 'reducing', file: m.output, ask: this.say('meeting.mapreduce.reduce', { results: notes(1, mappers), output: A(m.output) }) }];
-      }
-      case 'redblue': {
-        const [blue, red] = [0, 1];
-        const redNote = `${m.notes}/r${round}-red.md`;
-        const blueNote = `${m.notes}/r${round}-blue.md`;
-        if (step === 1) {
-          const before = round > 1 ? ` The Blue team's fixes from round ${round - 1} are in ${A(`${m.notes}/r${round - 1}-blue.md`)}: check them first, then keep looking.` : '';
-          return [{ seat: red, doing: 'attacking', file: redNote, ask: this.say('meeting.redblue.attack', { previousFixes: before, file: A(redNote) }) }];
-        }
-        if (step > 2) return null;
-        if (m.lastRound === round) {
-          return [{ seat: blue, doing: 'writing it up', file: m.output, ask: this.say('meeting.redblue.writeup', { findings: A(redNote), notes: A(m.notes), output: A(m.output) }) }];
-        }
-        const wrap = last ? ` This is the last round: once you've fixed things, also write ${A(m.output)}: every finding from every round (${A(m.notes)}/), what was fixed and how, and what's still open. That file is the meeting's output.` : '';
-        return [{ seat: blue, doing: last ? 'fixing and writing it up' : 'fixing', file: last ? m.output : blueNote, ask: this.say('meeting.redblue.fix', { findings: A(redNote), file: A(blueNote), lastRound: wrap, output: A(m.output) }) }];
-      }
-      case 'review': {
-        if (step > 1) return null;
-        if (round === 1) {
-          return all.map((i) => ({
-            seat: i,
-            doing: 'reviewing',
-            file: note(1, i),
-            ask: this.say('meeting.review.review', { pr: m.pr, role: m.seats[i].role, file: A(note(1, i)) }),
-          }));
-        }
-        return [{ seat: 0, doing: 'writing the review', file: m.output, ask: this.say('meeting.review.combine', { findings: notes(1, all), exampleRole: m.seats[1]?.role ?? 'Security', output: A(m.output) }) }];
-      }
-    }
+    try { return planMeeting(m, round, step, this.cwd(m), (id, vars) => this.say(id, vars)); }
+    catch (error) { this.halt(m, 'Workflow condition unavailable: ' + (error as Error).message); return null; }
   }
 
   // --- Files -----------------------------------------------------------------
@@ -688,6 +649,7 @@ export class MeetingRoom {
 
   /** Whether a part's file is there, with something in it, written since the part was handed over. */
   private written(m: Meeting, t: MeetingTurn): boolean {
+    if (t.file === m.output && m.outputRepairError && !repairOutputChanged(m, this.cwd(m))) return false;
     try {
       const st = statSync(path.join(this.cwd(m), t.file));
       return st.isFile() && st.size > 0 && st.mtimeMs >= (t.sentAt ?? 0) - 2000;
@@ -728,6 +690,7 @@ export class MeetingRoom {
       if (path.resolve(from) !== path.resolve(to) && existsSync(from)) cpSync(from, to, { recursive: true });
       const out = path.join(this.cwd(m), m.output);
       if (existsSync(out)) cpSync(out, path.join(to, `output-${path.basename(m.output)}`));
+      archiveCustomArtifacts(this.cwd(m), to, m);
       keepMeetingCommunications(to, m, this.events.communications?.() ?? { messages: [] });
     } catch {
       // the notes are a courtesy; the meeting is over either way
@@ -755,7 +718,12 @@ export class MeetingRoom {
       if (Array.isArray(saved.past)) this.past = saved.past.filter((r) => r && typeof r.id === 'string' && typeof r.summary === 'string').slice(0, PAST_MAX);
       const m = saved.current;
       // The workers at the table outlive a restart of the office, so a meeting carries on where it was.
-      if (m && typeof m.id === 'string' && isMeetingPattern(m.pattern) && Array.isArray(m.seats) && Array.isArray(m.turns)) this.current = m;
+      if (m && typeof m.id === 'string' && isMeetingPattern(m.pattern) && Array.isArray(m.seats) && Array.isArray(m.turns)) {
+        this.current = m;
+        if (m.pattern === 'custom' && (!m.workflow || workflowProblem(m.workflow) || m.patternVersion !== m.workflow.version) && m.status === 'running') {
+          m.status = 'stopped'; m.reason = 'Workflow definition/version unavailable; preserve notes and start a compatible session.';
+        }
+      }
     } catch {
       // corrupt state file: an empty room
     }
