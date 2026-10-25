@@ -127,3 +127,13 @@ test('small packets stay bounded and recovery/storage errors hold completion wit
 });
 import { createHash } from 'node:crypto';
 function sessionHash(id: string) { return createHash('sha256').update(id).digest('hex'); }
+
+test('restored frozen packets recreate their archive without changing packet identity', t => {
+  const f = fixture(t); f.m.notes = 'session-notes';
+  const context = meetingMemoryContext(f.dir, f.m);
+  const file = path.join(f.dir, f.m.notes, 'knowledge-context.json');
+  const original = fs.readFileSync(file, 'utf8');
+  fs.rmSync(file);
+  assert.equal(meetingMemoryContext(f.dir, f.m), context);
+  assert.equal(fs.readFileSync(file, 'utf8'), original);
+});

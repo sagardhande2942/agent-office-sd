@@ -640,3 +640,5 @@ An opt-in [task dispatcher](docs/task-routing.md) connects local meeting teams t
 Caller-defined result contracts can bound reference lists with `minItems`/`maxItems`; `maxItems: 0` requires an empty list. See [custom meetings](docs/custom-meetings.md).
 
 Task integrations may supply an optional generic `agent` choice (`provider`, `model`, `effort`) on each task. Explicit choices are frozen with the claim; omitted choices retain the Office default. See [task routing](docs/task-routing.md).
+
+Custom workflow memory recovery preserves the frozen packet and recreates its notes archive; see [meeting memory](docs/meeting-memory.md).

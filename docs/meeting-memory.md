@@ -47,3 +47,5 @@ Shared-memory review records what participants checked. It does not approve a do
 ## Verification
 
 `tests/meeting-memory.test.ts` exercises shared/frozen context, current note versions, evidence review binding, policy, authenticated role/path restrictions and stale writes. The real MeetingRoom regression covers required review, restart and communication override. Existing ordinary Knowledge and meeting-space/remote tests remain in the focused checks. Fixtures use no paid agents or external services.
+
+Restoring a frozen memory packet also recreates its `knowledge-context.json` archive when the session's notes directory becomes available. Recovery uses the original packet and digest; it does not refresh hints or alter the output-bound review.
