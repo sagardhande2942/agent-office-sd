@@ -63,3 +63,7 @@ Desk tasks reuse the generic worktree/output/gate engine internally but reserve 
 A desk task receives the existing scoped observation and output-bound Knowledge review contract. It cannot move/archive notes, write outside its observation scope or mark observations verified. Ordinary worker curation/checklist follow-ups are suppressed because the task engine owns its review gate. Knowledge access closes when the task finishes or its controller is unavailable. The task engine owns worktree cleanup after acknowledgment; sending the worker home does not separately delete its checkout.
 
 Empty queues and external-job waiting trigger no worker prompts. Task admission, research policies, usage allowances, meeting escalation and batch scheduling remain caller-owned. A session allowance limits dispatch, not provider tokens or in-flight usage.
+
+## Per-task agent choice
+
+A task may include `agent: {provider, model?, effort?}`. Existing provider/model/effort validators apply; unknown fields are refused. The choice is part of claim identity and is passed to both worker and meeting execution. A changed claim cannot silently switch providers. Omit `agent` to retain the Office default. Assignment policy belongs to the caller; Office does not interpret task group names or domain roles.

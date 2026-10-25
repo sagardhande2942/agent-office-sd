@@ -1,5 +1,9 @@
+import { isAgentProvider } from '../../shared/providers.js';
+import type { AgentChoice } from '../../shared/protocol.js';
+import { validateWorkerModel, validateWorkerEffort } from '../agents.js';
 import { workflowProblem, type MeetingWorkflow } from '../../shared/meeting-workflows.js';
 export interface QueueTask {
+  agent?: AgentChoice;
   execution?: 'meeting' | 'worker'; id: string; group: string; title: string; workflow: MeetingWorkflow; references?: string[]; version: number;
   input: Record<string, unknown>; claim_token?: string; execution_key?: string;
 }
@@ -8,6 +12,12 @@ export function taskProblem(t: QueueTask): string | undefined {
   if (!t || typeof t!=='object' || !safe(t.id,200) || !safe(t.group,100) || !safe(t.title,100) || !Number.isInteger(t.version) || t.version<1
     || !t.input || typeof t.input!=='object' || Array.isArray(t.input)
     || t.references!==undefined && (!Array.isArray(t.references)||t.references.length>20||t.references.some(v=>!safe(v,100)))) return 'Invalid meeting task envelope';
+  if (t.agent !== undefined) {
+    const a=t.agent;
+    if (!a || typeof a !== 'object' || Array.isArray(a) || Object.keys(a).some(k=>!['provider','model','effort'].includes(k)) || !isAgentProvider(a.provider)) return 'Invalid task agent choice';
+    const problem=validateWorkerModel('agent',a.provider,a.model) ?? validateWorkerEffort('agent',a.provider,a.effort);
+    if (problem) return problem;
+  }
   const bad = workflowProblem(t.workflow); if (bad) return bad;
   if (t.execution !== undefined && !['meeting','worker'].includes(t.execution)) return 'Unknown task execution';
   if (t.execution === 'worker' && (t.workflow.roles.length !== 1 || t.workflow.stages.length !== 1 || !t.workflow.stages[0].turns[0]?.output)) return 'Worker tasks require one role and one final stage';

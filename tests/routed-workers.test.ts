@@ -17,7 +17,7 @@ function fixture(t:any){
   const workers:any[]=[],prompts:string[]=[];let ids=0;
   const floor:any={def:{dir:root},meetings:{state:()=>({spaces:[]})},workers:{
     defaultProvider:'codex',officeDefault:{provider:'codex'},list:()=>workers,deskOccupied:(id:string)=>workers.some(w=>w.deskId===id),activeSince:()=>false,
-    spawn(...args:any[]){const w={id:'w'+(++ids),kind:'agent',name:'Worker',deskId:args[0],prompt:args[2],status:'done',worktree:args[16]?.worktree,routedTask:args[16]?.id};workers.push(w);prompts.push(w.prompt);return w;},
+    spawn(...args:any[]){const w={id:'w'+(++ids),kind:'agent',name:'Worker',deskId:args[0],prompt:args[2],provider:args[5],model:args[6],effort:args[7],status:'done',worktree:args[16]?.worktree,routedTask:args[16]?.id};workers.push(w);prompts.push(w.prompt);return w;},
     prompt(_id:string,text:string){prompts.push(text);},write(){},async kill(id:string){const i=workers.findIndex(w=>w.id===id);if(i>=0)workers.splice(i,1);return {};},
   }};
   const ctx:any={capacity:{room:()=>4-workers.length},ledger:{},toast(){}};
@@ -52,4 +52,12 @@ test('worker task contracts refuse multiple seats, unknown modes and incomplete 
   for(const mutate of [(v:any)=>v.workflow.roles.push('Peer'),(v:any)=>v.execution='unknown',(v:any)=>v.workflow.stages[0].turns[0].output=false]){
     const task=structuredClone(f.task);mutate(task);assert.ok(taskProblem(task));
   }
+});
+
+ test('explicit task agent overrides the office default and remains frozen on restart',async t=>{
+  const f=fixture(t);f.task.agent={provider:'opencode',model:'opencode/glm-5.3-flash-free'};
+  await f.service.start(f.task,'choice-doc-1','1234567890abcdef');
+  assert.equal(f.workers[0].provider,'opencode');assert.equal(f.workers[0].model,'opencode/glm-5.3-flash-free');
+  f.restart();assert.equal(f.state().provider,'opencode');assert.equal(f.state().model,'opencode/glm-5.3-flash-free');
+  for(const agent of [{provider:'missing'},{provider:'codex',model:{}},{provider:'codex',effort:'invalid'},{provider:'codex',extra:true}])assert.ok(taskProblem({...f.task,agent}));
 });

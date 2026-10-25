@@ -42,7 +42,7 @@ export class RoutedWorkers {
     const artifacts=meetingArtifacts(this.floor,task.references??[]);
     const prompt=JSON.stringify({task_id:task.id,input:task.input,previous_artifacts:artifacts.references});
     if (prompt.length>19000) throw Error('Task packet exceeds brief capacity');
-    const error=this.room(id).start({pattern:'custom',workflow:task.workflow,title:task.title,prompt,roles:task.workflow.roles},'Task router',this.owner,{key,id,inputs:artifacts.files});
+    const error=this.room(id).start({...task.agent,pattern:'custom',workflow:task.workflow,title:task.title,prompt,roles:task.workflow.roles},'Task router',this.owner,{key,id,inputs:artifacts.files});
     if(error)throw Error(error);
     const current=this.find(key);if(!current)throw Error('Worker task start acceptance ambiguous');return current;
   }

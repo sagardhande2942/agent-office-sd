@@ -81,7 +81,7 @@ export function installTaskRouting(floor: Floor, ctx: FloorContext) {
         const artifacts = meetingArtifacts(floor, previous);
         const prompt = JSON.stringify({ task_id: task.id, input: task.input, previous_artifacts: artifacts.references });
         if (prompt.length > 19000) throw Error('Task packet exceeds meeting brief capacity');
-        const error = floor.meetings.start({ pattern: 'custom', workflow: task.workflow, spaceId: group(task.group),
+        const error = floor.meetings.start({ ...task.agent, pattern: 'custom', workflow: task.workflow, spaceId: group(task.group),
           title: task.title, prompt, roles: [...task.workflow.roles] }, 'Task router', c.owner, { key, id, inputs: artifacts.files });
         if (error) throw Error(error);
         const m = current().find(m => m.routingKey === key); if (!m) throw Error('Meeting start acceptance ambiguous');

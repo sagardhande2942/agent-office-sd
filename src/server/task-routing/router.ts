@@ -69,7 +69,7 @@ export class TeamRouter {
       const claimed = await this.bridge.call<QueueTask>('claim', { task_id: a.task.id, version: a.task.version,
         dispatcher: this.dispatcher, claim_key: a.claimKey });
       if (taskProblem(claimed) || claimed.version !== a.task.version+1 || !claimed.claim_token || !claimed.execution_key
-        || !isDeepStrictEqual([claimed.execution,claimed.id,claimed.group,claimed.title,claimed.workflow,claimed.input,claimed.references], [a.task.execution,a.task.id,a.task.group,a.task.title,a.task.workflow,a.task.input,a.task.references])) throw Error('Malformed or changed claim response');
+        || !isDeepStrictEqual([claimed.agent,claimed.execution,claimed.id,claimed.group,claimed.title,claimed.workflow,claimed.input,claimed.references], [a.task.agent,a.task.execution,a.task.id,a.task.group,a.task.title,a.task.workflow,a.task.input,a.task.references])) throw Error('Malformed or changed claim response');
       a.task = claimed;
       a.state = 'starting'; this.save();
       // Only this fresh execution of the acknowledged claim may initiate a meeting.

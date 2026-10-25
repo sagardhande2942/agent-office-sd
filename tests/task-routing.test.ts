@@ -13,7 +13,7 @@ function fixture(t: test.TestContext) {
   const file = path.join(dir, 'state.json');
   const task: QueueTask = { id: 'task-1', group: 'documentation', title: 'Review documentation', workflow: DEFAULT_WORKFLOW, version: 1, input: {} };
   const meetings = new Map<string, RoutedMeeting>(); let starts = 0, claims = 0, completions = 0;
-  let lostStart = false, lostClaim = false, lostResult = false; let paused = false; let accepted = false; let changedClaim = false;
+  let lostStart = false, lostClaim = false, lostResult = false; let paused = false; let accepted = false; let changedClaim = false, changedAgent = false;
   const bridge: Bridge = { async call<T>(op: string, body?: any): Promise<T> {
     if (op === 'health') return { schema_version: 1, capabilities: ['meeting-tasks-v1'] } as T;
     if (op === 'ready') return { tasks: accepted ? [] : [task] } as T;
@@ -21,7 +21,7 @@ function fixture(t: test.TestContext) {
       claims++;
       if (lostClaim) { lostClaim = false; throw Error('Claim response lost'); }
       assert.equal(body.version, 1);
-      return { ...task, ...(changedClaim ? {group:'different-team'} : {}), version: 2, claim_token: 'claim-token', execution_key: 'execution-key' } as T;
+      return { ...task, ...(changedClaim ? {group:'different-team'} : {}), ...(changedAgent ? {agent:{provider:'opencode',model:'opencode/glm-5.3-flash-free'}} : {}), version: 2, claim_token: 'claim-token', execution_key: 'execution-key' } as T;
     }
     if (op === 'heartbeat') return {} as T;
     if (op === 'complete') {
@@ -39,7 +39,7 @@ function fixture(t: test.TestContext) {
   const router = () => new TeamRouter(file, bridge, io, 'floor-a');
   const retry = () => { const s = readRouting(file); for (const a of Object.values(s.attempts)) a.nextPoll = 0; saveRouting(file, s); };
   return { file, task, meetings, router, retry, counts: () => ({ starts, claims, completions }),
-    loseStart: () => lostStart = true, loseClaim: () => lostClaim = true, loseResult: () => lostResult = true, pause: () => paused = true, changeClaim: () => changedClaim = true };
+    loseStart: () => lostStart = true, loseClaim: () => lostClaim = true, loseResult: () => lostResult = true, pause: () => paused = true, changeClaim: () => changedClaim = true, changeAgent: () => changedAgent = true };
 }
 
 test('router persists claim/start and resumes the same meeting after restart', async t => {
@@ -130,4 +130,8 @@ test('worker tasks wait without claiming when a bridge lacks the worker capabili
   const f=fixture(t);f.task.execution='worker';f.task.workflow=structuredClone(DEFAULT_WORKFLOW);
   f.task.workflow.roles=['Writer'];f.task.workflow.stages=[{label:'Task',turns:[{seats:[0],output:true,prompt:'Write the result'}]}];
   await f.router().poll();await f.router().poll();assert.deepEqual(f.counts(),{starts:0,claims:0,completions:0});
+});
+
+test('claim identity refuses a provider switch after ready',async t=>{
+  const f=fixture(t);f.task.agent={provider:'codex'};f.changeAgent();await f.router().poll();assert.equal(f.counts().starts,0);
 });

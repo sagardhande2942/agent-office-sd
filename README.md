@@ -638,3 +638,5 @@ Memory-enabled meetings share [versioned Knowledge context and session reviews](
 An opt-in [task dispatcher](docs/task-routing.md) connects local meeting teams to a caller-owned queue, with durable claims, restart recovery and acknowledged room cleanup. Tasks can use a single ordinary desk worker or a meeting space. Workflow definitions, task content and lifecycle decisions come from the integration. Routing is disabled without explicit private configuration.
 
 Caller-defined result contracts can bound reference lists with `minItems`/`maxItems`; `maxItems: 0` requires an empty list. See [custom meetings](docs/custom-meetings.md).
+
+Task integrations may supply an optional generic `agent` choice (`provider`, `model`, `effort`) on each task. Explicit choices are frozen with the claim; omitted choices retain the Office default. See [task routing](docs/task-routing.md).
