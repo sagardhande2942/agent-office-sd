@@ -216,7 +216,7 @@ export class WorkerTrees {
    */
   async syncBranch(w: Worker): Promise<void> {
     const wt = w.info.worktree;
-    if (!wt || w.info.meeting || w.info.repos?.length) return;
+    if (!wt || w.info.meeting || w.info.routedTask || w.info.repos?.length) return;
     const now = await this.current(wt);
     // Sent home meanwhile, or another look got there first.
     if (now === wt || this.ctx.workers.get(w.info.id) !== w || w.info.worktree !== wt) return;
@@ -346,7 +346,7 @@ export class WorkerTrees {
    */
   async sendHome(info: WorkerInfo, cleanup?: WorktreeCleanup, landed?: string, landedRepos?: Record<string, string | undefined>): Promise<{ note?: string; error?: string }> {
     // A meeting's worktree is everyone at the table's: the meeting tidies it away once they've all gone.
-    if (!info.worktree || info.meeting) return {};
+    if (!info.worktree || info.meeting || info.routedTask) return {};
     // On the branch its work is on, should it have switched since it last came to rest.
     const wt = await this.current(info.worktree);
     const name = info.name;

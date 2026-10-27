@@ -1,10 +1,11 @@
 // The meeting room.
 import type { MeetingSpace } from '../meeting-spaces.js';
 
+import type { MeetingWorkflow } from '../meeting-workflows.js';
 import type { AgentEffort, AgentProvider } from './agents.js';
 
 /** How the workers at the meeting table work together (see shared/meetings.ts). */
-export type MeetingPattern = 'debate' | 'lead' | 'mapreduce' | 'redblue' | 'review';
+export type MeetingPattern = 'debate' | 'lead' | 'mapreduce' | 'redblue' | 'review' | 'custom';
 
 /** A worker's place at a meeting. */
 export interface MeetingSeat {
@@ -43,6 +44,11 @@ export type MeetingStatus = 'running' | 'done' | 'stopped';
 export interface Meeting {
   id: string;
   pattern: MeetingPattern;
+  /** Caller-defined workflow, frozen at session start. */
+  workflow?: MeetingWorkflow;
+  patternVersion?: number;
+  /** Server-assigned key for a durable middleware task; never taken from a browser request. */
+  routingKey?: string;
   title: string;
   /** The question or task, as whoever called the meeting put it. */
   prompt: string;
@@ -77,6 +83,13 @@ export interface Meeting {
   status: MeetingStatus;
   /** Finished output is held until linked requests resolve or a viewer explicitly overrides. */
   waitingForCommunications?: boolean;
+  /** Session-level Knowledge review, separate from a worker completion checklist. */
+  knowledgeReviewPending?: boolean;
+  /** Bounded chair-only repairs of malformed custom output; prior rounds remain intact. */
+  outputRepairAttempts?: number;
+  outputRepairError?: string;
+  outputRepairBaseline?: string;
+  knowledgeReviewPrompted?: boolean;
   coordinationError?: string;
   communicationOverride?: { by: string; at: number };
   /** Why it stopped short. */
@@ -102,6 +115,7 @@ export interface Meeting {
 
 /** A meeting that's over, in a line. */
 export interface MeetingRecord {
+  routingKey?: string;
   id: string;
   pattern: MeetingPattern;
   title: string;
@@ -124,6 +138,7 @@ export interface MeetingState {
 
 /** What calling a meeting asks for (see shared/meetings.ts for each pattern's defaults and limits). */
 export interface MeetingRequest {
+  workflow?: MeetingWorkflow;
   spaceId?: string;
   pattern: MeetingPattern;
   prompt: string;

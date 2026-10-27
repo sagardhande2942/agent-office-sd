@@ -1,9 +1,11 @@
+import type { MeetingExecution } from '../meeting-patterns/artifacts.js';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { MeetingRoom, type MeetingEvents, type MeetingTrees, type MeetingWorkers } from '../meetings.js';
 import type { MeetingRequest, MeetingState, WorkerInfo } from '../../shared/protocol.js';
 import { DEFAULT_MEETING_SPACE, MEETING_SPACE_LIMIT, spaceName } from '../../shared/meeting-spaces.js';
+import { meetingMemoryContext, meetingMemoryGate } from '../knowledge/meetings.js';
 
 interface Space { id: string; name: string; createdAt: number; room: MeetingRoom }
 /** Each space runs the existing meeting workflow independently; selecting one is a browser concern. */
@@ -39,7 +41,7 @@ export class MeetingSpaces {
       kill: wid => this.workers.kill(wid),
     };
     const source = this.workers;
-    room = new MeetingRoom(this.dir, data, workers, this.trees, { ...this.events, update: () => this.events.update(this.state()) });
+    room = new MeetingRoom(this.dir, data, workers, this.trees, { memoryContext: m => meetingMemoryContext(this.dir, m), memoryGate: m => meetingMemoryGate(this.dir, m), ...this.events, update: () => this.events.update(this.state()) });
     this.spaces.set(id, { id, name, createdAt, room });
   }
   state(): MeetingState {
@@ -72,11 +74,11 @@ export class MeetingSpaces {
       renameSync(this.file + '.tmp', this.file);
     } catch { return 'Could not save the meeting space; check the floor storage'; }
   }
-  start(req: MeetingRequest, by: string, owner?: string): string | undefined {
+  start(req: MeetingRequest, by: string, owner?: string, execution?: MeetingExecution): string | undefined {
     const space = this.spaces.get(req.spaceId ?? DEFAULT_MEETING_SPACE);
     if (!space) return 'No such meeting space';
     if (!this.trees && [...this.spaces.values()].some(s => s.id !== space.id && s.room.state().current?.status === 'running')) return 'Parallel meetings need a Git project so each meeting has its own worktree';
-    return space.room.start(req, by, owner);
+    return space.room.start(req, by, owner, execution);
   }
   stop(by: string, spaceId = DEFAULT_MEETING_SPACE) { return this.spaces.get(spaceId)?.room.stop(by) ?? (this.spaces.has(spaceId) ? undefined : 'No such meeting space'); }
   clear(by: string, spaceId = DEFAULT_MEETING_SPACE) { return this.spaces.get(spaceId)?.room.clear(by) ?? (this.spaces.has(spaceId) ? undefined : 'No such meeting space'); }

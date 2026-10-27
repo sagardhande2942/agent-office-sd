@@ -66,7 +66,7 @@ export class KnowledgeCurator {
   }
   pause(value: unknown) { if (typeof value !== 'boolean') throw Error('Invalid pause setting'); this.configure({ ...this.disk.settings, paused: value }); }
   feature(): WorkerFeature { return { update: worker => {
-    if (!worker.completion || worker.helper || worker.meeting || worker.planReview?.locked) return;
+    if (!worker.completion || worker.helper || worker.meeting || worker.routedTask || worker.planReview?.locked) return;
     const signature = JSON.stringify(worker.completion); if (this.completions.get(worker.id) === signature) return;
     this.completions.set(worker.id, signature); if (this.disk.settings.afterCompletion) { this.disk.eventAt = Date.now() + 30000; this.save(); }
   }, remove: worker => { this.completions.delete(worker.id); } }; }

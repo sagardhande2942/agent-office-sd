@@ -2,7 +2,8 @@ import type http from 'node:http';
 import type { Floor } from '../floor.js';
 import type { CommunicationsState } from '../../shared/communications.js';
 import type { MeetingRequest, ServerMsg } from '../../shared/protocol.js';
-import { isMeetingPattern, MEETING_PATTERNS } from '../../shared/meetings.js';
+import { isMeetingPattern, meetingDefinition } from '../../shared/meetings.js';
+import { DEFAULT_WORKFLOW, workflowProblem } from '../../shared/meeting-workflows.js';
 import { send } from '../http/util.js';
 import { str } from '../office/input.js';
 import { handoffInbox } from '../handoff/service.js';
@@ -24,8 +25,10 @@ export function meetingHostCalls(floors: Map<string, Floor>, seatLimit: number):
       const req = msg.req as MeetingRequest | undefined;
       if (!req || typeof req !== 'object' || !isMeetingPattern(req.pattern)) return 'Unknown meeting pattern';
       if (req.roles !== undefined && !Array.isArray(req.roles)) return 'Meeting roles must be a list';
-      const count = req.roles?.length || MEETING_PATTERNS[req.pattern].seats.default;
-      const pattern = MEETING_PATTERNS[req.pattern];
+      const workflow=req.pattern==='custom'?req.workflow??DEFAULT_WORKFLOW:undefined;
+      if(workflow) { const bad=workflowProblem(workflow);if(bad)return bad; }
+      const pattern=meetingDefinition({pattern:req.pattern,workflow});
+      const count = req.roles?.length || pattern.seats.default;
       if (count < pattern.seats.min || count > pattern.seats.max) return 'Invalid meeting worker count';
       const provider = req.provider ?? floor.workers.officeDefault.provider;
       if (!floor.project.agentProviders.includes(provider)) return 'Select a provider installed on the floor host';

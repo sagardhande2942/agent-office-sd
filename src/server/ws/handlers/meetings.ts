@@ -1,3 +1,4 @@
+import { workflowProblem } from '../../../shared/meeting-workflows.js';
 import { startMeeting } from '../../meeting-spaces/office.js';
 // The meeting room: calling a meeting, stopping it, and clearing the table.
 import { isAgentEffort, isAgentProvider, type MeetingClientMsg, type MeetingRequest } from '../../../shared/protocol.js';
@@ -17,10 +18,12 @@ export const meetingHandlers = {
       ctx.warn(c, 'Unknown agent provider');
       return;
     }
+    if (msg.workflow !== undefined) { const bad=workflowProblem(msg.workflow);if(bad) { ctx.warn(c,bad);return; } }
     const count = (v: unknown) => (Number.isInteger(v) && (v as number) > 0 ? (v as number) : undefined);
     const request: MeetingRequest = {
       spaceId: msg.spaceId === undefined ? undefined : str(msg.spaceId, 80),
       pattern: msg.pattern,
+      workflow: msg.workflow,
       prompt: str(msg.prompt, 20000),
       title: str(msg.title, 200) || undefined,
       output: str(msg.output, 300) || undefined,
